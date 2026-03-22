@@ -106,15 +106,15 @@ async function main() {
   const browser = await puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    protocolTimeout: 120000
+    protocolTimeout: 300000
   });
 
   try {
-    // 各ページは独立しているため並列生成
-    await Promise.all(HTML_CONFIGS.map(config => {
+    // 絵文字レンダリングの負荷を避けるため順次生成
+    for (const config of HTML_CONFIGS) {
       const outputPath = path.join(OUTPUT_DIR, config.output);
-      return generateScreenshot(browser, config.input, outputPath, config.width, config.height);
-    }));
+      await generateScreenshot(browser, config.input, outputPath, config.width, config.height);
+    }
   } finally {
     await browser.close();
   }

@@ -8,21 +8,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /** 各トグルの checkbox を feature キーでマッピング */
   const checkboxMap = {};
-  $toggleItems.forEach((item) => {
+  for (const item of $toggleItems) {
     const feature = item.dataset.feature;
     const checkbox = item.querySelector('input[type="checkbox"]');
     if (feature && checkbox) {
       checkboxMap[feature] = checkbox;
     }
-  });
+  }
 
   /** 現在のトグル状態を取得 */
   function getCurrentSettings() {
-    const settings = getDefaultSettings();
-    for (const [feature, checkbox] of Object.entries(checkboxMap)) {
-      settings[feature] = checkbox.checked;
-    }
-    return settings;
+    return Object.fromEntries(
+      Object.entries(checkboxMap).map(([feature, cb]) => [feature, cb.checked])
+    );
   }
 
   /** トグル状態を設定 */
@@ -33,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---------- 設定復元 ----------
-  chrome.storage.local.get(StorageKeys.SETTINGS, (result) => {
+  chrome.storage.local.get(StorageKeys.SETTINGS).then((result) => {
     const saved = result[StorageKeys.SETTINGS];
     if (saved) {
       for (const [feature, checkbox] of Object.entries(checkboxMap)) {

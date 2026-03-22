@@ -31,36 +31,28 @@
   }
 
   /**
-   * インライン属性ハンドラ（oncontextmenu, oncopy, onpaste, onselectstart）を除去する
+   * インライン属性ハンドラ（oncontextmenu, oncopy, onpaste, onselectstart）を除去する。
+   * 属性セレクタで対象要素のみ取得し、全DOM走査を回避する。
    */
   function removeInlineHandlers(attrNames) {
-    const all = document.querySelectorAll("*");
-    for (const el of all) {
+    // 属性セレクタで対象要素のみ取得（querySelectorAll("*") の全走査を回避）
+    const selector = attrNames.map((attr) => `[${attr}]`).join(",");
+    const targets = document.querySelectorAll(selector);
+    for (const el of targets) {
       for (const attr of attrNames) {
-        if (el.hasAttribute(attr)) {
-          el.removeAttribute(attr);
-        }
-        // DOM プロパティも null に
-        if (typeof el[attr] === "function") {
-          el[attr] = null;
-        }
+        el.removeAttribute(attr);
+        el[attr] = null;
       }
     }
     // document 自体のインラインハンドラも除去
     for (const attr of attrNames) {
-      if (typeof document[attr] === "function" || document[attr] !== null) {
-        document[attr] = null;
-      }
+      document[attr] = null;
     }
   }
 
   /** CSS クラスで制限解除スタイルを切り替える */
   function toggleCssClass(className, enable) {
-    if (enable) {
-      document.documentElement.classList.add(className);
-    } else {
-      document.documentElement.classList.remove(className);
-    }
+    document.documentElement.classList.toggle(className, enable);
   }
 
   /**
@@ -80,6 +72,13 @@
     if (PROTECTED_F_KEYS.has(e.key)) {
       e.stopImmediatePropagation();
       return;
+    }
+  }
+
+  /** keyup 用ハンドラ（applySettings のたびにクロージャ生成を回避） */
+  function keyboardKeyupHandler(e) {
+    if ((e.ctrlKey || e.metaKey) || PROTECTED_F_KEYS.has(e.key)) {
+      e.stopImmediatePropagation();
     }
   }
 
@@ -224,13 +223,8 @@
         document.addEventListener("keydown", keyboardUnblockHandler, true);
       }
       if (!handlers["__keyboard_keyup"]) {
-        const keyupHandler = (e) => {
-          if ((e.ctrlKey || e.metaKey) || PROTECTED_F_KEYS.has(e.key)) {
-            e.stopImmediatePropagation();
-          }
-        };
-        handlers["__keyboard_keyup"] = keyupHandler;
-        document.addEventListener("keyup", keyupHandler, true);
+        handlers["__keyboard_keyup"] = keyboardKeyupHandler;
+        document.addEventListener("keyup", keyboardKeyupHandler, true);
       }
       removeInlineHandlers(["onkeydown", "onkeypress", "onkeyup"]);
     } else {
@@ -266,7 +260,7 @@
   });
 
   // 初回ロード時: storage から設定を読み込んで自動適用
-  chrome.storage.local.get(StorageKeys.SETTINGS, (result) => {
+  chrome.storage.local.get(StorageKeys.SETTINGS).then((result) => {
     const saved = result[StorageKeys.SETTINGS];
     if (saved) {
       applySettings(saved);

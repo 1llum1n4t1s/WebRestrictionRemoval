@@ -1,4 +1,4 @@
-# スクリーンカーテン 拡張機能パッケージ生成スクリプト
+# WEB制限解除サポート 拡張機能パッケージ生成スクリプト
 # 使い方: powershell -ExecutionPolicy Bypass -File zip.ps1
 
 Write-Host "拡張機能パッケージを生成中..." -ForegroundColor Cyan
@@ -14,7 +14,7 @@ npm install --silent 2>$null
 node scripts/generate-icons.js
 
 # 古いZIPファイルを削除
-$zipName = "screen-curtain.zip"
+$zipName = "web-restriction-remover.zip"
 if (Test-Path $zipName) {
     Remove-Item $zipName -Force
     Write-Host "既存のZIPファイルを削除しました" -ForegroundColor Yellow

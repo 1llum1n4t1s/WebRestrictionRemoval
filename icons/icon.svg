@@ -1,36 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5B8DEF"/>
-      <stop offset="100%" stop-color="#3A6DD9"/>
-    </linearGradient>
-    <linearGradient id="doc" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#F0F4FF"/>
+      <stop offset="0%" stop-color="#C0605A"/>
+      <stop offset="100%" stop-color="#A8524D"/>
     </linearGradient>
   </defs>
 
   <!-- 背景の丸角四角 -->
   <rect x="32" y="32" width="448" height="448" rx="80" ry="80" fill="url(#bg)"/>
 
-  <!-- ドキュメント（コピー元） -->
-  <rect x="120" y="100" width="200" height="250" rx="16" ry="16" fill="url(#doc)" opacity="0.5"/>
-  <!-- テキスト行（コピー元） -->
-  <rect x="148" y="140" width="144" height="12" rx="6" fill="#5B8DEF" opacity="0.3"/>
-  <rect x="148" y="168" width="120" height="12" rx="6" fill="#5B8DEF" opacity="0.3"/>
-  <rect x="148" y="196" width="136" height="12" rx="6" fill="#5B8DEF" opacity="0.3"/>
+  <!-- スパナ（🔧） -->
+  <g transform="translate(256,256) rotate(-45) scale(1.45)">
+    <!-- シャフト -->
+    <rect x="-24" y="-140" width="48" height="200" rx="12" fill="#FFFFFF"/>
+    <!-- ヘッド（開口部付き） -->
+    <path d="M0,-140
+             C-52,-140 -72,-120 -72,-80
+             C-72,-45 -52,-25 -28,-20
+             L-28,0 L28,0 L28,-20
+             C52,-25 72,-45 72,-80
+             C72,-120 52,-140 0,-140 Z"
+          fill="#FFFFFF"/>
+    <!-- ヘッドの開口部（背景色で抜く） -->
+    <rect x="-12" y="-160" width="24" height="60" rx="8" fill="#A8524D"/>
+    <!-- グリップ部分 -->
+    <rect x="-30" y="30" width="60" height="120" rx="14" fill="#F0F0F0"/>
+    <rect x="-22" y="50" width="44" height="12" rx="4" fill="#C0605A" opacity="0.3"/>
+    <rect x="-22" y="72" width="44" height="12" rx="4" fill="#C0605A" opacity="0.3"/>
+    <rect x="-22" y="94" width="44" height="12" rx="4" fill="#C0605A" opacity="0.3"/>
+  </g>
 
-  <!-- ドキュメント（ペースト先） -->
-  <rect x="192" y="162" width="200" height="250" rx="16" ry="16" fill="url(#doc)"/>
-  <!-- テキスト行（ペースト先） -->
-  <rect x="220" y="202" width="144" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
-  <rect x="220" y="230" width="120" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
-  <rect x="220" y="258" width="136" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
-  <rect x="220" y="286" width="100" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
-
-  <!-- 解除マーク（チェックシールド） -->
-  <circle cx="370" cy="140" r="52" fill="#27AE60"/>
-  <circle cx="370" cy="140" r="44" fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.3"/>
-  <!-- チェックマーク -->
-  <polyline points="345,140 362,157 395,124" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

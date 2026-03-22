@@ -7,7 +7,7 @@
 body {
   font: 13px/1.6 -apple-system, "Segoe UI", sans-serif;
   color: #222;
-  width: 280px;
+  width: 400px;
 }
 
 .popup-container {
@@ -36,6 +36,8 @@ body {
   flex-direction: column;
   gap: 4px;
   margin-bottom: 12px;
+  max-height: 550px;
+  overflow-y: auto;
 }
 
 .toggle-item {
@@ -77,12 +79,6 @@ body {
   margin: 4px 10px;
 }
 
-/* ---------- Scrollable Toggle List ---------- */
-.toggle-list {
-  max-height: 340px;
-  overflow-y: auto;
-}
-
 /* ---------- Toggle Switch ---------- */
 .toggle-switch {
   position: relative;
@@ -121,7 +117,7 @@ body {
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background: #5b8def;
+  background: #C0605A;
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
@@ -142,7 +138,7 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: #fff;
-  background: #5b8def;
+  background: #C0605A;
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -150,7 +146,7 @@ body {
 }
 
 .btn-primary:hover {
-  background: #4a7de0;
+  background: #A8524D;
 }
 
 .btn-primary:active {
