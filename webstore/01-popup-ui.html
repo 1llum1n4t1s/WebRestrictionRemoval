@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 1 - Popup UI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1280px; height: 800px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    .container {
+      display: flex; align-items: center; gap: 80px;
+    }
+    .text-area {
+      color: #fff; max-width: 420px;
+    }
+    .text-area h1 {
+      font-size: 48px; font-weight: 800; margin-bottom: 16px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    .text-area p {
+      font-size: 20px; opacity: 0.9; line-height: 1.6;
+    }
+    /* ポップアップのモック */
+    .popup-mock {
+      background: #fff; border-radius: 12px; padding: 20px 22px;
+      width: 300px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .popup-mock .title {
+      font-size: 17px; font-weight: 700; text-align: center; color: #333; margin-bottom: 2px;
+    }
+    .popup-mock .desc {
+      font-size: 12px; text-align: center; color: #999; margin-bottom: 14px;
+    }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; border-radius: 8px; margin-bottom: 4px;
+    }
+    .toggle-row:hover { background: #f5f7fa; }
+    .toggle-left { display: flex; align-items: center; gap: 8px; }
+    .toggle-left .icon { font-size: 15px; }
+    .toggle-left .label { font-size: 13px; font-weight: 500; color: #444; }
+    .switch {
+      width: 38px; height: 22px; border-radius: 11px;
+      position: relative; cursor: pointer;
+    }
+    .switch.off { background: #ccc; }
+    .switch.on { background: #5b8def; }
+    .switch::after {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; top: 2px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: left 0.2s;
+    }
+    .switch.off::after { left: 2px; }
+    .switch.on::after { left: 18px; }
+    .btn-row {
+      display: flex; gap: 6px; margin-top: 12px;
+    }
+    .btn-apply {
+      flex: 1; padding: 8px; font-size: 14px; font-weight: 600;
+      color: #fff; background: #5b8def; border: none; border-radius: 6px;
+      text-align: center;
+    }
+    .btn-sub {
+      padding: 8px 10px; font-size: 12px; color: #888;
+      background: #f8f8f8; border: 1px solid #ddd; border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="text-area">
+      <h1>WEB制限解除サポート</h1>
+      <p>Webページのコピー・ペースト・右クリック制限をワンクリックで解除。快適なブラウジングを取り戻しましょう。</p>
+    </div>
+    <div class="popup-mock">
+      <div class="title">WEB制限解除サポート</div>
+      <div class="desc">ページの制限を解除します</div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">🖱️</span><span class="label">右クリック制限解除</span></div><div class="switch on"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">📋</span><span class="label">ペースト制限解除</span></div><div class="switch on"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">📝</span><span class="label">コピー制限解除</span></div><div class="switch on"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">✏️</span><span class="label">テキスト選択制限解除</span></div><div class="switch off"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">🔄</span><span class="label">カーソル制御解除</span></div><div class="switch off"></div></div>
+      <div style="height:1px;background:#eee;margin:4px 0"></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">🖨️</span><span class="label">印刷制限解除</span></div><div class="switch off"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">⌨️</span><span class="label">キーボード制限解除</span></div><div class="switch on"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">🖼️</span><span class="label">画像保存制限解除</span></div><div class="switch off"></div></div>
+      <div class="toggle-row"><div class="toggle-left"><span class="icon">🚫</span><span class="label">オーバーレイ除去</span></div><div class="switch off"></div></div>
+      <div class="btn-row">
+        <div class="btn-apply">適用</div>
+        <div class="btn-sub">全ON</div>
+        <div class="btn-sub">全OFF</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B8DEF"/>
+      <stop offset="100%" stop-color="#3A6DD9"/>
+    </linearGradient>
+    <linearGradient id="doc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F0F4FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景の丸角四角 -->
+  <rect x="32" y="32" width="448" height="448" rx="80" ry="80" fill="url(#bg)"/>
+
+  <!-- ドキュメント（コピー元） -->
+  <rect x="120" y="100" width="200" height="250" rx="16" ry="16" fill="url(#doc)" opacity="0.5"/>
+  <!-- テキスト行（コピー元） -->
+  <rect x="148" y="140" width="144" height="12" rx="6" fill="#5B8DEF" opacity="0.3"/>
+  <rect x="148" y="168" width="120" height="12" rx="6" fill="#5B8DEF" opacity="0.3"/>
+  <rect x="148" y="196" width="136" height="12" rx="6" fill="#5B8DEF" opacity="0.3"/>
+
+  <!-- ドキュメント（ペースト先） -->
+  <rect x="192" y="162" width="200" height="250" rx="16" ry="16" fill="url(#doc)"/>
+  <!-- テキスト行（ペースト先） -->
+  <rect x="220" y="202" width="144" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
+  <rect x="220" y="230" width="120" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
+  <rect x="220" y="258" width="136" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
+  <rect x="220" y="286" width="100" height="12" rx="6" fill="#5B8DEF" opacity="0.6"/>
+
+  <!-- 解除マーク（チェックシールド） -->
+  <circle cx="370" cy="140" r="52" fill="#27AE60"/>
+  <circle cx="370" cy="140" r="44" fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.3"/>
+  <!-- チェックマーク -->
+  <polyline points="345,140 362,157 395,124" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

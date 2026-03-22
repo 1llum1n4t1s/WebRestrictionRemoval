@@ -1,0 +1,79 @@
+/* ===== テキスト選択制限解除 ===== */
+.__cpa-enable-select,
+.__cpa-enable-select *,
+.__cpa-enable-select *::before,
+.__cpa-enable-select *::after {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+  -webkit-user-drag: auto !important;
+}
+
+/* ===== カーソル制御解除 ===== */
+.__cpa-reset-cursor,
+.__cpa-reset-cursor * {
+  cursor: auto !important;
+}
+
+/* リンクやボタンなどインタラクティブ要素はポインターに */
+.__cpa-reset-cursor a,
+.__cpa-reset-cursor a *,
+.__cpa-reset-cursor button,
+.__cpa-reset-cursor button *,
+.__cpa-reset-cursor [role="button"],
+.__cpa-reset-cursor [role="button"] *,
+.__cpa-reset-cursor input[type="submit"],
+.__cpa-reset-cursor input[type="button"],
+.__cpa-reset-cursor select,
+.__cpa-reset-cursor label {
+  cursor: pointer !important;
+}
+
+/* テキスト入力欄はテキストカーソルに */
+.__cpa-reset-cursor input[type="text"],
+.__cpa-reset-cursor input[type="email"],
+.__cpa-reset-cursor input[type="password"],
+.__cpa-reset-cursor input[type="search"],
+.__cpa-reset-cursor input[type="url"],
+.__cpa-reset-cursor input[type="tel"],
+.__cpa-reset-cursor input[type="number"],
+.__cpa-reset-cursor textarea,
+.__cpa-reset-cursor [contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* ===== 印刷制限解除 ===== */
+@media print {
+  .__cpa-enable-print * {
+    display: revert !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* ===== ドラッグ&ドロップ制限解除 ===== */
+.__cpa-enable-drag,
+.__cpa-enable-drag *,
+.__cpa-enable-drag img {
+  -webkit-user-drag: auto !important;
+  user-drag: auto !important;
+}
+
+.__cpa-enable-drag img {
+  pointer-events: auto !important;
+  draggable: true !important;
+}
+
+/* ===== 画像保存制限解除 ===== */
+.__cpa-image-save img {
+  pointer-events: auto !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  -webkit-touch-callout: default !important;
+}

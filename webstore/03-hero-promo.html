@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 3 - Hero Promo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1280px; height: 800px;
+      background: #1a1a2e;
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden;
+      color: #fff;
+    }
+    .container {
+      display: flex; align-items: center; gap: 60px;
+    }
+    .left { max-width: 500px; }
+    .badge {
+      display: inline-block; background: rgba(91,141,239,0.2);
+      color: #5b8def; padding: 6px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 600; margin-bottom: 20px;
+    }
+    h1 { font-size: 44px; font-weight: 800; margin-bottom: 16px; line-height: 1.2; }
+    .highlight { color: #5b8def; }
+    p { font-size: 18px; color: #aaa; line-height: 1.7; margin-bottom: 24px; }
+    .stats { display: flex; gap: 32px; }
+    .stat-item .num { font-size: 32px; font-weight: 800; color: #5b8def; }
+    .stat-item .label { font-size: 13px; color: #888; }
+    /* デモ画面 */
+    .demo {
+      background: #fff; border-radius: 12px; width: 380px;
+      overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .demo-bar {
+      background: #f0f0f0; padding: 10px 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #ff5f57; }
+    .dot.y { background: #ffbd2e; }
+    .dot.g { background: #28c840; }
+    .demo-url {
+      flex: 1; background: #fff; border-radius: 4px;
+      padding: 4px 10px; font-size: 11px; color: #666; margin-left: 8px;
+    }
+    .demo-body { padding: 24px; color: #333; }
+    .demo-body h3 { font-size: 16px; margin-bottom: 8px; }
+    .demo-body .line {
+      height: 10px; background: #e0e0e0; border-radius: 5px; margin-bottom: 8px;
+    }
+    .demo-body .line.sel {
+      background: #5b8def; opacity: 0.3;
+    }
+    .demo-body .context-menu {
+      background: #fff; border: 1px solid #ddd; border-radius: 6px;
+      padding: 6px 0; width: 140px; margin-top: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .context-menu .item {
+      padding: 6px 16px; font-size: 12px; color: #333;
+    }
+    .context-menu .item.active {
+      background: #5b8def; color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left">
+      <div class="badge">Chrome 拡張機能</div>
+      <h1>制限された<br><span class="highlight">Webページ</span>を<br>自由に</h1>
+      <p>コピー・ペースト・右クリック・テキスト選択の制限をワンクリックで解除。快適なブラウジングを。</p>
+      <div class="stats">
+        <div class="stat-item"><div class="num">5</div><div class="label">制限解除機能</div></div>
+        <div class="stat-item"><div class="num">1</div><div class="label">クリックで適用</div></div>
+        <div class="stat-item"><div class="num">0</div><div class="label">データ収集</div></div>
+      </div>
+    </div>
+    <div class="demo">
+      <div class="demo-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="demo-url">example.com/article</div>
+      </div>
+      <div class="demo-body">
+        <h3>記事のタイトル</h3>
+        <div class="line" style="width:90%"></div>
+        <div class="line sel" style="width:80%"></div>
+        <div class="line sel" style="width:85%"></div>
+        <div class="line" style="width:60%"></div>
+        <div class="context-menu">
+          <div class="item active">コピー</div>
+          <div class="item">ペースト</div>
+          <div class="item">すべて選択</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

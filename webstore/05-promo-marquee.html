@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Promo Marquee - 1400x560</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 1400px; height: 560px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      overflow: hidden; color: #fff;
+    }
+    .container {
+      display: flex; align-items: center; gap: 80px;
+    }
+    .left { max-width: 520px; }
+    h1 { font-size: 52px; font-weight: 800; margin-bottom: 16px; line-height: 1.2; }
+    p { font-size: 20px; opacity: 0.9; line-height: 1.6; }
+    .features {
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .feat {
+      background: rgba(255,255,255,0.15); border-radius: 12px;
+      padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+      backdrop-filter: blur(10px);
+    }
+    .feat .icon { font-size: 28px; }
+    .feat .text { font-size: 16px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="left">
+      <h1>WEB制限解除サポート</h1>
+      <p>Webページの様々な制限をワンクリックで解除する Chrome 拡張機能。10の制限解除機能を搭載。</p>
+    </div>
+    <div class="features">
+      <div class="feat"><span class="icon">🖱️</span><span class="text">右クリック・コピー・ペースト制限解除</span></div>
+      <div class="feat"><span class="icon">⌨️</span><span class="text">キーボードショートカット制限解除</span></div>
+      <div class="feat"><span class="icon">🖼️</span><span class="text">画像保存制限解除</span></div>
+      <div class="feat"><span class="icon">🖨️</span><span class="text">印刷・ドラッグ制限解除</span></div>
+      <div class="feat"><span class="icon">🚫</span><span class="text">モーダル・オーバーレイ除去</span></div>
+    </div>
+  </div>
+</body>
+</html>

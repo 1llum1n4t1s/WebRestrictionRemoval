@@ -1,0 +1,5 @@
+node_modules/
+webstore/images/
+images/
+temp-build/
+*.zip
