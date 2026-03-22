@@ -12,6 +12,7 @@ WEB制限解除サポート (Web Restriction Remover) は Chrome 拡張機能 (M
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → images/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
+powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP パッケージ生成
 ```
 
 テストフレームワーク・リンターは未導入。動作確認は Chrome に拡張機能を読み込んで手動テスト。
@@ -28,7 +29,7 @@ Popup (popup.html/js/css)
 ```
 
 ### Popup (`popup.html`, `popup.js`, `popup.css`)
-5つの機能トグル（右クリック、ペースト、コピー、テキスト選択、カーソル制御）を表示。適用ボタンで `APPLY_SETTINGS` に設定を載せて background へ送信後、ポップアップを閉じる。全ON/全OFFボタンあり。設定は `chrome.storage.local` から復元。
+10の機能トグルを表示（幅400px、高さ自動 max-height: 550px）。適用ボタンで `APPLY_SETTINGS` に設定を載せて background へ送信後、ポップアップを閉じる。全ON/全OFFボタンあり。設定は `chrome.storage.local` から復元。アクセントカラーは赤系（`#C0605A`）。
 
 ### Background (`scripts/background.js`)
 Service worker。アクティブタブへ content script + CSS を動的注入（`window.__copyPasteAssistRunning` フラグで二重注入防止）。`chrome://`, `edge://`, `about:` ページではスキップ。
@@ -64,8 +65,9 @@ IIFE でラップ。10の制限解除機能を実装:
 | `scripts/content.js` | 制限解除ロジック: イベントブロック、インラインハンドラ除去、CSS 切替 |
 | `popup.js` | ポップアップ UI: トグル管理、設定保存・復元、適用 |
 | `css/content.css` | 制限解除スタイル (`!important` で上書き) |
-| `icons/icon.svg` | ソースアイコン (512×512); PNG は `images/` に生成 |
-| `webstore/` | ストア申請用: HTML テンプレート、生成画像 |
+| `icons/icon.svg` | ソースアイコン (512×512 スパナデザイン 赤系); PNG は `images/` に生成 |
+| `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt` |
+| `zip.ps1` | ストア申請用 ZIP パッケージ生成 (PowerShell) |
 | `privacy-policy.md` | プライバシーポリシー |
 
 ## Store Asset Generation
