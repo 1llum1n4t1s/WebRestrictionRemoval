@@ -4,6 +4,8 @@ const Actions = Object.freeze({
   APPLY_SETTINGS: "applySettings",
   /** background → content script: 設定を反映 */
   APPLY_SETTINGS_CS: "applySettingsCS",
+  /** content script → background: メインワールドでインラインハンドラを除去 */
+  REMOVE_HANDLERS_MW: "removeHandlersMW",
 });
 
 /** @readonly 機能キー定義 */
@@ -35,18 +37,9 @@ const StorageKeys = Object.freeze({
   SETTINGS: "copyPasteSettings",
 });
 
-/** デフォルト設定（全て無効） */
+/** デフォルト設定（全て無効）— Features との同期を自動で保つ */
 function getDefaultSettings() {
-  return {
-    [Features.RIGHT_CLICK]: false,
-    [Features.PASTE]: false,
-    [Features.COPY]: false,
-    [Features.TEXT_SELECT]: false,
-    [Features.CURSOR_RESET]: false,
-    [Features.PRINT]: false,
-    [Features.DRAG_DROP]: false,
-    [Features.KEYBOARD]: false,
-    [Features.IMAGE_SAVE]: false,
-    [Features.OVERLAY_REMOVE]: false,
-  };
+  return Object.fromEntries(
+    Object.values(Features).map((key) => [key, false])
+  );
 }

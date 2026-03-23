@@ -6,15 +6,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const $allOffBtn = document.getElementById("allOffBtn");
   const $toggleItems = document.querySelectorAll(".toggle-item");
 
-  /** 各トグルの checkbox を feature キーでマッピング */
-  const checkboxMap = {};
-  for (const item of $toggleItems) {
-    const feature = item.dataset.feature;
-    const checkbox = item.querySelector('input[type="checkbox"]');
-    if (feature && checkbox) {
-      checkboxMap[feature] = checkbox;
-    }
-  }
+  /** 各トグルの checkbox を feature キーでマッピング（構築後は変更しない） */
+  const checkboxMap = Object.fromEntries(
+    Array.from($toggleItems, (item) => {
+      const feature = item.dataset.feature;
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      return feature && checkbox ? [feature, checkbox] : null;
+    }).filter(Boolean)
+  );
 
   /** 現在のトグル状態を取得 */
   function getCurrentSettings() {
@@ -44,23 +43,26 @@ document.addEventListener("DOMContentLoaded", () => {
   $applyBtn.addEventListener("click", () => {
     const settings = getCurrentSettings();
 
-    // storage に保存
-    chrome.storage.local.set({ [StorageKeys.SETTINGS]: settings });
+    // storage に保存（Promise チェーンでエラーハンドリング）
+    chrome.storage.local.set({ [StorageKeys.SETTINGS]: settings }).catch(() => {});
 
-    // background 経由で content script に適用
-    chrome.runtime.sendMessage(
-      { action: Actions.APPLY_SETTINGS, data: settings },
-      (response) => {
-        if (chrome.runtime.lastError || !response?.ok) {
+    // background 経由で content script に適用（MV3 推奨の Promise 形式）
+    chrome.runtime.sendMessage({ action: Actions.APPLY_SETTINGS, data: settings })
+      .then((response) => {
+        if (!response?.ok) {
           $applyBtn.textContent = "このページでは使用できません";
-          $applyBtn.style.background = "#e74c3c";
+          $applyBtn.classList.add("error");
         } else {
           $applyBtn.textContent = "適用しました！";
           $applyBtn.classList.add("applied");
         }
         setTimeout(() => window.close(), 800);
-      }
-    );
+      })
+      .catch(() => {
+        $applyBtn.textContent = "このページでは使用できません";
+        $applyBtn.classList.add("error");
+        setTimeout(() => window.close(), 800);
+      });
   });
 
   // ---------- 全ON / 全OFF ----------

@@ -5,7 +5,7 @@
 .__cpa-enable-select *::after {
   -webkit-user-select: text !important;
   user-select: text !important;
-  -webkit-user-drag: auto !important;
+  /* -webkit-user-drag はドラッグ&ドロップ（__cpa-enable-drag）の責務 */
 }
 
 /* ===== カーソル制御解除 ===== */
@@ -57,11 +57,11 @@
 
 /* ===== ドラッグ&ドロップ制限解除 ===== */
 .__cpa-enable-drag,
-.__cpa-enable-drag *,
-.__cpa-enable-drag img {
+.__cpa-enable-drag * {
   -webkit-user-drag: auto !important;
 }
 
+/* 画像のオーバーレイ突破のため明示的に pointer-events を設定 */
 .__cpa-enable-drag img {
   pointer-events: auto !important;
 }

@@ -176,3 +176,7 @@ body {
 .btn-primary.applied {
   background: #27ae60;
 }
+
+.btn-primary.error {
+  background: #c0605a;
+}
