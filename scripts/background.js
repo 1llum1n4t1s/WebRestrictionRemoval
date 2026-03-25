@@ -1,5 +1,26 @@
 importScripts("/scripts/actions.js");
 
+// ---------- 設定マイグレーション ----------
+// v1.0.6 以前の削除済み機能キーを storage からクリーンアップ
+const REMOVED_FEATURE_KEYS = ["cursorReset", "print", "dragDrop", "keyboard", "imageSave", "overlayRemove"];
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get(StorageKeys.SETTINGS).then((result) => {
+    const saved = result[StorageKeys.SETTINGS];
+    if (!saved) return;
+    let changed = false;
+    for (const key of REMOVED_FEATURE_KEYS) {
+      if (key in saved) {
+        delete saved[key];
+        changed = true;
+      }
+    }
+    if (changed) {
+      chrome.storage.local.set({ [StorageKeys.SETTINGS]: saved });
+    }
+  });
+});
+
 // ---------- Message Handler ----------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === Actions.APPLY_SETTINGS) {
@@ -65,37 +86,26 @@ async function removeInlineHandlersInMainWorld(tabId, settings) {
   if (settings[Features.PASTE]) { attrSet.add("onpaste"); attrSet.add("onbeforepaste"); }
   if (settings[Features.COPY]) { attrSet.add("oncopy"); attrSet.add("onbeforecopy"); }
   if (settings[Features.TEXT_SELECT]) { attrSet.add("onselectstart"); attrSet.add("ondragstart"); }
-  if (settings[Features.PRINT]) { attrSet.add("onbeforeprint"); attrSet.add("onafterprint"); }
-  if (settings[Features.DRAG_DROP]) { attrSet.add("ondragstart"); attrSet.add("ondrag"); attrSet.add("ondrop"); }
-  if (settings[Features.KEYBOARD]) { attrSet.add("onkeydown"); attrSet.add("onkeypress"); attrSet.add("onkeyup"); }
 
   const attrNames = [...attrSet];
-  if (attrNames.length === 0 && !settings[Features.PRINT]) return;
+  if (attrNames.length === 0) return;
 
-  // ハンドラ除去 + 印刷復元を1回の executeScript にまとめる
-  const shouldRestorePrint = !!settings[Features.PRINT];
   await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: (attrs, restorePrint) => {
+    func: (attrs) => {
       // インラインハンドラの除去
-      if (attrs.length > 0) {
-        [document, document.documentElement, document.body, window].forEach((root) => {
-          if (!root) return;
-          attrs.forEach((attr) => { root[attr] = null; });
+      [document, document.documentElement, document.body, window].forEach((root) => {
+        if (!root) return;
+        attrs.forEach((attr) => { root[attr] = null; });
+      });
+      attrs.forEach((attr) => {
+        document.querySelectorAll("[" + attr + "]").forEach((el) => {
+          el.removeAttribute(attr);
+          el[attr] = null;
         });
-        attrs.forEach((attr) => {
-          document.querySelectorAll("[" + attr + "]").forEach((el) => {
-            el.removeAttribute(attr);
-            el[attr] = null;
-          });
-        });
-      }
-      // 印刷制限解除時は window.print も復元
-      if (restorePrint && window.print !== Window.prototype.print) {
-        window.print = Window.prototype.print;
-      }
+      });
     },
-    args: [attrNames, shouldRestorePrint],
+    args: [attrNames],
   }).catch(() => {});
 }

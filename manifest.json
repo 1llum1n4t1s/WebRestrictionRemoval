@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "WEB制限解除サポート",
-  "description": "Webページの制限を解除。コピー・ペースト・右クリック・キーボード・印刷・画像保存・オーバーレイ除去など10機能搭載。",
-  "version": "1.0.6",
+  "description": "Webページの制限を解除。コピー・ペースト・右クリック・テキスト選択の4機能搭載。",
+  "version": "1.0.10",
   "action": {
     "default_icon": {
       "16": "images/icon-16.png",

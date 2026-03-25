@@ -18,18 +18,6 @@ const Features = Object.freeze({
   COPY: "copy",
   /** テキスト選択制限解除 */
   TEXT_SELECT: "textSelect",
-  /** カーソル制御解除 */
-  CURSOR_RESET: "cursorReset",
-  /** 印刷制限解除 */
-  PRINT: "print",
-  /** ドラッグ&ドロップ制限解除 */
-  DRAG_DROP: "dragDrop",
-  /** キーボードショートカット制限解除 */
-  KEYBOARD: "keyboard",
-  /** 画像保存制限解除（透明オーバーレイ除去） */
-  IMAGE_SAVE: "imageSave",
-  /** オーバーレイ除去（モーダル・ペイウォール） */
-  OVERLAY_REMOVE: "overlayRemove",
 });
 
 /** @readonly ストレージキー */

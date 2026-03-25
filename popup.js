@@ -43,10 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $applyBtn.addEventListener("click", () => {
     const settings = getCurrentSettings();
 
-    // storage に保存（Promise チェーンでエラーハンドリング）
-    chrome.storage.local.set({ [StorageKeys.SETTINGS]: settings }).catch(() => {});
-
-    // background 経由で content script に適用（MV3 推奨の Promise 形式）
+    // background 経由で storage 保存 + content script に適用
     chrome.runtime.sendMessage({ action: Actions.APPLY_SETTINGS, data: settings })
       .then((response) => {
         if (!response?.ok) {

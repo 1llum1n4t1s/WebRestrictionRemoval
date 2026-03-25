@@ -36,8 +36,6 @@ body {
   flex-direction: column;
   gap: 4px;
   margin-bottom: 12px;
-  max-height: 550px;
-  overflow-y: auto;
 }
 
 .toggle-item {
@@ -70,13 +68,6 @@ body {
   font-size: 12px;
   font-weight: 500;
   color: #444;
-}
-
-/* ---------- Toggle Divider ---------- */
-.toggle-divider {
-  height: 1px;
-  background: #e8e8e8;
-  margin: 4px 10px;
 }
 
 /* ---------- Toggle Switch ---------- */

@@ -59,11 +59,7 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
   const page = await browser.newPage();
 
   try {
-    await page.setViewport({
-      width: width,
-      height: height,
-      deviceScaleFactor: 1
-    });
+    await page.setViewport({ width, height, deviceScaleFactor: 1 });
 
     const absolutePath = path.resolve(htmlPath);
     await page.goto(`file://${absolutePath}`, {
@@ -71,8 +67,8 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
       timeout: 30000
     });
 
-    // レンダリング完了を待機
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // フォント・絵文字のレンダリング完了を待機
+    await page.evaluate(() => document.fonts.ready);
 
     await page.screenshot({
       path: outputPath,
@@ -104,7 +100,7 @@ async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     protocolTimeout: 300000
   });
