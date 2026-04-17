@@ -26,7 +26,8 @@
       "js": ["src/lib/actions.js", "src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_idle",
-      "all_frames": true
+      "all_frames": true,
+      "match_origin_as_fallback": true
     }
   ],
   "permissions": [
@@ -35,6 +36,7 @@
     "storage",
     "contextMenus",
     "clipboardRead",
-    "clipboardWrite"
+    "clipboardWrite",
+    "offscreen"
   ]
 }

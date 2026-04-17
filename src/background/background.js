@@ -31,6 +31,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
+  } else if (request.action === Actions.READ_CLIPBOARD) {
+    // content script が http:// 等の非 secure context で動作する場合、
+    // 直接 navigator.clipboard.readText を呼ぶと reject されるため
+    // offscreen document (chrome-extension:// = secure) 経由で読み取る
+    readClipboardViaOffscreen()
+      .then((text) => sendResponse({ ok: true, text }))
+      .catch(() => sendResponse({ ok: false, text: "" }));
+    return true;
   }
 });
 
@@ -121,6 +129,62 @@ async function updateContextMenus() {
  * ここで MAIN world を経由することでページ側の `window.oncontextmenu = ...` 等の
  * 動的ハンドラも確実に解除できる（CSP の影響も受けない）。
  */
+// ---------- Offscreen Document 管理 ----------
+// 並行 createDocument 防止: "Only one offscreen document may be created" エラーを避ける
+let offscreenCreatingPromise = null;
+
+/**
+ * Offscreen Document が未作成なら作成する。
+ * chrome.runtime.getContexts (Chrome 116+) で存在確認を試み、失敗時は
+ * createDocument を直接呼ぶ（二重作成エラーは catch で握り潰す）。
+ */
+async function ensureOffscreenDocument() {
+  if (!chrome.offscreen) return false;
+  const url = chrome.runtime.getURL(Offscreen.PATH);
+
+  try {
+    if (typeof chrome.runtime.getContexts === "function") {
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ["OFFSCREEN_DOCUMENT"],
+        documentUrls: [url],
+      });
+      if (contexts.length > 0) return true;
+    }
+  } catch {}
+
+  if (offscreenCreatingPromise) {
+    await offscreenCreatingPromise;
+    return true;
+  }
+  offscreenCreatingPromise = chrome.offscreen
+    .createDocument({
+      url: Offscreen.PATH,
+      reasons: ["CLIPBOARD"],
+      justification: "強制ペースト機能のためにクリップボードを読み取り",
+    })
+    .catch(() => {}); // 既に存在するケース等は握り潰す
+  await offscreenCreatingPromise;
+  offscreenCreatingPromise = null;
+  return true;
+}
+
+/**
+ * Offscreen Document 経由でクリップボードのテキストを読み取る。
+ * 失敗時は空文字を返す。
+ */
+async function readClipboardViaOffscreen() {
+  await ensureOffscreenDocument();
+  try {
+    const response = await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_READ,
+    });
+    return response?.text ?? "";
+  } catch {
+    return "";
+  }
+}
+
 async function removeInlineHandlersInMainWorld(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId, allFrames: true },

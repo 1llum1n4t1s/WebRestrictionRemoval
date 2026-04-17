@@ -36,6 +36,14 @@ Popup (src/popup/popup.{html,js,css})
 [右クリックメニュー]
   chrome.contextMenus.onClicked ─▶ Background
                                    ──FORCE_PASTE / FORCE_COPY──▶ Content Script
+
+[強制ペースト時のクリップボード読み取り (HTTP ページ対応)]
+  Content Script ──READ_CLIPBOARD──▶ Background
+                                     │ ensureOffscreenDocument()
+                                     ──target: "offscreen"──▶ Offscreen Document
+                                                              │ navigator.clipboard.readText()
+                                                              │ (失敗時は execCommand("paste"))
+                                                              └──{ text }──▶ Background ──▶ Content Script
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
@@ -59,7 +67,7 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 - CSS クラス `__cpa-enable-select` を `<html>` に付与し `user-select: text !important` を有効化
 
 **強制ペースト** (`FORCE_PASTE` 受信時):
-1. `navigator.clipboard.readText()` でクリップボード取得
+1. `READ_CLIPBOARD` メッセージを background に送り、offscreen document 経由でクリップボードテキストを取得（content script 直接の `navigator.clipboard.readText()` は http:// 非 secure context で reject されるため）
 2. 対象要素を決定: `document.activeElement` が編集可能ならそれを使用、そうでなければ `lastContextEditable`（直前の `contextmenu` イベントで記録した編集可能要素）にフォールバック。Chrome が contextmenu 後に activeElement を body にリセットするケース対応
 3. フォールバック時は `el.focus()` してから `document.execCommand("insertText", ...)` を実行（input/textarea/contenteditable 全対応、React 等のフレームワーク対応）
 4. execCommand 失敗時: `input`/`textarea` は native setter + `input`/`change` dispatch、`contenteditable` は Range API で挿入
@@ -79,10 +87,11 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `scripting`, `storage`, `contextMenus`, `clipboardRead`, `clipboardWrite` |
 | `src/lib/actions.js` | `Object.freeze` された Actions / StorageKeys / ContextMenuIds / SilentUnlock 定数 |
-| `src/background/background.js` | Service worker: メッセージ転送、contextMenus 管理、MW ハンドラ除去、設定マイグレーション |
+| `src/background/background.js` | Service worker: メッセージ転送、contextMenus 管理、MW ハンドラ除去、offscreen document 管理、設定マイグレーション |
 | `src/content/content.js` | サイレント解除 + 強制ペースト/コピーのロジック |
 | `src/content/content.css` | 制限解除スタイル (`!important` で上書き) |
 | `src/popup/popup.{html,js,css}` | ポップアップ UI: 単一トグル、設定保存・復元、適用フィードバック |
+| `src/offscreen/offscreen.{html,js}` | クリップボード読み取り専用の offscreen document (HTTP ページ対応) |
 | `icons/icon.svg` | ソースアイコン (512×512 スパナデザイン 赤系); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt` |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
@@ -100,6 +109,7 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 - **強制コピーのフォールバック** — `navigator.clipboard.writeText` が失敗したら一時 textarea + `execCommand("copy")`。
 - **メインワールドでのハンドラ除去** — `chrome.scripting.executeScript world: "MAIN"` で CSP やブラウザ独自制限を回避。
 - **contextMenus の再構築** — `ENABLED` 変更時・onStartup 時に `removeAll()` → `create()` で冪等に再構築。
-- **iframe 対応** — `content_scripts.all_frames: true` で iframe にも content script を注入。右クリックメニュー経由の `FORCE_PASTE` / `FORCE_COPY` は `chrome.contextMenus.onClicked` の `info.frameId` を `chrome.tabs.sendMessage` の `frameId` オプションに渡してクリックされたフレームに直接届ける。MW インラインハンドラ除去も `chrome.scripting.executeScript` に `allFrames: true` を指定して全フレーム対象。
+- **iframe 対応** — `content_scripts.all_frames: true` + `match_origin_as_fallback: true` で通常の iframe に加え `about:blank` / `about:srcdoc` / `data:` / `blob:` 等の関連フレームにも content script を注入（親の origin が `matches` を満たせば）。右クリックメニュー経由の `FORCE_PASTE` / `FORCE_COPY` は `chrome.contextMenus.onClicked` の `info.frameId` を `chrome.tabs.sendMessage` の `frameId` オプションに渡してクリックされたフレームに直接届ける。MW インラインハンドラ除去も `chrome.scripting.executeScript` に `allFrames: true` を指定して全フレーム対象。
+- **Offscreen Document によるクリップボード読み取り** — http:// の content script では secure context 制限で `navigator.clipboard.readText()` が reject される。`chrome.offscreen.createDocument({ reasons: ["CLIPBOARD"] })` で `src/offscreen/offscreen.html` を起動し、chrome-extension:// (secure) 側で読み取って background 経由で content script に返す。`ensureOffscreenDocument` は並行作成ガード付き（"Only one offscreen document" エラー回避）。
 - **`src/lib/actions.js` は 3経路で読み込まれる** — `importScripts("/src/lib/actions.js")` (background) + `content_scripts` (manifest.json で `src/lib/actions.js` を自動注入) + `<script src="../lib/actions.js">` (popup.html から)。ES modules ではなく従来のスクリプト形式で共通定数を共有。
 - **設定マイグレーション** — `onInstalled` で旧 `copyPasteSettings` キー（v1.0.x 以前）を削除、`enabled` 未設定時はデフォルト true で初期化。

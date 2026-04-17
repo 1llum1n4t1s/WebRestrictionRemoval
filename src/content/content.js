@@ -105,9 +105,13 @@
    * execCommand を最初に試し、失敗時のみフォールバック。
    */
   async function forcePaste() {
-    let text;
+    // content script は http:// 等の非 secure context で動作しうるため
+    // 直接 navigator.clipboard.readText を呼ぶと reject される。
+    // background 経由で offscreen document (chrome-extension:// = secure) を通す。
+    let text = "";
     try {
-      text = await navigator.clipboard.readText();
+      const response = await chrome.runtime.sendMessage({ action: Actions.READ_CLIPBOARD });
+      text = response?.text ?? "";
     } catch {
       return;
     }

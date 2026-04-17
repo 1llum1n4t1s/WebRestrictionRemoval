@@ -10,6 +10,18 @@ const Actions = Object.freeze({
   FORCE_COPY: "forceCopy",
   /** content script → background: メインワールドでインラインハンドラ除去 */
   REMOVE_HANDLERS_MW: "removeHandlersMW",
+  /** content script → background: offscreen 経由でクリップボードを読み取り */
+  READ_CLIPBOARD: "readClipboard",
+});
+
+/** @readonly Offscreen Document 関連定数 */
+const Offscreen = Object.freeze({
+  /** offscreen document の HTML パス（manifest 基準の相対パス） */
+  PATH: "src/offscreen/offscreen.html",
+  /** offscreen 側メッセージ向けの target タグ */
+  TARGET: "offscreen",
+  /** 読み取りアクション名 */
+  ACTION_READ: "readClipboard",
 });
 
 /** @readonly ストレージキー */

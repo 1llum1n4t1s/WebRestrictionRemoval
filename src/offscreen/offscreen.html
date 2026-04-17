@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>clipboard-bridge</title>
+</head>
+<body>
+  <!-- execCommand('paste') のフォールバック用。aria-hidden で支援技術に露出させない -->
+  <textarea id="clip" aria-hidden="true" tabindex="-1"></textarea>
+  <script src="offscreen.js"></script>
+</body>
+</html>
