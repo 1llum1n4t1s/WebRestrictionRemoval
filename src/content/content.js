@@ -158,7 +158,7 @@
 
   function insertIntoContentEditable(el, text) {
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
+    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
       const range = sel.getRangeAt(0);
       range.deleteContents();
       const node = document.createTextNode(text);
@@ -168,7 +168,20 @@
       sel.removeAllRanges();
       sel.addRange(range);
     } else {
-      el.textContent += text;
+      // セレクションが無い / 対象外の場合は末尾に textNode として追記する。
+      // `el.textContent += text` は editable 配下のマークアップを全破壊するため使わない。
+      const node = document.createTextNode(text);
+      el.appendChild(node);
+      // キャレットを挿入直後に移動（可能なら）
+      try {
+        const range = document.createRange();
+        range.setStartAfter(node);
+        range.collapse(true);
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      } catch {}
     }
     el.dispatchEvent(new InputEvent("input", { bubbles: true }));
   }
