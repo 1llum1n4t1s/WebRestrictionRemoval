@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <h1 class="app-title">🛡️ WEB制限解除サポート</h1>
+    <p class="app-desc">ページ制限を解除するシンプルな拡張機能</p>
+
+    <label class="main-toggle" id="mainToggle">
+      <div class="toggle-info">
+        <span class="toggle-icon">⚡</span>
+        <span class="toggle-label">制限解除</span>
+      </div>
+      <div class="toggle-switch">
+        <input type="checkbox" id="enabledToggle" />
+        <span class="toggle-slider"></span>
+      </div>
+    </label>
+
+    <section class="description">
+      <h2 class="section-title">自動で解除</h2>
+      <ul class="feature-list">
+        <li><span class="feat-icon">🖱️</span>右クリック制限</li>
+        <li><span class="feat-icon">✏️</span>テキスト選択制限</li>
+      </ul>
+
+      <h2 class="section-title">右クリックメニューから実行</h2>
+      <ul class="feature-list">
+        <li><span class="feat-icon">📋</span>強制ペースト（入力欄で右クリック）</li>
+        <li><span class="feat-icon">✂️</span>強制コピー（テキスト選択中に右クリック）</li>
+      </ul>
+    </section>
+
+    <p class="status" id="statusMsg"></p>
+  </div>
+  <script src="../lib/actions.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
