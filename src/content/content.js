@@ -152,23 +152,29 @@
     }
     const caret = start + text.length;
     try { el.setSelectionRange(caret, caret); } catch {}
-    el.dispatchEvent(new Event("input", { bubbles: true }));
+    // InputEvent に inputType/data を付与することで React 等のフレームワーク側で
+    // paste/insert として適切に処理される
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function insertIntoContentEditable(el, text) {
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
+    // Range が el の内側に収まっているかは commonAncestorContainer で判定する。
+    // anchorNode だけだと選択開始が el 内で終端が外にあるケースに対応できない。
+    const range0 = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const rangeInside = range0 && el.contains(range0.commonAncestorContainer);
+
+    if (rangeInside) {
+      range0.deleteContents();
       const node = document.createTextNode(text);
-      range.insertNode(node);
-      range.setStartAfter(node);
-      range.collapse(true);
+      range0.insertNode(node);
+      range0.setStartAfter(node);
+      range0.collapse(true);
       sel.removeAllRanges();
-      sel.addRange(range);
+      sel.addRange(range0);
     } else {
-      // セレクションが無い / 対象外の場合は末尾に textNode として追記する。
+      // セレクションが無い / el 外にある場合は末尾に textNode として追記する。
       // `el.textContent += text` は editable 配下のマークアップを全破壊するため使わない。
       const node = document.createTextNode(text);
       el.appendChild(node);
@@ -183,7 +189,8 @@
         }
       } catch {}
     }
-    el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    // inputType/data 付きで dispatch することで React 等のフレームワーク互換性を高める
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
   }
 
   // ---------- 強制コピー ----------

@@ -9,8 +9,14 @@ rm -f ./web-restriction-remover.zip
 
 if [ -f scripts/generate-icons.js ]; then
   echo "アイコン生成中..."
-  npm install --silent 2>/dev/null
-  node scripts/generate-icons.js
+  if ! npm install --silent; then
+    echo "npm install に失敗しました"
+    exit 1
+  fi
+  if ! node scripts/generate-icons.js; then
+    echo "アイコン生成に失敗しました"
+    exit 1
+  fi
 fi
 
 if ! command -v zip &> /dev/null; then

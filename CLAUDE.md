@@ -15,32 +15,33 @@ WEB制限解除サポート (Web Restriction Remover) は Chrome 拡張機能 (M
 
 ```bash
 npm run build                # アイコン + スクリーンショット一括生成
-npm run generate-icons       # icons/icon.svg → images/icon-{16,48,128}.png (sharp)
+npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
-powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP パッケージ生成
+powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP パッケージ生成 (Windows)
+bash ./zip.sh                # 同上 (Unix)
 ```
 
 テストフレームワーク・リンターは未導入。動作確認は Chrome に拡張機能を読み込んで手動テスト。
 
 ## Architecture
 
-3つのコンポーネントが `chrome.runtime` メッセージパッシングで連携する。アクション定数は `scripts/actions.js` で定義。
+3つのコンポーネントが `chrome.runtime` メッセージパッシングで連携する。アクション定数は `src/lib/actions.js` で定義。ファイルは `src/{popup,background,content,lib}/` に配置。
 
-```
-Popup (popup.html/js/css)
-  ──APPLY_SETTINGS──▶  Background (scripts/background.js)
+```text
+Popup (src/popup/popup.{html,js,css})
+  ──APPLY_SETTINGS──▶  Background (src/background/background.js)
                           │ storage 更新 + chrome.contextMenus 再構築 +
-                          ──APPLY_SETTINGS_CS──▶  Content Script (scripts/content.js)
+                          ──APPLY_SETTINGS_CS──▶  Content Script (src/content/content.js)
 
 [右クリックメニュー]
   chrome.contextMenus.onClicked ─▶ Background
                                    ──FORCE_PASTE / FORCE_COPY──▶ Content Script
 ```
 
-### Popup (`popup.html`, `popup.js`, `popup.css`)
+### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
 トグル1個のみ（幅340px）。トグル変更で即 `APPLY_SETTINGS` を background へ送信。ステータスメッセージ（成功/失敗）を1.5秒表示。設定は `chrome.storage.local.enabled` から復元（未設定時はデフォルト ON）。アクセントカラーは赤系（`#C0605A`）。
 
-### Background (`scripts/background.js`)
+### Background (`src/background/background.js`)
 Service worker。役割:
 1. **右クリックメニュー管理**: `enabled=true` のときのみ「強制ペースト」「強制コピー」をメニュー登録。クリックイベントを受けて対応 content script にメッセージ転送。
 2. **サイレント解除の補強**: メインワールドでのインラインハンドラ除去（`chrome.scripting.executeScript world: "MAIN"`）。CSP 影響を回避。
@@ -49,7 +50,7 @@ Service worker。役割:
 
 `chrome://`, `edge://`, `about:`, `file://` などの非 HTTP(S) ページにはメッセージ送信をスキップ（`content_scripts.matches` が `http(s)://*/*` のみのため）。
 
-### Content Script (`scripts/content.js`)
+### Content Script (`src/content/content.js`)
 IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`enabled=true` のとき:
 
 **サイレント自動解除**（処理負荷を抑えるため document 1箇所のキャプチャフェーズで一括処理）:
@@ -68,7 +69,7 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`e
 2. `navigator.clipboard.writeText()` で書き込み
 3. フォールバック: 一時 textarea + `execCommand("copy")`
 
-### Styling (`css/content.css`)
+### Styling (`src/content/content.css`)
 `!important` を使用してページスタイルを上書き。CSSクラスプレフィックス `__cpa-`:
 - `__cpa-enable-select`: `user-select: text` を強制
 
@@ -77,14 +78,14 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`e
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `scripting`, `storage`, `contextMenus`, `clipboardRead`, `clipboardWrite` |
-| `scripts/actions.js` | `Object.freeze` された Actions / StorageKeys / ContextMenuIds / SilentUnlock 定数 |
-| `scripts/background.js` | Service worker: メッセージ転送、contextMenus 管理、MW ハンドラ除去、設定マイグレーション |
-| `scripts/content.js` | サイレント解除 + 強制ペースト/コピーのロジック |
-| `popup.js` | ポップアップ UI: 単一トグル、設定保存・復元、適用フィードバック |
-| `css/content.css` | 制限解除スタイル (`!important` で上書き) |
-| `icons/icon.svg` | ソースアイコン (512×512 スパナデザイン 赤系); PNG は `images/` に生成 |
+| `src/lib/actions.js` | `Object.freeze` された Actions / StorageKeys / ContextMenuIds / SilentUnlock 定数 |
+| `src/background/background.js` | Service worker: メッセージ転送、contextMenus 管理、MW ハンドラ除去、設定マイグレーション |
+| `src/content/content.js` | サイレント解除 + 強制ペースト/コピーのロジック |
+| `src/content/content.css` | 制限解除スタイル (`!important` で上書き) |
+| `src/popup/popup.{html,js,css}` | ポップアップ UI: 単一トグル、設定保存・復元、適用フィードバック |
+| `icons/icon.svg` | ソースアイコン (512×512 スパナデザイン 赤系); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt` |
-| `zip.ps1` | ストア申請用 ZIP パッケージ生成 (PowerShell) |
+| `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
 | `privacy-policy.md` | プライバシーポリシー |
 
 ## Store Asset Generation
@@ -99,5 +100,5 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`e
 - **強制コピーのフォールバック** — `navigator.clipboard.writeText` が失敗したら一時 textarea + `execCommand("copy")`。
 - **メインワールドでのハンドラ除去** — `chrome.scripting.executeScript world: "MAIN"` で CSP やブラウザ独自制限を回避。
 - **contextMenus の再構築** — `ENABLED` 変更時・onStartup 時に `removeAll()` → `create()` で冪等に再構築。
-- **`actions.js` は 3経路で読み込まれる** — `importScripts` (background) + `content_scripts` (manifest.json 自動注入) + `<script>` (popup.html)。ES modules ではなく従来のスクリプト形式で共通定数を共有。
+- **`src/lib/actions.js` は 3経路で読み込まれる** — `importScripts("/src/lib/actions.js")` (background) + `content_scripts` (manifest.json で `src/lib/actions.js` を自動注入) + `<script src="../lib/actions.js">` (popup.html から)。ES modules ではなく従来のスクリプト形式で共通定数を共有。
 - **設定マイグレーション** — `onInstalled` で旧 `copyPasteSettings` キー（v1.0.x 以前）を削除、`enabled` 未設定時はデフォルト true で初期化。
