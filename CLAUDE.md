@@ -51,7 +51,7 @@ Service worker。役割:
 `chrome://`, `edge://`, `about:`, `file://` などの非 HTTP(S) ページにはメッセージ送信をスキップ（`content_scripts.matches` が `http(s)://*/*` のみのため）。
 
 ### Content Script (`src/content/content.js`)
-IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`enabled=true` のとき:
+IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`all_frames: true` で iframe にも注入されるため、`chrome.storage.onChanged` を購読して全フレーム横断でトグル状態に追従する。`enabled=true` のとき:
 
 **サイレント自動解除**（処理負荷を抑えるため document 1箇所のキャプチャフェーズで一括処理）:
 - `contextmenu`, `selectstart`, `dragstart` イベントを `stopImmediatePropagation()` でブロック
@@ -100,5 +100,6 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`e
 - **強制コピーのフォールバック** — `navigator.clipboard.writeText` が失敗したら一時 textarea + `execCommand("copy")`。
 - **メインワールドでのハンドラ除去** — `chrome.scripting.executeScript world: "MAIN"` で CSP やブラウザ独自制限を回避。
 - **contextMenus の再構築** — `ENABLED` 変更時・onStartup 時に `removeAll()` → `create()` で冪等に再構築。
+- **iframe 対応** — `content_scripts.all_frames: true` で iframe にも content script を注入。右クリックメニュー経由の `FORCE_PASTE` / `FORCE_COPY` は `chrome.contextMenus.onClicked` の `info.frameId` を `chrome.tabs.sendMessage` の `frameId` オプションに渡してクリックされたフレームに直接届ける。MW インラインハンドラ除去も `chrome.scripting.executeScript` に `allFrames: true` を指定して全フレーム対象。
 - **`src/lib/actions.js` は 3経路で読み込まれる** — `importScripts("/src/lib/actions.js")` (background) + `content_scripts` (manifest.json で `src/lib/actions.js` を自動注入) + `<script src="../lib/actions.js">` (popup.html から)。ES modules ではなく従来のスクリプト形式で共通定数を共有。
 - **設定マイグレーション** — `onInstalled` で旧 `copyPasteSettings` キー（v1.0.x 以前）を削除、`enabled` 未設定時はデフォルト true で初期化。

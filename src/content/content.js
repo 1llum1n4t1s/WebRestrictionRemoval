@@ -235,6 +235,17 @@
     }
   });
 
+  // ---------- ストレージ変更監視 ----------
+  // all_frames: true で iframe にも content script が注入されるため、popup からの
+  // APPLY_SETTINGS_CS はトップフレームにしか届かない。全フレームの挙動を同期させるため
+  // storage.onChanged を購読してフレーム横断でトグル状態に追従する。
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    const change = changes[StorageKeys.ENABLED];
+    if (!change) return;
+    applyEnabled(change.newValue === true);
+  });
+
   // ---------- 初回ロード ----------
   function initialize() {
     chrome.storage.local.get(StorageKeys.ENABLED).then((result) => {

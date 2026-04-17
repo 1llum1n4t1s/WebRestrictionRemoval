@@ -35,15 +35,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // ---------- 右クリックメニュー クリック ----------
+// frameId を指定してクリックされたフレームの content script のみにメッセージを届ける。
+// 指定しないと chrome.tabs.sendMessage はトップフレームにしか届かず、
+// iframe 内の編集可能要素が活性状態のケースで forcePaste が no-op になる。
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab?.id) return;
+  const sendOptions = typeof info.frameId === "number" ? { frameId: info.frameId } : undefined;
   if (info.menuItemId === ContextMenuIds.FORCE_PASTE) {
-    chrome.tabs.sendMessage(tab.id, { action: Actions.FORCE_PASTE }).catch(() => {});
+    chrome.tabs.sendMessage(tab.id, { action: Actions.FORCE_PASTE }, sendOptions).catch(() => {});
   } else if (info.menuItemId === ContextMenuIds.FORCE_COPY) {
-    chrome.tabs.sendMessage(tab.id, {
-      action: Actions.FORCE_COPY,
-      data: { selectionText: info.selectionText ?? "" },
-    }).catch(() => {});
+    chrome.tabs.sendMessage(
+      tab.id,
+      {
+        action: Actions.FORCE_COPY,
+        data: { selectionText: info.selectionText ?? "" },
+      },
+      sendOptions
+    ).catch(() => {});
   }
 });
 
@@ -115,7 +123,7 @@ async function updateContextMenus() {
  */
 async function removeInlineHandlersInMainWorld(tabId) {
   await chrome.scripting.executeScript({
-    target: { tabId },
+    target: { tabId, allFrames: true },
     world: "MAIN",
     func: (attrs) => {
       [document, document.documentElement, document.body, window].forEach((root) => {
