@@ -201,6 +201,11 @@
   /**
    * 選択範囲のテキストをクリップボードに書き込む。
    * 優先度: background から渡された info.selectionText → window.getSelection()
+   *
+   * 書き込み自体は background → offscreen document (chrome-extension:// = secure) で実行する。
+   * content script 直接の navigator.clipboard.writeText は http:// で secure context 制限により
+   * reject されるうえ、execCommand("copy") フォールバックもサイト側の copy ブロッカーに
+   * 阻害されうるため、extension context 側で確実に書き込む。
    */
   async function forceCopy(selectionText) {
     let text = selectionText;
@@ -209,20 +214,11 @@
     }
     if (!text) return;
     try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // フォールバック: 一時テキストエリア経由の execCommand('copy')
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      } catch {}
-    }
+      await chrome.runtime.sendMessage({
+        action: Actions.WRITE_CLIPBOARD,
+        data: { text },
+      });
+    } catch {}
   }
 
   // ---------- メッセージ受信 ----------

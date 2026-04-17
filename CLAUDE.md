@@ -37,13 +37,13 @@ Popup (src/popup/popup.{html,js,css})
   chrome.contextMenus.onClicked ─▶ Background
                                    ──FORCE_PASTE / FORCE_COPY──▶ Content Script
 
-[強制ペースト時のクリップボード読み取り (HTTP ページ対応)]
-  Content Script ──READ_CLIPBOARD──▶ Background
-                                     │ ensureOffscreenDocument()
-                                     ──target: "offscreen"──▶ Offscreen Document
-                                                              │ navigator.clipboard.readText()
-                                                              │ (失敗時は execCommand("paste"))
-                                                              └──{ text }──▶ Background ──▶ Content Script
+[強制ペースト/コピー時のクリップボード操作 (HTTP ページ対応)]
+  Content Script ──READ_CLIPBOARD / WRITE_CLIPBOARD──▶ Background
+                                                       │ ensureOffscreenDocument()
+                                                       ──target: "offscreen"──▶ Offscreen Document
+                                                                                │ navigator.clipboard.readText / writeText
+                                                                                │ (失敗時は execCommand("paste"/"copy"))
+                                                                                └──{ text | ok }──▶ Background ──▶ Content Script
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
@@ -74,8 +74,8 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 
 **強制コピー** (`FORCE_COPY` 受信時):
 1. `info.selectionText` または `window.getSelection()` からテキスト取得
-2. `navigator.clipboard.writeText()` で書き込み
-3. フォールバック: 一時 textarea + `execCommand("copy")`
+2. `WRITE_CLIPBOARD` メッセージを background に送り、offscreen document 経由で書き込み（content script 直接の `navigator.clipboard.writeText` は http:// 非 secure context で reject されるうえ、`execCommand("copy")` フォールバックもサイト側の copy ブロッカーに阻害されうるため extension context で実行）
+3. offscreen 側は `navigator.clipboard.writeText` を優先し、失敗時は hidden textarea + `execCommand("copy")`
 
 ### Styling (`src/content/content.css`)
 `!important` を使用してページスタイルを上書き。CSSクラスプレフィックス `__cpa-`:
@@ -106,7 +106,7 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 - **二重実行防止** — `window.__copyPasteAssistRunning` グローバルフラグ。
 - **軽量イベントブロック** — `document` 1箇所にキャプチャフェーズリスナーを登録し `stopImmediatePropagation()` でサイト側リスナー発火を封じる。全DOM走査なし。
 - **ペースト挿入の順序** — `execCommand("insertText")` を最初に試す（React 等のフレームワーク対応）。失敗時のみ native setter / Range API にフォールバック。
-- **強制コピーのフォールバック** — `navigator.clipboard.writeText` が失敗したら一時 textarea + `execCommand("copy")`。
+- **強制コピーのフォールバック** — offscreen document 側で `navigator.clipboard.writeText` が失敗した場合、同じ offscreen 内の hidden textarea + `execCommand("copy")` にフォールバック（extension context で実行するためサイト側の copy ブロッカーの影響を受けない）。
 - **メインワールドでのハンドラ除去** — `chrome.scripting.executeScript world: "MAIN"` で CSP やブラウザ独自制限を回避。
 - **contextMenus の再構築** — `ENABLED` 変更時・onStartup 時に `removeAll()` → `create()` で冪等に再構築。
 - **iframe 対応** — `content_scripts.all_frames: true` + `match_origin_as_fallback: true` で通常の iframe に加え `about:blank` / `about:srcdoc` / `data:` / `blob:` 等の関連フレームにも content script を注入（親の origin が `matches` を満たせば）。右クリックメニュー経由の `FORCE_PASTE` / `FORCE_COPY` は `chrome.contextMenus.onClicked` の `info.frameId` を `chrome.tabs.sendMessage` の `frameId` オプションに渡してクリックされたフレームに直接届ける。MW インラインハンドラ除去も `chrome.scripting.executeScript` に `allFrames: true` を指定して全フレーム対象。

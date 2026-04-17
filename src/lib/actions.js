@@ -12,6 +12,8 @@ const Actions = Object.freeze({
   REMOVE_HANDLERS_MW: "removeHandlersMW",
   /** content script → background: offscreen 経由でクリップボードを読み取り */
   READ_CLIPBOARD: "readClipboard",
+  /** content script → background: offscreen 経由でクリップボードへ書き込み */
+  WRITE_CLIPBOARD: "writeClipboard",
 });
 
 /** @readonly Offscreen Document 関連定数 */
@@ -22,6 +24,8 @@ const Offscreen = Object.freeze({
   TARGET: "offscreen",
   /** 読み取りアクション名 */
   ACTION_READ: "readClipboard",
+  /** 書き込みアクション名 */
+  ACTION_WRITE: "writeClipboard",
 });
 
 /** @readonly ストレージキー */

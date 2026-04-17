@@ -39,6 +39,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then((text) => sendResponse({ ok: true, text }))
       .catch(() => sendResponse({ ok: false, text: "" }));
     return true;
+  } else if (request.action === Actions.WRITE_CLIPBOARD) {
+    // forceCopy も同様にサイトの copy ブロッカーや secure context 制限の影響を
+    // 受けないよう、offscreen document (extension context) 経由で書き込む
+    writeClipboardViaOffscreen(request.data?.text ?? "")
+      .then((ok) => sendResponse({ ok }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
   }
 });
 
@@ -182,6 +189,27 @@ async function readClipboardViaOffscreen() {
     return response?.text ?? "";
   } catch {
     return "";
+  }
+}
+
+/**
+ * Offscreen Document 経由でクリップボードにテキストを書き込む。
+ * content script 直接だと http:// で secure context 制限により reject され、
+ * さらに execCommand("copy") フォールバックもページ側の copy ブロッカーの
+ * 影響を受けうるため、extension context で書き込む。
+ */
+async function writeClipboardViaOffscreen(text) {
+  if (!text) return false;
+  await ensureOffscreenDocument();
+  try {
+    const response = await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_WRITE,
+      text,
+    });
+    return !!response?.ok;
+  } catch {
+    return false;
   }
 }
 
