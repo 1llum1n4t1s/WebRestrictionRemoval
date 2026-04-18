@@ -19,19 +19,37 @@ chrome.runtime.onStartup.addListener(() => {
   updateContextMenus();
 });
 
+// ---------- sender 検証ヘルパー ----------
+// popup / option ページ由来: sender.tab が undefined、sender.id が自拡張の id
+// content script 由来:        sender.tab.id が存在
+// 外部 Web ページからの送信は manifest に externally_connectable が無い限り到達しないが、
+// content script が XSS 等で乗っ取られた場合の間接操作を閉じるためハンドラごとに明示検証する。
+function isFromPopup(sender) {
+  return sender?.id === chrome.runtime.id && !sender?.tab;
+}
+function isFromContentScript(sender) {
+  return sender?.id === chrome.runtime.id && typeof sender?.tab?.id === "number";
+}
+
 // ---------- メッセージハンドラ ----------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === Actions.APPLY_SETTINGS) {
+    // 設定変更は popup のみ許可（content script から送らせない）
+    if (!isFromPopup(sender)) return;
     handleApplySettings(request.data)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
-  } else if (request.action === Actions.REMOVE_HANDLERS_MW && sender.tab?.id) {
+  } else if (request.action === Actions.REMOVE_HANDLERS_MW) {
+    if (!isFromContentScript(sender)) return;
     removeInlineHandlersInMainWorld(sender.tab.id)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
   } else if (request.action === Actions.READ_CLIPBOARD) {
+    // クリップボード読取は content script 由来のみ。
+    // これが無いと同一拡張の任意コンテキストがユーザー意図なしで呼べる経路が残る。
+    if (!isFromContentScript(sender)) return;
     // content script が http:// 等の非 secure context で動作する場合、
     // 直接 navigator.clipboard.readText を呼ぶと reject されるため
     // offscreen document (chrome-extension:// = secure) 経由で読み取る
@@ -40,6 +58,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(() => sendResponse({ ok: false, text: "" }));
     return true;
   } else if (request.action === Actions.WRITE_CLIPBOARD) {
+    if (!isFromContentScript(sender)) return;
     // forceCopy も同様にサイトの copy ブロッカーや secure context 制限の影響を
     // 受けないよう、offscreen document (extension context) 経由で書き込む
     writeClipboardViaOffscreen(request.data?.text ?? "")
@@ -126,19 +145,13 @@ async function updateContextMenus() {
   });
 }
 
-/**
- * メインワールド（ページ側の JS 実行コンテキスト）で window/document/html/body の
- * インラインハンドラプロパティを null 化する。
- *
- * content script の removeInlineHandlers() は isolated world で動作するため、
- * DOM 属性（HTML 側）と DOM 要素プロパティは共有されるものの、
- * window/document 等の「グローバルオブジェクトのプロパティ」は別世界で独立している。
- * ここで MAIN world を経由することでページ側の `window.oncontextmenu = ...` 等の
- * 動的ハンドラも確実に解除できる（CSP の影響も受けない）。
- */
 // ---------- Offscreen Document 管理 ----------
 // 並行 createDocument 防止: "Only one offscreen document may be created" エラーを避ける
 let offscreenCreatingPromise = null;
+// アイドル時に offscreen を close するタイマー。クリップボード操作は頻度が低いため
+// 使用後は閉じてメモリ常駐を避ける。
+let offscreenIdleTimer = null;
+const OFFSCREEN_IDLE_MS = 30_000;
 
 /**
  * Offscreen Document が未作成なら作成する。
@@ -157,7 +170,11 @@ async function ensureOffscreenDocument() {
       });
       if (contexts.length > 0) return true;
     }
-  } catch {}
+  } catch (err) {
+    // getContexts 自体が失敗するのは Chrome バージョンや API 変更が原因。
+    // 診断導線確保のため最低限 warn する。以降は createDocument にフォールバック。
+    console.warn("[WebRestrictionRemover] getContexts failed:", err);
+  }
 
   if (offscreenCreatingPromise) {
     await offscreenCreatingPromise;
@@ -169,10 +186,33 @@ async function ensureOffscreenDocument() {
       reasons: ["CLIPBOARD"],
       justification: "強制ペースト機能のためにクリップボードを読み取り",
     })
-    .catch(() => {}); // 既に存在するケース等は握り潰す
+    .catch((err) => {
+      // 既に存在するケース（並行作成レース）はこのまま true を返せば良いが、
+      // それ以外の失敗は診断導線確保のため warn する。
+      if (!String(err?.message ?? "").includes("Only one offscreen document")) {
+        console.warn("[WebRestrictionRemover] createDocument failed:", err);
+      }
+    });
   await offscreenCreatingPromise;
   offscreenCreatingPromise = null;
   return true;
+}
+
+/**
+ * 次のクリップボード使用までアイドル状態が続いたら offscreen document を閉じる。
+ * 使い終わるたびに呼び、前回予約があれば延長する。
+ */
+function scheduleOffscreenClose() {
+  if (offscreenIdleTimer) clearTimeout(offscreenIdleTimer);
+  offscreenIdleTimer = setTimeout(async () => {
+    offscreenIdleTimer = null;
+    if (!chrome.offscreen) return;
+    try {
+      await chrome.offscreen.closeDocument();
+    } catch {
+      // 既に閉じている場合は無視
+    }
+  }, OFFSCREEN_IDLE_MS);
 }
 
 /**
@@ -189,6 +229,8 @@ async function readClipboardViaOffscreen() {
     return response?.text ?? "";
   } catch {
     return "";
+  } finally {
+    scheduleOffscreenClose();
   }
 }
 
@@ -210,9 +252,22 @@ async function writeClipboardViaOffscreen(text) {
     return !!response?.ok;
   } catch {
     return false;
+  } finally {
+    scheduleOffscreenClose();
   }
 }
 
+/**
+ * メインワールド（ページ側の JS 実行コンテキスト）で window/document/html/body の
+ * インラインハンドラプロパティを null 化する。
+ *
+ * content script の removeInlineHandlers() は isolated world で動作するが、
+ * DOM 要素の「属性」と「プロパティ」は isolated world と MAIN world で共有される。
+ * そのため属性セレクタヒットの除去は content script 側に任せ、ここでは
+ * window/document 等の「グローバルオブジェクトのプロパティ」除去のみ行う（二重走査削減）。
+ * document/html/body ノードのプロパティはどちらの world でも書けば OK だが、content script 側で
+ * 書いた結果がページ側の getter/setter 経由だと隠されうるため MAIN 側でも明示的に null 化する。
+ */
 async function removeInlineHandlersInMainWorld(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId, allFrames: true },
@@ -221,12 +276,6 @@ async function removeInlineHandlersInMainWorld(tabId) {
       [document, document.documentElement, document.body, window].forEach((root) => {
         if (!root) return;
         attrs.forEach((attr) => { root[attr] = null; });
-      });
-      attrs.forEach((attr) => {
-        document.querySelectorAll("[" + attr + "]").forEach((el) => {
-          el.removeAttribute(attr);
-          el[attr] = null;
-        });
       });
     },
     args: [SilentUnlock.INLINE_ATTRS],

@@ -18,7 +18,8 @@ async function generateIcons() {
   // imagesディレクトリの作成（recursive は既存でも安全）
   fs.mkdirSync(iconsDir, { recursive: true });
 
-  // 各サイズのPNGを並列生成
+  // 各サイズのPNGを並列生成。個別失敗は Promise を reject させて
+  // 呼び出し側の catch 経由で exit 1 にする（壊れたアイコンでの ZIP 生成を防ぐ）。
   await Promise.all(sizes.map(async (size) => {
     const outputPath = path.join(iconsDir, `icon-${size}.png`);
     try {
@@ -30,6 +31,7 @@ async function generateIcons() {
       console.log(`✅ ${size}x${size} アイコンを生成しました: ${path.basename(outputPath)}`);
     } catch (error) {
       console.error(`❌ ${size}x${size} アイコンの生成に失敗しました:`, error.message);
+      throw error;
     }
   }));
 

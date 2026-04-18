@@ -106,11 +106,19 @@ async function main() {
   });
 
   try {
-    // 絵文字レンダリングの負荷を避けるため順次生成
-    for (const config of HTML_CONFIGS) {
-      const outputPath = path.join(OUTPUT_DIR, config.output);
-      await generateScreenshot(browser, config.input, outputPath, config.width, config.height);
-    }
+    // 複数ページを並列生成（Puppeteer の page は独立しているため CPU 競合のみ）。
+    // 絵文字レンダリングが重いため concurrency を 2 に絞って過負荷を回避する。
+    const CONCURRENCY = 2;
+    const queue = [...HTML_CONFIGS];
+    const runWorker = async () => {
+      while (queue.length > 0) {
+        const config = queue.shift();
+        if (!config) break;
+        const outputPath = path.join(OUTPUT_DIR, config.output);
+        await generateScreenshot(browser, config.input, outputPath, config.width, config.height);
+      }
+    };
+    await Promise.all(Array.from({ length: CONCURRENCY }, runWorker));
   } finally {
     await browser.close();
   }

@@ -4,6 +4,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $toggle = document.getElementById("enabledToggle");
   const $status = document.getElementById("statusMsg");
 
+  // ステータス表示のタイムアウト管理（関数プロパティではなくクロージャで保持）
+  let statusTimer = null;
+
   // ---------- 現在状態を復元 ----------
   // 未設定時はデフォルト ON とみなす
   const stored = await chrome.storage.local.get(StorageKeys.ENABLED);
@@ -30,7 +33,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   function showStatus(msg, type) {
     $status.textContent = msg;
     $status.className = "status " + type;
-    clearTimeout(showStatus._t);
-    showStatus._t = setTimeout(() => { $status.textContent = ""; $status.className = "status"; }, 1500);
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+      $status.textContent = "";
+      $status.className = "status";
+      statusTimer = null;
+    }, 1500);
   }
 });

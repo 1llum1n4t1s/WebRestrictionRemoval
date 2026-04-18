@@ -49,12 +49,12 @@ async function writeClipboard(text) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.target !== "offscreen") return false;
-  if (msg?.action === "readClipboard") {
+  if (msg?.target !== Offscreen.TARGET) return false;
+  if (msg?.action === Offscreen.ACTION_READ) {
     readClipboard().then(sendResponse);
     return true; // 非同期 sendResponse のためメッセージチャネルを保持
   }
-  if (msg?.action === "writeClipboard") {
+  if (msg?.action === Offscreen.ACTION_WRITE) {
     writeClipboard(msg?.text ?? "").then(sendResponse);
     return true;
   }

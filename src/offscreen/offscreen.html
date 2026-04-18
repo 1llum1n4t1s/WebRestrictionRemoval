@@ -2,11 +2,16 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <!-- extension ページの CSP を明示。MV3 の拡張ページはインラインスクリプト禁止が既定だが、
+       意図を明確にするため script-src を 'self' に固定する。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>clipboard-bridge</title>
 </head>
 <body>
   <!-- execCommand('paste') のフォールバック用。aria-hidden で支援技術に露出させない -->
   <textarea id="clip" aria-hidden="true" tabindex="-1"></textarea>
+  <!-- actions.js を先に読み込み、Offscreen 定数を共有する -->
+  <script src="../lib/actions.js"></script>
   <script src="offscreen.js"></script>
 </body>
 </html>

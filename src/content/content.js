@@ -9,6 +9,13 @@
   const blockHandlers = {};
 
   /**
+   * インラインハンドラ属性除去を済ませたかのフラグ。
+   * 属性は一度消せば DOM ノードのプロパティとして null 化された状態で維持されるため、
+   * applyEnabled が複数回呼ばれても全DOM走査は初回のみに抑える。
+   */
+  let inlineHandlersRemoved = false;
+
+  /**
    * 直近の右クリック対象のうち編集可能だった要素をキャッシュする。
    * chrome.contextMenus クリック時に document.activeElement が <body> に
    * リセットされるケース（Chrome のフォーカス仕様）があり、forcePaste で
@@ -62,6 +69,8 @@
    * 属性セレクタヒットと主要3ノードのみ対象にして全DOM走査を回避する。
    */
   function removeInlineHandlers() {
+    if (inlineHandlersRemoved) return;
+    inlineHandlersRemoved = true;
     const attrs = SilentUnlock.INLINE_ATTRS;
     const selector = attrs.map((a) => `[${a}]`).join(",");
     document.querySelectorAll(selector).forEach((el) => {
@@ -79,14 +88,21 @@
   /**
    * サイレント自動解除を有効化/無効化する。
    * 対象: 右クリック制限 + テキスト選択制限（processing cost を抑えるため自動発動）
+   *
+   * @param {boolean} isEnabled
+   * @param {{ requestMwRemove?: boolean }} [opts] - MW 除去を background に依頼するか。
+   *   true の経路（初回 load / popup からの APPLY_SETTINGS_CS 受信）のみ送信する。
+   *   storage.onChanged は iframe 毎に発火するため送信源を絞らないと O(iframe^2) 負荷。
+   *   background 側は allFrames: true で全フレームの MW 除去を行うので 1 回送れば十分。
    */
-  function applyEnabled(isEnabled) {
+  function applyEnabled(isEnabled, opts) {
     if (isEnabled) {
       SilentUnlock.EVENTS.forEach(blockEvent);
       removeInlineHandlers();
       document.documentElement.classList.add(SilentUnlock.CSS_CLASS_SELECT);
-      // メインワールドでの除去を background に依頼（CSP 等の影響を回避）
-      chrome.runtime.sendMessage({ action: Actions.REMOVE_HANDLERS_MW }).catch(() => {});
+      if (opts?.requestMwRemove) {
+        chrome.runtime.sendMessage({ action: Actions.REMOVE_HANDLERS_MW }).catch(() => {});
+      }
     } else {
       SilentUnlock.EVENTS.forEach(unblockEvent);
       document.documentElement.classList.remove(SilentUnlock.CSS_CLASS_SELECT);
@@ -224,7 +240,8 @@
   // ---------- メッセージ受信 ----------
   chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === Actions.APPLY_SETTINGS_CS) {
-      applyEnabled(request.data?.enabled === true);
+      // popup 由来: トップフレームのみ受信するので MW 除去を依頼する（background が allFrames で全域カバー）
+      applyEnabled(request.data?.enabled === true, { requestMwRemove: true });
       sendResponse({ ok: true });
     } else if (request.action === Actions.FORCE_PASTE) {
       forcePaste();
@@ -235,30 +252,29 @@
     }
   });
 
+  // トップフレーム判定（1 タブ 1 回に絞って MW 除去の多重送信を防ぐ）。
+  // window === window.top は cross-origin iframe でも安全に比較できる。
+  const isTopFrame = window === window.top;
+
   // ---------- ストレージ変更監視 ----------
   // all_frames: true で iframe にも content script が注入されるため、popup からの
-  // APPLY_SETTINGS_CS はトップフレームにしか届かない。全フレームの挙動を同期させるため
-  // storage.onChanged を購読してフレーム横断でトグル状態に追従する。
+  // APPLY_SETTINGS_CS はアクティブタブのトップフレームにしか届かない。
+  // 非アクティブタブや同タブ内の他フレームも挙動を同期させるため storage.onChanged を購読する。
+  // MW 除去依頼は 1 タブあたりトップフレーム 1 回に限定し、O(iframe²) 負荷を回避する
+  // （background 側は allFrames: true で全フレームに実行するため 1 回で十分）。
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
     const change = changes[StorageKeys.ENABLED];
     if (!change) return;
-    applyEnabled(change.newValue === true);
+    const enabled = change.newValue === true;
+    applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
   });
 
   // ---------- 初回ロード ----------
-  function initialize() {
-    chrome.storage.local.get(StorageKeys.ENABLED).then((result) => {
-      // 未設定時はデフォルト ON 扱い（初回インストールで background 初期化前の content script 読込に対応）
-      applyEnabled(result[StorageKeys.ENABLED] !== false);
-    });
-  }
-
-  // サイトが window.onload でハンドラを設定するケースに対応するため
-  // load 完了後に初期化する
-  if (document.readyState === "complete") {
-    initialize();
-  } else {
-    window.addEventListener("load", () => setTimeout(initialize, 0));
-  }
+  // document_idle で注入されるため DOM は既に安定しており、setTimeout で遅延させる必要はない。
+  // むしろ遅延すると blockEvent の登録前にサイト側 contextmenu が発火するリスクが残る。
+  chrome.storage.local.get(StorageKeys.ENABLED).then((result) => {
+    const enabled = result[StorageKeys.ENABLED] !== false;
+    applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
+  });
 })();

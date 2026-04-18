@@ -8,10 +8,20 @@ Write-Host ""
 $scriptDir = Split-Path -Parent ($MyInvocation.MyCommand.Path ?? $PSCommandPath ?? $PWD)
 if ($scriptDir) { Set-Location $scriptDir }
 
-# アイコン生成
+# 依存インストール & アイコン生成
+Write-Host "依存パッケージをインストール中..." -ForegroundColor Yellow
+npm install --silent
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "npm install に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "アイコンを生成中..." -ForegroundColor Yellow
-npm install --silent 2>$null
 node scripts/generate-icons.js
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "アイコン生成に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
+    exit 1
+}
 
 # 古いZIPファイルを削除
 $zipName = "web-restriction-remover.zip"
