@@ -1,36 +1,42 @@
 {
   "manifest_version": 3,
   "name": "WEB制限解除サポート",
-  "description": "Webページの制限を解除。コピー・ペースト・右クリック・テキスト選択の4機能搭載。",
-  "version": "1.0.10",
+  "description": "右クリック・テキスト選択を自動解除。右クリックメニューから強制ペースト・強制コピーが可能。",
+  "version": "1.1.0",
   "action": {
     "default_icon": {
-      "16": "images/icon-16.png",
-      "48": "images/icon-48.png",
-      "128": "images/icon-128.png"
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
     },
     "default_title": "WEB制限解除サポート",
-    "default_popup": "popup.html"
+    "default_popup": "src/popup/popup.html"
   },
   "icons": {
-    "16": "images/icon-16.png",
-    "48": "images/icon-48.png",
-    "128": "images/icon-128.png"
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "background": {
-    "service_worker": "scripts/background.js"
+    "service_worker": "src/background/background.js"
   },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["scripts/actions.js", "scripts/content.js"],
-      "css": ["css/content.css"],
-      "run_at": "document_idle"
+      "js": ["src/lib/actions.js", "src/content/content.js"],
+      "css": ["src/content/content.css"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_origin_as_fallback": true
     }
   ],
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "contextMenus",
+    "clipboardRead",
+    "clipboardWrite",
+    "offscreen"
   ]
 }

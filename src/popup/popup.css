@@ -1,0 +1,173 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font: 13px/1.6 -apple-system, "Segoe UI", sans-serif;
+  color: #222;
+  width: 340px;
+}
+
+.popup-container {
+  padding: 16px 18px;
+}
+
+/* ---------- Header ---------- */
+.app-title {
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.app-desc {
+  font-size: 11px;
+  text-align: center;
+  color: #999;
+  margin-bottom: 14px;
+}
+
+/* ---------- Main Toggle ---------- */
+.main-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-bottom: 14px;
+}
+
+.main-toggle:hover {
+  background: #faf5f5;
+  border-color: #e5d5d3;
+}
+
+.toggle-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-icon {
+  font-size: 16px;
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ---------- Toggle Switch ---------- */
+.toggle-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 11px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  bottom: 2px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #C0605A;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+}
+
+/* ---------- Description ---------- */
+.description {
+  background: #faf7f7;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #C0605A;
+  letter-spacing: 0.05em;
+  margin: 0 0 6px 0;
+}
+
+.section-title + .feature-list {
+  margin-bottom: 10px;
+}
+
+.description > .section-title:not(:first-child) {
+  margin-top: 2px;
+}
+
+.feature-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.feature-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #555;
+}
+
+.feat-icon {
+  font-size: 13px;
+  width: 18px;
+  text-align: center;
+}
+
+/* ---------- Status ---------- */
+.status {
+  min-height: 16px;
+  margin-top: 8px;
+  font-size: 11px;
+  text-align: center;
+  color: transparent;
+  transition: color 0.2s;
+}
+
+.status.ok {
+  color: #27ae60;
+}
+
+.status.error {
+  color: #C0605A;
+}
