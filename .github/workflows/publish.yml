@@ -59,11 +59,26 @@ jobs:
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
-          npx --yes chrome-webstore-upload-cli@3 upload \
+          set +e
+          output=$(npx --yes chrome-webstore-upload-cli@3 upload \
             --source web-restriction-remover.zip \
             --extension-id "$CWS_EXTENSION_ID" \
             --client-id "$CWS_CLIENT_ID" \
             --client-secret "$CWS_CLIENT_SECRET" \
             --refresh-token "$CWS_REFRESH_TOKEN" \
-            --auto-publish
-          echo "🎉 Chrome Web Store への公開リクエストを送信したよ〜"
+            --auto-publish 2>&1)
+          exit_code=$?
+          echo "$output"
+          if [ $exit_code -eq 0 ]; then
+            echo "🎉 Chrome Web Store への公開リクエストを送信したよ〜"
+            exit 0
+          fi
+          # アップロードは成功したが auto-publish 条件を満たさないケースを warning 化。
+          # 代表例: Developer Dashboard の "Privacy practices" 未入力 (400 Bad Request)。
+          # ZIP は Draft として登録済みのため、Dashboard で手動公開すれば良い。
+          if echo "$output" | grep -qE "Publish condition not met|Privacy practices|mandatory privacy information"; then
+            echo "::warning::アップロードは成功したけど自動公開できなかったよ💦 Developer Dashboard の Privacy practices タブを埋めてから手動で公開してね (次回以降は auto-publish が通るよ)"
+            exit 0
+          fi
+          # それ以外の失敗は従来通り fail にする
+          exit $exit_code
