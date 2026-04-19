@@ -6,3 +6,14 @@
   -webkit-user-select: text !important;
   user-select: text !important;
 }
+
+/* <a> タグだけは除外。
+   user-select: text を当てると SPA サイトで <a> をダブルクリックしたとき
+   selectstart が発火し、拡張機能が stopImmediatePropagation で止めることで
+   React の event delegation 状態が崩れ、2 回目 click が
+   native ナビゲーション（= フルリロード）にフォールバックする。 */
+.__cpa-enable-select a,
+.__cpa-enable-select a * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}

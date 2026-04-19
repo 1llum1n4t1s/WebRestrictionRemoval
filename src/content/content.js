@@ -44,6 +44,37 @@
   );
 
   /**
+   * SPA ページ（X.com 等）でロゴ等のリンクをダブルクリックしたとき、
+   * SPA ルーターが再レンダリング中で 2 回目の click に対して
+   * preventDefault() を呼べない競合状態が起きる。
+   * キャプチャフェーズで同一アンカーへの連続 click（600ms 以内）を検知し、
+   * 2 回目以降は preventDefault() でネイティブナビゲーションをブロックする。
+   * stopImmediatePropagation は呼ばないため SPA 側ハンドラには届く。
+   */
+  {
+    let _lastAnchorClick = null;
+    document.addEventListener("click", (e) => {
+      if (!e.isTrusted) return;
+      const anchor = e.target.closest("a[href]");
+      if (!anchor) return;
+      const now = performance.now();
+      if (
+        _lastAnchorClick &&
+        _lastAnchorClick.href === anchor.href &&
+        now - _lastAnchorClick.time < 600
+      ) {
+        // stopImmediatePropagation は呼ばない（React の event delegation 状態を壊して
+        // 次のダブルクリックで React の handler が機能停止するため）。
+        // preventDefault だけでネイティブリンク遷移は防げる。
+        e.preventDefault();
+        _lastAnchorClick = null;
+        return;
+      }
+      _lastAnchorClick = { href: anchor.href, time: now };
+    }, true);
+  }
+
+  /**
    * キャプチャフェーズでイベントを横取りしてサイト側のリスナー発火を封じる。
    * document 1箇所のみに登録するため処理負荷は極小。
    */
