@@ -16,7 +16,7 @@ jobs:
       # Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の更新 PR を自動生成する。
       # 現状は major タグのまま運用し、Dependabot の提案で SHA pinned 版に段階移行する。
       - name: リポジトリをチェックアウト
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: バージョンを取得
         id: version
