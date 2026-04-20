@@ -4,12 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB制限解除サポート (Web Restriction Remover) は Chrome 拡張機能 (Manifest V3)。Webページの制限を解除する。**v1.1.0 以降はトグル1個**で拡張機能全体を ON/OFF 切替する設計。ON時の動作:
+WEB制限解除サポート (Web Restriction Remover) は Chrome 拡張機能 (Manifest V3)。Webページの制限を解除する。**メイン「制限解除」トグル + 独立オプトインの「セッション維持」トグル + カスタム右クリック許可リスト**の 3 機能構成。制限解除 ON 時の動作:
 
 - **サイレント自動解除** (ON中は常時): 右クリック制限 / テキスト選択制限
 - **右クリックメニューから手動実行**: 強制ペースト（`contexts: ["editable"]`）/ 強制コピー（`contexts: ["selection"]`）
 
+「セッション維持」は `enabled` と独立にオプトイン（デフォルト OFF）。「カスタム右クリック許可リスト」は常時機能し、組み込みパターン + ユーザー追加ドメインで判定する。
+
 設定は `chrome.storage.local` の `enabled` キー（boolean）で保存。UI は日本語。デフォルト ON。
+
+Excel Online / Google Docs / Notion / Figma 等 **カスタム右クリックメニューを提供する SaaS** では、サイト側のメニューを尊重するため `contextmenu` ブロックをスキップする。判定は `actions.js` の `ContextMenuAllowlist`（組み込みパターン + ユーザー追加の `contextMenuAllowDomains`）で行う。許可ホストでも `selectstart`/`dragstart` ブロック・user-select CSS・インラインハンドラ除去は通常どおり作用する。ユーザー追加ドメインは popup のアコーディオン内 textarea（1行1ドメイン）で編集し、`ContextMenuAllowlist.normalizeDomain` で正規化してから保存。
 
 ## Build Commands
 
@@ -69,6 +73,7 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 
 **サイレント自動解除**（処理負荷を抑えるため document 1箇所のキャプチャフェーズで一括処理）:
 - `contextmenu`, `selectstart`, `dragstart` イベントを `stopImmediatePropagation()` でブロック
+- **`ContextMenuAllowlist.isAllowed(location.hostname, currentAllowDomains)` が true のホストでは `contextmenu` のみ unblock** し、サイト側カスタムメニューを通す（例: Office Online / Google Docs / Notion）。`selectstart`/`dragstart` は通常どおりブロック
 - インラインハンドラ属性（`oncontextmenu`, `onselectstart`, `ondragstart`）は属性セレクタヒットと主要3ノード(document/html/body)のみ除去。`inlineHandlersRemoved` フラグで applyEnabled 複数回呼び出しでも1回のみ実行
 - CSS クラス `__cpa-enable-select` を `<html>` に付与し `user-select: text !important` を有効化
 
@@ -95,7 +100,7 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `scripting`, `storage`, `contextMenus`, `clipboardRead`, `clipboardWrite`, `offscreen` |
-| `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / ContextMenuIds / SilentUnlock 定数 |
+| `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / ContextMenuIds / SilentUnlock / ContextMenuAllowlist 定数 |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、contextMenus 管理、MW ハンドラ除去、offscreen document 管理、設定マイグレーション |
 | `src/content/content.js` | サイレント解除 + 強制ペースト/コピーのロジック |
 | `src/content/content.css` | 制限解除スタイル (`!important` で上書き) |
@@ -126,3 +131,4 @@ IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`a
 - **iframe 対応** — `content_scripts.all_frames: true` + `match_origin_as_fallback: true` で通常の iframe に加え `about:blank` / `about:srcdoc` / `data:` / `blob:` 等の関連フレームにも content script を注入（親の origin が `matches` を満たせば）。右クリックメニュー経由の `FORCE_PASTE` / `FORCE_COPY` は `chrome.contextMenus.onClicked` の `info.frameId` を `chrome.tabs.sendMessage` の `frameId` オプションに渡してクリックされたフレームに直接届ける。MW インラインハンドラ除去も `chrome.scripting.executeScript` に `allFrames: true` を指定して全フレーム対象。
 - **Offscreen Document のライフサイクル** — http:// の content script では secure context 制限で `navigator.clipboard.readText()` が reject される。`chrome.offscreen.createDocument({ reasons: ["CLIPBOARD"] })` で `src/offscreen/offscreen.html` を起動し、chrome-extension:// (secure) 側で読み取って background 経由で content script に返す。`ensureOffscreenDocument` は `getContexts` (Chrome 116+) での存在確認 + 並行作成ガード付き（"Only one offscreen document" エラー回避）。使用後 30 秒アイドルで `scheduleOffscreenClose()` により自動クローズしメモリ常駐を避ける。
 - **設定マイグレーション** — `onInstalled` で旧 `copyPasteSettings` キー（v1.0.x 以前）を削除、`enabled` 未設定時はデフォルト true で初期化。
+- **カスタム右クリック許可リスト** — Excel Online / Google Docs / Notion 等のカスタムメニュー提供サイトで `contextmenu` ブロックをスキップする。組み込みパターン（`ContextMenuAllowlist.BUILTIN_PATTERNS`）＋ユーザー追加ドメイン（`StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS` 配列）の 2 層構成。ユーザー追加値は popup 側で `ContextMenuAllowlist.normalizeDomain()` を通して保存（`https://` 等のプレフィックス除去、`*.` / 先頭ドット除去、不正文字行を reject）。suffix match はドット境界付き（`example.com` は `foo.example.com` にマッチ、`barexample.com` にはマッチしない）。content script 側は `currentAllowDomains` を closure 保持し、`storage.onChanged` と `APPLY_SETTINGS_CS` の両経路で同期する。allow-list が変化したら `applyEnabled` を再実行して block/unblock を切り替える（同じイベントを再 register しないガードは `blockHandlers` Map が担う）。

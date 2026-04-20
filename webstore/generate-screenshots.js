@@ -86,6 +86,9 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
   } catch (error) {
     console.error(`❌ エラー: ${htmlPath} -> ${outputPath}`);
     console.error(error);
+    // throw で Promise.all を reject させて main().catch → process.exit(1) へ伝播させる。
+    // 握りつぶすと壊れた画像のまま CI が success 扱いになり、ストア申請 ZIP に混入しうる。
+    throw error;
   } finally {
     await page.close();
   }

@@ -11,6 +11,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.ENABLED,
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+    StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS,
   ]);
   const defaults = {};
   if (!(StorageKeys.ENABLED in stored)) defaults[StorageKeys.ENABLED] = true;
@@ -18,6 +19,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
   if (!(StorageKeys.KEEP_ALIVE_INTERVAL_MS in stored)) {
     defaults[StorageKeys.KEEP_ALIVE_INTERVAL_MS] = KeepAlive.DEFAULT_INTERVAL_MS;
+  }
+  // カスタム右クリック許可リストは初期空（組み込みパターンのみが効く）
+  if (!(StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS in stored)) {
+    defaults[StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS] = [];
   }
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);
@@ -29,6 +34,14 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(() => {
   updateContextMenus();
 });
+
+// SW 初期化トップレベルでの再構築:
+//   MV3 SW はアイドル（約 30 秒）で停止し、次のイベントで再起動する。このタイミングで
+//   contextMenus が失われるケースがあるが、onInstalled / onStartup はブラウザ起動時のみ
+//   発火するため idle 再起動に対応できない。SW 初期化ごとにトップレベルで再構築することで
+//   全起動シナリオ（初回インストール / ブラウザ起動 / idle 再起動）をカバーする。
+//   updateContextMenus は removeAll → create で冪等なので重複呼び出しでも副作用なし。
+updateContextMenus().catch(() => {});
 
 // ---------- sender 検証ヘルパー ----------
 // popup / option ページ由来: sender.tab が undefined、sender.id が自拡張の id
@@ -121,14 +134,20 @@ async function getActiveTab() {
 async function handleApplySettings(settings) {
   const enabled = !!settings?.enabled;
   const keepAliveEnabled = !!settings?.keepAliveEnabled;
-  const keepAliveIntervalMs = Number.isFinite(settings?.keepAliveIntervalMs)
-    ? settings.keepAliveIntervalMs
-    : KeepAlive.DEFAULT_INTERVAL_MS;
+  // clampIntervalMs は Number.isFinite チェック + MIN/MAX クランプを一括で行うため、
+  // 生値を渡せば常に安全な範囲の数値になる。不正値（負数・NaN）は DEFAULT に落ちる。
+  const keepAliveIntervalMs = KeepAlive.clampIntervalMs(settings?.keepAliveIntervalMs);
+  // 許可ドメイン配列は popup 側で正規化済み。background では型チェックのみ行い
+  // 不正な要素（非文字列や空文字）を最終段で弾く（XSS 目的の非文字列を保存しない）。
+  const contextMenuAllowDomains = Array.isArray(settings?.contextMenuAllowDomains)
+    ? settings.contextMenuAllowDomains.filter((d) => typeof d === "string" && d.length > 0)
+    : [];
 
   await chrome.storage.local.set({
     [StorageKeys.ENABLED]: enabled,
     [StorageKeys.KEEP_ALIVE_ENABLED]: keepAliveEnabled,
     [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: keepAliveIntervalMs,
+    [StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS]: contextMenuAllowDomains,
   });
   await updateContextMenus();
 
@@ -145,7 +164,7 @@ async function handleApplySettings(settings) {
 
   await chrome.tabs.sendMessage(tab.id, {
     action: Actions.APPLY_SETTINGS_CS,
-    data: { enabled, keepAliveEnabled, keepAliveIntervalMs },
+    data: { enabled, keepAliveEnabled, keepAliveIntervalMs, contextMenuAllowDomains },
   }).catch(() => {});
 
   if (enabled) {
@@ -175,29 +194,52 @@ async function updateContextMenus() {
 }
 
 // ---------- Offscreen Document 管理 ----------
-// 並行 createDocument 防止: "Only one offscreen document may be created" エラーを避ける
+//
+// ライフサイクルを明示的な状態機械で扱う。以下の並走を制御する:
+//  1. 並行 createDocument: "Only one offscreen document may be created" エラー回避
+//  2. close 中の create: 30 秒タイマー発火後 closeDocument の await 中に
+//     新しいクリップボード操作が入って ensure が走るとレースする
+//  3. create 失敗の誤信: create が reject した場合に ensure が true を返すと
+//     呼び出し元は「存在する」と誤認して sendMessage が無応答で空文字を返し、
+//     ユーザーから見ると強制ペーストが無音で失敗する
+//
+// 状態: CLOSED (初期/close 完了) / CREATING / OPEN / CLOSING
+let offscreenState = "CLOSED";
+// create / close それぞれの進行中 Promise。待機用
 let offscreenCreatingPromise = null;
-// アイドル時に offscreen を close するタイマー。クリップボード操作は頻度が低いため
-// 使用後は閉じてメモリ常駐を避ける。
+let offscreenClosingPromise = null;
+// アイドル時の自動 close タイマー。クリップボード操作は頻度が低いので閉じて常駐回避
+// （閾値は actions.js の Offscreen.IDLE_MS が単一情報源）
 let offscreenIdleTimer = null;
-const OFFSCREEN_IDLE_MS = 30_000;
 
 /**
  * Offscreen Document が未作成なら作成する。
  * chrome.runtime.getContexts (Chrome 116+) で存在確認を試み、失敗時は
- * createDocument を直接呼ぶ（二重作成エラーは catch で握り潰す）。
+ * createDocument を直接呼ぶ。create 失敗は呼び出し元に false で伝播する。
+ *
+ * @returns {Promise<boolean>} 作成成功/既存確認なら true、失敗なら false
  */
 async function ensureOffscreenDocument() {
   if (!chrome.offscreen) return false;
+
+  // CLOSING 中なら close の完了を待つ（次の create を走らせる前に close を完了させる）
+  if (offscreenClosingPromise) {
+    try { await offscreenClosingPromise; } catch {}
+  }
+
   const url = chrome.runtime.getURL(Offscreen.PATH);
 
+  // getContexts で既存確認（Chrome 116+）
   try {
     if (typeof chrome.runtime.getContexts === "function") {
       const contexts = await chrome.runtime.getContexts({
         contextTypes: ["OFFSCREEN_DOCUMENT"],
         documentUrls: [url],
       });
-      if (contexts.length > 0) return true;
+      if (contexts.length > 0) {
+        offscreenState = "OPEN";
+        return true;
+      }
     }
   } catch (err) {
     // getContexts 自体が失敗するのは Chrome バージョンや API 変更が原因。
@@ -205,51 +247,83 @@ async function ensureOffscreenDocument() {
     console.warn("[WebRestrictionRemover] getContexts failed:", err);
   }
 
+  // 並行 create ガード
   if (offscreenCreatingPromise) {
-    await offscreenCreatingPromise;
-    return true;
+    try {
+      const ok = await offscreenCreatingPromise;
+      return ok === true;
+    } catch {
+      return false;
+    }
   }
+
+  offscreenState = "CREATING";
   offscreenCreatingPromise = chrome.offscreen
     .createDocument({
       url: Offscreen.PATH,
       reasons: ["CLIPBOARD"],
       justification: "強制ペースト機能のためにクリップボードを読み取り",
     })
+    .then(() => {
+      offscreenState = "OPEN";
+      return true;
+    })
     .catch((err) => {
-      // 既に存在するケース（並行作成レース）はこのまま true を返せば良いが、
-      // それ以外の失敗は診断導線確保のため warn する。
-      if (!String(err?.message ?? "").includes("Only one offscreen document")) {
-        console.warn("[WebRestrictionRemover] createDocument failed:", err);
+      // "Only one offscreen document may be created" は並行作成レース。
+      // 別経路で作成済みと見なして成功扱いにする。
+      if (String(err?.message ?? "").includes("Only one offscreen document")) {
+        offscreenState = "OPEN";
+        return true;
       }
+      // それ以外の失敗（メモリ逼迫 / API 無効環境等）は明示的に失敗を返し、
+      // 呼び出し元が「offscreen は存在しない」と判断できるようにする。
+      console.warn("[WebRestrictionRemover] createDocument failed:", err);
+      offscreenState = "CLOSED";
+      return false;
     });
-  await offscreenCreatingPromise;
-  offscreenCreatingPromise = null;
-  return true;
+
+  try {
+    const ok = await offscreenCreatingPromise;
+    return ok === true;
+  } finally {
+    offscreenCreatingPromise = null;
+  }
 }
 
 /**
  * 次のクリップボード使用までアイドル状態が続いたら offscreen document を閉じる。
  * 使い終わるたびに呼び、前回予約があれば延長する。
+ * closeDocument の await 中は offscreenClosingPromise で並走中の ensure を待機させる。
  */
 function scheduleOffscreenClose() {
   if (offscreenIdleTimer) clearTimeout(offscreenIdleTimer);
-  offscreenIdleTimer = setTimeout(async () => {
+  offscreenIdleTimer = setTimeout(() => {
     offscreenIdleTimer = null;
     if (!chrome.offscreen) return;
-    try {
-      await chrome.offscreen.closeDocument();
-    } catch {
-      // 既に閉じている場合は無視
-    }
-  }, OFFSCREEN_IDLE_MS);
+    if (offscreenState === "CREATING") return; // 作成中は閉じない
+    offscreenState = "CLOSING";
+    offscreenClosingPromise = chrome.offscreen
+      .closeDocument()
+      .catch(() => {
+        // 既に閉じている場合は無視
+      })
+      .finally(() => {
+        offscreenState = "CLOSED";
+        offscreenClosingPromise = null;
+      });
+  }, Offscreen.IDLE_MS);
 }
 
 /**
  * Offscreen Document 経由でクリップボードのテキストを読み取る。
- * 失敗時は空文字を返す。
+ * offscreen の作成に失敗した場合や sendMessage が失敗した場合は空文字を返す。
  */
 async function readClipboardViaOffscreen() {
-  await ensureOffscreenDocument();
+  const ready = await ensureOffscreenDocument();
+  if (!ready) {
+    // create 失敗時は sendMessage に進まず即時空文字返却（無音の誤信を避ける）
+    return "";
+  }
   try {
     const response = await chrome.runtime.sendMessage({
       target: Offscreen.TARGET,
@@ -271,7 +345,8 @@ async function readClipboardViaOffscreen() {
  */
 async function writeClipboardViaOffscreen(text) {
   if (!text) return false;
-  await ensureOffscreenDocument();
+  const ready = await ensureOffscreenDocument();
+  if (!ready) return false;
   try {
     const response = await chrome.runtime.sendMessage({
       target: Offscreen.TARGET,

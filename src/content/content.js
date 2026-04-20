@@ -1,9 +1,15 @@
 (function () {
   "use strict";
 
-  // 二重実行防止
-  if (window.__copyPasteAssistRunning) return;
+  // 二重実行防止。
+  // 新フラグ名 `__webRestrictionRemoverRunning` を採用（旧名 `__copyPasteAssistRunning` は
+  // v1.0.x のコピペ特化時代の遺物で現在の多機能化に名前が合わない）。
+  // 拡張機能更新（ページリロードなし）で新旧インスタンスが混在する移行期の二重実行を
+  // 防ぐため、両フラグを OR でチェックし set する（旧コードが先に set していても
+  // 新コードが再実行されない、逆も同様）。
+  if (window.__copyPasteAssistRunning || window.__webRestrictionRemoverRunning) return;
   window.__copyPasteAssistRunning = true;
+  window.__webRestrictionRemoverRunning = true;
 
   /** キャプチャフェーズでブロックしたイベントハンドラ登録簿 */
   const blockHandlers = {};
@@ -25,6 +31,24 @@
    * applyEnabled が複数回呼ばれても全DOM走査は初回のみに抑える。
    */
   let inlineHandlersRemoved = false;
+
+  /**
+   * ユーザー追加の contextmenu 許可ドメイン。storage / メッセージ経由で同期する。
+   * 組み込みパターンは actions.js の ContextMenuAllowlist.BUILTIN_PATTERNS が判定する。
+   */
+  let currentAllowDomains = [];
+
+  /**
+   * 現在の storage 状態の closure キャッシュ。
+   * storage.onChanged の changes には「変化したキー」しか含まれないため、
+   * 変化していないキーの現在値を得るために毎回 storage.local.get するのは
+   * 全フレーム × 変更頻度 × iframe 数 の IPC 爆発を招く。
+   * ここで closure 保持し、各パス（初回 load / APPLY_SETTINGS_CS / storage.onChanged）
+   * で最新値を一貫して更新することで追加 get を不要にする。
+   */
+  let currentEnabled = true;
+  let currentKeepAliveEnabled = false;
+  let currentKeepAliveIntervalMs = KeepAlive.DEFAULT_INTERVAL_MS;
 
   /**
    * 直近の右クリック対象のうち編集可能だった要素をキャッシュする。
@@ -88,6 +112,12 @@
   /**
    * キャプチャフェーズでイベントを横取りしてサイト側のリスナー発火を封じる。
    * document 1箇所のみに登録するため処理負荷は極小。
+   *
+   * 注意: preventDefault は呼ばない。contextmenu に対して呼ぶとネイティブメニュー
+   * まで抑制してしまうため、本拡張の「右クリック解除」の目的と逆になる。
+   * サイト側 capture が content script より先に登録され preventDefault 済みのケース
+   * （document_idle 注入のため起きうる）は本戦術では解消できないため、
+   * 設計上の既知の制限として受容する。
    */
   function blockEvent(eventName) {
     if (blockHandlers[eventName]) return;
@@ -139,7 +169,20 @@
    */
   function applyEnabled(isEnabled, opts) {
     if (isEnabled) {
-      SilentUnlock.EVENTS.forEach(blockEvent);
+      // 許可ホスト（Excel Online / Google Docs / Notion 等）では contextmenu + selectstart を
+      // サイト側に通し、カスタム右クリックメニューとテキスト選択制御を尊重する。
+      // selectstart も通すのは、contextmenu だけ通しても Google Sheets 等でサイト側の
+      // 選択範囲追跡が動かず「コピー項目がグレーアウトする」半壊を起こしうるため。
+      // dragstart ブロックとインラインハンドラ除去・user-select CSS は通常通り作用させる。
+      // currentAllowDomains が後から変化しても再 apply で切り替わるよう毎回判定する。
+      const allowCustomMenu = ContextMenuAllowlist.isAllowed(location.hostname, currentAllowDomains);
+      for (const ev of SilentUnlock.EVENTS) {
+        if (allowCustomMenu && (ev === "contextmenu" || ev === "selectstart")) {
+          unblockEvent(ev);
+        } else {
+          blockEvent(ev);
+        }
+      }
       removeInlineHandlers();
       document.documentElement.classList.add(SilentUnlock.CSS_CLASS_SELECT);
       if (opts?.requestMwRemove) {
@@ -305,20 +348,50 @@
   }
 
   // ---------- メッセージ受信 ----------
-  chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  // content script へのメッセージは background (Service Worker) 由来のみ許可する。
+  // 同一拡張内の popup / 他 content script / offscreen から APPLY_SETTINGS_CS を偽装されて
+  // currentAllowDomains 上書き等の挙動差し替えを受けないよう二層防御を固める。
+  const _expectedBackgroundUrl = chrome.runtime.getURL("src/background/background.js");
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (
+      sender?.id !== chrome.runtime.id ||
+      sender?.tab ||
+      sender?.url !== _expectedBackgroundUrl
+    ) {
+      return;
+    }
     if (request.action === Actions.APPLY_SETTINGS_CS) {
       const enabled = request.data?.enabled === true;
-      // chrome.tabs.sendMessage が frameId 未指定でも iframe に届くケースへの防衛ガード。
-      // MW 除去は background 側で allFrames: true で実行されるため、トップフレームから 1 回送れば十分。
-      applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
-      applyKeepAlive(request.data?.keepAliveEnabled === true, request.data?.keepAliveIntervalMs);
+      // 許可ドメインはメッセージに含まれている場合のみ更新する（互換性のため。
+      // 無い場合は storage.onChanged 経由の同期値を維持）。
+      if (Array.isArray(request.data?.contextMenuAllowDomains)) {
+        currentAllowDomains = request.data.contextMenuAllowDomains;
+      }
+      // closure キャッシュを更新（storage.onChanged の追加 get を不要にするため）
+      currentEnabled = enabled;
+      const kaEnabled = request.data?.keepAliveEnabled === true;
+      currentKeepAliveEnabled = kaEnabled;
+      if (Number.isFinite(request.data?.keepAliveIntervalMs)) {
+        currentKeepAliveIntervalMs = request.data.keepAliveIntervalMs;
+      }
+      // MW 除去は background (handleApplySettings) 側で handleApplySettings 直後に
+      // allFrames: true で直接実行されるため、APPLY_SETTINGS_CS 経路からは再送しない。
+      // storage.onChanged 経由の再適用は iframe でも発火するためそちらに一本化する。
+      applyEnabled(enabled, { requestMwRemove: false });
+      applyKeepAlive(kaEnabled, currentKeepAliveIntervalMs);
       sendResponse({ ok: true });
     } else if (request.action === Actions.FORCE_PASTE) {
-      forcePaste();
-      sendResponse({ ok: true });
+      // async 関数の結果を待ってから sendResponse。return true でチャネルを保持する。
+      // これがないと background 側は完了前に「成功」応答を受け取り、失敗を検知できない。
+      forcePaste()
+        .then(() => sendResponse({ ok: true }))
+        .catch(() => sendResponse({ ok: false }));
+      return true;
     } else if (request.action === Actions.FORCE_COPY) {
-      forceCopy(request.data?.selectionText);
-      sendResponse({ ok: true });
+      forceCopy(request.data?.selectionText)
+        .then(() => sendResponse({ ok: true }))
+        .catch(() => sendResponse({ ok: false }));
+      return true;
     }
   });
 
@@ -331,22 +404,34 @@
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
     const enabledChange = changes[StorageKeys.ENABLED];
-    if (enabledChange) {
-      const enabled = enabledChange.newValue === true;
-      applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
+    const allowChange = changes[StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS];
+    const kaEnabledChange = changes[StorageKeys.KEEP_ALIVE_ENABLED];
+    const kaIntervalChange = changes[StorageKeys.KEEP_ALIVE_INTERVAL_MS];
+
+    if (allowChange) {
+      currentAllowDomains = Array.isArray(allowChange.newValue) ? allowChange.newValue : [];
     }
+    if (enabledChange) {
+      currentEnabled = enabledChange.newValue === true;
+    }
+
+    // enabled / allow-list のどちらかが変化したら applyEnabled を再実行。
+    // 現在値は closure の currentEnabled を参照するため追加 storage.get 不要。
+    if (enabledChange || allowChange) {
+      // enabled 変化時のみ MW 除去を再依頼（allow-list のみの変化では不要）。
+      // トップフレームに集約して O(iframe²) 負荷を回避（background は allFrames: true）。
+      const requestMwRemove = !!enabledChange && currentEnabled && isTopFrame;
+      applyEnabled(currentEnabled, { requestMwRemove });
+    }
+
     // セッション維持関連の変更は enabled と独立に処理する（片方だけのトグル変更もあり得るため）。
-    // 現在値は changes.newValue ではなく storage.local.get で取り直す（片方だけの変更だと
-    // もう片方の newValue が changes に入らないため）。
-    if (changes[StorageKeys.KEEP_ALIVE_ENABLED] || changes[StorageKeys.KEEP_ALIVE_INTERVAL_MS]) {
-      chrome.storage.local
-        .get([StorageKeys.KEEP_ALIVE_ENABLED, StorageKeys.KEEP_ALIVE_INTERVAL_MS])
-        .then((result) => {
-          applyKeepAlive(
-            result[StorageKeys.KEEP_ALIVE_ENABLED] === true,
-            result[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
-          );
-        });
+    // changes[key].newValue を直接使い、closure キャッシュも同時に更新。これで追加 get 不要。
+    if (kaEnabledChange || kaIntervalChange) {
+      if (kaEnabledChange) currentKeepAliveEnabled = kaEnabledChange.newValue === true;
+      if (kaIntervalChange && Number.isFinite(kaIntervalChange.newValue)) {
+        currentKeepAliveIntervalMs = kaIntervalChange.newValue;
+      }
+      applyKeepAlive(currentKeepAliveEnabled, currentKeepAliveIntervalMs);
     }
   });
 
@@ -358,13 +443,17 @@
       StorageKeys.ENABLED,
       StorageKeys.KEEP_ALIVE_ENABLED,
       StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+      StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS,
     ])
     .then((result) => {
-      const enabled = result[StorageKeys.ENABLED] !== false;
-      applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
-      applyKeepAlive(
-        result[StorageKeys.KEEP_ALIVE_ENABLED] === true,
-        result[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
-      );
+      currentEnabled = result[StorageKeys.ENABLED] !== false;
+      currentKeepAliveEnabled = result[StorageKeys.KEEP_ALIVE_ENABLED] === true;
+      if (Number.isFinite(result[StorageKeys.KEEP_ALIVE_INTERVAL_MS])) {
+        currentKeepAliveIntervalMs = result[StorageKeys.KEEP_ALIVE_INTERVAL_MS];
+      }
+      const ad = result[StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS];
+      currentAllowDomains = Array.isArray(ad) ? ad : [];
+      applyEnabled(currentEnabled, { requestMwRemove: currentEnabled && isTopFrame });
+      applyKeepAlive(currentKeepAliveEnabled, currentKeepAliveIntervalMs);
     });
 })();

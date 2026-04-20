@@ -13,6 +13,8 @@ jobs:
     name: Chrome Web Store 公開
     runs-on: ubuntu-latest
     steps:
+      # Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の更新 PR を自動生成する。
+      # 現状は major タグのまま運用し、Dependabot の提案で SHA pinned 版に段階移行する。
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v5
 
@@ -41,7 +43,10 @@ jobs:
           node-version: '20'
 
       - name: 依存インストール
-        run: npm ci || npm install
+        # lockfile の整合性を強制するため npm ci のみ。`|| npm install` フォールバックは
+        # lockfile を迂回して最新依存を取得するため、サプライチェーン攻撃の経路になりうる。
+        # lockfile が古い場合は CI を失敗させ、開発者に更新を促す。
+        run: npm ci
 
       - name: アイコン生成
         run: node scripts/generate-icons.js
@@ -60,7 +65,10 @@ jobs:
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
           set +e
-          output=$(npx --yes chrome-webstore-upload-cli@3 upload \
+          # chrome-webstore-upload-cli は devDependencies 経由で固定バージョン + lockfile integrity
+          # 付きでインストール済み（package.json 参照）。npx はローカル node_modules/.bin を使うため
+          # レジストリから再ダウンロードしない（= 実行時改ざんの経路を閉じる）。
+          output=$(npx chrome-webstore-upload-cli upload \
             --source web-restriction-remover.zip \
             --extension-id "$CWS_EXTENSION_ID" \
             --client-id "$CWS_CLIENT_ID" \

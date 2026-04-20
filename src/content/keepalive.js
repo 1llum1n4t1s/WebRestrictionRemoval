@@ -22,7 +22,7 @@
 function createKeepAlive({ intervalMs }) {
   // 初期値も setIntervalMs と同じルールでクランプする
   // （呼び出し側で Number.isFinite チェックを重複させないため）。
-  let currentIntervalMs = clampInterval(intervalMs);
+  let currentIntervalMs = KeepAlive.clampIntervalMs(intervalMs);
   let timerId = null;
   // hostname は location で取得。プリセットマッチは初期化時 1 回だけ行い
   // 以降は tick ごとの再計算を避ける（hostname は frame 内で不変）。
@@ -81,12 +81,9 @@ function createKeepAlive({ intervalMs }) {
       clearInterval(timerId);
       timerId = null;
     },
-    isRunning() {
-      return timerId !== null;
-    },
     /** 稼働中なら新しい間隔で再起動、停止中なら次回 start に反映 */
     setIntervalMs(ms) {
-      const clamped = clampInterval(ms);
+      const clamped = KeepAlive.clampIntervalMs(ms);
       if (clamped === currentIntervalMs) return;
       currentIntervalMs = clamped;
       if (timerId !== null) {
@@ -122,13 +119,3 @@ function shouldFireHttpPing() {
   }
 }
 
-/**
- * ポーリング間隔の値を許容範囲にクランプする。
- * storage 上のユーザー設定値や旧バージョンの残骸値で暴走しないためのガード。
- */
-function clampInterval(ms) {
-  if (!Number.isFinite(ms)) return KeepAlive.DEFAULT_INTERVAL_MS;
-  if (ms < KeepAlive.MIN_INTERVAL_MS) return KeepAlive.MIN_INTERVAL_MS;
-  if (ms > KeepAlive.MAX_INTERVAL_MS) return KeepAlive.MAX_INTERVAL_MS;
-  return ms;
-}

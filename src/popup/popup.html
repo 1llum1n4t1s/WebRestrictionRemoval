@@ -42,6 +42,27 @@
       <input type="range" id="intervalSlider" class="interval-slider" step="1" />
     </div>
 
+    <details class="allowlist-row" id="allowlistRow">
+      <summary class="allowlist-summary">
+        <span class="allowlist-icon">🖱️</span>
+        <span class="allowlist-label">カスタム右クリックを許可するサイト</span>
+      </summary>
+      <p class="allowlist-hint">
+        Office / Google Docs / Notion / Figma 等は初めから許可済みです。<br />
+        追加で許可したいドメインを1行ずつ入力してください（例: <code>example.com</code>）。
+      </p>
+      <textarea
+        id="allowDomainsInput"
+        class="allowlist-textarea"
+        rows="4"
+        spellcheck="false"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        placeholder="example.com&#10;sub.example.org"></textarea>
+      <p class="allowlist-status" id="allowlistStatus"></p>
+    </details>
+
     <section class="description">
       <h2 class="section-title">自動で解除</h2>
       <ul class="feature-list">

@@ -48,7 +48,21 @@ async function writeClipboard(text) {
   return { ok: false };
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // offscreen document へのメッセージは background (Service Worker) 由来のみ許可する。
+  // background の isFromContentScript ゲートを経由せずに offscreen を直接叩く抜け道
+  // （同一拡張内の popup / 他 content script からの直接送信）を塞ぐ二層防御。
+  // - sender.id === chrome.runtime.id: 同一拡張のコンテキスト
+  // - !sender.tab: content script 由来を弾く（content script には sender.tab.id がある）
+  // - sender.url が background SW の URL: popup / 他 offscreen 等の extension ページを弾く
+  const expectedBackgroundUrl = chrome.runtime.getURL("src/background/background.js");
+  if (
+    sender?.id !== chrome.runtime.id ||
+    sender?.tab ||
+    sender?.url !== expectedBackgroundUrl
+  ) {
+    return false;
+  }
   if (msg?.target !== Offscreen.TARGET) return false;
   if (msg?.action === Offscreen.ACTION_READ) {
     readClipboard().then(sendResponse);

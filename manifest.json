@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WEB制限解除サポート",
   "description": "右クリック・テキスト選択を自動解除。右クリックメニューから強制ペースト・強制コピーが可能。",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
