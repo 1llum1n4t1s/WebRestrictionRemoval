@@ -22,6 +22,26 @@
       </div>
     </label>
 
+    <label class="main-toggle" id="keepAliveToggleRow">
+      <div class="toggle-info">
+        <span class="toggle-icon">🔄</span>
+        <span class="toggle-label">セッション維持</span>
+      </div>
+      <div class="toggle-switch">
+        <input type="checkbox" id="keepAliveToggle" />
+        <span class="toggle-slider"></span>
+      </div>
+    </label>
+
+    <!-- min / max / value は popup.js が KeepAlive 定数から動的に設定する（actions.js の単一情報源を守るため） -->
+    <div class="interval-row hidden" id="intervalRow">
+      <div class="interval-header">
+        <span class="interval-label">ポーリング間隔</span>
+        <span class="interval-value" id="intervalValue"></span>
+      </div>
+      <input type="range" id="intervalSlider" class="interval-slider" step="1" />
+    </div>
+
     <section class="description">
       <h2 class="section-title">自動で解除</h2>
       <ul class="feature-list">
@@ -33,6 +53,12 @@
       <ul class="feature-list">
         <li><span class="feat-icon">📋</span>強制ペースト（入力欄で右クリック）</li>
         <li><span class="feat-icon">✂️</span>強制コピー（テキスト選択中に右クリック）</li>
+      </ul>
+
+      <h2 class="section-title">セッション維持</h2>
+      <ul class="feature-list">
+        <li><span class="feat-icon">💤</span>アイドル検知をリセット（合成イベント）</li>
+        <li><span class="feat-icon">🌐</span>SharePoint は同一オリジン ping も追加</li>
       </ul>
     </section>
 

@@ -8,6 +8,17 @@
   /** キャプチャフェーズでブロックしたイベントハンドラ登録簿 */
   const blockHandlers = {};
 
+  // トップフレーム判定（MW 除去の多重送信を防ぐ用途）。cross-origin iframe でも安全に比較できる。
+  const isTopFrame = window === window.top;
+
+  /**
+   * セッション維持ポーラー。初回 applyKeepAlive まで null。
+   * all_frames: true で全 iframe に注入される。合成 mousemove は各フレームの idle 検知用に
+   * 全フレーム発火が必要（他フレームには届かないため）。HTTP ping 側は keepalive.js 内で
+   * クロスオリジン/重複判定をしてから発射する（同一オリジン iframe の N 倍発射を回避）。
+   */
+  let keepAlive = null;
+
   /**
    * インラインハンドラ属性除去を済ませたかのフラグ。
    * 属性は一度消せば DOM ノードのプロパティとして null 化された状態で維持されるため、
@@ -137,6 +148,31 @@
     } else {
       SilentUnlock.EVENTS.forEach(unblockEvent);
       document.documentElement.classList.remove(SilentUnlock.CSS_CLASS_SELECT);
+    }
+  }
+
+  /**
+   * セッション維持機能を有効化/無効化する。
+   * iframe を含む全フレームで動作する（合成 mousemove は各フレームの idle 検知に必要）。
+   * HTTP ping の多重発射回避は keepalive.js 内で shouldFireHttpPing() がクロスオリジン判定する。
+   * 初回呼び出しで createKeepAlive によりポーラーを生成し、以降は同じインスタンスを start/stop/setIntervalMs で制御する。
+   * 値の正規化（非数値・範囲外）は keepalive.js 側に一任する。
+   *
+   * @param {boolean} isEnabled
+   * @param {number | unknown} intervalMs ポーリング間隔候補（数値以外や範囲外は keepalive 内で DEFAULT にクランプ）
+   */
+  function applyKeepAlive(isEnabled, intervalMs) {
+    if (!keepAlive) {
+      // 遅延生成: keepAliveEnabled が一度も true にならないタブでは createKeepAlive を呼ばない
+      if (!isEnabled) return;
+      keepAlive = createKeepAlive({ intervalMs });
+    } else {
+      keepAlive.setIntervalMs(intervalMs);
+    }
+    if (isEnabled) {
+      keepAlive.start();
+    } else {
+      keepAlive.stop();
     }
   }
 
@@ -271,8 +307,11 @@
   // ---------- メッセージ受信 ----------
   chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === Actions.APPLY_SETTINGS_CS) {
-      // popup 由来: トップフレームのみ受信するので MW 除去を依頼する（background が allFrames で全域カバー）
-      applyEnabled(request.data?.enabled === true, { requestMwRemove: true });
+      const enabled = request.data?.enabled === true;
+      // chrome.tabs.sendMessage が frameId 未指定でも iframe に届くケースへの防衛ガード。
+      // MW 除去は background 側で allFrames: true で実行されるため、トップフレームから 1 回送れば十分。
+      applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
+      applyKeepAlive(request.data?.keepAliveEnabled === true, request.data?.keepAliveIntervalMs);
       sendResponse({ ok: true });
     } else if (request.action === Actions.FORCE_PASTE) {
       forcePaste();
@@ -283,10 +322,6 @@
     }
   });
 
-  // トップフレーム判定（1 タブ 1 回に絞って MW 除去の多重送信を防ぐ）。
-  // window === window.top は cross-origin iframe でも安全に比較できる。
-  const isTopFrame = window === window.top;
-
   // ---------- ストレージ変更監視 ----------
   // all_frames: true で iframe にも content script が注入されるため、popup からの
   // APPLY_SETTINGS_CS はアクティブタブのトップフレームにしか届かない。
@@ -295,17 +330,41 @@
   // （background 側は allFrames: true で全フレームに実行するため 1 回で十分）。
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
-    const change = changes[StorageKeys.ENABLED];
-    if (!change) return;
-    const enabled = change.newValue === true;
-    applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
+    const enabledChange = changes[StorageKeys.ENABLED];
+    if (enabledChange) {
+      const enabled = enabledChange.newValue === true;
+      applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
+    }
+    // セッション維持関連の変更は enabled と独立に処理する（片方だけのトグル変更もあり得るため）。
+    // 現在値は changes.newValue ではなく storage.local.get で取り直す（片方だけの変更だと
+    // もう片方の newValue が changes に入らないため）。
+    if (changes[StorageKeys.KEEP_ALIVE_ENABLED] || changes[StorageKeys.KEEP_ALIVE_INTERVAL_MS]) {
+      chrome.storage.local
+        .get([StorageKeys.KEEP_ALIVE_ENABLED, StorageKeys.KEEP_ALIVE_INTERVAL_MS])
+        .then((result) => {
+          applyKeepAlive(
+            result[StorageKeys.KEEP_ALIVE_ENABLED] === true,
+            result[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
+          );
+        });
+    }
   });
 
   // ---------- 初回ロード ----------
   // document_idle で注入されるため DOM は既に安定しており、setTimeout で遅延させる必要はない。
   // むしろ遅延すると blockEvent の登録前にサイト側 contextmenu が発火するリスクが残る。
-  chrome.storage.local.get(StorageKeys.ENABLED).then((result) => {
-    const enabled = result[StorageKeys.ENABLED] !== false;
-    applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
-  });
+  chrome.storage.local
+    .get([
+      StorageKeys.ENABLED,
+      StorageKeys.KEEP_ALIVE_ENABLED,
+      StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+    ])
+    .then((result) => {
+      const enabled = result[StorageKeys.ENABLED] !== false;
+      applyEnabled(enabled, { requestMwRemove: enabled && isTopFrame });
+      applyKeepAlive(
+        result[StorageKeys.KEEP_ALIVE_ENABLED] === true,
+        result[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
+      );
+    });
 })();

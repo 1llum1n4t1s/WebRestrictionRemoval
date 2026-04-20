@@ -32,6 +32,34 @@ const Offscreen = Object.freeze({
 const StorageKeys = Object.freeze({
   /** 拡張機能の有効/無効（単一トグル） */
   ENABLED: "enabled",
+  /** セッション維持機能の有効/無効 */
+  KEEP_ALIVE_ENABLED: "keepAliveEnabled",
+  /** セッション維持のポーリング間隔（ミリ秒） */
+  KEEP_ALIVE_INTERVAL_MS: "keepAliveIntervalMs",
+});
+
+/** @readonly セッション維持機能の定数 */
+const KeepAlive = Object.freeze({
+  /** デフォルトのポーリング間隔（4分 = 300秒以内ターゲットの最もタイトな idle timeout の前に1回ヒット） */
+  DEFAULT_INTERVAL_MS: 4 * 60 * 1000,
+  /** 最小ポーリング間隔（1分） */
+  MIN_INTERVAL_MS: 1 * 60 * 1000,
+  /** 最大ポーリング間隔（15分） */
+  MAX_INTERVAL_MS: 15 * 60 * 1000,
+  /**
+   * サイトプリセット: `test(hostname)` が true の場合、同一オリジン GET を追加実行してサーバー側
+   * スライディングセッションをリフレッシュする（それ以外のサイトは合成イベントのみ）。
+   * 追加する場合は「認証済みで GET 安全（副作用なし）」な軽量エンドポイントを選ぶこと。
+   * Box の Web UI は HTTP ping 対象の公開エンドポイントが明確でないため、合成イベントのみで対応する。
+   */
+  PRESET_ENDPOINTS: Object.freeze([
+    Object.freeze({
+      name: "SharePoint",
+      test: (hostname) =>
+        /(^|\.)sharepoint\.(com|cn|de|us)$/i.test(hostname),
+      paths: Object.freeze(["/_api/web"]),
+    }),
+  ]),
 });
 
 /** @readonly 右クリックメニュー定義 */

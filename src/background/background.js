@@ -7,9 +7,20 @@ importScripts("/src/lib/actions.js");
 //   - 右クリックメニューを現在の ENABLED 状態に合わせて作成
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.storage.local.remove("copyPasteSettings").catch(() => {});
-  const stored = await chrome.storage.local.get(StorageKeys.ENABLED);
-  if (!(StorageKeys.ENABLED in stored)) {
-    await chrome.storage.local.set({ [StorageKeys.ENABLED]: true });
+  const stored = await chrome.storage.local.get([
+    StorageKeys.ENABLED,
+    StorageKeys.KEEP_ALIVE_ENABLED,
+    StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+  ]);
+  const defaults = {};
+  if (!(StorageKeys.ENABLED in stored)) defaults[StorageKeys.ENABLED] = true;
+  // セッション維持はオプトイン（Default OFF）。HTTP ping を勝手に始めないため。
+  if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
+  if (!(StorageKeys.KEEP_ALIVE_INTERVAL_MS in stored)) {
+    defaults[StorageKeys.KEEP_ALIVE_INTERVAL_MS] = KeepAlive.DEFAULT_INTERVAL_MS;
+  }
+  if (Object.keys(defaults).length > 0) {
+    await chrome.storage.local.set(defaults);
   }
   await updateContextMenus();
 });
@@ -97,10 +108,28 @@ async function getActiveTab() {
 /**
  * Popup から有効/無効切替を受けた際の処理。
  * storage 保存 → 右クリックメニュー更新 → content script へ通知 → メインワールド除去。
+ *
+ * `settings` は popup からの単一メッセージで制限解除トグルとセッション維持設定の両方を運ぶ:
+ *   - `enabled`: 制限解除トグル
+ *   - `keepAliveEnabled`: セッション維持トグル
+ *   - `keepAliveIntervalMs`: ポーリング間隔（範囲外の値は content script 側でクランプ）
+ *
+ * MW インラインハンドラ除去は `enabled=true` のときのみ行うが、セッション維持のみ変更する
+ * ケースでも active tab の content script には APPLY_SETTINGS_CS を届けて即時反映する
+ * （storage.onChanged でも非アクティブタブ含め全タブ・全フレームに追従する）。
  */
 async function handleApplySettings(settings) {
   const enabled = !!settings?.enabled;
-  await chrome.storage.local.set({ [StorageKeys.ENABLED]: enabled });
+  const keepAliveEnabled = !!settings?.keepAliveEnabled;
+  const keepAliveIntervalMs = Number.isFinite(settings?.keepAliveIntervalMs)
+    ? settings.keepAliveIntervalMs
+    : KeepAlive.DEFAULT_INTERVAL_MS;
+
+  await chrome.storage.local.set({
+    [StorageKeys.ENABLED]: enabled,
+    [StorageKeys.KEEP_ALIVE_ENABLED]: keepAliveEnabled,
+    [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: keepAliveIntervalMs,
+  });
   await updateContextMenus();
 
   const tab = await getActiveTab();
@@ -116,7 +145,7 @@ async function handleApplySettings(settings) {
 
   await chrome.tabs.sendMessage(tab.id, {
     action: Actions.APPLY_SETTINGS_CS,
-    data: { enabled },
+    data: { enabled, keepAliveEnabled, keepAliveIntervalMs },
   }).catch(() => {});
 
   if (enabled) {
