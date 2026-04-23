@@ -6,8 +6,11 @@
  * 動作:
  *   - `start()` で `intervalMs` 間隔の `setInterval` 起動、`stop()` で停止
  *   - 毎 tick:
- *     A) document に合成 `mousemove` を dispatch（サイト側 JS のアイドル検知をリセット）
- *     B) `KeepAlive.PRESET_ENDPOINTS` にマッチしたサイトでは同一オリジン GET を fire-and-forget
+ *     A) `window` / `document` に複数の合成アクティビティを dispatch
+ *        （サイト側 JS のアイドル検知をリセット）
+ *     B) 同一オリジン HTTP ping を fire-and-forget
+ *        - `KeepAlive.PRESET_ENDPOINTS` があれば専用 GET を優先
+ *        - それ以外は現在 URL / origin root に軽量 HEAD を試す
  *        （サーバー側のスライディングセッションをリフレッシュ）
  *   - 全ての失敗は catch で握り潰す（サイレントスキップ方針）
  *
@@ -27,8 +30,11 @@ function createKeepAlive({ intervalMs }) {
   // hostname は location で取得。プリセットマッチは初期化時 1 回だけ行い
   // 以降は tick ごとの再計算を避ける（hostname は frame 内で不変）。
   const matchedPaths = collectMatchedPaths(location.hostname);
-  // HTTP ping を発射するか（iframe 多重発射を避けつつ「アプリが iframe 内にある」ケースもカバー）
-  const httpPingAllowed = matchedPaths.length > 0 && shouldFireHttpPing();
+  // HTTP ping 候補は初期化時に固定し、成功した候補を以後再利用する。
+  // 毎 tick の URL 構築や 405 fallback 判定を避けるため。
+  const httpPingCandidates = collectHttpPingCandidates();
+  let selectedPingCandidate = httpPingCandidates[0] ?? null;
+  let pingInFlight = false;
 
   function collectMatchedPaths(hostname) {
     const paths = [];
@@ -40,30 +46,133 @@ function createKeepAlive({ intervalMs }) {
     return paths;
   }
 
-  function tick() {
-    // A) 合成 mousemove — 各フレームのサイト側アイドル検知（SessionTimeoutManager 等）のリセット用。
-    //    iframe でも独立に必要（mousemove は frame 内に閉じるため親から届かない）。
+  function collectHttpPingCandidates() {
+    // iframe 多重発射を避けつつ「アプリ本体が iframe 内にある」ケースは許可する。
+    if (!shouldFireHttpPing()) return [];
+
+    let currentUrl = null;
     try {
-      document.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));
+      currentUrl = new URL(location.href);
     } catch {
-      // 環境次第で MouseEvent constructor が使えないケースの保険
+      return [];
     }
-    // B) HTTP ping — 同一オリジンの重複発射を避けるため httpPingAllowed で絞る。
-    //    credentials: "include" はデフォルトで同一オリジンでは有効だが、意図を明示する。
-    //    keepalive: true はタブが閉じられても送信継続させるため。
-    if (!httpPingAllowed) return;
+    if (!/^https?:$/i.test(currentUrl.protocol)) return [];
+
+    const candidates = [];
+    const seen = new Set();
+    const pushCandidate = (candidate) => {
+      const key = candidate.method + " " + candidate.url;
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push(candidate);
+    };
+
     for (const path of matchedPaths) {
+      pushCandidate({
+        method: "GET",
+        url: new URL(path, currentUrl.origin).href,
+      });
+    }
+
+    // 汎用 fallback:
+    //   1. 現在 URL に HEAD（副作用と転送量を抑えつつ認証済みリソースに触れる）
+    //   2. origin root に HEAD（深い SPA ルートや 405/404 に備える）
+    currentUrl.hash = "";
+    currentUrl.search = "";
+    pushCandidate({ method: "HEAD", url: currentUrl.href });
+    pushCandidate({ method: "HEAD", url: currentUrl.origin + "/" });
+
+    return candidates;
+  }
+
+  function dispatchEventToTargets(targets, type, EventCtor, init) {
+    for (const target of targets) {
+      if (!target) continue;
       try {
-        fetch(path, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          keepalive: true,
-        }).catch(() => {});
+        target.dispatchEvent(new EventCtor(type, init));
       } catch {
-        // Manifest 等で fetch が禁止される異常環境用の保険
+        // 一部 ctor 非対応環境や dispatch 不可オブジェクトは黙って飛ばす
       }
     }
+  }
+
+  function dispatchSyntheticActivity() {
+    const bubbleTargets = [document, window];
+    dispatchEventToTargets(
+      bubbleTargets,
+      "mousemove",
+      MouseEvent,
+      { bubbles: true, cancelable: false, clientX: 0, clientY: 0, screenX: 0, screenY: 0 }
+    );
+
+    if (typeof PointerEvent === "function") {
+      dispatchEventToTargets(
+        bubbleTargets,
+        "pointermove",
+        PointerEvent,
+        {
+          bubbles: true,
+          cancelable: false,
+          clientX: 0,
+          clientY: 0,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+        }
+      );
+    }
+
+    // `scroll` / `focus` を軽く送って、mousemove 以外を見ている idle detector にも寄せる。
+    // クリック / keydown のような副作用を誘発しやすいイベントは送らない。
+    dispatchEventToTargets([document, window], "scroll", Event, { bubbles: false, cancelable: false });
+    dispatchEventToTargets([window], "focus", Event, { bubbles: false, cancelable: false });
+  }
+
+  async function tryHttpPing(candidate) {
+    try {
+      const response = await fetch(candidate.url, {
+        method: candidate.method,
+        credentials: "include",
+        cache: "no-store",
+        keepalive: true,
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function runHttpPing() {
+    if (httpPingCandidates.length === 0 || pingInFlight) return;
+    pingInFlight = true;
+    try {
+      if (selectedPingCandidate && await tryHttpPing(selectedPingCandidate)) {
+        return;
+      }
+      for (const candidate of httpPingCandidates) {
+        if (
+          selectedPingCandidate &&
+          candidate.method === selectedPingCandidate.method &&
+          candidate.url === selectedPingCandidate.url
+        ) {
+          continue;
+        }
+        if (await tryHttpPing(candidate)) {
+          selectedPingCandidate = candidate;
+          return;
+        }
+      }
+    } finally {
+      pingInFlight = false;
+    }
+  }
+
+  function tick() {
+    // A) 合成アクティビティ束 — 各フレームのサイト側アイドル検知
+    //    （SessionTimeoutManager / pointer 系 / focus 系）を幅広くリセットする。
+    dispatchSyntheticActivity();
+    // B) HTTP ping — 重いページ GET を毎回投げないよう、成功した候補を以後再利用する。
+    runHttpPing().catch(() => {});
   }
 
   return {
@@ -118,4 +227,3 @@ function shouldFireHttpPing() {
     return true;
   }
 }
-

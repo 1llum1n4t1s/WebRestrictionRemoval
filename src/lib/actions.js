@@ -54,9 +54,10 @@ const KeepAlive = Object.freeze({
   MAX_INTERVAL_MS: 15 * 60 * 1000,
   /**
    * サイトプリセット: `test(hostname)` が true の場合、同一オリジン GET を追加実行してサーバー側
-   * スライディングセッションをリフレッシュする（それ以外のサイトは合成イベントのみ）。
+   * スライディングセッションをリフレッシュする（それ以外のサイトは keepalive.js 側で
+   * 現在 URL / origin root への軽量 HEAD ping をフォールバックとして試す）。
    * 追加する場合は「認証済みで GET 安全（副作用なし）」な軽量エンドポイントを選ぶこと。
-   * Box の Web UI は HTTP ping 対象の公開エンドポイントが明確でないため、合成イベントのみで対応する。
+   * Box の Web UI は専用 GET の公開エンドポイントが明確でないため、汎用 HEAD fallback に委ねる。
    */
   PRESET_ENDPOINTS: Object.freeze([
     Object.freeze({

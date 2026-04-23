@@ -19,7 +19,7 @@
 
   /**
    * セッション維持ポーラー。初回 applyKeepAlive まで null。
-   * all_frames: true で全 iframe に注入される。合成 mousemove は各フレームの idle 検知用に
+   * all_frames: true で全 iframe に注入される。合成アクティビティ束は各フレームの idle 検知用に
    * 全フレーム発火が必要（他フレームには届かないため）。HTTP ping 側は keepalive.js 内で
    * クロスオリジン/重複判定をしてから発射する（同一オリジン iframe の N 倍発射を回避）。
    */
@@ -196,7 +196,7 @@
 
   /**
    * セッション維持機能を有効化/無効化する。
-   * iframe を含む全フレームで動作する（合成 mousemove は各フレームの idle 検知に必要）。
+   * iframe を含む全フレームで動作する（合成アクティビティ束は各フレームの idle 検知に必要）。
    * HTTP ping の多重発射回避は keepalive.js 内で shouldFireHttpPing() がクロスオリジン判定する。
    * 初回呼び出しで createKeepAlive によりポーラーを生成し、以降は同じインスタンスを start/stop/setIntervalMs で制御する。
    * 値の正規化（非数値・範囲外）は keepalive.js 側に一任する。
