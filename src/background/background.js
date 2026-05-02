@@ -3,7 +3,7 @@ importScripts("/src/lib/actions.js");
 // ---------- 初期化 ----------
 // onInstalled: 初回インストール/アップデート時
 //   - 旧バージョンの設定キー（copyPasteSettings）をクリーンアップ
-//   - ENABLED が未設定ならデフォルト ON
+//   - ENABLED が未設定ならデフォルト OFF（ユーザーが意図的に ON にした時のみ動作させるオプトイン方針）
 //   - 右クリックメニューを現在の ENABLED 状態に合わせて作成
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.storage.local.remove("copyPasteSettings").catch(() => {});
@@ -12,9 +12,18 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
     StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS,
+    StorageKeys.YT_SHORTS_REMOVAL_ENABLED,
+    StorageKeys.SEARCH_FIXER_ENABLED,
+    StorageKeys.SEARCH_FIXER_FEATURES,
+    StorageKeys.SEARCH_FIXER_GRID_ITEMS,
+    StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_ENABLED,
   ]);
   const defaults = {};
-  if (!(StorageKeys.ENABLED in stored)) defaults[StorageKeys.ENABLED] = true;
+  // 制限解除はオプトイン（Default OFF）。インストール直後にサイト挙動を勝手に書き換えないため、
+  // ユーザーが popup で明示的に ON にしたときのみ右クリック/選択ブロックの解除と
+  // インラインハンドラ除去・右クリックメニュー登録を始める。
+  if (!(StorageKeys.ENABLED in stored)) defaults[StorageKeys.ENABLED] = false;
   // セッション維持はオプトイン（Default OFF）。HTTP ping を勝手に始めないため。
   if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
   if (!(StorageKeys.KEEP_ALIVE_INTERVAL_MS in stored)) {
@@ -23,6 +32,31 @@ chrome.runtime.onInstalled.addListener(async () => {
   // カスタム右クリック許可リストは初期空（組み込みパターンのみが効く）
   if (!(StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS in stored)) {
     defaults[StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS] = [];
+  }
+  // YouTube Shorts 削除はオプトイン（Default OFF）。"web 制限解除" が主軸のため
+  // YouTube 専用 DOM 改変を勝手に始めず、ユーザーが明示的に ON にしたときのみ動かす。
+  if (!(StorageKeys.YT_SHORTS_REMOVAL_ENABLED in stored)) {
+    defaults[StorageKeys.YT_SHORTS_REMOVAL_ENABLED] = false;
+  }
+  // YouTube Search Fixer もマスター OFF + 全機能 OFF + グリッド自動 で初期化（オプトイン方針）。
+  if (!(StorageKeys.SEARCH_FIXER_ENABLED in stored)) {
+    defaults[StorageKeys.SEARCH_FIXER_ENABLED] = false;
+  }
+  if (!(StorageKeys.SEARCH_FIXER_FEATURES in stored)) {
+    defaults[StorageKeys.SEARCH_FIXER_FEATURES] = SearchFixer.mergeFeatures({});
+  }
+  if (!(StorageKeys.SEARCH_FIXER_GRID_ITEMS in stored)) {
+    defaults[StorageKeys.SEARCH_FIXER_GRID_ITEMS] = 0;
+  }
+  // Amazon 定期おトク便の合計表示もオプトイン（Default OFF）。
+  // ページに DOM 挿入を行うため、ユーザーが意図的に有効化したときのみ動かす。
+  if (!(StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED in stored)) {
+    defaults[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] = false;
+  }
+  // 音量ブースターもオプトイン（Default OFF）。tabCapture でタブ音声を取得するため、
+  // ユーザーが明示的に有効化したときのみ動かす。OFF 時はマイク的な許可ダイアログも出ない。
+  if (!(StorageKeys.VOLUME_BOOSTER_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_ENABLED] = false;
   }
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);
@@ -44,16 +78,12 @@ chrome.runtime.onStartup.addListener(() => {
 updateContextMenus().catch(() => {});
 
 // ---------- sender 検証ヘルパー ----------
-// popup / option ページ由来: sender.tab が undefined、sender.id が自拡張の id
-// content script 由来:        sender.tab.id が存在
-// 外部 Web ページからの送信は manifest に externally_connectable が無い限り到達しないが、
-// content script が XSS 等で乗っ取られた場合の間接操作を閉じるためハンドラごとに明示検証する。
-function isFromPopup(sender) {
-  return sender?.id === chrome.runtime.id && !sender?.tab;
-}
-function isFromContentScript(sender) {
-  return sender?.id === chrome.runtime.id && typeof sender?.tab?.id === "number";
-}
+// 検証ロジックは actions.js の SenderCheck に集約。background 由来チェックは三層
+// （id + !tab + url 一致）で popup / offscreen / option page を厳密に区別する。
+// 旧実装の isFromPopup は !sender.tab だけを見ていたため offscreen 等が popup と
+// 誤認される脆弱性があった（指摘 #11）。
+const isFromPopup = SenderCheck.isFromPopup;
+const isFromContentScript = SenderCheck.isFromContentScript;
 
 // ---------- メッセージハンドラ ----------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -89,7 +119,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then((ok) => sendResponse({ ok }))
       .catch(() => sendResponse({ ok: false }));
     return true;
+  } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
+    // 音量ブースト変更は popup 由来のみ。content script からの叩きは遮断する。
+    // tabCapture は user gesture が要求されるが、popup の input 操作は user gesture として
+    // 認められるため、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
+    if (!isFromPopup(sender)) return;
+    setVolumeBoosterGain(request.data?.tabId, request.data?.gain)
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  } else if (request.action === Actions.VOLUME_BOOSTER_GET_GAIN) {
+    if (!isFromPopup(sender)) return;
+    getVolumeBoosterGain(request.data?.tabId)
+      .then((res) => sendResponse(res))
+      .catch(() => sendResponse({ gain: null }));
+    return true;
+  } else if (request.action === Actions.VOLUME_BOOSTER_RELEASE_ALL) {
+    if (!isFromPopup(sender)) return;
+    releaseAllVolumeBoosts()
+      .then((res) => sendResponse(res))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
   }
+});
+
+// ---------- タブクローズで音量ブーストを解放 ----------
+// chrome.tabs.onRemoved は permission 不要で永続的に発火する。タブを閉じた瞬間に
+// SW が眠っていてもイベントで起動するため、AudioContext の取り残しを防げる。
+chrome.tabs.onRemoved.addListener((tabId) => {
+  // offscreen が無くてもメッセージは receiver 不在で空応答になるため、軽く投げて握り潰す。
+  // ensureOffscreenDocument は呼ばない（タブクローズだけで offscreen を起こすのは無駄）。
+  chrome.runtime.sendMessage({
+    target: Offscreen.TARGET,
+    action: Offscreen.ACTION_VOLUME_RELEASE_TAB,
+    tabId,
+  }).catch(() => {});
 });
 
 // ---------- 右クリックメニュー クリック ----------
@@ -142,14 +206,41 @@ async function handleApplySettings(settings) {
   const contextMenuAllowDomains = Array.isArray(settings?.contextMenuAllowDomains)
     ? settings.contextMenuAllowDomains.filter((d) => typeof d === "string" && d.length > 0)
     : [];
+  // YouTube Shorts 削除トグル。メイン enabled と独立にオプトイン。
+  const ytShortsRemovalEnabled = !!settings?.ytShortsRemovalEnabled;
+  // YouTube Search Fixer マスタートグルと個別機能オブジェクト・グリッド列数。
+  const searchFixerEnabled = !!settings?.searchFixerEnabled;
+  const searchFixerFeatures = SearchFixer.mergeFeatures(settings?.searchFixerFeatures);
+  const searchFixerGridItems = SearchFixer.clampGridItems(settings?.searchFixerGridItems);
+  // Amazon 定期おトク便 月別合計表示マスタートグル。
+  const amazonDeliveryTotalEnabled = !!settings?.amazonDeliveryTotalEnabled;
+  // 音量ブースターマスタートグル。OFF なら必ず全タブを release する。
+  // TOCTOU 競合 (#9): 旧実装は storage.get → set の間に別の APPLY_SETTINGS が割り込むと
+  // wasEnabled の判定がずれて release 漏れになるリスクがあった。新値が false なら無条件で
+  // releaseAllVolumeBoosts を呼ぶ設計に変更（offscreen 不在時は no-op で冪等）。
+  // これにより read-before-write を排除し、storage.get の 1 IPC も削減 (#17)。
+  const volumeBoosterEnabled = !!settings?.volumeBoosterEnabled;
 
   await chrome.storage.local.set({
     [StorageKeys.ENABLED]: enabled,
     [StorageKeys.KEEP_ALIVE_ENABLED]: keepAliveEnabled,
     [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: keepAliveIntervalMs,
     [StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS]: contextMenuAllowDomains,
+    [StorageKeys.YT_SHORTS_REMOVAL_ENABLED]: ytShortsRemovalEnabled,
+    [StorageKeys.SEARCH_FIXER_ENABLED]: searchFixerEnabled,
+    [StorageKeys.SEARCH_FIXER_FEATURES]: searchFixerFeatures,
+    [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: searchFixerGridItems,
+    [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: amazonDeliveryTotalEnabled,
+    [StorageKeys.VOLUME_BOOSTER_ENABLED]: volumeBoosterEnabled,
   });
   await updateContextMenus();
+
+  // 音量ブースター: 新値が false なら無条件に release。
+  // OFF→OFF でも releaseAllVolumeBoosts は audioStates が空なら即 return するため冪等。
+  // TOCTOU を構造的に排除し、wasEnabled の get を不要にした (#9, #17)。
+  if (!volumeBoosterEnabled) {
+    await releaseAllVolumeBoosts().catch(() => {});
+  }
 
   const tab = await getActiveTab();
   if (!tab?.id) return;
@@ -167,8 +258,70 @@ async function handleApplySettings(settings) {
     data: { enabled, keepAliveEnabled, keepAliveIntervalMs, contextMenuAllowDomains },
   }).catch(() => {});
 
+  // YouTube 系 content script (Shorts 削除 + Search Fixer) は matches=youtube.com 限定。
+  // 非 YouTube タブに送ると receiver 不在で例外を投げるため URL 判定でガードする。
+  // 非アクティブな YouTube タブは chrome.storage.onChanged 経由で自然に同期される。
+  if (isYouTubeUrl(url)) {
+    // Shorts 削除と Search Fixer は独立した content script で並行実行可能 (#26)。
+    // 旧実装は逐次 await で 1 RTT 余計にかかっていた。
+    await Promise.all([
+      chrome.tabs.sendMessage(tab.id, {
+        action: Actions.APPLY_YT_SHORTS_CS,
+        data: { enabled: ytShortsRemovalEnabled },
+      }).catch(() => {}),
+      chrome.tabs.sendMessage(tab.id, {
+        action: Actions.APPLY_SEARCH_FIXER_CS,
+        data: {
+          enabled: searchFixerEnabled,
+          features: searchFixerFeatures,
+          gridItems: searchFixerGridItems,
+        },
+      }).catch(() => {}),
+    ]);
+  }
+
+  // Amazon 定期おトク便 content script は `*://www.amazon.co.jp/auto-deliveries*` 限定。
+  // 非対象タブへの送信は receiver 不在で例外になるため URL 判定でガード。
+  if (isAmazonAutoDeliveryUrl(url)) {
+    await chrome.tabs.sendMessage(tab.id, {
+      action: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS,
+      data: { enabled: amazonDeliveryTotalEnabled },
+    }).catch(() => {});
+  }
+
   if (enabled) {
     await removeInlineHandlersInMainWorld(tab.id);
+  }
+}
+
+/**
+ * URL が youtube.com サブドメインかを判定する（content_scripts.matches "*://*.youtube.com/*" と一致）。
+ * `*.youtube.com` の suffix match のみ。`example-youtube.com` のような偽装は弾く。
+ */
+function isYouTubeUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    return h === "youtube.com" || h.endsWith(".youtube.com");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * URL が Amazon.co.jp の定期おトク便ページかを判定する
+ * （content_scripts.matches "*://www.amazon.co.jp/auto-deliveries*" と一致）。
+ * hostname の厳密一致 + パスの prefix チェック。サブドメインや偽装は受け付けない。
+ */
+function isAmazonAutoDeliveryUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    if (u.hostname.toLowerCase() !== "www.amazon.co.jp") return false;
+    return u.pathname.startsWith("/auto-deliveries");
+  } catch {
+    return false;
   }
 }
 
@@ -261,8 +414,11 @@ async function ensureOffscreenDocument() {
   offscreenCreatingPromise = chrome.offscreen
     .createDocument({
       url: Offscreen.PATH,
-      reasons: ["CLIPBOARD"],
-      justification: "強制ペースト機能のためにクリップボードを読み取り",
+      // クリップボード + 音量ブースター用の tabCapture (USER_MEDIA) + AudioContext 出力
+      // (AUDIO_PLAYBACK) を 1 つの offscreen で扱う。Chrome は 1 拡張 1 offscreen 制約。
+      reasons: Offscreen.REASONS,
+      justification:
+        "強制ペースト機能のクリップボード読取と、音量ブースター機能の AudioContext 維持のため",
     })
     .then(() => {
       offscreenState = "OPEN";
@@ -297,10 +453,18 @@ async function ensureOffscreenDocument() {
  */
 function scheduleOffscreenClose() {
   if (offscreenIdleTimer) clearTimeout(offscreenIdleTimer);
-  offscreenIdleTimer = setTimeout(() => {
+  offscreenIdleTimer = setTimeout(async () => {
     offscreenIdleTimer = null;
     if (!chrome.offscreen) return;
     if (offscreenState === "CREATING") return; // 作成中は閉じない
+    // 音量ブースト中のタブが残っている場合は close を抑止する。
+    // close すると AudioContext が解放されて音が一瞬で 100% に戻ってしまうため、
+    // ユーザー体験的に NG。代わりに次のアイドル close を再スケジュールして
+    // 「ブースト解除されるまで」 close を保留する。
+    if (await isVolumeBoosterActive()) {
+      scheduleOffscreenClose();
+      return;
+    }
     offscreenState = "CLOSING";
     offscreenClosingPromise = chrome.offscreen
       .closeDocument()
@@ -315,6 +479,49 @@ function scheduleOffscreenClose() {
 }
 
 /**
+ * Offscreen に「現在 boost 中のタブ数」を問い合わせ、1 件以上なら true を返す。
+ * 通信失敗（offscreen が無い等）は false に倒す。
+ */
+async function isVolumeBoosterActive() {
+  // SW 再起動直後など offscreen との通信が一瞬失敗するケースで、誤って close を走らせると
+  // 進行中のブーストが無音になる。安全策として「通信失敗時はブースト中の可能性あり」と倒す。
+  // ただし offscreen 文書自体が存在しない場合は確実にブーストもないので getContexts で先に確認する。
+  if (typeof chrome.runtime.getContexts !== "function") {
+    // getContexts API 未対応環境（古い Chrome）では sendMessage 結果を信じるしかない
+    try {
+      const res = await chrome.runtime.sendMessage({
+        target: Offscreen.TARGET,
+        action: Offscreen.ACTION_VOLUME_QUERY_ACTIVE,
+      });
+      return Number(res?.activeCount ?? 0) > 0;
+    } catch {
+      return false; // フォールバック: 古い環境では従来通り
+    }
+  }
+  try {
+    const url = chrome.runtime.getURL(Offscreen.PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (contexts.length === 0) return false; // offscreen 不在 = ブースト不可能
+  } catch {
+    // getContexts 自体の失敗は安全側に倒す（close を保留）
+    return true;
+  }
+  try {
+    const res = await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_VOLUME_QUERY_ACTIVE,
+    });
+    return Number(res?.activeCount ?? 0) > 0;
+  } catch {
+    // offscreen は存在するが通信失敗 → SW 再起動直後の可能性あり、安全側で active 扱い
+    return true;
+  }
+}
+
+/**
  * Offscreen Document 経由でクリップボードのテキストを読み取る。
  * offscreen の作成に失敗した場合や sendMessage が失敗した場合は空文字を返す。
  */
@@ -324,6 +531,8 @@ async function readClipboardViaOffscreen() {
     // create 失敗時は sendMessage に進まず即時空文字返却（無音の誤信を避ける）
     return "";
   }
+  // closeDocument の非同期破棄と次の sendMessage の間で receiver 不在の競合が起きうる (#16)。
+  // 1 回だけ ensure → retry を入れて回復可能性を上げる。リトライしても失敗する場合は諦める。
   try {
     const response = await chrome.runtime.sendMessage({
       target: Offscreen.TARGET,
@@ -331,7 +540,18 @@ async function readClipboardViaOffscreen() {
     });
     return response?.text ?? "";
   } catch {
-    return "";
+    // receiver 不在 → ensure 再実行 → リトライ
+    try {
+      const ok = await ensureOffscreenDocument();
+      if (!ok) return "";
+      const response = await chrome.runtime.sendMessage({
+        target: Offscreen.TARGET,
+        action: Offscreen.ACTION_READ,
+      });
+      return response?.text ?? "";
+    } catch {
+      return "";
+    }
   } finally {
     scheduleOffscreenClose();
   }
@@ -347,6 +567,7 @@ async function writeClipboardViaOffscreen(text) {
   if (!text) return false;
   const ready = await ensureOffscreenDocument();
   if (!ready) return false;
+  // closeDocument 非同期破棄レース対策で 1 回リトライする (#16)。
   try {
     const response = await chrome.runtime.sendMessage({
       target: Offscreen.TARGET,
@@ -355,10 +576,171 @@ async function writeClipboardViaOffscreen(text) {
     });
     return !!response?.ok;
   } catch {
-    return false;
+    try {
+      const ok = await ensureOffscreenDocument();
+      if (!ok) return false;
+      const response = await chrome.runtime.sendMessage({
+        target: Offscreen.TARGET,
+        action: Offscreen.ACTION_WRITE,
+        text,
+      });
+      return !!response?.ok;
+    } catch {
+      return false;
+    }
   } finally {
     scheduleOffscreenClose();
   }
+}
+
+
+// ---------- 音量ブースター ヘルパー ----------
+
+/**
+ * 指定タブの音量を設定する。
+ *
+ * フロー:
+ *   1. master トグル `volumeBoosterEnabled` が true でなければ拒否
+ *   2. ensureOffscreenDocument() で offscreen を起こす（reasons には USER_MEDIA / AUDIO_PLAYBACK 含む）
+ *   3. chrome.tabCapture.getMediaStreamId({ targetTabId }) で MediaStream ID を取得
+ *      （これは popup の user gesture が伝播している必要があるが、popup → background の
+ *        sendMessage 連鎖で OK）
+ *   4. offscreen に gain 変更メッセージを送信
+ *   5. アイドル close を再スケジュール（ブースト中はスキップされる）
+ *
+ * @param {number} tabId
+ * @param {number} gain  0-600 の整数（％）
+ * @returns {Promise<{ok: boolean, gain?: number, error?: string}>}
+ */
+async function setVolumeBoosterGain(tabId, gain) {
+  if (!Number.isInteger(tabId) || tabId <= 0) {
+    // #24: NaN / Infinity / 浮動小数点を弾く。typeof "number" だけでは不十分。
+    return { ok: false, error: "invalid-tab-id" };
+  }
+  // master トグルガード（防御的: popup 側でもガードしているが、storage 直接書込みされたケースに備える）
+  const stored = await chrome.storage.local.get(StorageKeys.VOLUME_BOOSTER_ENABLED);
+  if (stored[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) {
+    return { ok: false, error: "master-disabled" };
+  }
+  const ready = await ensureOffscreenDocument();
+  if (!ready) return { ok: false, error: "offscreen-unavailable" };
+
+  const clamped = VolumeBooster.clampValue(gain);
+
+  // #12 最適化: 既に offscreen の audioStates にこのタブの AudioContext がある場合、
+  // streamId は捨てられるだけなので getMediaStreamId 呼出を完全にスキップする。
+  // 廃止予定 API への依存を減らし、スライダードラッグ時の連続コールも削減できる。
+  const existing = await getVolumeBoosterGain(tabId);
+  if (Number.isFinite(existing?.gain)) {
+    try {
+      const res = await chrome.runtime.sendMessage({
+        target: Offscreen.TARGET,
+        action: Offscreen.ACTION_VOLUME_SET_GAIN,
+        tabId,
+        streamId: null, // 既存 AudioContext あり → 不要
+        gain: clamped,
+      });
+      return res ?? { ok: false, error: "no-response" };
+    } catch (err) {
+      // フォールスルーして fresh 取得経路へ
+    } finally {
+      scheduleOffscreenClose();
+    }
+  }
+
+  // 新規接続パス: tabCapture から streamId を取得して offscreen で AudioContext を構築。
+  // tabCapture.getMediaStreamId は user gesture が要求されるが、popup → background の
+  // sendMessage で gesture が伝播するため動作する。
+  let streamId = null;
+  try {
+    streamId = await new Promise((resolve, reject) => {
+      chrome.tabCapture.getMediaStreamId(
+        { targetTabId: tabId },
+        (id) => {
+          const err = chrome.runtime.lastError;
+          if (err) reject(new Error(err.message));
+          else resolve(id);
+        }
+      );
+    });
+  } catch (err) {
+    return { ok: false, error: String(err?.message ?? err) };
+  }
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_VOLUME_SET_GAIN,
+      tabId,
+      streamId,
+      gain: clamped,
+    });
+    return res ?? { ok: false, error: "no-response" };
+  } catch (err) {
+    return { ok: false, error: String(err?.message ?? err) };
+  } finally {
+    scheduleOffscreenClose();
+  }
+}
+
+/**
+ * 指定タブの現在 gain（％）を offscreen から取得する。
+ * offscreen が起動していない場合は null を返す（= 未ブースト = 100% 相当）。
+ */
+async function getVolumeBoosterGain(tabId) {
+  if (typeof tabId !== "number") return { gain: null };
+  // offscreen を起こさずに query する。起動していなければ未ブーストと同義。
+  if (typeof chrome.runtime.getContexts !== "function") return { gain: null };
+  try {
+    const url = chrome.runtime.getURL(Offscreen.PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (contexts.length === 0) return { gain: null };
+  } catch {
+    return { gain: null };
+  }
+  try {
+    const res = await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_VOLUME_GET_GAIN,
+      tabId,
+    });
+    return { gain: res?.gain ?? null };
+  } catch {
+    return { gain: null };
+  }
+}
+
+/**
+ * 全タブの音量ブーストを解放する（master OFF 時に popup から呼ばれる）。
+ * offscreen が無ければ何もしない（既に close 済み）。
+ */
+async function releaseAllVolumeBoosts() {
+  if (typeof chrome.runtime.getContexts !== "function") return { ok: true };
+  try {
+    const url = chrome.runtime.getURL(Offscreen.PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (contexts.length === 0) return { ok: true };
+  } catch {
+    return { ok: true };
+  }
+  try {
+    await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_VOLUME_RELEASE_ALL,
+    });
+  } catch {
+    // 既に閉じている等は無視
+  } finally {
+    // 全 release 後は次のアイドル close で確実に閉じる
+    scheduleOffscreenClose();
+  }
+  return { ok: true };
 }
 
 /**

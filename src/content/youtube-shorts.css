@@ -1,0 +1,49 @@
+/*
+ * YouTube Shorts 削除 CSS。
+ *
+ * youtube-shorts.js が <html> に `__cpa-yt-shorts-hidden` を付けたときだけ有効化される。
+ * MutationObserver による物理削除（SELECTORS_REMOVE）と相補的に動き、
+ * 「DOM から消すと YouTube SPA がエラーを吐くが、表示だけ消したい」要素は CSS 側で隠す。
+ *
+ * !important は YouTube が inline style で表示を上書きしてくる箇所への対抗。
+ */
+
+/* サイドバーの "Shorts" タブ（デスクトップ） */
+html.__cpa-yt-shorts-hidden a[title="Shorts"],
+html.__cpa-yt-shorts-hidden ytd-mini-guide-entry-renderer[aria-label="Shorts"],
+html.__cpa-yt-shorts-hidden ytd-guide-entry-renderer:has(a[title="Shorts"]) {
+  display: none !important;
+}
+
+/* タブシェイプ（チャンネルページ等の Shorts タブ） */
+html.__cpa-yt-shorts-hidden yt-tab-shape[tab-title="Shorts"],
+html.__cpa-yt-shorts-hidden tp-yt-paper-tab:has([title="Shorts"]) {
+  display: none !important;
+}
+
+/* チップクラウドの Shorts チップ（フィルタ用）。aria-label 経由の保険として CSS でも隠す */
+html.__cpa-yt-shorts-hidden yt-chip-cloud-chip-renderer[aria-label="Shorts"] {
+  display: none !important;
+}
+
+/* 棚系（Shorts セクション全体） */
+html.__cpa-yt-shorts-hidden ytd-reel-shelf-renderer,
+html.__cpa-yt-shorts-hidden ytd-reel-shelf-renderer.ytd-item-section-renderer,
+html.__cpa-yt-shorts-hidden ytd-reel-item-renderer,
+html.__cpa-yt-shorts-hidden ytd-rich-shelf-renderer[is-shorts],
+html.__cpa-yt-shorts-hidden grid-shelf-view-model,
+html.__cpa-yt-shorts-hidden ytm-reel-shelf-renderer,
+html.__cpa-yt-shorts-hidden ytm-rich-section-renderer,
+html.__cpa-yt-shorts-hidden ytm-promoted-sparkles-web-renderer {
+  display: none !important;
+}
+
+/* モバイル Web のピボットバー Shorts ボタン */
+html.__cpa-yt-shorts-hidden .pivot-shorts {
+  display: none !important;
+}
+
+/* Shorts ページ自体のコンテナ（リダイレクト前に一瞬表示されるのを抑える） */
+html.__cpa-yt-shorts-hidden #shorts-container {
+  overflow: hidden !important;
+}

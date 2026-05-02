@@ -1,0 +1,61 @@
+/*
+ * YouTube Search Fixer 用 CSS。
+ *
+ * search-fixer.js が要素に付けるクラスへスタイルを当てる責務。
+ * 機能 OFF 時は JS 側がクラスを外すため、ここの定義は active 時のみ作用する。
+ *
+ * クラス命名:
+ *   __cpa-sfx-thumb-{dark,light}  サムネ枠装飾（ダーク/ライト両対応）
+ *   __cpa-sfx-title-center        動画タイトル中央配置
+ *   __cpa-sfx-desc-full           動画説明文フル幅
+ *   cpa-sfx-demoted               キーワード非マッチ動画（デモート）— JS 側で動的注入する CSS と二段構え
+ */
+
+/* ---------- サムネ枠装飾（検索結果） ---------- */
+.__cpa-sfx-thumb-dark {
+  background: #272727;
+  padding: 5px;
+  border-radius: 17px;
+}
+.__cpa-sfx-thumb-light {
+  background: #f2f2f2;
+  padding: 5px;
+  border-radius: 17px;
+}
+
+/* ---------- 動画ページ: タイトル中央配置 ---------- */
+.__cpa-sfx-title-center {
+  display: flex !important;
+  justify-content: center;
+}
+
+/* ---------- 動画ページ: 説明文フル幅 ---------- */
+.__cpa-sfx-desc-full {
+  min-width: 100% !important;
+  text-align: center !important;
+}
+
+/* ---------- 検索結果のミニガイド微調整（元拡張からの慣性） ---------- */
+.ytd-mini-guide-renderer { margin-top: 5px; }
+a.ytd-mini-guide-entry-renderer { padding: 15px 0px; }
+
+/* ---------- 検索結果ページ: チャンネル行のフォントサイズ調整 ---------- */
+[class="style-scope ytd-channel-renderer"] {
+  font-size: 1.4rem;
+  text-align: left;
+}
+
+/* ---------- 動画ページのレイアウト幅拡張（元拡張の慣性） ---------- */
+ytd-watch-flexy[flexy_][is-two-columns_][is-extra-wide-video_]
+  #primary.ytd-watch-flexy,
+ytd-watch-flexy[flexy_][is-two-columns_][is-four-three-to-sixteen-nine-video_]
+  #primary.ytd-watch-flexy {
+  max-width: 90% !important;
+}
+
+/* ---------- ヘッダのホバー時透明化を解除（元拡張の慣性） ---------- */
+#container.ytd-masthead:hover {
+  opacity: 100%;
+  border: none;
+  transition: 20ms;
+}

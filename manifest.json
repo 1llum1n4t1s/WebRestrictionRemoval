@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WEB制限解除サポート",
   "description": "右クリック・テキスト選択を自動解除。右クリックメニューから強制ペースト・強制コピーが可能。",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -28,6 +28,20 @@
       "run_at": "document_idle",
       "all_frames": true,
       "match_origin_as_fallback": true
+    },
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["src/content/youtube-shorts.js", "src/content/search-fixer.js"],
+      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://www.amazon.co.jp/auto-deliveries*"],
+      "js": ["src/content/amazon-delivery-total.js"],
+      "css": ["src/content/amazon-delivery-total.css"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "permissions": [
@@ -37,6 +51,7 @@
     "contextMenus",
     "clipboardRead",
     "clipboardWrite",
-    "offscreen"
+    "offscreen",
+    "tabCapture"
   ]
 }

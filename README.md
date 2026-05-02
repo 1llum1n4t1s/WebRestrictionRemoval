@@ -48,7 +48,7 @@ Excel Online / Google Docs / Notion / Figma 等、**サイト側が独自の右�
 4. 入力欄やテキスト選択中の右クリックメニューから強制ペースト／強制コピーを実行
 5. 必要に応じて「🖱️ カスタム右クリックを許可するサイト」アコーディオンを開き、サイト独自の右クリックメニューを尊重したいドメインを追加
 
-設定は `chrome.storage.local` の `enabled` / `keepAliveEnabled` / `keepAliveIntervalMs` / `contextMenuAllowDomains` に保存され、次回以降も維持されます。初回インストール時のデフォルトは 制限解除=ON / セッション維持=OFF / 許可ドメイン=空（組み込み許可のみ）です。
+設定は `chrome.storage.local` に保存され、次回以降も維持されます（10 個のキー: 各機能のマスタートグル + Search Fixer 個別機能 + ホームグリッド列数 + 許可ドメイン配列）。**初回インストール時のデフォルトは全機能 OFF**（制限解除 OFF / セッション維持 OFF / Shorts 削除 OFF / クリーナー OFF / Amazon 合計 OFF / 音量ブースター OFF / 許可ドメイン空）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。
 
 ## インストール
 
@@ -87,7 +87,7 @@ bash ./zip.sh
 ## 技術詳細
 
 - **Manifest V3** 対応
-- **権限**: `activeTab`, `scripting`, `storage`, `contextMenus`, `clipboardRead`, `clipboardWrite`, `offscreen`
+- **権限**: `activeTab`, `scripting`, `storage`, `contextMenus`, `clipboardRead`, `clipboardWrite`, `offscreen`, `tabCapture`（音量ブースター機能のため）
 - 外部サーバーとの通信なし
 - 個人情報の収集なし
 

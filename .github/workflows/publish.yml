@@ -13,10 +13,11 @@ jobs:
     name: Chrome Web Store 公開
     runs-on: ubuntu-latest
     steps:
-      # Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の更新 PR を自動生成する。
-      # 現状は major タグのまま運用し、Dependabot の提案で SHA pinned 版に段階移行する。
+      # サプライチェーン攻撃対策で SHA ピン留め (#6)。タグは指すコミットを書き換え可能なため
+      # 信頼境界として弱い。Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の
+      # 更新 PR を自動生成するので、そちらをマージして最新化する運用。
       - name: リポジトリをチェックアウト
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
 
       - name: バージョンを取得
         id: version
@@ -38,7 +39,7 @@ jobs:
           echo "✅ ブランチ名と manifest バージョン一致: $expected"
 
       - name: Node セットアップ
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.0.0
         with:
           node-version: '20'
 

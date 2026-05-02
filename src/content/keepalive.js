@@ -130,11 +130,18 @@ function createKeepAlive({ intervalMs }) {
 
   async function tryHttpPing(candidate) {
     try {
+      // credentials: "same-origin" に限定 (#3): クロスオリジン iframe からの ping で
+      // 第三者ドメインに認証情報が送られるのを防ぐ。SharePoint プリセットは同一オリジンなので
+      // 影響なし。汎用フォールバック HEAD は Cookie なしで投げる（同一オリジン解決時のみ
+      // ブラウザが自動付与する）。
+      // タイムアウト追加 (#21): ネットワーク断でリクエストが永遠に解決されず pingInFlight が
+      // ロックされるのを防ぐため、5 秒で abort する。
       const response = await fetch(candidate.url, {
         method: candidate.method,
-        credentials: "include",
+        credentials: "same-origin",
         cache: "no-store",
         keepalive: true,
+        signal: AbortSignal.timeout(5000),
       });
       return response.ok;
     } catch {

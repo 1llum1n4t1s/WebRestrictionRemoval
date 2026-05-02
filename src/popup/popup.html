@@ -4,87 +4,203 @@
   <meta charset="UTF-8" />
   <!-- extension の popup は MV3 既定で厳格 CSP が適用されるが、意図を明示するため宣言 -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
+  <!-- color-scheme: ブラウザに「両モード対応している」と伝え、<input>/<select> 等のネイティブ
+       UI 要素も prefers-color-scheme に合わせて自動で再着色させる。-->
+  <meta name="color-scheme" content="light dark" />
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <div class="popup-container">
-    <h1 class="app-title">🛡️ WEB制限解除サポート</h1>
-    <p class="app-desc">ページ制限を解除するシンプルな拡張機能</p>
-
-    <label class="main-toggle" id="mainToggle">
-      <div class="toggle-info">
-        <span class="toggle-icon">⚡</span>
-        <span class="toggle-label">制限解除</span>
+  <div class="popup-shell">
+    <!-- ===== Header ===== -->
+    <header class="hdr">
+      <div class="hdr-mark" aria-hidden="true">🛡️</div>
+      <div class="hdr-text">
+        <h1 class="hdr-title">WEB制限解除サポート</h1>
+        <p class="hdr-tag">解除 / 維持 / 整理 を 1 つのトグルから</p>
       </div>
-      <div class="toggle-switch">
-        <input type="checkbox" id="enabledToggle" />
-        <span class="toggle-slider"></span>
+    </header>
+
+    <!-- ===== Core Toggles ===== -->
+    <section class="grp" aria-label="基本機能">
+      <h2 class="grp-title">基本機能</h2>
+
+      <label class="toggle-row" id="enabledToggleRow">
+        <span class="tr-icon" aria-hidden="true">⚡</span>
+        <span class="tr-text">
+          <span class="tr-name">制限解除</span>
+          <span class="tr-desc">右クリック・選択・ドラッグの自動解除</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="enabledToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="toggle-row" id="keepAliveToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔄</span>
+        <span class="tr-text">
+          <span class="tr-name">セッション維持</span>
+          <span class="tr-desc">アイドル検知をリセット + 軽量 HTTP ping</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="keepAliveToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- セッション維持 ON 時のみ表示するスライダー -->
+      <div class="sub-block hidden" id="intervalRow">
+        <div class="sub-head">
+          <span class="sub-label">ポーリング間隔</span>
+          <span class="sub-value" id="intervalValue"></span>
+        </div>
+        <input type="range" id="intervalSlider" class="range" step="1" />
       </div>
-    </label>
-
-    <label class="main-toggle" id="keepAliveToggleRow">
-      <div class="toggle-info">
-        <span class="toggle-icon">🔄</span>
-        <span class="toggle-label">セッション維持</span>
-      </div>
-      <div class="toggle-switch">
-        <input type="checkbox" id="keepAliveToggle" />
-        <span class="toggle-slider"></span>
-      </div>
-    </label>
-
-    <!-- min / max / value は popup.js が KeepAlive 定数から動的に設定する（actions.js の単一情報源を守るため） -->
-    <div class="interval-row hidden" id="intervalRow">
-      <div class="interval-header">
-        <span class="interval-label">ポーリング間隔</span>
-        <span class="interval-value" id="intervalValue"></span>
-      </div>
-      <input type="range" id="intervalSlider" class="interval-slider" step="1" />
-    </div>
-
-    <details class="allowlist-row" id="allowlistRow">
-      <summary class="allowlist-summary">
-        <span class="allowlist-icon">🖱️</span>
-        <span class="allowlist-label">カスタム右クリックを許可するサイト</span>
-      </summary>
-      <p class="allowlist-hint">
-        Office / Google Docs / Notion / Figma 等は初めから許可済みです。<br />
-        追加で許可したいドメインを1行ずつ入力してください（例: <code>example.com</code>）。
-      </p>
-      <textarea
-        id="allowDomainsInput"
-        class="allowlist-textarea"
-        rows="4"
-        spellcheck="false"
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        placeholder="example.com&#10;sub.example.org"></textarea>
-      <p class="allowlist-status" id="allowlistStatus"></p>
-    </details>
-
-    <section class="description">
-      <h2 class="section-title">自動で解除</h2>
-      <ul class="feature-list">
-        <li><span class="feat-icon">🖱️</span>右クリック制限</li>
-        <li><span class="feat-icon">✏️</span>テキスト選択制限</li>
-      </ul>
-
-      <h2 class="section-title">右クリックメニューから実行</h2>
-      <ul class="feature-list">
-        <li><span class="feat-icon">📋</span>強制ペースト（入力欄で右クリック）</li>
-        <li><span class="feat-icon">✂️</span>強制コピー（テキスト選択中に右クリック）</li>
-      </ul>
-
-      <h2 class="section-title">セッション維持</h2>
-      <ul class="feature-list">
-        <li><span class="feat-icon">💤</span>複数の合成アクティビティでアイドル検知をリセット</li>
-        <li><span class="feat-icon">🌐</span>SharePoint は専用 ping、その他サイトも軽量 HEAD ping を試行</li>
-      </ul>
     </section>
 
-    <p class="status" id="statusMsg"></p>
+    <!-- ===== YouTube Group ===== -->
+    <section class="grp" aria-label="YouTube">
+      <h2 class="grp-title">
+        <span class="grp-title-text">YouTube</span>
+        <span class="grp-pill">2 機能</span>
+      </h2>
+
+      <label class="toggle-row" id="ytShortsToggleRow">
+        <span class="tr-icon" aria-hidden="true">📺</span>
+        <span class="tr-text">
+          <span class="tr-name">Shorts 削除</span>
+          <span class="tr-desc">サイドバー / 棚を非表示 + URL リダイレクト</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="ytShortsToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="toggle-row" id="searchFixerToggleRow">
+        <span class="tr-icon" aria-hidden="true">🧹</span>
+        <span class="tr-text">
+          <span class="tr-name">YouTube クリーナー</span>
+          <span class="tr-desc">検索結果の不要要素を一括除去</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="searchFixerToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- YouTube クリーナー詳細 -->
+      <details class="accordion" id="cleanerAccordion">
+        <summary class="acc-summary">
+          <span class="acc-icon" aria-hidden="true">⚙️</span>
+          <span class="acc-label">クリーナー詳細設定</span>
+          <span class="acc-count" id="cleanerCount">0/19</span>
+          <span class="acc-chevron" aria-hidden="true"></span>
+        </summary>
+
+        <div class="acc-body">
+          <p class="acc-hint">
+            マスタートグル（クリーナー）が ON のときだけ動作します。
+            個別に ON / OFF を選んでカスタマイズしてください。
+          </p>
+
+          <!-- カテゴリブロックは popup.js が生成する -->
+          <div id="featureCategories"></div>
+
+          <!-- グリッド列数（select）。クリーナー OFF でも storage に保存されるが見た目は dim -->
+          <div class="select-row">
+            <label class="select-label" for="gridItemsSelect">
+              <span class="select-icon" aria-hidden="true">🔢</span>
+              <span class="select-name">ホーム列数</span>
+            </label>
+            <select id="gridItemsSelect" class="select"></select>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ===== Audio Group ===== -->
+    <section class="grp" aria-label="オーディオ">
+      <h2 class="grp-title">
+        <span class="grp-title-text">オーディオ</span>
+      </h2>
+
+      <label class="toggle-row" id="volumeBoosterToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔊</span>
+        <span class="tr-text">
+          <span class="tr-name">音量ブースター</span>
+          <span class="tr-desc">アクティブタブの音量を 0〜600% で増幅</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="volumeBoosterToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- 音量ブースター ON 時のみ表示するスライダー（既存 .sub-block を再利用） -->
+      <div class="sub-block hidden" id="volumeRow">
+        <div class="sub-head">
+          <span class="sub-label">アクティブタブの音量</span>
+          <span class="sub-value" id="volumeValue">100%</span>
+        </div>
+        <input type="range" id="volumeSlider" class="range" />
+        <div class="volume-actions">
+          <button type="button" id="volumeResetBtn" class="ghost-btn" aria-label="音量を 100% に戻す">100% に戻す</button>
+          <span class="volume-hint" id="volumeHint"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Amazon Group ===== -->
+    <section class="grp" aria-label="Amazon">
+      <h2 class="grp-title">
+        <span class="grp-title-text">Amazon</span>
+      </h2>
+
+      <label class="toggle-row" id="amazonDeliveryToggleRow">
+        <span class="tr-icon" aria-hidden="true">📦</span>
+        <span class="tr-text">
+          <span class="tr-name">定期おトク便 月別合計</span>
+          <span class="tr-desc">配送月ごとの合計金額を <code class="tr-code">/auto-deliveries</code> ページに表示</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="amazonDeliveryToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+    </section>
+
+    <!-- ===== Allowlist ===== -->
+    <section class="grp" aria-label="許可リスト">
+      <details class="accordion" id="allowlistRow">
+        <summary class="acc-summary">
+          <span class="acc-icon" aria-hidden="true">🖱️</span>
+          <span class="acc-label">カスタム右クリックを許可するサイト</span>
+          <span class="acc-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="acc-body">
+          <p class="acc-hint">
+            Office / Google Docs / Notion / Figma 等は初めから許可済みです。<br />
+            追加で許可したいドメインを 1 行ずつ入力してください（例: <code>example.com</code>）。
+          </p>
+          <textarea
+            id="allowDomainsInput"
+            class="textarea"
+            rows="4"
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            placeholder="example.com&#10;sub.example.org"></textarea>
+          <p class="textarea-status" id="allowlistStatus"></p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ===== Status (live region) ===== -->
+    <p class="footer-status" id="statusMsg" role="status" aria-live="polite"></p>
   </div>
+
   <script src="../lib/actions.js"></script>
   <script src="popup.js"></script>
 </body>

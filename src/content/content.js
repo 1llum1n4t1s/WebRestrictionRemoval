@@ -46,7 +46,9 @@
    * ここで closure 保持し、各パス（初回 load / APPLY_SETTINGS_CS / storage.onChanged）
    * で最新値を一貫して更新することで追加 get を不要にする。
    */
-  let currentEnabled = true;
+  // デフォルト OFF 方針 (background.js:onInstalled / popup.js / CLAUDE.md と整合)。
+  // chrome.storage.local.get 完了前の数 ms に applyEnabled が誤発火しないよう false 始まり。
+  let currentEnabled = false;
   let currentKeepAliveEnabled = false;
   let currentKeepAliveIntervalMs = KeepAlive.DEFAULT_INTERVAL_MS;
 
@@ -351,13 +353,9 @@
   // content script へのメッセージは background (Service Worker) 由来のみ許可する。
   // 同一拡張内の popup / 他 content script / offscreen から APPLY_SETTINGS_CS を偽装されて
   // currentAllowDomains 上書き等の挙動差し替えを受けないよう二層防御を固める。
-  const _expectedBackgroundUrl = chrome.runtime.getURL("src/background/background.js");
+  // 検証ロジックは actions.js の SenderCheck.isFromBackground に集約（4 経路で共有）。
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (
-      sender?.id !== chrome.runtime.id ||
-      sender?.tab ||
-      sender?.url !== _expectedBackgroundUrl
-    ) {
+    if (!SenderCheck.isFromBackground(sender)) {
       return;
     }
     if (request.action === Actions.APPLY_SETTINGS_CS) {
@@ -446,7 +444,8 @@
       StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS,
     ])
     .then((result) => {
-      currentEnabled = result[StorageKeys.ENABLED] !== false;
+      // ENABLED は未設定時 false 扱い（onInstalled でのデフォルト false に揃える）。
+      currentEnabled = result[StorageKeys.ENABLED] === true;
       currentKeepAliveEnabled = result[StorageKeys.KEEP_ALIVE_ENABLED] === true;
       if (Number.isFinite(result[StorageKeys.KEEP_ALIVE_INTERVAL_MS])) {
         currentKeepAliveIntervalMs = result[StorageKeys.KEEP_ALIVE_INTERVAL_MS];

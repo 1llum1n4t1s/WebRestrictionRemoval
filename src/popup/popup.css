@@ -1,345 +1,834 @@
+/*
+ * Popup スタイル — refined craft × minimal Japanese editorial.
+ *
+ * 設計判断:
+ *   - 幅 380px（旧 340px から拡大）。19 個のサブトグルと select を抱えるため余裕を確保。
+ *   - アクセントは元拡張からの慣性で #C0605A（茜寄りのテラコッタ）を継承し、補色に深いインク #1f1d1b を新規導入。
+ *     白系 #fdfaf7 で和紙のような無彩色背景を作り、機能ブロックを溶け込ませず明確に縁取る。
+ *   - Typography: 日本語は Hiragino Mincho ProN → Noto Serif JP の明朝で「読み物」感を、
+ *     英数字は SF Mono / Cascadia Mono のモノで設定っぽさを出す二段構え。
+ *     見出しはスモールキャップス + tracking で雑誌見出しのリズムにする。
+ *   - Toggle: 既存の slider 形状を踏襲しつつ、track を pill ではなく rounded square にして道具感を強調。
+ *     ON 時には片側に小さなセリフ罫を出し、状態を二重に伝える（色覚多様性配慮）。
+ *   - Accordion: chevron を独自 ::after で描画し、open 時に 90 度回転 + アクセント色化。
+ *
+ * カラートークン:
+ *   --ink           深いインク色（本文）
+ *   --ink-soft      副本文・キャプション
+ *   --ink-faint     プレースホルダ・無効
+ *   --paper         カード背景（やや黄味の白）
+ *   --paper-deep    画面背景（カードよりわずかに濃い）
+ *   --paper-card    強調カード（より明るい白）
+ *   --rule          罫線・境界
+ *   --rule-soft     淡い罫線
+ *   --rule-strong   hover 時の罫線
+ *   --accent        メインアクセント（赤茜 / 茜）
+ *   --accent-deep   強調アクセント（見出し・hover）
+ *   --accent-soft   薄いアクセント（背景や hover）
+ *   --switch-off    トグル OFF 時の track 色
+ *   --shadow-thumb-1 / 2  switch thumb 形状の影
+ *   --shadow-knob   range thumb の影
+ *   --ok / --warn   ステータス表現
+ *
+ * ダークモードへの追従:
+ *   ブラウザの `prefers-color-scheme: dark` に追従して `:root` のトークンを上書きする。
+ *   構造・余白・モーションは共通、色だけ差し替えるためコード重複を回避できる。
+ *   ライト = 和紙ベージュ × 茜、ダーク = 墨黒 × 明度を上げた茜（夜空に映える色相）。
+ *   茜は色相をキープしたまま明度・彩度を上げてダーク背景でも沈まない発色に調整。
+ */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-body {
-  font: 13px/1.6 -apple-system, "Segoe UI", sans-serif;
-  color: #222;
-  width: 340px;
+:root {
+  --ink: #1f1d1b;
+  --ink-soft: #5b554f;
+  --ink-faint: #9b948b;
+  --paper: #fefcf9;
+  --paper-deep: #f6f1eb;
+  --paper-card: #ffffff;
+  --rule: #e7dfd5;
+  --rule-soft: #f1ebe2;
+  --rule-strong: #d8c7c2;
+  --accent: #C0605A;
+  --accent-deep: #9c4a45;
+  --accent-soft: #f7e9e6;
+  --switch-off: #d8d2c8;
+  --shadow-thumb-1: 0 1px 0 rgba(0, 0, 0, 0.08);
+  --shadow-thumb-2: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --ok: #4a8a55;
+  --warn: #c0605a;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  --font-sans:
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+    "Yu Gothic", "Meiryo", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", system-ui, sans-serif;
+  --font-serif:
+    "Hiragino Mincho ProN", "Yu Mincho", "YuMincho",
+    "Noto Serif JP", "Times New Roman", serif;
+  --font-mono:
+    "SFMono-Regular", "Cascadia Mono", "JetBrains Mono",
+    Consolas, "Liberation Mono", monospace;
 }
 
-.popup-container {
-  padding: 16px 18px;
+/*
+ * ダークモード追従: ブラウザ / OS の `prefers-color-scheme: dark` に従って
+ * トークンを上書きする。色だけ差し替えで構造とアニメーションは共通実装を再利用。
+ *
+ * 配色設計:
+ *   - ライトの「和紙ベージュ」と対をなす「墨黒（微紫寄り）」を画面背景に置く。
+ *     真っ黒 #000 を避け、わずかに紫紺を含むことで茜アクセントと和ませる。
+ *   - 茜色 #C0605A は HSL ≈ (4°, 41%, 56%)。暗背景にそのまま置くと沈むため、
+ *     色相を保ったまま明度・彩度を上げて (4°, 60%, 70%) ≈ #df8983 に持ち上げる。
+ *   - shadow はダークでは強める（thumb 形状の判別を維持するため）。
+ *   - 白文字は純白 #ffffff だと角立つので、わずかに暖色を残した #efe8df を本文に使う。
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #efe8df;          /* 絹白（暖色寄り） */
+    --ink-soft: #b0a89c;     /* 副本文 */
+    --ink-faint: #6b6358;    /* プレースホルダ・ドット */
+    --paper: #1d181f;        /* カード背景: 墨に微茜紫を混ぜた暖かい黒 */
+    --paper-deep: #14101a;   /* 画面最暗 */
+    --paper-card: #25202a;   /* 強調カード（feature リスト等） */
+    --rule: #3a3340;         /* 罫線 */
+    --rule-soft: #2a242e;    /* 細罫 */
+    --rule-strong: #54454f;  /* hover 時の罫線 */
+    --accent: #df8983;       /* 茜（夜空向け明度上げ） */
+    --accent-deep: #f0a39d;  /* 見出し・hover 強調 */
+    --accent-soft: #2d1f22;  /* 薄茜の暗背景 */
+    --switch-off: #3a3340;   /* OFF 時 track（rule と同色で統一感） */
+    --shadow-thumb-1: 0 1px 0 rgba(0, 0, 0, 0.5);
+    --shadow-thumb-2: 0 2px 4px rgba(0, 0, 0, 0.55);
+    --shadow-knob: 0 2px 5px rgba(0, 0, 0, 0.6);
+    --ok: #87cd8e;           /* 緑（暗背景でくすまない明度） */
+    --warn: #df8983;         /* warn は accent と同系統で統一 */
+  }
+}
+
+html, body {
+  background: var(--paper-deep);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  width: 380px;
+  /* iframe 越しにスクロールバーが噛み合わないケースに備えてオーバーフロー制御 */
+  overflow-x: hidden;
+}
+
+/* ---------- Shell ---------- */
+.popup-shell {
+  background: var(--paper);
+  padding: 18px 18px 14px;
+  position: relative;
+}
+
+/* 上端に細いインクのアクセント帯（雑誌の小口飾りイメージ） */
+.popup-shell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0,
+    var(--accent) 28px,
+    var(--ink) 28px,
+    var(--ink) 30px,
+    transparent 30px
+  );
 }
 
 /* ---------- Header ---------- */
-.app-title {
-  font-size: 15px;
-  font-weight: 700;
-  text-align: center;
-  color: #333;
-  margin-bottom: 2px;
-}
-
-.app-desc {
-  font-size: 11px;
-  text-align: center;
-  color: #999;
+.hdr {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--rule);
   margin-bottom: 14px;
 }
 
-/* ---------- Main Toggle ---------- */
-.main-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border: 1px solid #eee;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  margin-bottom: 14px;
-}
-
-.main-toggle:hover {
-  background: #faf5f5;
-  border-color: #e5d5d3;
-}
-
-.toggle-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.toggle-icon {
-  font-size: 16px;
-}
-
-.toggle-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-}
-
-/* ---------- Toggle Switch ---------- */
-.toggle-switch {
-  position: relative;
-  width: 38px;
-  height: 22px;
+.hdr-mark {
+  font-size: 22px;
+  line-height: 1;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
+.hdr-text {
+  flex: 1;
+  min-width: 0;
 }
 
-.toggle-slider {
-  position: absolute;
-  inset: 0;
-  background: #ccc;
-  border-radius: 11px;
-  transition: background 0.2s;
-  cursor: pointer;
+.hdr-title {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  line-height: 1.3;
 }
 
-.toggle-slider::before {
-  content: "";
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  left: 2px;
-  bottom: 2px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+.hdr-tag {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
 }
 
-.toggle-switch input:checked + .toggle-slider {
-  background: #C0605A;
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(16px);
-}
-
-/* ---------- Interval Slider ---------- */
-.interval-row {
-  padding: 10px 14px 12px;
-  border: 1px solid #eee;
-  border-radius: 10px;
+/* ---------- Group ---------- */
+.grp {
   margin-bottom: 14px;
-  background: #fafafa;
 }
 
-.interval-row.hidden {
-  display: none;
+.grp:last-of-type {
+  margin-bottom: 6px;
 }
 
-.interval-header {
+.grp-title {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent-deep);
+  padding: 0 4px 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed var(--rule);
+}
+
+.grp-title-text {
+  position: relative;
+}
+
+.grp-title-text::before {
+  content: "—";
+  margin-right: 6px;
+  color: var(--ink-faint);
+}
+
+.grp-pill {
+  margin-left: auto;
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  padding: 1px 8px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  text-transform: none;
+}
+
+/* ---------- Toggle Row ---------- */
+.toggle-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
   margin-bottom: 8px;
 }
 
-.interval-label {
+.toggle-row:hover {
+  background: var(--paper);
+  border-color: var(--rule-strong);
+}
+
+.toggle-row:active {
+  transform: scale(0.997);
+}
+
+/* ON 状態のとき左端にアクセントの細罫 */
+.toggle-row:has(input:checked) {
+  border-color: var(--rule-strong);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.tr-icon {
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+.tr-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tr-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+.tr-desc {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  line-height: 1.45;
+  /* 説明文は1行省略しない（情報を切り捨てるよりはみ出させる） */
+}
+
+/* tr-desc 内のインラインパスやセレクタを目立たせる小型 chip */
+.tr-code {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  background: var(--paper-deep);
+  color: var(--accent-deep);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--rule-soft);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* ---------- Switch ---------- */
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--switch-off);
+  border-radius: 7px;
+  transition: background 180ms ease;
+}
+
+.switch-track::before {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  top: 3px;
+  left: 3px;
+  background: var(--paper);
+  border-radius: 4px;
+  transition: transform 200ms cubic-bezier(0.65, 0, 0.35, 1);
+  box-shadow: var(--shadow-thumb-1), var(--shadow-thumb-2);
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track::before {
+  transform: translateX(16px);
+  background: var(--paper);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Sub block (slider container) ---------- */
+.sub-block {
+  background: var(--paper-deep);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  padding: 9px 12px 11px;
+  margin: -3px 0 8px;
+  /* キャプチャ感を出すため左に細い罫 */
+  border-left: 2px solid var(--accent-soft);
+}
+
+.sub-block.hidden {
+  display: none;
+}
+
+.sub-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.sub-label {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+}
+
+.sub-value {
+  font-family: var(--font-mono);
   font-size: 12px;
-  color: #666;
+  font-weight: 600;
+  color: var(--accent-deep);
+  letter-spacing: 0.02em;
 }
 
-.interval-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: #C0605A;
-}
-
-.interval-slider {
+/* ---------- Range slider ---------- */
+.range {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
-  height: 4px;
-  background: #e5d5d3;
+  height: 3px;
+  background: var(--rule);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
 }
 
-.interval-slider::-webkit-slider-thumb {
+.range::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #C0605A;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 0.15s;
+  box-shadow: var(--shadow-knob);
+  transition: transform 140ms ease;
 }
 
-.interval-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+.range::-webkit-slider-thumb:hover {
+  transform: scale(1.15) rotate(45deg);
 }
 
-.interval-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+.range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
   border: none;
-  border-radius: 50%;
-  background: #C0605A;
+  border-radius: 4px;
+  background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-knob);
 }
 
-/* ---------- Allowlist (カスタム右クリック許可ドメイン) ---------- */
-.allowlist-row {
-  border: 1px solid #eee;
-  border-radius: 10px;
-  margin-bottom: 14px;
-  background: #fafafa;
-  padding: 0;
-}
-
-.allowlist-summary {
+/* ---------- Volume Booster actions ---------- */
+.volume-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  list-style: none;
-  user-select: none;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-.allowlist-summary::-webkit-details-marker {
-  display: none;
-}
-
-.allowlist-summary::after {
-  content: "▸";
-  margin-left: auto;
-  color: #999;
-  font-size: 11px;
-  transition: transform 0.15s;
-}
-
-.allowlist-row[open] .allowlist-summary::after {
-  transform: rotate(90deg);
-}
-
-.allowlist-summary:hover {
-  background: #faf5f5;
-}
-
-.allowlist-icon {
-  font-size: 16px;
-}
-
-.allowlist-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-}
-
-.allowlist-hint {
-  padding: 0 14px 8px;
-  font-size: 11px;
-  color: #777;
-  line-height: 1.5;
-}
-
-.allowlist-hint code {
-  background: #f0e8e7;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+.ghost-btn {
+  font-family: var(--font-mono);
   font-size: 10.5px;
-  color: #C0605A;
+  letter-spacing: 0.04em;
+  background: transparent;
+  color: var(--accent-deep);
+  border: 1px solid var(--rule);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
 
-.allowlist-textarea {
-  display: block;
-  width: calc(100% - 28px);
-  margin: 0 14px 8px;
-  padding: 6px 8px;
-  border: 1px solid #e5d5d3;
-  border-radius: 6px;
-  background: #fff;
-  font: 11.5px/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  color: #333;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.15s;
+.ghost-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
-.allowlist-textarea:focus {
-  border-color: #C0605A;
+.ghost-btn:active {
+  transform: translateY(0.5px);
 }
 
-.allowlist-status {
-  padding: 0 14px 10px;
-  margin: 0;
-  min-height: 14px;
-  font-size: 11px;
-  color: transparent;
-  transition: color 0.2s;
+.volume-hint {
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+  text-align: right;
+  /* エラーや状態テキストが入る。短い・1行前提 */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.allowlist-status.ok {
-  color: #27ae60;
+.volume-hint.error {
+  color: var(--warn);
 }
 
-.allowlist-status.error {
-  color: #C0605A;
+/* スライダー上で 100% を視覚的にマーキング（::before の grid mark）。
+   appearance: none の input には疑似要素を直接付けられないので、
+   親 .sub-block に重ねるグラデーション線で 100% (= 1/6) 位置に細い罫を描く。 */
+.sub-block.volume-track-mark {
+  position: relative;
+}
+.sub-block.volume-track-mark::after {
+  content: "";
+  position: absolute;
+  /* スライダーの padding 分（12px）をオフセット。100/600 ≒ 16.67% 地点に縦線。 */
+  left: calc(12px + (100% - 24px) * (100 / 600));
+  bottom: 13px;
+  width: 1px;
+  height: 9px;
+  background: var(--accent-soft);
+  pointer-events: none;
 }
 
-/* ---------- Description ---------- */
-.description {
-  background: #faf7f7;
-  border-radius: 8px;
-  padding: 10px 12px;
+/* ---------- Accordion ---------- */
+.accordion {
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
   margin-bottom: 8px;
 }
 
-.section-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: #C0605A;
-  letter-spacing: 0.05em;
-  margin: 0 0 6px 0;
+.acc-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+  user-select: none;
+  transition: background 120ms ease;
 }
 
-.section-title + .feature-list {
+.acc-summary::-webkit-details-marker {
+  display: none;
+}
+
+.acc-summary:hover {
+  background: var(--paper);
+}
+
+.acc-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.acc-label {
+  flex: 1;
+  min-width: 0;
+  letter-spacing: 0.01em;
+}
+
+.acc-count {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-soft);
+  background: var(--paper-deep);
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid var(--rule);
+  letter-spacing: 0.05em;
+}
+
+/* シェブロン: 三角ではなく短い罫線2本で記号化、回転で開閉表現 */
+.acc-chevron {
+  width: 9px;
+  height: 9px;
+  border-right: 1.5px solid var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink-soft);
+  transform: rotate(-45deg);
+  margin-right: 2px;
+  transition: transform 200ms ease, border-color 200ms ease;
+}
+
+.accordion[open] .acc-chevron {
+  transform: rotate(45deg);
+  border-color: var(--accent);
+}
+
+.accordion[open] .acc-summary {
+  border-bottom: 1px dashed var(--rule);
+}
+
+.acc-body {
+  padding: 10px 12px 12px;
+}
+
+.acc-hint {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  margin-bottom: 10px;
+  padding-left: 8px;
+  border-left: 2px solid var(--rule-soft);
+}
+
+.acc-hint code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--paper-deep);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--accent-deep);
+}
+
+/* ---------- Feature category (inside cleaner accordion) ---------- */
+.cat {
   margin-bottom: 10px;
 }
 
-.description > .section-title:not(:first-child) {
-  margin-top: 2px;
+.cat:last-child {
+  margin-bottom: 0;
 }
 
-.feature-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.feature-list li {
+.cat-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: #555;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  padding: 2px 4px 6px;
 }
 
-.feat-icon {
-  font-size: 13px;
-  width: 18px;
-  text-align: center;
-}
-
-/* ---------- Status ---------- */
-.status {
-  min-height: 16px;
-  margin-top: 8px;
+.cat-head-icon {
   font-size: 11px;
-  text-align: center;
+}
+
+.cat-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+}
+
+/* 各機能トグル: コンパクト 1 行レイアウト */
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 100ms ease;
+  font-size: 11px;
+  color: var(--ink);
+  /* ラベル長すぎ対策: 折り返してOK */
+  min-width: 0;
+}
+
+.feature-row:hover {
+  background: var(--paper);
+}
+
+.feature-row .fr-name {
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  /* 視覚的階層: ラベルを serif にすると重すぎるためサンセリフのまま、
+     代わりにアクセント色のドットで先頭装飾 */
+  position: relative;
+  padding-left: 11px;
+}
+
+.feature-row .fr-name::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  transition: background 120ms ease;
+}
+
+.feature-row:has(input:checked) .fr-name::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* マスターが OFF だと feature 全体を視覚的に dim する（実機能はストレージに残る） */
+.cleaner-disabled .cat-list {
+  opacity: 0.5;
+}
+
+/* コンパクトスイッチ: feature 専用、本体は通常 switch を継承するが幅を縮める */
+.feature-row .switch {
+  width: 28px;
+  height: 16px;
+}
+
+.feature-row .switch-track {
+  border-radius: 5px;
+}
+
+.feature-row .switch-track::before {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  top: 3px;
+  left: 3px;
+}
+
+.feature-row .switch input:checked + .switch-track::before {
+  transform: translateX(12px);
+}
+
+/* ---------- Select row ---------- */
+.select-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+}
+
+.select-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.select-icon {
+  font-size: 12px;
+}
+
+.select-name {
+  letter-spacing: 0.02em;
+}
+
+.select {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--paper-card);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.select:hover {
+  border-color: var(--accent);
+}
+
+.select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* ---------- Textarea (allowlist) ---------- */
+.textarea {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.textarea-status {
+  margin-top: 6px;
+  min-height: 13px;
+  font-size: 10.5px;
   color: transparent;
-  transition: color 0.2s;
+  transition: color 200ms ease;
+  letter-spacing: 0.02em;
 }
 
-.status.ok {
-  color: #27ae60;
+.textarea-status.ok {
+  color: var(--ok);
 }
 
-.status.error {
-  color: #C0605A;
+.textarea-status.error {
+  color: var(--warn);
+}
+
+/* ---------- Footer status ---------- */
+.footer-status {
+  margin-top: 8px;
+  padding: 6px 8px;
+  min-height: 24px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  color: transparent;
+  border-top: 1px dashed var(--rule);
+  transition: color 220ms ease;
+}
+
+.footer-status.ok {
+  color: var(--ok);
+}
+
+.footer-status.error {
+  color: var(--warn);
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

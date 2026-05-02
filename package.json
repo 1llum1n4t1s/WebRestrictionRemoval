@@ -1,6 +1,6 @@
 {
   "name": "web-restriction-remover",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "type": "commonjs",
   "description": "Chrome extension to remove copy/paste/right-click/text-selection restrictions on web pages",
   "scripts": {
@@ -11,8 +11,8 @@
   },
   "devDependencies": {
     "chrome-webstore-upload-cli": "3.5.0",
-    "puppeteer": "^24.42.0",
-    "sharp": "^0.34.5"
+    "puppeteer": "24.42.0",
+    "sharp": "0.34.5"
   },
   "keywords": [
     "chrome-extension",
