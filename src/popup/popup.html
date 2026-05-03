@@ -36,6 +36,31 @@
           <button type="button" id="volumeResetBtn" class="ghost-btn" aria-label="音量を 100% に戻す">100% に戻す</button>
           <span class="volume-hint" id="volumeHint"></span>
         </div>
+
+        <!-- 自動歪み防止 / 自動音量正規化（オプトイン・デフォルト OFF） -->
+        <label class="toggle-row toggle-row--sub" id="volumeAntiClipToggleRow">
+          <span class="tr-icon" aria-hidden="true">🛡️</span>
+          <span class="tr-text">
+            <span class="tr-name">自動歪み防止</span>
+            <span class="tr-desc">高い増幅率でもピークを抑え音割れを防止（DynamicsCompressor 即応リミッタ）</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="volumeAntiClipToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <label class="toggle-row toggle-row--sub" id="volumeNormalizeToggleRow">
+          <span class="tr-icon" aria-hidden="true">📊</span>
+          <span class="tr-text">
+            <span class="tr-name">自動音量正規化</span>
+            <span class="tr-desc">動画ごとの音量バラつきを緩く圧縮して均一化（DynamicsCompressor ナチュラル圧縮）</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="volumeNormalizeToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
       </div>
     </section>
 

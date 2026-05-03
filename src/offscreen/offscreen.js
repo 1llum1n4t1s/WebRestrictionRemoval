@@ -15,22 +15,46 @@
 // ============================================================
 
 /**
- * tabId → { ctx: AudioContext, gainNode: GainNode, stream: MediaStream } の Map。
- * AudioContext は close するまで音声を増幅し続けるため、release 時に必ず close する。
+ * tabId → AudioState の Map。AudioContext は close するまで音声を増幅し続けるため
+ * release 時に必ず close する。
+ *
+ * AudioState の構造（ノードチェーン: source → gainNode → normalizerNode → antiClipNode → destination）:
+ *   - ctx: AudioContext
+ *   - gainNode: GainNode（ユーザースライダーの 0-600% ブースト）
+ *   - normalizerNode: DynamicsCompressorNode（自動音量正規化、OFF 時はバイパス設定）
+ *   - antiClipNode: DynamicsCompressorNode（自動歪み防止 / リミッタ、OFF 時はバイパス設定）
+ *   - stream: MediaStream
+ *
+ * 両 compressor は常時チェーン接続したまま、OFF 時は ratio:1 のバイパス設定で実質パススルー化。
+ * disconnect/reconnect を避けることでトグル切替時の音切れリスクを排除。
  */
 const audioStates = new Map();
-/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, stream: MediaStream}>>} */
+/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, normalizerNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream}>>} */
 const audioInitPromises = new Map();
 
 /**
- * 指定タブの GainNode 値を設定する。未登録なら getUserMedia → AudioContext を構築する。
+ * DynamicsCompressorNode に preset を適用する。
+ * 機能 OFF 時は VolumeBooster.COMPRESSOR_BYPASS（ratio:1）を渡してパススルー化する。
+ */
+function applyCompressorPreset(node, preset) {
+  node.threshold.value = preset.threshold;
+  node.knee.value = preset.knee;
+  node.ratio.value = preset.ratio;
+  node.attack.value = preset.attack;
+  node.release.value = preset.release;
+}
+
+/**
+ * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。
  *
  * @param {number} tabId 対象タブ ID
  * @param {string} streamId chrome.tabCapture.getMediaStreamId が返した stream ID
  * @param {number} gainPercent 0-600 の整数（％）
+ * @param {boolean} antiClip 自動歪み防止 ON/OFF
+ * @param {boolean} normalize 自動音量正規化 ON/OFF
  * @returns {Promise<{ok: boolean, gain?: number, error?: string}>}
  */
-async function volumeSetGain(tabId, streamId, gainPercent) {
+async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize) {
   try {
     if (!Number.isInteger(tabId) || tabId <= 0) {
       return { ok: false, error: "invalid-tab-id" };
@@ -66,6 +90,15 @@ async function volumeSetGain(tabId, streamId, gainPercent) {
     }
 
     state.gainNode.gain.value = VolumeBooster.clampValue(gainPercent) / 100;
+    // 既存ノードのプロパティを書き換えるだけなので AudioContext 再構築は不要。トグル切替時も音切れなし。
+    applyCompressorPreset(
+      state.normalizerNode,
+      normalize === true ? VolumeBooster.NORMALIZE_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
+    );
+    applyCompressorPreset(
+      state.antiClipNode,
+      antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
+    );
     return { ok: true, gain: Math.round(state.gainNode.gain.value * 100) };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
@@ -96,12 +129,20 @@ async function createAudioState(tabId, streamId) {
     const ctx = new AudioContext();
     const source = ctx.createMediaStreamSource(stream);
     const gainNode = ctx.createGain();
-    // mediaSource → gainNode → destination のシンプルな 3 ノード構成。
-    // 音質変更（BiquadFilter / Analyser）は機能スコープ外のため省略し、純粋な GainNode で増幅。
+    // 自動音量正規化（緩い圧縮）→ 自動歪み防止（リミッタ）の直列接続。
+    // 音響工学のセオリーに従い「平均化してからピーク抑制」の順で並べる。
+    // 両 compressor は volumeSetGain で OFF 時にバイパス設定 (ratio:1) に切り替えるので
+    // 機能 OFF 時もチェーン上に残したまま実質パススルー化する（disconnect/reconnect の音切れ回避）。
+    const normalizerNode = ctx.createDynamicsCompressor();
+    const antiClipNode = ctx.createDynamicsCompressor();
+    applyCompressorPreset(normalizerNode, VolumeBooster.COMPRESSOR_BYPASS);
+    applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
     source.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    gainNode.connect(normalizerNode);
+    normalizerNode.connect(antiClipNode);
+    antiClipNode.connect(ctx.destination);
 
-    const state = { ctx, gainNode, stream };
+    const state = { ctx, gainNode, normalizerNode, antiClipNode, stream };
     audioStates.set(tabId, state);
     return state;
   } catch (err) {
@@ -169,7 +210,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.target !== Offscreen.TARGET) return false;
 
   if (msg.action === Offscreen.ACTION_VOLUME_SET_GAIN) {
-    volumeSetGain(msg.tabId, msg.streamId, msg.gain).then(sendResponse);
+    volumeSetGain(msg.tabId, msg.streamId, msg.gain, msg.antiClip, msg.normalize).then(sendResponse);
     return true;
   }
   if (msg.action === Offscreen.ACTION_VOLUME_GET_GAIN) {

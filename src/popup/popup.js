@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeValue = document.getElementById("volumeValue");
   const $volumeResetBtn = document.getElementById("volumeResetBtn");
   const $volumeHint = document.getElementById("volumeHint");
+  const $volumeAntiClipToggle = document.getElementById("volumeAntiClipToggle");
+  const $volumeNormalizeToggle = document.getElementById("volumeNormalizeToggle");
   const $intervalRow = document.getElementById("intervalRow");
   const $intervalSlider = document.getElementById("intervalSlider");
   const $intervalValue = document.getElementById("intervalValue");
@@ -64,6 +66,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
+    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
   ]);
 
   $keepAliveToggle.checked = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
@@ -71,6 +75,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
+  $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
+  $volumeNormalizeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
 
   // 音量スライダー初期値設定（ブースト中なら active tab の現在値を反映）
   $volumeSlider.min = String(VolumeBooster.MIN);
@@ -145,6 +151,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateVolumeLabel(VolumeBooster.DEFAULT);
     await pushVolumeNow(VolumeBooster.DEFAULT);
   });
+
+  // 自動歪み防止 / 自動音量正規化トグル: storage に保存 + 現在 gain を再送信して即時反映。
+  // ブースト中なら offscreen の compressor パラメータが書き換わり、UNITY (100%) なら次回ブースト時に有効。
+  // cancelVolumePush() を先頭で呼ぶのは、debounce タイマー (120ms) が古いトグル状態のまま
+  // 発火するレースを防ぐため。storage.set は fire-and-forget で OK（pushVolumeNow は DOM
+  // のトグル状態を直接読むので storage 書き込み完了を待つ必要がない）。
+  $volumeAntiClipToggle.addEventListener("change", () => {
+    cancelVolumePush();
+    chrome.storage.local.set({
+      [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
+    }).catch(() => {});
+    applyCompressorTogglePush();
+  });
+  $volumeNormalizeToggle.addEventListener("change", () => {
+    cancelVolumePush();
+    chrome.storage.local.set({
+      [StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]: $volumeNormalizeToggle.checked,
+    }).catch(() => {});
+    applyCompressorTogglePush();
+  });
+
+  /**
+   * compressor トグル変更時の共通処理: 現在 gain を再送信 → UNITY のときだけ
+   * 「100% より上で有効」のヒントを表示する。
+   *
+   * UNITY (100%) では `setVolumeBoosterGain` が `releaseVolumeBoosterTab` を呼んで
+   * AudioContext を解放するため、compressor 設定は次回ブースト時まで反映されない。
+   * トグルを ON にしたのに音が変わらないというユーザーの誤解を防ぐためヒントを出す。
+   */
+  async function applyCompressorTogglePush() {
+    const v = VolumeBooster.clampValue($volumeSlider.value);
+    await pushVolumeNow(v).catch(() => {});
+    if (v === VolumeBooster.UNITY && ($volumeAntiClipToggle.checked || $volumeNormalizeToggle.checked)) {
+      setVolumeHint("ℹ️ 100% より上で有効になります");
+    }
+  }
 
   $intervalSlider.addEventListener("input", () => {
     updateIntervalLabel(Number($intervalSlider.value));
@@ -416,8 +458,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * gain を background に送って反映する。100% 時は background 側で release を呼ぶため
-   * ここではただ送るだけでよい。エラー時は res.error をユーザーに伝えてデバッグしやすくする。
+   * gain と compressor フラグを background に送って反映する。100% 時は background 側で
+   * release を呼ぶため、ここではただ送るだけでよい。エラー時は res.error をユーザーに
+   * 伝えてデバッグしやすくする。
+   *
+   * antiClip / normalize は現在のトグル状態を都度読み取るため、トグルだけ変えて gain は
+   * 据え置く操作も「現在 gain を再 push」だけで反映できる。
    */
   async function pushVolumeNow(value) {
     const tab = await getActiveHttpTab();
@@ -428,7 +474,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.VOLUME_BOOSTER_SET_GAIN,
-        data: { tabId: tab.id, gain: value },
+        data: {
+          tabId: tab.id,
+          gain: value,
+          antiClip: $volumeAntiClipToggle.checked,
+          normalize: $volumeNormalizeToggle.checked,
+        },
       });
       if (res?.ok) {
         setVolumeHint("");

@@ -46,6 +46,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
+    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
   ]);
   const defaults = {};
   if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
@@ -74,6 +76,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.INSTAGRAM_CLEANER_FEATURES in stored)) {
     defaults[StorageKeys.INSTAGRAM_CLEANER_FEATURES] = InstagramCleaner.mergeFeatures({});
   }
+  if (!(StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] = false;
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] = false;
+  }
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);
   }
@@ -90,7 +98,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
     // popup が user gesture を持つので、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
     if (!SenderCheck.isFromPopup(sender)) return;
-    setVolumeBoosterGain(request.data?.tabId, request.data?.gain)
+    setVolumeBoosterGain(request.data?.tabId, request.data?.gain, request.data?.antiClip, request.data?.normalize)
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
@@ -440,14 +448,21 @@ async function isVolumeBoosterActive() {
 /**
  * 指定タブの音量を設定する。スライダー値が UNITY (100) のときは AudioContext を解放するだけで
  * 新規 tabCapture は呼ばない（リソース節約 + chrome:// 等での無駄なエラー回避）。
+ *
+ * `antiClip` / `normalize` は popup から渡される DynamicsCompressor 機能フラグで、
+ * offscreen 側で各 compressor のパラメータを切り替える。両 OFF 時もチェーンには残し
+ * ratio:1 のバイパス設定にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
   if (!Number.isInteger(tabId) || tabId <= 0) {
     return { ok: false, error: "invalid-tab-id" };
   }
   const clamped = VolumeBooster.clampValue(gain);
+  const antiClipFlag = antiClip === true;
+  const normalizeFlag = normalize === true;
 
   // スライダーが等倍位置 (100%) ならブースト不要 → タブを解放してリソース返却。
+  // compressor フラグは「ブースト中のみ意味を持つ」ため、ここでは反映しない（次回ブースト時に有効）。
   if (clamped === VolumeBooster.UNITY) {
     await releaseVolumeBoosterTab(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
@@ -467,6 +482,8 @@ async function setVolumeBoosterGain(tabId, gain) {
         tabId,
         streamId: null,
         gain: clamped,
+        antiClip: antiClipFlag,
+        normalize: normalizeFlag,
       });
     } catch (err) {
       // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー
@@ -505,6 +522,8 @@ async function setVolumeBoosterGain(tabId, gain) {
       tabId,
       streamId,
       gain: clamped,
+      antiClip: antiClipFlag,
+      normalize: normalizeFlag,
     });
     return res ?? { ok: false, error: "no-response" };
   } catch (err) {

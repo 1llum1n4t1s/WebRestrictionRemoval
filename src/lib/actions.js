@@ -97,6 +97,10 @@ const StorageKeys = Object.freeze({
   INSTAGRAM_CLEANER_ENABLED: "instagramCleanerEnabled",
   /** Instagram クリーナーの個別機能オン/オフ（オブジェクト） */
   INSTAGRAM_CLEANER_FEATURES: "instagramCleanerFeatures",
+  /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
+  VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
+  /** 音量ブースター: 自動音量正規化（DynamicsCompressor で緩い圧縮） */
+  VOLUME_BOOSTER_NORMALIZE_ENABLED: "volumeBoosterNormalizeEnabled",
 });
 
 /** @readonly セッション維持機能の定数 */
@@ -496,4 +500,43 @@ const VolumeBooster = Object.freeze({
     if (n > VolumeBooster.MAX) return VolumeBooster.MAX;
     return Math.round(n);
   },
+  /**
+   * 自動歪み防止用 DynamicsCompressor プリセット（ブリックウォール風リミッタ）。
+   * threshold:-3dBFS / ratio:12 で実質的な hard limiter として動作し、
+   * attack:1ms / release:50ms で過渡応答を最優先（瞬間ピークを確実に抑える）。
+   */
+  ANTI_CLIP_PRESET: Object.freeze({
+    threshold: -3,
+    knee: 0,
+    ratio: 12,
+    attack: 0.001,
+    release: 0.05,
+  }),
+  /**
+   * 自動音量正規化用 DynamicsCompressor プリセット（ナチュラル圧縮）。
+   * threshold:-24dBFS / ratio:4 で広いダイナミックレンジを緩く圧縮し、
+   * knee:6dB のソフトニー + attack:50ms / release:300ms で pumping artifact を抑制。
+   */
+  NORMALIZE_PRESET: Object.freeze({
+    threshold: -24,
+    knee: 6,
+    ratio: 4,
+    attack: 0.05,
+    release: 0.3,
+  }),
+  /**
+   * compressor 機能 OFF 時のバイパス設定（ratio:1 で実質パススルー）。
+   * AudioContext の構築コストを避けるためチェーン上は常時接続のままパラメータで制御する。
+   *
+   * attack:0.003 / release:0.25 は Web Audio API の DynamicsCompressor デフォルト値。
+   * `0` を渡すと Chrome が内部最小値 (~0.0003 秒) に clamp し DevTools 警告を出すケースが
+   * あるため、安全側のデフォルト値を採用してパススルー時の DSP 負荷も最小化する。
+   */
+  COMPRESSOR_BYPASS: Object.freeze({
+    threshold: 0,
+    knee: 0,
+    ratio: 1,
+    attack: 0.003,
+    release: 0.25,
+  }),
 });
