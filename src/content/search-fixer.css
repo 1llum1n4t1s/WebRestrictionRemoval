@@ -8,6 +8,7 @@
  *   __cpa-sfx-thumb-{dark,light}  サムネ枠装飾（ダーク/ライト両対応）
  *   __cpa-sfx-title-center        動画タイトル中央配置
  *   __cpa-sfx-desc-full           動画説明文フル幅
+ *   __cpa-sfx-hide-comments       動画ページのコメント欄非表示（`<html>` 駆動）
  *   cpa-sfx-demoted               キーワード非マッチ動画（デモート）— JS 側で動的注入する CSS と二段構え
  */
 
@@ -33,4 +34,10 @@
 .__cpa-sfx-desc-full {
   min-width: 100% !important;
   text-align: center !important;
+}
+
+/* ---------- 動画ページ: コメント欄非表示 ---------- */
+/* `<html>` クラス駆動 — 詳細は search-fixer.js の applyWatchPageClasses 参照 */
+html.__cpa-sfx-hide-comments ytd-comments#comments {
+  display: none !important;
 }

@@ -270,6 +270,12 @@ const SearchFixerFeatures = Object.freeze([
     category: "watch_page",
   }),
   Object.freeze({
+    key: "hideComments",
+    label: "コメント欄非表示",
+    desc: "動画ページ下部のコメントセクション（件数・並び替え・入力欄・スレッド一覧）を一括で非表示化。ライブ配信のチャット欄は対象外",
+    category: "watch_page",
+  }),
+  Object.freeze({
     key: "searchGrid",
     label: "検索結果をグリッド表示",
     desc: "検索結果を 1 列リストから複数列グリッドに変更（ホーム列数が 4/5/6 ならその値、自動なら 3 列）",

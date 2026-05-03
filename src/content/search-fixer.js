@@ -151,9 +151,10 @@
       clearThumbnailHighlight();
     }
 
-    if (isWatchPage()) {
-      applyWatchPageClasses();
-    }
+    // `applyWatchPageClasses()` は <html> クラス (__cpa-sfx-hide-comments) も操作するため、
+    // /watch 以外のページに遷移したときも呼んで class を確実に剥がす必要がある。
+    // 個別要素 toggle (#title h1 / #description) は要素ガード済みなので空振りで害なし。
+    applyWatchPageClasses();
   }
 
   // ---------- MutationObserver ライフサイクル ----------
@@ -429,12 +430,15 @@
     });
   }
 
-  // ---------- 動画ページ（タイトル中央 / 説明文フル幅） ----------
+  // ---------- 動画ページ（タイトル中央 / 説明文フル幅 / コメント欄非表示） ----------
   function applyWatchPageClasses() {
     const titleEl = document.querySelector("#title h1");
     if (titleEl) titleEl.classList.toggle("__cpa-sfx-title-center", f("centerTitle"));
     const descEl = document.querySelectorAll("#description")[1];
     if (descEl) descEl.classList.toggle("__cpa-sfx-desc-full", f("fullWidthDesc"));
+    // コメント欄は遅延レンダリング（スクロールで初めて DOM 出現）するため、個別要素 toggle だと
+    // 初期ロード時に空振りする。`<html>` クラスで CSS 駆動にすれば後から DOM が現れても即時適用される。
+    document.documentElement.classList.toggle("__cpa-sfx-hide-comments", f("hideComments"));
   }
 
   // ---------- ホームのリッチグリッド列数 ----------
