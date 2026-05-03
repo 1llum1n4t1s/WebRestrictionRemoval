@@ -316,15 +316,13 @@ async function ensureOffscreenDocument() {
   const url = chrome.runtime.getURL(Offscreen.PATH);
 
   try {
-    if (typeof chrome.runtime.getContexts === "function") {
-      const contexts = await chrome.runtime.getContexts({
-        contextTypes: ["OFFSCREEN_DOCUMENT"],
-        documentUrls: [url],
-      });
-      if (contexts.length > 0) {
-        offscreenState = "OPEN";
-        return true;
-      }
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (contexts.length > 0) {
+      offscreenState = "OPEN";
+      return true;
     }
   } catch (err) {
     console.warn("[WebViewingAssist] getContexts failed:", err);
@@ -409,19 +407,11 @@ function scheduleOffscreenClose() {
 }
 
 async function isVolumeBoosterActive() {
-  if (typeof chrome.runtime.getContexts !== "function") {
-    try {
-      const res = await chrome.runtime.sendMessage({
-        target: Offscreen.TARGET,
-        action: Offscreen.ACTION_VOLUME_QUERY_ACTIVE,
-      });
-      return Number(res?.activeCount ?? 0) > 0;
-    } catch {
-      // 通信失敗時は safe side で active 扱い（同関数内の他の catch も true 返却で揃える）。
-      // false を返すとブースト中タブが残っているのに offscreen を close してしまうリスクあり。
-      return true;
-    }
-  }
+  // 我々が把握する offscreen state が CLOSED なら、boost 中タブが残っている可能性はゼロ
+  // （boost 中であれば必ず offscreen は OPEN）。query を発行せず即 false を返すことで、
+  // 30 秒間隔の `scheduleOffscreenClose()` 再 schedule cycle を確実に止める。
+  if (offscreenState === "CLOSED") return false;
+
   try {
     const url = chrome.runtime.getURL(Offscreen.PATH);
     const contexts = await chrome.runtime.getContexts({
@@ -439,6 +429,8 @@ async function isVolumeBoosterActive() {
     });
     return Number(res?.activeCount ?? 0) > 0;
   } catch {
+    // 通信失敗時は safe side で active 扱い（offscreen 健在だが SW 再起動直後など）。
+    // false を返すとブースト中タブが残っているのに offscreen を close してしまうリスクあり。
     return true;
   }
 }
@@ -535,7 +527,6 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
 
 async function getVolumeBoosterGain(tabId) {
   if (typeof tabId !== "number") return { gain: null };
-  if (typeof chrome.runtime.getContexts !== "function") return { gain: null };
   try {
     const url = chrome.runtime.getURL(Offscreen.PATH);
     const contexts = await chrome.runtime.getContexts({
@@ -561,29 +552,23 @@ async function getVolumeBoosterGain(tabId) {
 /**
  * 指定タブの AudioContext を解放（スライダー 100% 復帰時に呼ぶ）。
  *
- * `chrome.runtime.getContexts` は Chrome 116+ の API で、本拡張がサポートしたい
- * 古い Chrome では未実装。getContexts が使える場合は最適化として「offscreen 不在なら
- * 早期 return」で無駄な sendMessage を抑制し、未実装環境では直接 release を送信して
- * 受信側が居なければ catch で握りつぶす。
- *
- * 旧実装は `getContexts` 未実装環境でも early return していたため、release メッセージが
- * 届かず AudioContext が永続的に残留する resource leak があった (CodeRabbit P2 指摘)。
+ * 最適化として `chrome.runtime.getContexts` で「offscreen 不在なら早期 return」を行い
+ * 無駄な sendMessage を抑制する。getContexts 自体が一時失敗した場合は release を
+ * 諦めず sendMessage に fall-through し、受信側不在なら catch で握りつぶす。
  */
 async function releaseVolumeBoosterTab(tabId) {
   if (!Number.isInteger(tabId) || tabId <= 0) return { ok: true };
-  if (typeof chrome.runtime.getContexts === "function") {
-    try {
-      const url = chrome.runtime.getURL(Offscreen.PATH);
-      const contexts = await chrome.runtime.getContexts({
-        contextTypes: ["OFFSCREEN_DOCUMENT"],
-        documentUrls: [url],
-      });
-      // offscreen 不在が確定したときのみ早期 return（release 不要）。
-      if (contexts.length === 0) return { ok: true };
-    } catch {
-      // getContexts 自体の一時失敗では release を諦めない。下の sendMessage に fall-through。
-      // 受信側不在なら finally の握りつぶしで安全に終わる。
-    }
+  try {
+    const url = chrome.runtime.getURL(Offscreen.PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    // offscreen 不在が確定したときのみ早期 return（release 不要）。
+    if (contexts.length === 0) return { ok: true };
+  } catch {
+    // getContexts 自体の一時失敗では release を諦めない。下の sendMessage に fall-through。
+    // 受信側不在なら finally の握りつぶしで安全に終わる。
   }
   try {
     await chrome.runtime.sendMessage({

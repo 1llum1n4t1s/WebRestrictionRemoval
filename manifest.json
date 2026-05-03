@@ -55,5 +55,6 @@
     "storage",
     "offscreen",
     "tabCapture"
-  ]
+  ],
+  "minimum_chrome_version": "140"
 }
