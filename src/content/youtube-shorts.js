@@ -3,19 +3,21 @@
 /**
  * YouTube Shorts 削除 content script。
  *
- * メインの「制限解除」トグルと独立にオプトインで動作（デフォルト OFF）。
- * 元拡張機能 "Remove YouTube Shorts" の DOM 削除ロジックを再実装したもので、
- * 外部送信・テレメトリ・localStorage は一切持たない。設定は chrome.storage.local のみ。
+ * v1.0.18 から YouTube クリーナーのサブ機能 `removeShorts` として統合された。
+ * オプトインで動作（デフォルト OFF）。`searchFixerEnabled` (master) AND
+ * `searchFixerFeatures.removeShorts` の両方が true のときに DOM 削除と URL リダイレクトを
+ * 実行する。外部送信・テレメトリ・localStorage は一切持たない。
  *
  * 役割:
- *   - chrome.storage.local の YT_SHORTS_REMOVAL_ENABLED を購読し、
+ *   - SEARCH_FIXER_ENABLED + SEARCH_FIXER_FEATURES (.removeShorts) を購読し、
  *     有効化時は MutationObserver で Shorts 関連 DOM を物理削除
  *   - /shorts/<videoId> URL を /watch?v=<videoId> へ書き換え（SPA 遷移対策で polling）
  *   - 無効化時は observer / interval を確実に停止し DOM 副作用を残さない
  *
  * 設計判断:
- *   - メイン content.js とは別ファイル: youtube.com 専用ロジックを汎用 content から分離。
- *     manifest.json の content_scripts も別エントリで matches を youtube.com に限定する。
+ *   - search-fixer.js とは別ファイル: 検索ページ・動画ページに閉じない「サイト全体」スコープの
+ *     URL リダイレクト + DOM 削除は責務が異なるため分離。同一 isolated world で動作するため
+ *     共通定数 (Actions / StorageKeys / SearchFixer / YouTubeShorts) は同じ参照で共有される。
  *   - 全フレーム inject ではなく top frame のみ: YouTube は埋め込みプレーヤーで動画 ID 単独の
  *     iframe を多数生成するため、すべてに observer をぶら下げると CPU を浪費する。
  *     Shorts UI は基本的にトップフレームの SPA に存在するため top のみで十分。
@@ -39,27 +41,60 @@
   // 適用フラグの単一情報源。purge() が二重に走るのを防ぐ。
   let active = false;
 
+  /** master enabled と features.removeShorts の AND を取って活性判定（単一の真実源）。 */
+  function computeActive(masterEnabled, features) {
+    if (masterEnabled !== true) return false;
+    const merged = SearchFixer.mergeFeatures(features);
+    return merged.removeShorts === true;
+  }
+
   // ---------- 初期化: 現在状態を読んで適用 ----------
-  chrome.storage.local.get(StorageKeys.YT_SHORTS_REMOVAL_ENABLED).then((stored) => {
-    apply(stored[StorageKeys.YT_SHORTS_REMOVAL_ENABLED] === true);
-  }).catch(() => {});
+  chrome.storage.local
+    .get([StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES])
+    .then((stored) => {
+      apply(
+        computeActive(
+          stored[StorageKeys.SEARCH_FIXER_ENABLED],
+          stored[StorageKeys.SEARCH_FIXER_FEATURES]
+        )
+      );
+    })
+    .catch(() => {});
 
   // ---------- 状態追従 ----------
-  // popup → background → content の APPLY_YT_SHORTS_CS 経路と、
+  // popup → background → content の APPLY_SEARCH_FIXER_CS 経路と、
   // storage.onChanged の 2 経路で同期する（メイン content.js と同じ二重購読方針）。
   chrome.runtime.onMessage.addListener((request, sender) => {
     // background SW 由来のみ受け付ける。他 content script の XSS 経由や popup から
     // 直接呼ばれるとユーザー設定をバイパスして state を書き換えられるため必須。
     if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action === Actions.APPLY_YT_SHORTS_CS) {
-      apply(request.data?.enabled === true);
+    if (request?.action === Actions.APPLY_SEARCH_FIXER_CS) {
+      const data = request.data ?? {};
+      apply(computeActive(data.enabled, data.features));
     }
   });
 
-  chrome.storage.onChanged.addListener((changes, areaName) => {
+  chrome.storage.onChanged.addListener(async (changes, areaName) => {
     if (areaName !== "local") return;
-    if (StorageKeys.YT_SHORTS_REMOVAL_ENABLED in changes) {
-      apply(changes[StorageKeys.YT_SHORTS_REMOVAL_ENABLED].newValue === true);
+    const touched =
+      StorageKeys.SEARCH_FIXER_ENABLED in changes ||
+      StorageKeys.SEARCH_FIXER_FEATURES in changes;
+    if (!touched) return;
+    // 片方だけ変わった場合に備えて両方再取得（変更されてないキーは undefined になるため
+    // computeActive() が誤判定する）。
+    try {
+      const stored = await chrome.storage.local.get([
+        StorageKeys.SEARCH_FIXER_ENABLED,
+        StorageKeys.SEARCH_FIXER_FEATURES,
+      ]);
+      apply(
+        computeActive(
+          stored[StorageKeys.SEARCH_FIXER_ENABLED],
+          stored[StorageKeys.SEARCH_FIXER_FEATURES]
+        )
+      );
+    } catch {
+      // storage 一時的にアクセス不可 → 次の通知に任せる
     }
   });
 
@@ -149,7 +184,7 @@
 
   // ---------- /shorts/ URL リダイレクト ----------
   // YouTube は SPA で history.pushState を多用するため popstate / load では捕捉できない。
-  // 元拡張と同じく setInterval(1s) で監視する。タブが非アクティブでも YouTube SPA は
+  // setInterval(1s) で監視する。タブが非アクティブでも YouTube SPA は
   // 動画再生のため動き続けるので throttling の影響は限定的。
   function startUrlRedirectPoll() {
     if (urlPollTimerId !== null) return;

@@ -1,0 +1,207 @@
+/*
+ * Instagram クリーナー用 CSS（独自実装）。
+ *
+ * 設計方針:
+ *   `<html>` に instagram-cleaner.js が付与する body クラス（`__cpa-ig-*` prefix）を起点に、
+ *   各機能の隠蔽 CSS を発動させる。クラスが付いていないとき (= 機能 OFF) はすべてのルールが
+ *   不活性化する純粋な CSS-only 駆動。
+ *
+ * セレクタ戦略（安定性優先）:
+ *   1. `aria-label` 属性 — Instagram の i18n キー。Build ID に依らず安定。
+ *   2. `href` 属性 — Instagram の URL ルーティング。`/reels/` 等は機能と直結。
+ *   3. `role` 属性 — ARIA セマンティクス。dialog / button 等の意味論的識別。
+ *   4. `data-pagelet` 属性 — Instagram が React Pagelet として公開する境界。
+ *   5. SVG `path[d=...]` — アイコンの幾何形状。Instagram の DOM が公開する事実情報として扱う。
+ *   6. JS が動的に付与する `__cpa-ig-*` 独自マーカークラス（counter / video container 識別用）。
+ *
+ * 意図的に避けているセレクタ:
+ *   - 難読化された生成 class 名（例: `.x9f619.xjbqb8w...`）
+ *     → Instagram の internal build ID と紐づいており、デプロイのたびに値が変わる。
+ *     → 安定性ゼロ + リバースエンジニアリング・ライセンスリスクが残るため使用禁止。
+ *
+ * 機能 ID と body クラスの対応は instagram-cleaner.js の InstagramCleaner.BODY_CLASS で定義。
+ */
+
+/* =============================================================
+   1. Reels 削除（サイドバー / モバイル下部ナビ / プロフィール内タブ）
+   ============================================================= */
+html.__cpa-ig-reels a[href="/reels/"],
+html.__cpa-ig-reels a[href^="/reels/"],
+html.__cpa-ig-reels a[href*="/reels/"][role="link"],
+html.__cpa-ig-reels [aria-label="Reels"],
+html.__cpa-ig-reels [aria-label="リール"] {
+  display: none !important;
+}
+/* SVG path によるアイコン識別（aria-label が i18n で揺れるケースの保険） */
+html.__cpa-ig-reels a:has(svg path[d^="M2 12.001v3.449c0 2.849"]),
+html.__cpa-ig-reels [role="tablist"] > * :has(path[d^="M2 12.001v3.449c0 2.849"]) {
+  display: none !important;
+}
+
+/* =============================================================
+   2. Explore 削除（サイドバー / モバイル下部ナビ）
+   ============================================================= */
+html.__cpa-ig-explore a[href="/explore/"],
+html.__cpa-ig-explore a[href^="/explore/"],
+html.__cpa-ig-explore [aria-label="Explore"],
+html.__cpa-ig-explore [aria-label="検索"],
+html.__cpa-ig-explore [aria-label="発見"] {
+  display: none !important;
+}
+/* モバイルナビ: 虫眼鏡アイコンの SVG points 形状 */
+@media only screen and (max-width: 768px) {
+  html.__cpa-ig-explore svg:has(polyline[points^="13.941 13.953"]),
+  html.__cpa-ig-explore svg:has(polyline[points^="13.941 13.953"]) * {
+    fill: transparent !important;
+    opacity: 0;
+  }
+}
+
+/* =============================================================
+   3. ストーリー段非表示（ホームフィード）
+   ============================================================= */
+/* data-pagelet による意味論的識別が最も安定 */
+html.__cpa-ig-stories main [data-pagelet="story_tray"],
+html.__cpa-ig-stories main [role="presentation"]:has([data-pagelet="story_tray"]) {
+  display: none !important;
+}
+/* ARIA ラベルベースのフォールバック */
+html.__cpa-ig-stories main [aria-label="Stories"],
+html.__cpa-ig-stories main [aria-label="ストーリーズ"] {
+  display: none !important;
+}
+
+/* =============================================================
+   4. Stories URL ホーム遷移時の表示前隠蔽（JS の URL リダイレクト前のチラ見せ防止）
+   ============================================================= */
+html.__cpa-ig-stories-all main [data-pagelet*="story"],
+html.__cpa-ig-stories-all section[role="dialog"] [aria-label*="Story"],
+html.__cpa-ig-stories-all section[role="dialog"] [aria-label*="ストーリー"] {
+  display: none !important;
+}
+/* dialog 内のストーリー UI（reaction バー、進行 progress 等） */
+html.__cpa-ig-stories-all [role="dialog"] [aria-label="Like"],
+html.__cpa-ig-stories-all [role="dialog"] [aria-label="Share"],
+html.__cpa-ig-stories-all [role="dialog"] [aria-label="Send"] {
+  pointer-events: none !important;
+  opacity: 0.3;
+}
+
+/* =============================================================
+   5. Threads 誘導非表示（サイドバー / モバイル下部ナビ）
+   ============================================================= */
+html.__cpa-ig-threads a[href*="threads.net"],
+html.__cpa-ig-threads a[href*="threads.com"],
+html.__cpa-ig-threads [aria-label="Threads"],
+html.__cpa-ig-threads [aria-label="スレッド"] {
+  display: none !important;
+}
+/* @ ロゴ的な SVG path（モバイル下部ナビの Threads アイコン形状） */
+@media only screen and (max-width: 768px) {
+  html.__cpa-ig-threads a:has(svg path[d^="M141.537 88.9883"]),
+  html.__cpa-ig-threads svg path[d^="M141.537 88.9883"] {
+    display: none !important;
+  }
+}
+
+/* =============================================================
+   6. いいね数・フォロワー数非表示
+   ============================================================= */
+/* JS の markCounterButtons() が動的に付与するマーカー（数値ラベル判定済み） */
+html.__cpa-ig-vanity .__cpa-ig-hide-counter {
+  display: none !important;
+}
+/* プロフィールヘッダの「投稿数 / フォロワー数 / フォロー中」行 — aria-label ベース */
+html.__cpa-ig-vanity li:has(a[href$="/followers/"]),
+html.__cpa-ig-vanity li:has(a[href$="/following/"]),
+html.__cpa-ig-vanity a[href$="/followers/"] [class],
+html.__cpa-ig-vanity a[href$="/following/"] [class] {
+  visibility: hidden !important;
+}
+/* いいね数を表す button.__cpa-ig-hide-counter（数値先頭・末尾判定で JS が付与） */
+html.__cpa-ig-vanity button.__cpa-ig-hide-counter span {
+  font-size: 0 !important;
+}
+
+/* =============================================================
+   7. 投稿内の動画ブロック
+   ============================================================= */
+html.__cpa-ig-block-videos video {
+  display: none !important;
+}
+/* JS の markArticlesContainingVideo() が <article> に付与するマーカー */
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="Toggle audio"],
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="Play"],
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="Pause"],
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="再生"],
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="一時停止"],
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="ミュート"],
+html.__cpa-ig-block-videos article.__cpa-ig-article-video button[type="button"] {
+  display: none !important;
+}
+html.__cpa-ig-block-videos article.__cpa-ig-article-video {
+  position: relative;
+  overflow: hidden;
+}
+/* 動画があった場所をライト背景プレースホルダーに置換（ライト/ダーク両対応） */
+html.__cpa-ig-block-videos article.__cpa-ig-article-video::after {
+  content: "🎬";
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inset: 0;
+  background-color: #f4f4f4;
+  font-size: 2rem;
+  opacity: 0.6;
+  pointer-events: none;
+}
+html.__cpa-ig-block-videos.__fb-dark-mode article.__cpa-ig-article-video::after {
+  background-color: #1e1f20;
+}
+
+/* =============================================================
+   8. コメント欄非表示
+   ============================================================= */
+/* JS マーカー由来（最も確実） — instagram-cleaner.js の markCommentElements() で
+   article スコープ + 厳格条件のもと動的に付与される。
+   入力フォーム / View all comments リンク / コメントリスト UL の 3 種を identifies。 */
+html.__cpa-ig-comments .__cpa-ig-comment-input,
+html.__cpa-ig-comments .__cpa-ig-comment-view,
+html.__cpa-ig-comments .__cpa-ig-comment-list {
+  display: none !important;
+}
+/* コメントアイコン (SVG) — aria-label による意味論的識別 */
+html.__cpa-ig-comments [aria-label="Comment"],
+html.__cpa-ig-comments [aria-label="コメント"],
+html.__cpa-ig-comments [aria-label="コメントする"],
+html.__cpa-ig-comments svg[aria-label="Comment"],
+html.__cpa-ig-comments svg[aria-label="コメント"] {
+  display: none !important;
+}
+/* コメント入力フィールド — placeholder/aria-label の意味論的識別 */
+html.__cpa-ig-comments textarea[aria-label*="comment" i],
+html.__cpa-ig-comments textarea[aria-label*="コメント"],
+html.__cpa-ig-comments textarea[placeholder*="comment" i],
+html.__cpa-ig-comments textarea[placeholder*="コメント"] {
+  display: none !important;
+}
+
+/* =============================================================
+   9. Notes 非表示
+   ============================================================= */
+html.__cpa-ig-notes [aria-label="Note"],
+html.__cpa-ig-notes [aria-label="Notes"],
+html.__cpa-ig-notes [aria-label="ノート"] {
+  display: none !important;
+}
+
+/* =============================================================
+   10. 新規メッセージカウンター非表示（DM の赤バッジ）
+   ============================================================= */
+/* aria-label に件数情報を含むバッジを識別 */
+html.__cpa-ig-msg-counters [aria-label*="unread" i],
+html.__cpa-ig-msg-counters [aria-label*="new message" i],
+html.__cpa-ig-msg-counters [aria-label*="未読"] {
+  display: none !important;
+}

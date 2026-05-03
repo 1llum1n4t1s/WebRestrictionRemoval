@@ -54,9 +54,9 @@ jobs:
 
       - name: zip パッケージを作成
         run: |
-          zip -r web-restriction-remover.zip manifest.json icons src \
+          zip -r web-viewing-assist.zip manifest.json icons src \
             -x "*.DS_Store" "*.swp" "*~"
-          ls -lh web-restriction-remover.zip
+          ls -lh web-viewing-assist.zip
 
       - name: Chrome Web Store にアップロード & 公開
         env:
@@ -70,7 +70,7 @@ jobs:
           # 付きでインストール済み（package.json 参照）。npx はローカル node_modules/.bin を使うため
           # レジストリから再ダウンロードしない（= 実行時改ざんの経路を閉じる）。
           output=$(npx chrome-webstore-upload-cli upload \
-            --source web-restriction-remover.zip \
+            --source web-viewing-assist.zip \
             --extension-id "$CWS_EXTENSION_ID" \
             --client-id "$CWS_CLIENT_ID" \
             --client-secret "$CWS_CLIENT_SECRET" \

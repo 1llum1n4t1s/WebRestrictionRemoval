@@ -3,8 +3,8 @@
 /**
  * Amazon 定期おトク便 月別合計金額表示 content script。
  *
- * 元拡張 "Amazon定期おトク便の合計金額表示" (`npipdojmddhaehjoglciocbpengfoipp` v1.0.3) の機能を
- * 軽量な vanilla JS で再実装。React + Webpack bundle (131KB) を必要としない実装にする。
+ * Amazon 定期おトク便ページの DOM 構造を解析し、配送月ごとの合計金額を独自に計算・表示する
+ * vanilla JS 実装。React や bundler は使用せず、軽量に動作する。
  *
  * 機能:
  *   - `/auto-deliveries*` ページ内の `[data-delivery-type]` 要素（=月単位セクション）を走査
@@ -13,25 +13,28 @@
  *
  * 設計判断:
  *   - master トグル `amazonDeliveryTotalEnabled` で制御。OFF にしたら挿入要素を撤去
- *   - MutationObserver で動的更新（Amazon は SPA ではないが React 更新やフィルタ操作に対応）
+ *   - MutationObserver で動的更新。ただし自分が DOM に書き戻すと再発火 → 無限ループになるため、
+ *     書き込み中は disconnect → 書き込み → takeRecords (蓄積を破棄) → observe で再接続する。
+ *     さらに requestAnimationFrame による rAF ベース coalesce を併用し、過剰スキャンを防ぐ。
  *   - 重複挿入防止: 各セクションに 1 つだけ `__cpa-amzn-delivery-total` クラスのルート要素を保つ
  *   - top frame 限定（広告 iframe 等で副作用を出さないため）
- *   - manifest.json で `*://www.amazon.co.jp/auto-deliveries*` に matches を絞っているため、
- *     content script 自体が他ページに注入されない設計（ホスト判定は content 内ではしない）
  */
 
 (() => {
   if (window.__amazonDeliveryTotalRunning) return;
   window.__amazonDeliveryTotalRunning = true;
-  // top frame 限定。広告系 iframe で同セレクタが別の意味でヒットする可能性を排除する。
   if (window !== window.top) return;
 
   /** @type {boolean} 機能 ON/OFF */
   let active = false;
   /** @type {MutationObserver|null} */
   let observer = null;
-  /** 連続 mutation の coalesce 用フラグ（queueMicrotask で 1 フレーム単位に圧縮） */
+  /** rAF 連続抑制用フラグ */
   let scanScheduled = false;
+  /** rAF id（cancel 用） */
+  let rafHandle = 0;
+  /** observer の observe 引数（再接続時に使う） */
+  const OBSERVE_OPTIONS = { childList: true, subtree: true };
 
   // ---------- 状態購読 ----------
   chrome.storage.local
@@ -42,7 +45,6 @@
     .catch(() => {});
 
   chrome.runtime.onMessage.addListener((request, sender) => {
-    // background SW 由来のみ受け付ける（他経路からの偽装を遮断）。
     if (!SenderCheck.isFromBackground(sender)) return;
     if (request?.action !== Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS) return;
     apply(request.data?.enabled === true);
@@ -55,17 +57,13 @@
     }
   });
 
-  /**
-   * 有効/無効を反映する。
-   * - true: MutationObserver 起動 + 即時 1 回スキャン
-   * - false: observer 切断 + 既存挿入要素を撤去
-   */
   function apply(enabled) {
     if (enabled === active) return;
     active = enabled;
     if (enabled) {
       startObserver();
-      renderAllTotals();
+      // 初回スキャンも write-guard 経由で（自分の書き込み由来の再発火を防ぐ）。
+      scheduleRender();
     } else {
       stopObserver();
       removeAllTotals();
@@ -74,37 +72,63 @@
 
   function startObserver() {
     if (observer) return;
-    observer = new MutationObserver(scheduleScan);
-    observer.observe(document.body || document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    observer = new MutationObserver(scheduleRender);
+    observer.observe(document.body || document.documentElement, OBSERVE_OPTIONS);
   }
 
   function stopObserver() {
-    if (!observer) return;
-    observer.disconnect();
-    observer = null;
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+    if (rafHandle) {
+      cancelAnimationFrame(rafHandle);
+      rafHandle = 0;
+    }
+    scanScheduled = false;
   }
 
-  function scheduleScan() {
+  /**
+   * MutationObserver からのコールバックは同期的・高頻度に呼ばれうる。rAF 1 個に集約することで:
+   *   1. 同一フレーム内の連続 mutation を 1 回の render に圧縮
+   *   2. ブラウザが描画余裕のあるタイミングで実行（主スレッドのジャンク回避）
+   *   3. 自分の append/textContent 書き込みを次フレームへ遅延 → 同期再発火を遮断
+   */
+  function scheduleRender() {
     if (scanScheduled) return;
     scanScheduled = true;
-    queueMicrotask(() => {
+    rafHandle = requestAnimationFrame(() => {
       scanScheduled = false;
+      rafHandle = 0;
       if (!active) return;
-      renderAllTotals();
+      runRenderInsideObserverGuard();
     });
+  }
+
+  /**
+   * Observer を一時 disconnect → render → takeRecords で蓄積分を破棄 → observe 再開。
+   * これにより自分の append / textContent が次の MutationRecord に積まれて scheduleRender を
+   * 連鎖発火させる無限ループを断ち切る。
+   */
+  function runRenderInsideObserverGuard() {
+    if (!observer) {
+      renderAllTotals();
+      return;
+    }
+    observer.disconnect();
+    try {
+      renderAllTotals();
+    } finally {
+      // disconnect 中に積まれていた pending records は破棄して捨てる。
+      // disconnect 後の DOM 変更は observer に届かないため、takeRecords は基本空を返すが
+      // 仕様上一応呼んでおき、再 observe 時にゴーストレコードが残らないようにする。
+      observer.takeRecords();
+      observer.observe(document.body || document.documentElement, OBSERVE_OPTIONS);
+    }
   }
 
   // ---------- レンダリング ----------
 
-  /**
-   * すべての月セクションを走査して合計表示を更新する。
-   * - 既存の `.__cpa-amzn-delivery-total` があれば数値だけ更新（DOM 構築コスト削減）
-   * - 無ければ新規作成して挿入
-   * - 挿入対象 `.a-fixed-left-grid-col` が見つからないセクションはスキップ
-   */
   function renderAllTotals() {
     const sections = document.querySelectorAll(AmazonDeliveryTotal.SECTION_SELECTOR);
     sections.forEach((section) => {
@@ -117,16 +141,16 @@
         root = buildTotalNode();
         target.append(root);
       }
-      // 数値表示部だけ書き換える（毎回 createElement する無駄を避ける）
       const priceEl = root.querySelector(`.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__price`);
-      if (priceEl) priceEl.textContent = total.toLocaleString();
+      if (priceEl) {
+        const next = total.toLocaleString();
+        // 値が変化したときだけ書き込む。同じ文字列で textContent を上書きしても MutationRecord は
+        // 発火するため (Chrome の DOM 仕様)、disconnect 中に守られていてもコストの差が出る。
+        if (priceEl.textContent !== next) priceEl.textContent = next;
+      }
     });
   }
 
-  /**
-   * 1 セクション内の `.subscription-price` テキストを数値化して合計する。
-   * 価格テキストが空 / 非数字のみのケースは 0 として扱う（NaN 伝播防止）。
-   */
   function computeSectionTotal(section) {
     let total = 0;
     const prices = section.querySelectorAll(AmazonDeliveryTotal.PRICE_SELECTOR);
@@ -135,15 +159,12 @@
         AmazonDeliveryTotal.PRICE_NORMALIZE_RE,
         ""
       );
-      // 空文字を Number にすると 0 になるので NaN 心配は無い。
-      // ただし parseInt は前方一致で動くため、Number() で全文字一致を要求して安全側に倒す。
       const n = Number(raw);
       if (Number.isFinite(n)) total += n;
     });
     return total;
   }
 
-  /** 「合計金額 ¥nn,nnn 円」のラッパ要素を組み立てる。 */
   function buildTotalNode() {
     const root = document.createElement("div");
     root.className = AmazonDeliveryTotal.TOTAL_ROOT_CLASS;
@@ -164,7 +185,6 @@
 
     const price = document.createElement("span");
     price.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__price`;
-    // textContent は renderAllTotals() 側で都度書き込み
 
     const unit = document.createElement("span");
     unit.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__unit`;
@@ -175,8 +195,28 @@
     return root;
   }
 
-  /** 機能 OFF 時にすべての挿入要素を撤去する。 */
+  /**
+   * 機能 OFF 時にすべての挿入要素を撤去する。
+   *
+   * 通常の `apply(false)` 経路は `stopObserver()` → `removeAllTotals()` の順で呼ばれるため
+   * 突入時点で `observer` は既に null。よって直接 `removeNodes()` で十分。observer が
+   * 残存している経路（observer 起動中のまま master OFF など）に備えて、念のため
+   * disconnect → takeRecords で再発火を防ぐ guard を持つ。
+   */
   function removeAllTotals() {
+    if (observer) {
+      // observer 残存ケース: 自身の remove による mutation で再発火しないよう一時停止
+      observer.disconnect();
+      try {
+        document
+          .querySelectorAll(`.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}`)
+          .forEach((el) => el.remove());
+      } finally {
+        // OFF 経路では reconnect しない。蓄積された mutation は takeRecords で破棄。
+        observer.takeRecords();
+      }
+      return;
+    }
     document
       .querySelectorAll(`.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}`)
       .forEach((el) => el.remove());

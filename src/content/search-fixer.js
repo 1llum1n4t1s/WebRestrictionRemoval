@@ -1,12 +1,11 @@
 "use strict";
 
 /**
- * YouTube Search Fixer content script。
+ * YouTube クリーナー content script（独自実装）。
  *
- * 元拡張機能 "Search Fixer for YouTube" (`bojdknokkpgboeonegndfcgkaommhleo`) の DOM 操作ロジックを
- * 単一ファイルに移植したもの。元コードは外部送信ゼロだったため移植時もテレメトリ無し。
- * 設定は `chrome.storage.local` の `searchFixerEnabled` (master) / `searchFixerFeatures` (個別) /
- * `searchFixerGridItems` (数値) の 3 キーで管理する。
+ * YouTube の検索結果・動画ページ・ホームグリッドの冗長 UI を非表示にするための DOM 操作と
+ * CSS 注入を行う。外部送信ゼロ。設定は `chrome.storage.local` の `searchFixerEnabled` (master) /
+ * `searchFixerFeatures` (個別) / `searchFixerGridItems` (数値) の 3 キーで管理する。
  *
  * 役割:
  *   - 検索結果ページ（/results）で `MutationObserver` を起動し、ノイズ要素を `removeDistractions()` で除去
@@ -14,8 +13,8 @@
  *   - ホームのリッチグリッドに列数 CSS を注入（4/5/6 のみ、0 は YouTube 既定）
  *   - 検索結果ページのキーワード非マッチ動画を `yt-ext-demoted` クラスでデモート（CSS 側でグレー化）
  *
- * 設計上の差分（元拡張比）:
- *   - `counterString`（除去カウンタ）は機能的価値が薄いため移植しない（プライバシー UI もポップアップに含めない）
+ * 設計方針:
+ *   - 除去カウンタのような動的フィードバック UI は持たない（ポップアップもシンプルなトグル UI に絞る）
  *   - top frame 限定で動かす（埋め込みプレーヤー iframe では検索ページが出ないため）
  *   - master OFF / すべての個別機能 OFF のときは observer / interval / 注入 CSS をすべて停止
  */
@@ -132,6 +131,7 @@
       applyHomeGridStyle();      // active=false なら style 要素を撤去するだけ
       applySearchGridStyle();    // 同上
       applyDemoteStyleInjection(); // 同上 + demoted クラス剥がし
+      applyWatchPageClasses();   // 動画ページ装飾クラスも撤去する
       return;
     }
 
@@ -201,76 +201,117 @@
   }
 
   // ---------- 検索結果のノイズ除去 ----------
+  /**
+   * 有効化された機能群を 3 つのスキャンパスに集約して実行する。
+   *
+   * 旧実装は 13 機能 ON 時に最大 13 回の document-wide querySelectorAll を直列実行していたが、
+   * 機能ドメインごとに以下のように統合することで最大 3 回に削減（O(K×M) → O(M)）:
+   *   1. 個別 renderer タグ系（shelf / cardList / channel / reel / course / secondary）
+   *      → 1 つの `:is(...)` セレクタに結合した 1 回の querySelectorAll で削除
+   *   2. ytd-video-renderer 属性判定系（shortsBtn / live / verified / artist / watched / chapter）
+   *      → 全 ytd-video-renderer を 1 回取得し、1 ループで属性チェック
+   *   3. playlist / mix（独立した `.yt-lockup-view-model--horizontal` の badge/href 判定）
+   *      → 1 回の querySelectorAll
+   *
+   * いずれの機能も OFF なら対応するパスをスキップ。
+   */
   function removeDistractions() {
     if (!isResultsPage()) return;
 
-    // ヘルパ: 該当要素を try で囲んで一括除去
-    const removeAll = (selector, scope = document, transform = (el) => el) => {
+    // ===== Pass 1: 独立 renderer タグ系を :is() で結合した 1 回スキャン =====
+    const tagSelectors = [];
+    if (f("shelf")) {
+      tagSelectors.push("#primary .ytd-two-column-search-results-renderer ytd-shelf-renderer");
+    }
+    if (f("cardList")) {
+      tagSelectors.push("ytd-horizontal-card-list-renderer.ytd-item-section-renderer:not(:first-child)");
+    }
+    if (f("channel")) {
+      tagSelectors.push("#primary .ytd-two-column-search-results-renderer ytd-channel-renderer");
+    }
+    if (f("reel")) {
+      tagSelectors.push("#primary .ytd-two-column-search-results-renderer ytd-reel-shelf-renderer");
+      tagSelectors.push("grid-shelf-view-model");
+    }
+    if (f("course")) {
+      tagSelectors.push(".yt-lockup-view-model--wrapper");
+    }
+    if (f("secondary")) {
+      tagSelectors.push("ytd-secondary-search-container-renderer");
+    }
+    if (tagSelectors.length > 0) {
       try {
-        scope.querySelectorAll(selector).forEach((el) => {
-          const target = transform(el);
-          if (target && target.isConnected) target.remove();
+        // `:is(a, b, c)` は modern Chrome (140+) で広くサポート。複合カンマセレクタとほぼ等価。
+        document.querySelectorAll(`:is(${tagSelectors.join(",")})`).forEach((el) => {
+          if (el.isConnected) el.remove();
         });
       } catch {
-        // セレクタ未対応 / 対象不在は無視
+        // :is() 失敗時は個別セレクタにフォールバック
+        for (const sel of tagSelectors) {
+          try {
+            document.querySelectorAll(sel).forEach((el) => {
+              if (el.isConnected) el.remove();
+            });
+          } catch {}
+        }
       }
-    };
-
-    if (f("shelf")) {
-      removeAll(
-        "#primary .ytd-two-column-search-results-renderer ytd-shelf-renderer"
-      );
     }
 
-    if (f("cardList")) {
-      // 元実装はカードリストとシェルフを同セレクタで重複削除していたため、こちらは
-      // 横並びカード（ytd-horizontal-card-list-renderer）を対象に絞る方が実害が少ない
-      removeAll(
-        "ytd-horizontal-card-list-renderer.ytd-item-section-renderer:not(:first-child)"
-      );
-    }
-
-    if (f("channel")) {
-      removeAll(
-        "#primary .ytd-two-column-search-results-renderer ytd-channel-renderer"
-      );
-    }
-
-    if (f("reel")) {
-      removeAll(
-        "#primary .ytd-two-column-search-results-renderer ytd-reel-shelf-renderer"
-      );
-      removeAll("grid-shelf-view-model");
-    }
-
-    if (f("shortsBtn")) {
-      // ytd-video-renderer 内のサムネイルが /shorts/ を指すケース（検索結果に紛れ込む単発 Shorts）
+    // ===== Pass 2: ytd-video-renderer 属性判定系を 1 ループで処理 =====
+    const checkShortsBtn = f("shortsBtn");
+    const checkLive = f("live");
+    const checkVerified = f("verified");
+    const checkArtist = f("artist");
+    const checkWatched = f("watched");
+    const checkChapter = f("chapter");
+    if (checkShortsBtn || checkLive || checkVerified || checkArtist || checkWatched || checkChapter) {
       try {
         document
-          .querySelectorAll(
-            "ytd-video-renderer ytd-thumbnail a#thumbnail[href*='/shorts/']"
-          )
-          .forEach((a) => {
-            const renderer = a.closest("ytd-video-renderer");
-            if (renderer && renderer.isConnected) renderer.remove();
+          .querySelectorAll("#primary ytd-item-section-renderer ytd-video-renderer")
+          .forEach((renderer) => {
+            if (!renderer.isConnected) return;
+            // 順番に判定し、最初に該当した条件で remove → 早期 return（重複処理を避ける）
+            if (checkShortsBtn && renderer.querySelector("ytd-thumbnail a#thumbnail[href*='/shorts/']")) {
+              renderer.remove();
+              return;
+            }
+            if (checkLive) {
+              const badges = renderer.querySelectorAll("#badges .yt-badge-shape__text, #badges > div > p");
+              for (const badge of badges) {
+                const text = badge.textContent.trim();
+                if (text === "LIVE" || text === "PREMIERE") {
+                  renderer.remove();
+                  return;
+                }
+              }
+            }
+            if (checkVerified && renderer.querySelector('badge-shape[aria-label="Verified"]')) {
+              renderer.remove();
+              return;
+            }
+            if (checkArtist && renderer.querySelector('badge-shape[aria-label="Official Artist Channel"]')) {
+              renderer.remove();
+              return;
+            }
+            if (checkWatched && renderer.querySelector("ytd-thumbnail-overlay-resume-playback-renderer")) {
+              renderer.remove();
+              return;
+            }
+            if (checkChapter && renderer.querySelector("ytd-expandable-metadata-renderer")) {
+              renderer.remove();
+              return;
+            }
           });
       } catch {}
     }
 
-    if (f("live")) {
-      try {
-        document.querySelectorAll("#badges .yt-badge-shape__text, #badges > div > p").forEach((badge) => {
-          const text = badge.textContent.trim();
-          if (text === "LIVE" || text === "PREMIERE") {
-            badge.closest("ytd-video-renderer")?.remove();
-          }
-        });
-      } catch {}
-    }
-
+    // ===== Pass 3: playlist / mix の独立判定（badge or href ベース） =====
     if (f("playlist") || f("mix")) {
+      const checkPlaylist = f("playlist");
+      const checkMix = f("mix");
       try {
         document.querySelectorAll(".yt-lockup-view-model--horizontal").forEach((item) => {
+          if (!item.isConnected) return;
           let isPlaylist = false;
           let isMix = false;
           const badge = item.querySelector(".yt-badge-shape__text");
@@ -291,48 +332,10 @@
               isMix = true;
             }
           }
-          if (f("playlist") && isPlaylist) item.remove();
-          else if (f("mix") && isMix) item.remove();
+          if (checkPlaylist && isPlaylist) item.remove();
+          else if (checkMix && isMix) item.remove();
         });
       } catch {}
-    }
-
-    if (f("course")) {
-      removeAll(".yt-lockup-view-model--wrapper");
-    }
-
-    if (f("verified") || f("artist")) {
-      try {
-        document.querySelectorAll("#primary ytd-item-section-renderer ytd-video-renderer").forEach((renderer) => {
-          if (f("verified") && renderer.querySelector('badge-shape[aria-label="Verified"]')) {
-            renderer.remove();
-            return;
-          }
-          if (f("artist") && renderer.querySelector('badge-shape[aria-label="Official Artist Channel"]')) {
-            renderer.remove();
-          }
-        });
-      } catch {}
-    }
-
-    if (f("watched")) {
-      try {
-        document.querySelectorAll("ytd-thumbnail-overlay-resume-playback-renderer").forEach((overlay) => {
-          overlay.closest("ytd-video-renderer")?.remove();
-        });
-      } catch {}
-    }
-
-    if (f("chapter")) {
-      try {
-        document.querySelectorAll("ytd-expandable-metadata-renderer").forEach((meta) => {
-          meta.closest("ytd-video-renderer")?.remove();
-        });
-      } catch {}
-    }
-
-    if (f("secondary")) {
-      removeAll("ytd-secondary-search-container-renderer");
     }
   }
 

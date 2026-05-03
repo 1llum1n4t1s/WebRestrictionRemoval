@@ -7,11 +7,13 @@
  *   - `start()` で `intervalMs` 間隔の `setInterval` 起動、`stop()` で停止
  *   - 毎 tick:
  *     A) `window` / `document` に複数の合成アクティビティを dispatch
- *        （サイト側 JS のアイドル検知をリセット）
- *     B) 同一オリジン HTTP ping を fire-and-forget
+ *        （サイト側 JS のアイドル検知をリセット）— 副作用ゼロ。常時実行。
+ *     B) 同一オリジン HTTP ping を fire-and-forget — **`httpPingEnabled === true` のときのみ実行**。
  *        - `KeepAlive.PRESET_ENDPOINTS` があれば専用 GET を優先
  *        - それ以外は現在 URL / origin root に軽量 HEAD を試す
  *        （サーバー側のスライディングセッションをリフレッシュ）
+ *        - 認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発しうるため
+ *          オプトイン化されている。デフォルトは合成イベントのみ。
  *   - 全ての失敗は catch で握り潰す（サイレントスキップ方針）
  *
  * 制限:
@@ -20,12 +22,13 @@
  *
  * 依存: `KeepAlive.PRESET_ENDPOINTS`（`src/lib/actions.js`）
  *
- * @param {{ intervalMs: number }} options
+ * @param {{ intervalMs: number, httpPingEnabled?: boolean }} options
  */
-function createKeepAlive({ intervalMs }) {
+function createKeepAlive({ intervalMs, httpPingEnabled = false }) {
   // 初期値も setIntervalMs と同じルールでクランプする
   // （呼び出し側で Number.isFinite チェックを重複させないため）。
   let currentIntervalMs = KeepAlive.clampIntervalMs(intervalMs);
+  let currentHttpPingEnabled = httpPingEnabled === true;
   let timerId = null;
   // hostname は location で取得。プリセットマッチは初期化時 1 回だけ行い
   // 以降は tick ごとの再計算を避ける（hostname は frame 内で不変）。
@@ -176,10 +179,13 @@ function createKeepAlive({ intervalMs }) {
 
   function tick() {
     // A) 合成アクティビティ束 — 各フレームのサイト側アイドル検知
-    //    （SessionTimeoutManager / pointer 系 / focus 系）を幅広くリセットする。
+    //    （SessionTimeoutManager / pointer 系 / focus 系）を幅広くリセットする。副作用ゼロで常時実行。
     dispatchSyntheticActivity();
-    // B) HTTP ping — 重いページ GET を毎回投げないよう、成功した候補を以後再利用する。
-    runHttpPing().catch(() => {});
+    // B) HTTP ping — オプトイン時のみ実行。認証プロキシ環境（Zscaler 等）で 401/302 ループや
+    //    SIEM ログアラートを誘発しうるため、デフォルト OFF。成功した候補は以後再利用される。
+    if (currentHttpPingEnabled) {
+      runHttpPing().catch(() => {});
+    }
   }
 
   return {
@@ -206,6 +212,10 @@ function createKeepAlive({ intervalMs }) {
         clearInterval(timerId);
         timerId = setInterval(tick, currentIntervalMs);
       }
+    },
+    /** HTTP ping の有効/無効を切り替え（合成イベント dispatch は影響なく継続）。 */
+    setHttpPingEnabled(enabled) {
+      currentHttpPingEnabled = enabled === true;
     },
   };
 }
@@ -234,3 +244,105 @@ function shouldFireHttpPing() {
     return true;
   }
 }
+
+// ============================================================
+// ランナー: storage / メッセージ購読 + ライフサイクル管理
+// ============================================================
+//
+// content.js 削除に伴い、keepalive 自身が起動責任を持つ。
+// 全 http(s) フレームに注入され、`chrome.storage.onChanged` と
+// `APPLY_KEEP_ALIVE_CS` メッセージの両経路で active tab / 非 active タブの両方を
+// 同期する。`window.__cpaKeepAliveRunning` で同一フレーム二重実行を防ぐ。
+(() => {
+  if (window.__cpaKeepAliveRunning) return;
+  window.__cpaKeepAliveRunning = true;
+
+  let keeper = null;
+
+  function ensureKeeper(intervalMs, httpPingEnabled) {
+    if (!keeper) {
+      keeper = createKeepAlive({ intervalMs, httpPingEnabled });
+    } else {
+      keeper.setIntervalMs(intervalMs);
+      keeper.setHttpPingEnabled(httpPingEnabled);
+    }
+    return keeper;
+  }
+
+  function applyState(enabled, intervalMs, httpPingEnabled) {
+    const ms = KeepAlive.clampIntervalMs(intervalMs);
+    const ping = httpPingEnabled === true;
+    if (enabled) {
+      ensureKeeper(ms, ping).start();
+    } else if (keeper) {
+      keeper.stop();
+    }
+  }
+
+  // 初期復元: storage から状態を読み出して適用
+  chrome.storage.local
+    .get([
+      StorageKeys.KEEP_ALIVE_ENABLED,
+      StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+      StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
+    ])
+    .then((stored) => {
+      const enabled = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
+      const ms = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
+        ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
+        : KeepAlive.DEFAULT_INTERVAL_MS;
+      const httpPing = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
+      applyState(enabled, ms, httpPing);
+    })
+    .catch(() => {});
+
+  // background → APPLY_KEEP_ALIVE_CS で active tab に即時同期
+  chrome.runtime.onMessage.addListener((request, sender) => {
+    if (!SenderCheck.isFromBackground(sender)) return;
+    if (request?.action !== Actions.APPLY_KEEP_ALIVE_CS) return;
+    const enabled = request.data?.keepAliveEnabled === true;
+    const ms = Number.isFinite(request.data?.keepAliveIntervalMs)
+      ? request.data.keepAliveIntervalMs
+      : KeepAlive.DEFAULT_INTERVAL_MS;
+    const httpPing = request.data?.keepAliveHttpPingEnabled === true;
+    applyState(enabled, ms, httpPing);
+  });
+
+  // 全タブ・全フレーム横断の同期 (onChanged は MV3 で全 frame に発火する)
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    const enabledChange = changes[StorageKeys.KEEP_ALIVE_ENABLED];
+    const intervalChange = changes[StorageKeys.KEEP_ALIVE_INTERVAL_MS];
+    const httpPingChange = changes[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED];
+    if (!enabledChange && !intervalChange && !httpPingChange) return;
+
+    // 通常パス: handleApplySettings 経由で 3 キーすべてが同時変化する場合は newValue を直接使い、
+    // 不要な storage.get IPC ラウンドトリップを節約する（全 http(s) フレーム × 全タブ分の節約効果）。
+    if (enabledChange && intervalChange && httpPingChange) {
+      const enabled = enabledChange.newValue === true;
+      const ms = Number.isFinite(intervalChange.newValue)
+        ? intervalChange.newValue
+        : KeepAlive.DEFAULT_INTERVAL_MS;
+      const httpPing = httpPingChange.newValue === true;
+      applyState(enabled, ms, httpPing);
+      return;
+    }
+
+    // エッジケース（一部のキーだけ変化）: 変化していない側の最新値を取得するため storage.get で補完。
+    chrome.storage.local
+      .get([
+        StorageKeys.KEEP_ALIVE_ENABLED,
+        StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+        StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
+      ])
+      .then((stored) => {
+        const enabled = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
+        const ms = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
+          ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
+          : KeepAlive.DEFAULT_INTERVAL_MS;
+        const httpPing = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
+        applyState(enabled, ms, httpPing);
+      })
+      .catch(() => {});
+  });
+})();

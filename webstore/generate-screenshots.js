@@ -94,6 +94,26 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
   }
 }
 
+function findChromeExecutable() {
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
+  const candidates = [];
+  if (process.platform === 'win32') {
+    candidates.push(
+      path.join(process.env.ProgramFiles || '', 'Google/Chrome/Application/chrome.exe'),
+      path.join(process.env['ProgramFiles(x86)'] || '', 'Google/Chrome/Application/chrome.exe'),
+      path.join(process.env.LOCALAPPDATA || '', 'Google/Chrome/Application/chrome.exe')
+    );
+  } else if (process.platform === 'darwin') {
+    candidates.push('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
+  } else {
+    candidates.push('/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium');
+  }
+
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
+}
+
 /**
  * メイン処理
  */
@@ -102,11 +122,18 @@ async function main() {
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  const browser = await puppeteer.launch({
+  const launchOptions = {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     protocolTimeout: 300000
-  });
+  };
+  const executablePath = findChromeExecutable();
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+    console.log(`🧭 ローカル Chrome を使用します: ${executablePath}`);
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     // 複数ページを並列生成（Puppeteer の page は独立しているため CPU 競合のみ）。

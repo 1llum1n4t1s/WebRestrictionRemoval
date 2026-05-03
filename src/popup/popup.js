@@ -7,24 +7,15 @@
  *   - chrome.storage.local から現在の設定を復元し、UI 要素にバインド
  *   - 各 input の変更を都度 background に APPLY_SETTINGS で送信
  *   - SearchFixer の機能トグル（19 個）と select は actions.js の定数から動的生成
- *   - 状態メッセージ（適用/失敗）は応答ベースで 1.5 秒表示
- *
- * 設計上の判断:
- *   - apply() 単一関数で全フィールドを集約して送信する。トグルごとの差分送信は採用しない
- *     （storage の単一トランザクション化と background の sender 検証を簡潔に保つため）
- *   - applySeq でレース防止: 後発リクエスト完了後に先発の遅延応答が UI を上書きしないよう
- *   - クリーナー詳細はマスター OFF のときも編集可能（ON にしたとき即反映できるよう）
+ *   - 音量ブースターはマスタートグルなしの常時表示。100% で AudioContext 解放、
+ *     それ以外の値で増幅処理を起動する
  */
 
 document.addEventListener("DOMContentLoaded", async () => {
   // ----- 要素参照 -----
-  const $enabledToggle = document.getElementById("enabledToggle");
   const $keepAliveToggle = document.getElementById("keepAliveToggle");
-  const $ytShortsToggle = document.getElementById("ytShortsToggle");
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
-  const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
-  const $volumeRow = document.getElementById("volumeRow");
   const $volumeSlider = document.getElementById("volumeSlider");
   const $volumeValue = document.getElementById("volumeValue");
   const $volumeResetBtn = document.getElementById("volumeResetBtn");
@@ -32,20 +23,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $intervalRow = document.getElementById("intervalRow");
   const $intervalSlider = document.getElementById("intervalSlider");
   const $intervalValue = document.getElementById("intervalValue");
-  const $allowDomainsInput = document.getElementById("allowDomainsInput");
-  const $allowlistStatus = document.getElementById("allowlistStatus");
+  const $keepAliveHttpPingToggle = document.getElementById("keepAliveHttpPingToggle");
   const $featureCategories = document.getElementById("featureCategories");
   const $cleanerCount = document.getElementById("cleanerCount");
   const $cleanerAccordion = document.getElementById("cleanerAccordion");
   const $gridItemsSelect = document.getElementById("gridItemsSelect");
+  const $instagramCleanerToggle = document.getElementById("instagramCleanerToggle");
+  const $igFeatureCategories = document.getElementById("igFeatureCategories");
+  const $igCleanerCount = document.getElementById("igCleanerCount");
+  const $igCleanerAccordion = document.getElementById("igCleanerAccordion");
   const $status = document.getElementById("statusMsg");
 
   // ----- ローカル状態 -----
   let statusTimer = null;
   let applySeq = 0;
-  // 機能チェックボックスは動的生成。key → input の参照を保持して apply() で集計する
   /** @type {Map<string, HTMLInputElement>} */
   const featureInputs = new Map();
+  /** @type {Map<string, HTMLInputElement>} Instagram クリーナーの個別機能入力 */
+  const igFeatureInputs = new Map();
 
   // ----- スライダー単位は分、storage は ms -----
   const MIN_MIN = Math.round(KeepAlive.MIN_INTERVAL_MS / KeepAlive.MS_PER_MIN);
@@ -54,42 +49,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   $intervalSlider.min = String(MIN_MIN);
   $intervalSlider.max = String(MAX_MIN);
 
-  // ----- 機能トグル DOM をカテゴリごとに生成 -----
   buildFeatureCategories();
   buildGridSelect();
+  buildInstagramFeatureCategories();
 
   // ----- 現在状態を復元 -----
   const stored = await chrome.storage.local.get([
-    StorageKeys.ENABLED,
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
-    StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS,
-    StorageKeys.YT_SHORTS_REMOVAL_ENABLED,
+    StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_ENABLED,
+    StorageKeys.INSTAGRAM_CLEANER_ENABLED,
+    StorageKeys.INSTAGRAM_CLEANER_FEATURES,
   ]);
 
-  // 全 4 トグルは未設定時 false 扱い
-  $enabledToggle.checked = stored[StorageKeys.ENABLED] === true;
   $keepAliveToggle.checked = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
-  $ytShortsToggle.checked = stored[StorageKeys.YT_SHORTS_REMOVAL_ENABLED] === true;
+  $keepAliveHttpPingToggle.checked = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
-  $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
+  $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
 
-  // 音量スライダーの初期値設定（master ON のときに active tab の現在値を取得して反映）
+  // 音量スライダー初期値設定（ブースト中なら active tab の現在値を反映）
   $volumeSlider.min = String(VolumeBooster.MIN);
   $volumeSlider.max = String(VolumeBooster.MAX);
   $volumeSlider.step = String(VolumeBooster.STEP);
   $volumeSlider.value = String(VolumeBooster.DEFAULT);
   updateVolumeLabel(VolumeBooster.DEFAULT);
-  updateVolumeRowVisibility();
-  if ($volumeBoosterToggle.checked) {
-    syncCurrentTabVolume().catch(() => {});
-  }
+  syncCurrentTabVolume().catch(() => {});
 
   const storedIntervalMs = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
     ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
@@ -99,57 +88,46 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateIntervalLabel(storedMin);
   updateIntervalRowVisibility();
 
-  const storedDomains = Array.isArray(stored[StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS])
-    ? stored[StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS]
-    : [];
-  $allowDomainsInput.value = storedDomains.join("\n");
-
-  // 機能フラグを復元
   const storedFeatures = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
   for (const [key, input] of featureInputs) {
     input.checked = storedFeatures[key] === true;
   }
-  // グリッド列数を復元
   $gridItemsSelect.value = String(SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]));
+
+  const storedIgFeatures = InstagramCleaner.mergeFeatures(stored[StorageKeys.INSTAGRAM_CLEANER_FEATURES]);
+  for (const [key, input] of igFeatureInputs) {
+    input.checked = storedIgFeatures[key] === true;
+  }
 
   updateCleanerCountBadge();
   updateCleanerDimState();
+  updateIgCleanerCountBadge();
+  updateIgCleanerDimState();
 
   // ----- イベントバインド -----
-  $enabledToggle.addEventListener("change", apply);
   $keepAliveToggle.addEventListener("change", () => {
     updateIntervalRowVisibility();
     apply();
   });
-  $ytShortsToggle.addEventListener("change", apply);
+  $keepAliveHttpPingToggle.addEventListener("change", apply);
   $searchFixerToggle.addEventListener("change", () => {
     updateCleanerDimState();
-    // master ON にしたとき詳細未開封ならアクセス導線として開く
     if ($searchFixerToggle.checked && !$cleanerAccordion.open) {
       $cleanerAccordion.open = true;
     }
     apply();
   });
   $amazonDeliveryToggle.addEventListener("change", apply);
-  $volumeBoosterToggle.addEventListener("change", async () => {
-    updateVolumeRowVisibility();
-    // master ON にした瞬間、active tab の現在 gain を offscreen から取得してスライダーへ反映。
-    // 未ブーストなら 100% (DEFAULT) を表示。OFF にすると background が release_all を呼ぶ。
-    if ($volumeBoosterToggle.checked) {
-      // 設定を保存してから問い合わせる（保存前は background ガードに弾かれる）
-      await apply();
-      await syncCurrentTabVolume();
-    } else {
-      $volumeSlider.value = String(VolumeBooster.DEFAULT);
-      updateVolumeLabel(VolumeBooster.DEFAULT);
-      setVolumeHint("");
-      await apply();
+
+  $instagramCleanerToggle.addEventListener("change", () => {
+    updateIgCleanerDimState();
+    if ($instagramCleanerToggle.checked && !$igCleanerAccordion.open) {
+      $igCleanerAccordion.open = true;
     }
+    apply();
   });
 
-  // 音量スライダー: input でラベルだけ更新、change で gain を即送信。
-  // input ごとに送るとメッセージが洪水になるので、change（マウスアップ）で送信。
-  // ただし反応性のため、debounced input でも送るようにする（最終的な値の取りこぼし防止）。
+  // 音量スライダー: input でラベル + debounced push、change（マウスアップ）で即送信
   $volumeSlider.addEventListener("input", () => {
     const v = VolumeBooster.clampValue($volumeSlider.value);
     updateVolumeLabel(v);
@@ -157,22 +135,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   $volumeSlider.addEventListener("change", () => {
     const v = VolumeBooster.clampValue($volumeSlider.value);
+    cancelVolumePush();
     pushVolumeNow(v).catch(() => {});
   });
 
   $volumeResetBtn.addEventListener("click", async () => {
+    cancelVolumePush();
     $volumeSlider.value = String(VolumeBooster.DEFAULT);
     updateVolumeLabel(VolumeBooster.DEFAULT);
     await pushVolumeNow(VolumeBooster.DEFAULT);
   });
 
-  // スライダーは入力中は label のみ更新、確定時に apply（書き込み連打抑制）
   $intervalSlider.addEventListener("input", () => {
     updateIntervalLabel(Number($intervalSlider.value));
   });
   $intervalSlider.addEventListener("change", apply);
 
-  // 機能トグルと select は change で apply
   for (const input of featureInputs.values()) {
     input.addEventListener("change", () => {
       updateCleanerCountBadge();
@@ -181,33 +159,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   $gridItemsSelect.addEventListener("change", apply);
 
-  // 許可ドメインは blur で正規化 + apply（編集途中の連打を避ける）
-  $allowDomainsInput.addEventListener("blur", () => {
-    const { domains, rejectedCount } = parseAllowDomains($allowDomainsInput.value);
-    $allowDomainsInput.value = domains.join("\n");
-    if (rejectedCount > 0) {
-      $allowlistStatus.textContent = `⚠️ ${rejectedCount} 行を無効として除外`;
-      $allowlistStatus.className = "textarea-status error";
-    } else if (domains.length > 0) {
-      $allowlistStatus.textContent = `✓ ${domains.length} 件のドメインを保存`;
-      $allowlistStatus.className = "textarea-status ok";
-    } else {
-      $allowlistStatus.textContent = "";
-      $allowlistStatus.className = "textarea-status";
-    }
-    apply();
-  });
+  for (const input of igFeatureInputs.values()) {
+    input.addEventListener("change", () => {
+      updateIgCleanerCountBadge();
+      apply();
+    });
+  }
 
   // ----- DOM 構築 -----
 
   /**
-   * クリーナーの詳細設定 UI（カテゴリブロック + 個別トグル）を SearchFixer 定数から生成する。
-   * label/input を組み立て、後で apply に集計するため featureInputs Map に登録する。
+   * クリーナー詳細アコーディオンの DOM ビルダー（YouTube クリーナー / Instagram クリーナー共通）。
+   *
+   * 構造: `cat` > `cat-head` (アイコン + ラベル) + `cat-list` (各機能のトグル行)。
+   * 各 `feature-row` は 1 行 1 トグル + 説明文の縦積みレイアウト。
+   * 各 `<input type="checkbox">` には `id="${idPrefix}${item.key}"` を付与し、
+   * `inputMap` (`Map<key, input>`) に登録して呼び出し側で値の収集・復元に使う。
    */
-  function buildFeatureCategories() {
+  function _buildAccordionCategories(rootEl, categories, features, inputMap, idPrefix) {
     const frag = document.createDocumentFragment();
-    for (const cat of SearchFixer.CATEGORIES) {
-      const items = SearchFixer.FEATURES.filter((f) => f.category === cat.id);
+    for (const cat of categories) {
+      const items = features.filter((f) => f.category === cat.id);
       if (items.length === 0) continue;
 
       const wrap = document.createElement("div");
@@ -230,33 +202,53 @@ document.addEventListener("DOMContentLoaded", async () => {
         const row = document.createElement("label");
         row.className = "feature-row";
 
+        const text = document.createElement("span");
+        text.className = "fr-text";
+
         const name = document.createElement("span");
         name.className = "fr-name";
         name.textContent = item.label;
+        text.appendChild(name);
+
+        if (item.desc) {
+          const desc = document.createElement("span");
+          desc.className = "fr-desc";
+          desc.textContent = item.desc;
+          text.appendChild(desc);
+        }
 
         const sw = document.createElement("span");
         sw.className = "switch";
         const input = document.createElement("input");
         input.type = "checkbox";
-        input.id = `feature-${item.key}`;
+        input.id = `${idPrefix}${item.key}`;
         input.dataset.featureKey = item.key;
         const track = document.createElement("span");
         track.className = "switch-track";
         track.setAttribute("aria-hidden", "true");
         sw.append(input, track);
 
-        row.append(name, sw);
+        row.append(text, sw);
         list.appendChild(row);
-        featureInputs.set(item.key, input);
+        inputMap.set(item.key, input);
       }
 
       wrap.append(head, list);
       frag.appendChild(wrap);
     }
-    $featureCategories.appendChild(frag);
+    rootEl.appendChild(frag);
   }
 
-  /** グリッド select を SearchFixer.GRID_OPTIONS から生成 */
+  function buildFeatureCategories() {
+    _buildAccordionCategories(
+      $featureCategories,
+      SearchFixer.CATEGORIES,
+      SearchFixer.FEATURES,
+      featureInputs,
+      "feature-"
+    );
+  }
+
   function buildGridSelect() {
     for (const opt of SearchFixer.GRID_OPTIONS) {
       const o = document.createElement("option");
@@ -266,7 +258,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ----- バッジ・dim 更新 -----
   function updateCleanerCountBadge() {
     let on = 0;
     for (const input of featureInputs.values()) {
@@ -276,53 +267,73 @@ document.addEventListener("DOMContentLoaded", async () => {
     $cleanerCount.textContent = `${on}/${total}`;
   }
 
-  /** マスター OFF のとき詳細を視覚的に薄くする（編集自体は許可） */
   function updateCleanerDimState() {
     const dim = !$searchFixerToggle.checked;
     $featureCategories.classList.toggle("cleaner-disabled", dim);
   }
 
+  // ----- Instagram クリーナー DOM 構築（YouTube クリーナーと共通の _buildAccordionCategories を再利用） -----
+  function buildInstagramFeatureCategories() {
+    _buildAccordionCategories(
+      $igFeatureCategories,
+      InstagramCleaner.CATEGORIES,
+      InstagramCleaner.FEATURES,
+      igFeatureInputs,
+      "ig-feature-"
+    );
+  }
+
+  function updateIgCleanerCountBadge() {
+    let on = 0;
+    for (const input of igFeatureInputs.values()) {
+      if (input.checked) on++;
+    }
+    const total = igFeatureInputs.size;
+    $igCleanerCount.textContent = `${on}/${total}`;
+  }
+
+  function updateIgCleanerDimState() {
+    const dim = !$instagramCleanerToggle.checked;
+    $igFeatureCategories.classList.toggle("cleaner-disabled", dim);
+  }
+
   // ----- 適用 -----
   async function apply() {
-    const enabled = $enabledToggle.checked;
     const keepAliveEnabled = $keepAliveToggle.checked;
-    const ytShortsRemovalEnabled = $ytShortsToggle.checked;
+    const keepAliveHttpPingEnabled = $keepAliveHttpPingToggle.checked;
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
-    const volumeBoosterEnabled = $volumeBoosterToggle.checked;
+    const instagramCleanerEnabled = $instagramCleanerToggle.checked;
     const minutes = clampMinutes(Number($intervalSlider.value));
     const keepAliveIntervalMs = minutes * KeepAlive.MS_PER_MIN;
-    const { domains: contextMenuAllowDomains } = parseAllowDomains($allowDomainsInput.value);
     const searchFixerFeatures = collectFeatureValues();
     const searchFixerGridItems = SearchFixer.clampGridItems($gridItemsSelect.value);
+    const instagramCleanerFeatures = collectIgFeatureValues();
 
     const seq = ++applySeq;
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.APPLY_SETTINGS,
         data: {
-          enabled,
           keepAliveEnabled,
           keepAliveIntervalMs,
-          contextMenuAllowDomains,
-          ytShortsRemovalEnabled,
+          keepAliveHttpPingEnabled,
           searchFixerEnabled,
           searchFixerFeatures,
           searchFixerGridItems,
           amazonDeliveryTotalEnabled,
-          volumeBoosterEnabled,
+          instagramCleanerEnabled,
+          instagramCleanerFeatures,
         },
       });
       if (seq !== applySeq) return;
       if (res?.ok) {
         showStatus(
           buildOkMessage(
-            enabled,
             keepAliveEnabled,
-            ytShortsRemovalEnabled,
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
-            volumeBoosterEnabled
+            instagramCleanerEnabled
           ),
           "ok"
         );
@@ -343,21 +354,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     return out;
   }
 
+  function collectIgFeatureValues() {
+    const out = {};
+    for (const [key, input] of igFeatureInputs) {
+      out[key] = input.checked;
+    }
+    return out;
+  }
+
   function buildOkMessage(
-    enabled,
     keepAliveEnabled,
-    ytShortsRemovalEnabled,
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
-    volumeBoosterEnabled
+    instagramCleanerEnabled
   ) {
     const parts = [];
-    if (enabled) parts.push("制限解除");
     if (keepAliveEnabled) parts.push("セッション維持");
-    if (ytShortsRemovalEnabled) parts.push("Shorts");
-    if (searchFixerEnabled) parts.push("クリーナー");
+    if (searchFixerEnabled) parts.push("YT クリーナー");
     if (amazonDeliveryTotalEnabled) parts.push("Amazon");
-    if (volumeBoosterEnabled) parts.push("音量");
+    if (instagramCleanerEnabled) parts.push("Instagram");
     if (parts.length === 0) return "⏹  すべて停止";
     return "✓  " + parts.join("  /  ");
   }
@@ -376,19 +391,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeValue.textContent = `${v}%`;
   }
 
-  function updateVolumeRowVisibility() {
-    $volumeRow.classList.toggle("hidden", !$volumeBoosterToggle.checked);
-  }
-
   function setVolumeHint(text, isError = false) {
     $volumeHint.textContent = text ?? "";
     $volumeHint.className = isError ? "volume-hint error" : "volume-hint";
   }
 
   /**
-   * input イベントごとに sendMessage する代わりに、120ms debounce してから送る。
-   * スライダーをドラッグ中は連続して input が走るが、その都度 tabCapture を呼ぶと
-   * Chrome 側の getMediaStreamId 連打になるため、debounce で 1 つに集約する。
+   * input イベントごとに sendMessage する代わりに 120ms debounce してから送る。
+   * スライダー連続ドラッグ時の getMediaStreamId 連打を抑制する。
    */
   let volumePushTimer = null;
   function scheduleVolumePush(value) {
@@ -399,8 +409,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 120);
   }
 
+  function cancelVolumePush() {
+    if (!volumePushTimer) return;
+    clearTimeout(volumePushTimer);
+    volumePushTimer = null;
+  }
+
+  /**
+   * gain を background に送って反映する。100% 時は background 側で release を呼ぶため
+   * ここではただ送るだけでよい。エラー時は res.error をユーザーに伝えてデバッグしやすくする。
+   */
   async function pushVolumeNow(value) {
-    if (!$volumeBoosterToggle.checked) return;
     const tab = await getActiveHttpTab();
     if (!tab) {
       setVolumeHint("⚠ このページでは使えません", true);
@@ -414,11 +433,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (res?.ok) {
         setVolumeHint("");
       } else {
-        // master-disabled / no-stream-id / chrome:// など
-        const msg = res?.error === "master-disabled"
-          ? "⚠ 先にトグルを ON にしてください"
-          : "⚠ このページでは使えません";
-        setVolumeHint(msg, true);
+        setVolumeHint(formatVolumeError(res?.error), true);
       }
     } catch {
       setVolumeHint("⚠ 通信エラー", true);
@@ -426,8 +441,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * Popup を開いたとき / master ON 時に、active tab の現在 gain を取得して反映する。
-   * offscreen が起動していない場合は gain=null が返り、デフォルト 100% 表示にする。
+   * background が返すエラーコード文字列を、ユーザー向けの短いヒントに翻訳する。
+   * デバッグしやすいよう、不明なエラーの場合は原文（短縮）も併記する。
+   */
+  function formatVolumeError(error) {
+    if (!error) return "⚠ このページでは使えません";
+    const s = String(error);
+    if (s.includes("invalid-tab-id")) return "⚠ タブを取得できません";
+    if (s.includes("offscreen-unavailable")) return "⚠ 内部処理を起動できません";
+    if (s.includes("invalid-stream-id")) return "⚠ 音声を取得できません";
+    if (/Tab capture not granted|user gesture/i.test(s)) {
+      return "⚠ ポップアップ操作中のみ変更可能です";
+    }
+    if (/cannot capture|chrome:|edge:/i.test(s)) {
+      return "⚠ このページでは使えません";
+    }
+    if (/permission/i.test(s)) {
+      return "⚠ 権限エラー";
+    }
+    // 不明なエラーは原文の先頭 60 文字までを表示してデバッグ容易化
+    return "⚠ " + s.slice(0, 60);
+  }
+
+  /**
+   * Popup を開いたときに active tab の現在 gain を取得して反映する。
+   * offscreen が起動していない / 未ブーストなら DEFAULT (100%) を表示。
    */
   async function syncCurrentTabVolume() {
     const tab = await getActiveHttpTab();
@@ -451,7 +489,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * tabCapture が動作するのは http(s):// タブのみ（chrome:// 等は不可）。
+   * tabCapture が動作するのは http(s):// タブのみ。
    * activeTab permission 経由で active tab を取得し、URL 判定で弾く。
    */
   async function getActiveHttpTab() {
@@ -466,38 +504,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // KeepAlive.clampIntervalMs を ms 単位の単一情報源として再利用 (#19)。
-  // popup は分単位で操作するが、内部で ms に変換してクランプ後また分に戻すことで
-  // MIN/MAX の数値定義を 1 箇所に集約する。
   function clampMinutes(min) {
     const n = Number(min);
     if (!Number.isFinite(n)) return DEFAULT_MIN;
     const ms = KeepAlive.clampIntervalMs(n * KeepAlive.MS_PER_MIN);
     return Math.round(ms / KeepAlive.MS_PER_MIN);
-  }
-
-  /**
-   * textarea の複数行入力を正規化済みドメイン配列に変換する。
-   * 1 行 1 ドメイン・空行スキップ・重複排除・不正行カウント。
-   */
-  function parseAllowDomains(text) {
-    const seen = new Set();
-    const domains = [];
-    let rejectedCount = 0;
-    const lines = String(text ?? "").split(/\r?\n/);
-    for (const line of lines) {
-      const raw = line.trim();
-      if (!raw) continue;
-      const d = ContextMenuAllowlist.normalizeDomain(raw);
-      if (!d) {
-        rejectedCount++;
-        continue;
-      }
-      if (seen.has(d)) continue;
-      seen.add(d);
-      domains.push(d);
-    }
-    return { domains, rejectedCount };
   }
 
   function showStatus(msg, type) {

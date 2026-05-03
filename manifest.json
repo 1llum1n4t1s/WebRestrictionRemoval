@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "WEB制限解除サポート",
-  "description": "右クリック・テキスト選択を自動解除。右クリックメニューから強制ペースト・強制コピーが可能。",
+  "name": "WEB閲覧アシスト",
+  "description": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整える Chrome 拡張機能。",
   "version": "1.0.17",
+  "minimum_chrome_version": "140",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "WEB制限解除サポート",
+    "default_title": "WEB閲覧アシスト",
     "default_popup": "src/popup/popup.html"
   },
   "icons": {
@@ -23,8 +24,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/keepalive.js", "src/content/content.js"],
-      "css": ["src/content/content.css"],
+      "js": ["src/lib/actions.js", "src/content/keepalive.js"],
       "run_at": "document_idle",
       "all_frames": true,
       "match_origin_as_fallback": true
@@ -42,15 +42,18 @@
       "css": ["src/content/amazon-delivery-total.css"],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": ["*://*.instagram.com/*"],
+      "js": ["src/content/instagram-cleaner.js"],
+      "css": ["src/content/instagram-cleaner.css"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "permissions": [
     "activeTab",
-    "scripting",
     "storage",
-    "contextMenus",
-    "clipboardRead",
-    "clipboardWrite",
     "offscreen",
     "tabCapture"
   ]

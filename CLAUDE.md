@@ -4,16 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB制限解除サポート (Web Restriction Remover) は Chrome 拡張機能 (Manifest V3)。Webページの制限を解除する。**「制限解除」「セッション維持」「YouTube Shorts 削除」「YouTube クリーナー (Search Fixer)」「Amazon 定期おトク便 月別合計」「音量ブースター」の 6 つの独立オプトイントグル + カスタム右クリック許可リスト**の構成。YouTube クリーナーは 19 個のサブトグル + グリッド列数 select を、音量ブースターは 0-600% スライダー + リセットボタンを内包する。制限解除 ON 時の動作:
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 5 機能を提供する：「セッション維持」「YouTube クリーナー（Shorts 削除を含む 20 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
-- **サイレント自動解除** (ON中は常時): 右クリック制限 / テキスト選択制限
-- **右クリックメニューから手動実行**: 強制ペースト（`contexts: ["editable"]`）/ 強制コピー（`contexts: ["selection"]`）
+> **メジャー変更（次回リリース予定）**: v1.0.x の「制限解除」（右クリック解除 / テキスト選択解除 / 強制ペースト / 強制コピー / カスタム右クリック許可リスト）を全廃。`clipboardRead` / `clipboardWrite` / `contextMenus` / `scripting` permission も削除済み。拡張機能名は「WEB制限解除サポート」→「WEB閲覧アシスト」に改名。バージョン番号確定は `/vava` スキル経由で行う。
 
-「制限解除」「セッション維持」「YouTube Shorts 削除」の 3 機能はすべて独立にオプトイン（**全てデフォルト OFF**）。「カスタム右クリック許可リスト」は常時機能し、組み込みパターン + ユーザー追加ドメインで判定する。
-
-設定は `chrome.storage.local` の `enabled` キー（boolean）で保存。UI は日本語。**デフォルトは全機能 OFF**（インストール直後にサイト挙動を勝手に書き換えず、ユーザーが意図的に ON にした機能のみ動作する方針）。
-
-Excel Online / Google Docs / Notion / Figma 等 **カスタム右クリックメニューを提供する SaaS** では、サイト側のメニューを尊重するため `contextmenu` ブロックをスキップする。判定は `actions.js` の `ContextMenuAllowlist`（組み込みパターン + ユーザー追加の `contextMenuAllowDomains`）で行う。許可ホストでも `selectstart`/`dragstart` ブロック・user-select CSS・インラインハンドラ除去は通常どおり作用する。ユーザー追加ドメインは popup のアコーディオン内 textarea（1行1ドメイン）で編集し、`ContextMenuAllowlist.normalizeDomain` で正規化してから保存。
+設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は日本語。**インストール直後は全マスタートグル OFF**（音量ブースターは 100% = 解放状態）。サイト挙動を勝手に書き換えないオプトイン方針。
 
 ## Build Commands
 
@@ -27,180 +22,177 @@ powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP パ�
 bash ./zip.sh                # 同上 (Unix)
 ```
 
-テストフレームワーク・リンターは未導入。動作確認は Chrome に拡張機能を読み込んで手動テスト。
+## Development Workflow
+
+### Chrome に未パッケージ拡張機能をロード
+1. `chrome://extensions` を開く → デベロッパーモード ON
+2. 「パッケージ化されていない拡張機能を読み込む」→ プロジェクトルートを選択
+3. コード変更後は拡張機能カードの 🔄 リロードボタン
+4. content script 変更時は対象タブを再読込、background SW 変更時は SW 再起動が必要
+
+### JS 構文チェック（テスト不在の代替）
+Lint / test framework は未導入。コード変更後は最低限以下を実行:
+
+```bash
+node --check src/lib/actions.js \
+  && node --check src/popup/popup.js \
+  && node --check src/background/background.js \
+  && node --check src/content/youtube-shorts.js \
+  && node --check src/content/search-fixer.js \
+  && node --check src/content/keepalive.js \
+  && node --check src/content/amazon-delivery-total.js \
+  && node --check src/content/instagram-cleaner.js \
+  && node --check src/offscreen/offscreen.js
+```
+
+### デバッグ
+- popup: ポップアップ右クリック →「検証」で DevTools
+- background SW: `chrome://extensions` の「Service Worker」リンク
+- offscreen: `chrome://inspect/#other` で `chrome-extension://<id>/src/offscreen/offscreen.html` を開く
+- content script: 対象タブの DevTools Console（ログ prefix `[WebViewingAssist]`）
 
 ## Architecture
 
-4つのコンポーネントが `chrome.runtime` メッセージパッシングで連携する。アクション定数は `src/lib/actions.js` で定義。ファイルは `src/{popup,background,content,lib,offscreen}/` に配置。
+3 つのレイヤが `chrome.runtime` メッセージパッシングで連携する。アクション定数は `src/lib/actions.js` で集中管理。
 
 ```text
 Popup (src/popup/popup.{html,js,css})
-  ──APPLY_SETTINGS──▶  Background (src/background/background.js)
-                          │ storage 更新 + chrome.contextMenus 再構築 +
-                          ──APPLY_SETTINGS_CS──▶  Content Script (src/content/content.js)
+  ──APPLY_SETTINGS──▶ Background (src/background/background.js)
+                        │ storage 更新 +
+                        ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS / APPLY_INSTAGRAM_CLEANER_CS──▶
+                          各 Content Script
 
-[右クリックメニュー]
-  chrome.contextMenus.onClicked ─▶ Background
-                                   ──FORCE_PASTE / FORCE_COPY──▶ Content Script
-
-[強制ペースト/コピー時のクリップボード操作 (HTTP ページ対応)]
-  Content Script ──READ_CLIPBOARD / WRITE_CLIPBOARD──▶ Background
-                                                       │ ensureOffscreenDocument()
-                                                       ──target: "offscreen"──▶ Offscreen Document
-                                                                                │ navigator.clipboard.readText / writeText
-                                                                                │ (失敗時は execCommand("paste"/"copy"))
-                                                                                └──{ text | ok }──▶ Background ──▶ Content Script
+[音量ブースター]
+  Popup ──VOLUME_BOOSTER_SET_GAIN──▶ Background
+                                    │ chrome.tabCapture.getMediaStreamId
+                                    ──ACTION_VOLUME_SET_GAIN──▶ Offscreen Document
+                                                                  │ getUserMedia + AudioContext + GainNode
+                                                                  └ 増幅して再出力
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-トグル1個のみ（幅340px）。トグル変更で即 `APPLY_SETTINGS` を background へ送信。ステータスメッセージ（成功/失敗）を1.5秒表示。設定は `chrome.storage.local.enabled` から復元（未設定時は **デフォルト OFF**、`=== true` で防御的に判定）。アクセントカラーは赤系（ライト `#C0605A` / ダーク `#df8983`）。CSP meta を明示（`default-src 'self'; script-src 'self'; style-src 'self'`）。
+4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）+ 音量ブースタースライダー（マスタートグルなしの常時表示）+ クリーナー詳細アコーディオン × 2（YouTube クリーナー 20 機能 / Instagram クリーナー 10 機能）。Shorts 削除は YouTube クリーナーの「サイト全体」カテゴリ内サブ機能 `removeShorts` として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。
 
-**ダーク/ライトモード追従**: `<meta name="color-scheme" content="light dark">` でネイティブ要素も追従させ、CSS は `:root` のライト用トークン定義 + `@media (prefers-color-scheme: dark)` のダーク用トークン上書きの 2 層構造。色値はすべて CSS 変数経由で、本文セレクタにはハードコード色がない（茜色は HSL の色相を維持したまま明度・彩度を上げて夜空向けに調整、shadow も dark 時に強めて thumb 形状の判別を維持）。
+**クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
+
+**テーマ**: アクセントカラーは茜系（ライト `#C0605A` / ダーク `#df8983`）。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン + `@media (prefers-color-scheme: dark)` のダーク上書きの 2 層構造。色値はすべて CSS 変数経由でハードコードなし。CSP meta 明示。
+
+**音量スライダー**: input 時 120ms debounce → `VOLUME_BOOSTER_SET_GAIN` 送信。change（マウスアップ）で即 push。100% に戻すボタンは `pushVolumeNow(100)` で release。popup 起動時に `VOLUME_BOOSTER_GET_GAIN` で active tab の現在 gain を取得して反映。エラーは `formatVolumeError(res.error)` で人間可読な日本語メッセージに翻訳して表示。
 
 ### Background (`src/background/background.js`)
 Service worker。役割:
-1. **右クリックメニュー管理**: `enabled=true` のときのみ「強制ペースト」「強制コピー」をメニュー登録。クリックイベントを受けて対応 content script にメッセージ転送（`info.frameId` を `sendMessage` に渡して iframe 直配送）。
-2. **サイレント解除の補強**: メインワールドでのインラインハンドラ除去（`chrome.scripting.executeScript world: "MAIN"`, `allFrames: true`）。CSP 影響を回避。
-3. **Offscreen Document ライフサイクル管理**: `ensureOffscreenDocument()` で並行作成ガード、`scheduleOffscreenClose()` で 30 秒アイドル後に自動クローズ（メモリ常駐回避）。`console.warn` で診断導線を確保（`getContexts` / `createDocument` 失敗時）。
-4. **Message Handler の sender 検証**: `isFromPopup()` / `isFromContentScript()` ヘルパーで由来を検証。`APPLY_SETTINGS` は popup 由来のみ、`READ/WRITE_CLIPBOARD` と `REMOVE_HANDLERS_MW` は content script 由来のみ受け付ける（content script 乗っ取り経由のクリップボード不正読み取りを閉じる）。
-5. **設定マイグレーション**: `onInstalled` で旧 `copyPasteSettings` キー（v1.0.x 以前）を削除し、`enabled` / `keepAliveEnabled` / `ytShortsRemovalEnabled` 未設定時は **すべて false** で初期化（オプトイン方針）。
-6. **onStartup** でも `updateContextMenus()` を実行（Service Worker 再起動対策）。
+1. **設定の集約と各 content script への配布**: `APPLY_SETTINGS` を popup から受信し、storage 保存と active tab 通知を行う。YouTube タブ / Amazon `auto-deliveries` タブ判定は URL パターンで行う。非マッチタブには receiver 不在で例外になるため `try/catch` でガード。
+2. **Offscreen Document ライフサイクル管理**: `ensureOffscreenDocument()` で並行作成ガード、`scheduleOffscreenClose()` で 30 秒アイドル後に自動クローズ。**音量ブースト中タブが残っている間は close を再延期**（`isVolumeBoosterActive` で確認、SW 再起動直後は安全側に倒す）。`reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。
+3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain)` がエントリ。スライダーが UNITY (100%) のときは `releaseVolumeBoosterTab` を呼ぶだけで `getMediaStreamId` をスキップ（リソース節約）。既存 AudioContext がある場合も streamId なしで gain 値だけ更新。
+4. **Message Handler の sender 検証**: `SenderCheck.isFromPopup` / `isFromContentScript` ヘルパーで由来を検証。`APPLY_SETTINGS` / `VOLUME_BOOSTER_*` は popup 由来のみ受け付ける。
+5. **タブクローズで自動 release**: `chrome.tabs.onRemoved` で `ACTION_VOLUME_RELEASE_TAB` を offscreen に送信（permission 不要、SW 再起動でも永続的に発火する）。
+6. **設定マイグレーション**: `onInstalled` で旧キー削除 + 未設定キーの初期化（詳細は Important Patterns の「マイグレーション」を参照）。
 
 `chrome://`, `edge://`, `about:`, `file://` などの非 HTTP(S) ページにはメッセージ送信をスキップ（`content_scripts.matches` が `http(s)://*/*` のみのため）。
 
-### Content Script (`src/content/content.js`)
-IIFE でラップ、`window.__copyPasteAssistRunning` で二重実行防止。`all_frames: true` で iframe にも注入されるため、`chrome.storage.onChanged` を購読して全フレーム横断でトグル状態に追従する。初期化は `document_idle` 直後に `chrome.storage.local.get` → `applyEnabled` を即時実行（`window.load` + `setTimeout` での遅延はしない。遅延すると blockEvent 登録前にサイト側 `contextmenu` が発火する空白期間が生じるため）。
+### Keepalive (`src/content/keepalive.js`)
+全 http(s) フレームに `all_frames: true` で注入される唯一の汎用 content script。役割:
+1. `createKeepAlive` ファクトリで合成イベント dispatch + 同一オリジン HTTP ping ロジックを定義
+2. ファイル末尾の IIFE ランナーが起動責任を持ち、`chrome.storage.local` の `keepAliveEnabled` / `keepAliveIntervalMs` を読み出して keeper を on/off
+3. `chrome.runtime.onMessage` で `APPLY_KEEP_ALIVE_CS`、`chrome.storage.onChanged` で全タブ・全フレーム横断の同期を実装
+4. `window.__cpaKeepAliveRunning` で同一フレーム二重実行を防ぐ
 
-`enabled=true` のとき:
+合成アクティビティは `mousemove` / `pointermove` / `scroll` / `focus` を `document` / `window` に dispatch（クリック / keydown は副作用が大きいため避ける）— **常時実行・副作用ゼロ**。
 
-**サイレント自動解除**（処理負荷を抑えるため document 1箇所のキャプチャフェーズで一括処理）:
-- `contextmenu`, `selectstart`, `dragstart` イベントを `stopImmediatePropagation()` でブロック
-- **`ContextMenuAllowlist.isAllowed(location.hostname, currentAllowDomains)` が true のホストでは `contextmenu` のみ unblock** し、サイト側カスタムメニューを通す（例: Office Online / Google Docs / Notion）。`selectstart`/`dragstart` は通常どおりブロック
-- インラインハンドラ属性（`oncontextmenu`, `onselectstart`, `ondragstart`）は属性セレクタヒットと主要3ノード(document/html/body)のみ除去。`inlineHandlersRemoved` フラグで applyEnabled 複数回呼び出しでも1回のみ実行
-- CSS クラス `__cpa-enable-select` を `<html>` に付与し `user-select: text !important` を有効化
-
-**強制ペースト** (`FORCE_PASTE` 受信時):
-1. `READ_CLIPBOARD` メッセージを background に送り、offscreen document 経由でクリップボードテキストを取得（content script 直接の `navigator.clipboard.readText()` は http:// 非 secure context で reject されるため）
-2. 対象要素を決定: `document.activeElement` が編集可能ならそれを使用、そうでなければ `lastContextEditable`（直前の `contextmenu` イベントで記録した編集可能要素）にフォールバック。Chrome が contextmenu 後に activeElement を body にリセットするケース対応
-3. フォールバック時は `el.focus()` してから `document.execCommand("insertText", ...)` を実行（input/textarea/contenteditable 全対応、React 等のフレームワーク対応）
-4. execCommand 失敗時: `input`/`textarea` は native setter + `input`/`change` dispatch、`contenteditable` は Range API で挿入
-
-**強制コピー** (`FORCE_COPY` 受信時):
-1. `info.selectionText` または `window.getSelection()` からテキスト取得
-2. `WRITE_CLIPBOARD` メッセージを background に送り、offscreen document 経由で書き込み（content script 直接の `navigator.clipboard.writeText` は http:// 非 secure context で reject されるうえ、`execCommand("copy")` フォールバックもサイト側の copy ブロッカーに阻害されうるため extension context で実行）
-3. offscreen 側は `navigator.clipboard.writeText` を優先し、失敗時は hidden textarea + `execCommand("copy")`
+HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン**（デフォルト OFF）。有効時のみ `KeepAlive.PRESET_ENDPOINTS`（SharePoint 等）の同一オリジン GET → 現在 URL に HEAD → origin root に HEAD のフォールバックを発射する。`credentials: "same-origin"` で第三者ドメインへの認証情報送信を防ぎ、`AbortSignal.timeout(5000)` で永久 pending を防止。同一オリジン iframe は `shouldFireHttpPing()` で多重発射を回避。デフォルト OFF にしている理由は認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発しうるため。
 
 ### Offscreen (`src/offscreen/offscreen.html`, `src/offscreen/offscreen.js`)
-クリップボード読み書き専用の extension-context ドキュメント。`chrome-extension://` は常に secure context のため `navigator.clipboard.{readText,writeText}` が使える。`target: Offscreen.TARGET` を先に検証してから `Offscreen.ACTION_READ` / `Offscreen.ACTION_WRITE` で分岐（文字列ハードコードではなく `actions.js` の定数を参照）。`offscreen.html` は `<script src="../lib/actions.js">` を先読みし、CSP meta を明示。
+音量ブースター専用の extension-context ドキュメント。`chrome-extension://` は常に secure context のため `getUserMedia({ chromeMediaSourceId })` が動く。`audioStates` Map で tabId → `{ ctx, gainNode, stream }` を保持し、release 時に `stream.getTracks().stop()` → `ctx.close()` をこの順で呼ぶ（逆順だと生きているソースから出力先消失でエラーになり得る）。`pagehide` / `unload` で全 audioStates を cleanup。streamId は `typeof streamId !== "string"` の型チェックのみ通してから `getUserMedia` に流す（過去に `^[a-zA-Z0-9_:.\-]{8,256}$` の正規表現検証を試したが、Chrome の `getMediaStreamId` 戻り値とマッチしないケースで誤拒否が出たため撤去）。`mandatory.chromeMediaSource = "tab"` 形式を先に試して、失敗時のみ `chromeMediaSourceId` フラット形式にフォールバック。
 
-### Styling (`src/content/content.css`)
-`!important` を使用してページスタイルを上書き。CSSクラスプレフィックス `__cpa-`:
-- `__cpa-enable-select`: `user-select: text` を強制
+### YouTube Shorts Removal (`src/content/youtube-shorts.js`)
+`*://*.youtube.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に注入。`window === window.top` チェックで埋め込みプレーヤーには注入せず CPU 負荷を抑える。
+
+**YouTube クリーナーへの統合**: 独立 storage key と独自メッセージは持たず、YouTube クリーナーのサブ機能 `searchFixerFeatures.removeShorts` として動作。アクティブ判定は `searchFixerEnabled === true` AND `features.removeShorts === true` の AND。`APPLY_SEARCH_FIXER_CS` メッセージを search-fixer.js と共に購読する（同一 isolated world で同じメッセージを 2 ファイルが受けて、それぞれの責務に応じて反応する設計）。`storage.onChanged` は片方の key だけ変わった場合に備え、両 key を再取得してから `computeActive()` で判定する（変更されてないキーが undefined になる罠を回避）。
+
+### YouTube クリーナー (`src/content/search-fixer.js`)
+`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。20 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`（v1.0.18 で `removeShorts` を「サイト全体」カテゴリに追加して 19 → 20）。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**`removeShorts` サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
+
+### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
+`*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
+
+**フリーズ対策**: 旧実装は `MutationObserver(subtree: true)` 監視中に自身が `target.append(root)` / `priceEl.textContent = ...` で DOM を書き戻すと再発火 → 再 render → 無限ループでブラウザがフリーズする問題があった。修正版は **rAF coalesce + observer disconnect / takeRecords / reconnect ガード** パターン:
+1. `scheduleRender()` を `requestAnimationFrame` で 1 フレームに 1 回に圧縮
+2. `runRenderInsideObserverGuard()` 内で `observer.disconnect()` → `renderAllTotals()` → `observer.takeRecords()`（蓄積分を破棄）→ `observer.observe()` で再接続
+3. `priceEl.textContent` は変化時のみ更新（同じ文字列の再代入でも `MutationRecord` は積まれるため）
+
+**動作対象**: top frame 限定、`[data-delivery-type]` セクションの `.subscription-price` を `/\D/g` で数値化して合計、各セクションの `.a-fixed-left-grid-col` に `__cpa-amzn-delivery-total` クラスのルート要素を append。OFF 時は observer 切断 + 既存挿入要素を全部撤去（撤去操作も同じ guard 経由）。
+
+### Instagram クリーナー (`src/content/instagram-cleaner.js` + `src/content/instagram-cleaner.css`)
+`*://*.instagram.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に `run_at: document_idle` で注入。`window.__cpaInstagramCleanerRunning` で二重実行防止。`instagramCleanerEnabled` (master) + `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理。10 機能の単一情報源は `actions.js` の `InstagramCleaner.FEATURES`。
+
+**run_at 注意**: 最初の content_scripts エントリ（`http(s)://*/*` で `actions.js` を含む）が `document_idle` のため、Instagram エントリも揃えないと「`InstagramCleaner is not defined`」エラーになる。Chrome は `run_at` が違うと早い方を先に評価するので、`document_start` を指定すると `actions.js` 未ロード状態で走ってしまう。CSS は manifest の `css:` 配列で別経路で document_start に近いタイミングで注入されるため、JS を idle にしても見た目への影響は小さい。
+
+Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Notes / メッセージカウンター）を非表示にする独自実装。クリーンアップ目的に機能を絞っており、寄付ボタン UI 注入・多言語ローカライズ・フォント変更・グレースケール / 正方形化等は実装しない。
+
+**実装パターン**:
+1. **body クラスベースの CSS 駆動**: `applyBodyClasses()` で `<html>` に `__cpa-ig-{reels,explore,stories,...}` クラスを付け外し。CSS 側は各セレクタを `html.__cpa-ig-XXX` で prefix し、クラスが付いていないときは完全に不活性化する
+2. **DOM スイープ (300ms ポーリング)**: `block_videos` 機能では `<article>` 内 `<video>` を検出 → 親に `__cpa-ig-article-video` マーカーを付与 → CSS でサムネ差し替え。`vanity` 機能では `<article>` 内 `<button>` の innerText が純粋な数値表現（カンマ・小数点・k/M/万 単位等）にマッチする場合に `__cpa-ig-hide-counter` マーカーを付ける
+3. **URL リダイレクト (300ms ポーリング)**: `reels` / `explore` / `storiesAll` 機能が ON のとき、対応する URL パスでホーム `/` に `location.assign("/")`。SPA の history hook より単純で確実
+4. **master OFF 時の cleanup**: domSweepTimer / urlGuardTimer を停止し、付与済みマーカークラスをすべて剥がして元の Instagram UI に戻す
+
+**CSS セレクター戦略**: Instagram の難読化 class 名（`.x9f619` 等）は build ごとに変わるため**意図的に避け**、`aria-label` / `href` / `role` / `data-pagelet` / SVG path data などの意味論的属性のみで構成する。例: Reels は `a[href="/reels/"]` + `aria-label="Reels"` + 日本語ロケール用 `aria-label="リール"` + SVG path data の 4 重に重ね、どれか 1 つでもヒットすれば隠れる構造。
 
 ### 音量ブースター (`src/offscreen/offscreen.js` の Volume Booster 部分)
-元拡張 "Volume Master" (`jghecgabfgfdldnmbfkhmffcabddioke`) の音量ブースト機能だけを移植したオプトイン機能。元拡張の Equalizer (Default / Voice boost / Bass Boost) は意図的に除外し、純粋な GainNode ベースの音量増幅のみ実装。`volumeBoosterEnabled` (boolean) で master 制御。
+Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext + GainNode）のみを使ったタブ音声増幅の独自実装。Equalizer や音質変更は持たず、純粋な GainNode ベースの音量増幅のみ。スライダーが UNITY (100%) のときは AudioContext を release してリソース返却する master トグルレス設計（`volumeBoosterEnabled` storage key も持たない）。
 
 **処理フロー**:
-1. popup でマスタートグル ON → スライダー操作（0-600%）
-2. popup → background: `VOLUME_BOOSTER_SET_GAIN` メッセージ（`tabId`, `gain`）
-3. background: `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得
-4. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`）
-5. offscreen: 未登録タブなら `getUserMedia({chromeMediaSource:"tab", chromeMediaSourceId:streamId})` で stream 取得 → `AudioContext` + `GainNode` 構築 → `mediaSource → gainNode → destination` の 3 ノード接続。登録済みなら GainNode の `.value` だけ更新
+1. popup でスライダー操作（0-600%）→ 120ms debounce → `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`）
+2. background: gain が UNITY なら `releaseVolumeBoosterTab` を呼んで終了。それ以外なら `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext がある場合は streamId なしで gain だけ更新）
+3. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`）
+4. offscreen: 未登録タブなら `getUserMedia({mandatory:{chromeMediaSource:"tab", chromeMediaSourceId:streamId}})` で stream 取得 → `AudioContext` + `GainNode` 構築 → `mediaSource → gainNode → destination` の 3 ノード接続。登録済みなら GainNode の `.value` だけ更新
 
-**ライフサイクル**:
-- `chrome.tabs.onRemoved`: タブ閉じで該当 `tabId` を offscreen から release（`AudioContext.close()` + stream tracks 停止）
-- master OFF 切替: `VOLUME_BOOSTER_RELEASE_ALL` で全タブを release
-- アイドル close 抑止: `scheduleOffscreenClose` 発火時に `ACTION_VOLUME_QUERY_ACTIVE` を送り、boost 中タブが残っていれば close をスキップ（音が止まらないようにするため）
-
-**Offscreen reasons の合算**: 既存 clipboard 用 offscreen と同居するため `Offscreen.REASONS = ["CLIPBOARD", "USER_MEDIA", "AUDIO_PLAYBACK"]`。Chrome は 1 拡張 1 offscreen 制約のため、機能ごとに別文書を作れない。
-
-**popup UI**: `volumeBoosterToggle` ON 時のみ `volumeRow` を表示（`hidden` クラス制御）。スライダーは `input` イベントで 120ms debounce 後に gain 送信、`change` イベント（マウスアップ）で即送信。リセットボタンで 100% 復帰。
-
-### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`, `src/content/amazon-delivery-total.css`)
-元拡張 "Amazon定期おトク便の合計金額表示" (`npipdojmddhaehjoglciocbpengfoipp`) を vanilla JS で再実装したオプトイン機能。`amazonDeliveryTotalEnabled` (boolean) で master 制御。
-
-**動作対象**: `*://www.amazon.co.jp/auto-deliveries*` のみ（manifest の matches で限定）。top frame 限定。
-
-**動作**:
-1. `[data-delivery-type]` 要素（=月単位セクション）を `document.querySelectorAll` で取得
-2. 各セクション内の `.subscription-price` 要素のテキストを `/\D/g` で非数字を除去して数値化
-3. 合計を `Number.toLocaleString()` で 3 桁区切り表示
-4. 各セクションの `.a-fixed-left-grid-col` に `.__cpa-amzn-delivery-total` クラスのルート要素を append
-5. MutationObserver で動的更新（`queueMicrotask` で coalesce）
-
-OFF 時は observer 切断 + 既存挿入要素 `.__cpa-amzn-delivery-total` を全部撤去。重複挿入防止のため、再描画では既存ルートが見つかれば数値表示部 `__price` の textContent だけ書き換える。
-
-設定の同期は **`chrome.storage.onChanged` + `APPLY_AMAZON_DELIVERY_TOTAL_CS` メッセージ** の二重購読方針。background は `isAmazonAutoDeliveryUrl()` (hostname 厳密一致 `www.amazon.co.jp` + パスは `/auto-deliveries` prefix) でガードしてから送信する。
-
-### YouTube Search Fixer (`src/content/search-fixer.js`, `src/content/search-fixer.css`)
-元拡張 "Search Fixer for YouTube" (`bojdknokkpgboeonegndfcgkaommhleo`) の DOM 操作機能（19 機能 + グリッド列数）を再実装したオプトイン機能。`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理。19 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES` で、popup はこの定義から動的に DOM を生成する（人手二重管理を避ける）。
-
-機能カテゴリ:
-- 🗑️ **検索結果ノイズ** (10): 動画棚 / カードリスト / プレイリスト / ミックス / コース / チャンネル / Shorts 棚 / Shorts ボタン動画 / ライブ / 関連検索ブロック
-- 🚫 **動画属性で削除** (4): 認証 / アーティスト / 視聴済み / チャプター付き
-- ✨ **ハイライト** (2): キーワード非マッチをグレー化 / サムネ枠装飾
-- 🎬 **動画ページ** (2): タイトル中央配置 / 説明文フル幅
-- 📐 **レイアウト** (1): 検索結果グリッド表示
-
-実装: top frame 限定で `MutationObserver(childList: true, subtree: true)` を起動し、`yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行する。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止して DOM 副作用を残さない。
-
-設定の同期は **`chrome.storage.onChanged` + `APPLY_SEARCH_FIXER_CS` メッセージ** の二重購読方針（YouTube Shorts 削除と同じパターン）。background は `isYouTubeUrl()` で active tab が youtube.com 系かを判定してからメッセージ送信する。
-
-### YouTube Shorts Removal (`src/content/youtube-shorts.js`, `src/content/youtube-shorts.css`)
-YouTube Shorts を非表示・物理削除するオプトイン機能（メイン制限解除トグルと独立）。manifest.json では `*://*.youtube.com/*` 限定の専用 content_scripts エントリで `all_frames: false`（top frame のみ）に注入し、汎用 content.js とは別ライフサイクルで動く。`window.__ytShortsRemoverRunning` で二重実行防止、`window === window.top` チェックで埋め込みプレーヤーには注入せず CPU 負荷を抑える。
-
-**actions.js の二重ロード回避**: youtube.com は最初のエントリ（`http(s)://*/*`）にもマッチするため、両エントリで `actions.js` を読み込むと同じ isolated world で `const Actions = ...` が再宣言され SyntaxError になる。Chrome の同一拡張・同一ページの content scripts は同一 isolated world で「script scope」を共有するため、最初のエントリで読み込んだ `Actions` / `StorageKeys` / `YouTubeShorts` 定数は2番目のエントリの `youtube-shorts.js` からも参照できる。よって 2 番目のエントリの `js` 配列には `actions.js` を含めない。
-
-`enabled=true` のとき:
-- `<html>` に CSS クラス `__cpa-yt-shorts-hidden` を付与し `youtube-shorts.css` でサイドバー / チップ / 棚 / タブを `display: none !important`
-- `MutationObserver(childList: true, subtree: true)` で `YouTubeShorts.SELECTORS_REMOVE` の要素を発見次第 `.remove()`。連続 mutation の coalesce には `queueMicrotask` を使う
-- "Shorts" チップのみは `#text.textContent === "Shorts"` を確認してから削除（他のチップを巻き込まない）
-- `setInterval(YouTubeShorts.URL_POLL_MS = 1000)` で `location.pathname` を監視し、`/shorts/<videoId>` を `/watch?v=<videoId>` へ `location.replace`（YouTube SPA は history.pushState を使うので popstate / load では捕捉できないため polling 必須）
-
-`enabled=false` 切替時は observer / interval / CSS クラスをすべて停止（DOM から削除済みの要素は復元できないが、SPA 遷移で次回再構築されるため実用上問題なし）。
-
-設定の同期は **`chrome.storage.onChanged` + `APPLY_YT_SHORTS_CS` メッセージ** の二重購読方針。background は `handleApplySettings` 内で `URL.hostname` が `youtube.com` または `*.youtube.com` のときのみ `APPLY_YT_SHORTS_CS` を送信する（receiver なしタブでの例外回避）。
+**ライフサイクル**: `chrome.tabs.onRemoved` でタブ閉じ release / スライダー 100% 復帰で release / アイドル close 抑止は Important Patterns 参照。
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `manifest.json` | MV3 設定; permissions: `activeTab`, `scripting`, `storage`, `contextMenus`, `clipboardRead`, `clipboardWrite`, `offscreen`, `tabCapture` |
-| `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / ContextMenuIds / SilentUnlock / ContextMenuAllowlist 定数 |
-| `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、contextMenus 管理、MW ハンドラ除去、offscreen document 管理、設定マイグレーション |
-| `src/content/content.js` | サイレント解除 + 強制ペースト/コピーのロジック |
-| `src/content/youtube-shorts.js` | YouTube Shorts 削除（top frame のみ）: MutationObserver + URL リダイレクト |
+| `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` |
+| `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / KeepAlive / SenderCheck / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / VolumeBooster / ExtensionPaths 定数 |
+| `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
+| `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
+| `src/content/youtube-shorts.js` | YouTube クリーナーの `removeShorts` サブ機能（top frame のみ）: MutationObserver + URL リダイレクト |
 | `src/content/youtube-shorts.css` | `__cpa-yt-shorts-hidden` クラス付与時に Shorts UI を `display: none` |
-| `src/content/search-fixer.js` | YouTube Search Fixer（19 機能 + グリッド列数）: master + features + gridItems で駆動 |
+| `src/content/search-fixer.js` | YouTube クリーナー（20 機能 + グリッド列数）: master + features + gridItems で駆動 |
 | `src/content/search-fixer.css` | サムネ枠装飾 / タイトル中央 / 説明文フル幅 等のクラス定義 |
-| `src/content/amazon-delivery-total.js` | Amazon 定期おトク便ページ（matches 限定）: 月別合計を MutationObserver 駆動で挿入 |
+| `src/content/amazon-delivery-total.js` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 |
 | `src/content/amazon-delivery-total.css` | `.__cpa-amzn-delivery-total` の Amazon 配色合計表示スタイル |
-| `src/content/content.css` | 制限解除スタイル (`!important` で上書き) |
-| `src/popup/popup.{html,js,css}` | ポップアップ UI: 単一トグル、設定保存・復元、適用フィードバック |
-| `src/offscreen/offscreen.{html,js}` | 多目的 offscreen document: クリップボード読み書き + 音量ブースターの AudioContext 維持 |
-| `icons/icon.svg` | ソースアイコン (512×512 スパナデザイン 赤系); PNG は `icons/icon-{16,48,128}.png` に生成 |
+| `src/content/instagram-cleaner.js` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ |
+| `src/content/instagram-cleaner.css` | `html.__cpa-ig-*` 駆動の隠蔽 CSS（aria-label / href / role / data-pagelet / SVG path data ベースの意味論的セレクタのみ） |
+| `src/popup/popup.{html,js,css}` | ポップアップ UI: 4 トグル + 音量スライダー + クリーナー詳細アコーディオン × 2（1 行 1 トグル + 説明文）、設定保存・復元、適用フィードバック、ダーク/ライト追従 |
+| `src/offscreen/offscreen.{html,js}` | 音量ブースター専用 offscreen document: AudioContext + GainNode で増幅 |
+| `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt` |
-| `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix)、npm install / アイコン生成失敗で exit 1 |
-| `docs/privacy-policy.md` | プライバシーポリシー (`enabled` 単一キー + offscreen/clipboard 権限説明) |
-
-## Store Asset Generation
-
-`icons/icon.svg` → sharp で PNG 変換 (`scripts/generate-icons.js`, 個別失敗は `throw` → `process.exit(1)`)。`webstore/*.html` → Puppeteer でスクリーンショット PNG 生成 (`webstore/generate-screenshots.js`, worker-pool concurrency=2 で並列)。Chrome Web Store 画像サイズ: スクリーンショット 1280×800、プロモ小 440×280、マーキー 1400×560。
+| `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
+| `docs/privacy-policy.md` | プライバシーポリシー |
 
 ## Important Patterns
 
-- **Message Handler の sender 検証** — background は `isFromPopup()` / `isFromContentScript()` を各ハンドラ冒頭で呼ぶ。`APPLY_SETTINGS` は popup 由来（`sender.tab` なし + `sender.id === chrome.runtime.id`）のみ、`READ/WRITE_CLIPBOARD` と `REMOVE_HANDLERS_MW` は content script 由来（`sender.tab?.id` 存在）のみ受ける。新しいメッセージアクションを追加するときは必ずどちらの由来を許可するか明示すること。
-- **アクション定数は `src/lib/actions.js` を 4経路で共有** — `importScripts("/src/lib/actions.js")` (background) + `content_scripts` (manifest.json で自動注入) + `<script src="../lib/actions.js">` (popup.html) + `<script src="../lib/actions.js">` (offscreen.html)。ES modules ではなく従来のスクリプト形式で共通定数を共有。offscreen.js で文字列をハードコードしない（二重定義で保守ミスを誘発するため）。
-- **二重実行防止** — `window.__copyPasteAssistRunning` グローバルフラグ。
-- **軽量イベントブロック** — `document` 1箇所にキャプチャフェーズリスナーを登録し `stopImmediatePropagation()` でサイト側リスナー発火を封じる。全DOM走査なし。
-- **インラインハンドラ除去の二重走査回避** — content script 側（isolated world）で属性セレクタヒット + 主要3ノード除去を行い、`inlineHandlersRemoved` フラグで初回のみ実行。background 側の MW 除去（`world: "MAIN"`）は `window/document/html/body` のグローバルプロパティ null 化のみ行い、属性セレクタは content 側に一本化（DOM 属性/プロパティは world 間共有）。
-- **iframe 多重呼び出し対策** — `applyEnabled(enabled, { requestMwRemove })` オプションで MW 除去依頼の送信源を制限。`storage.onChanged` は全フレームで発火するため、トップフレーム (`window === window.top`) のみが `REMOVE_HANDLERS_MW` を送る（`chrome.scripting.executeScript allFrames: true` が全フレーム分を1回でカバーするため O(iframe²) を回避）。
-- **初期化タイミング** — `document_idle` 注入後、`chrome.storage.local.get` の then で即時 `applyEnabled` を呼ぶ。`window.load` + `setTimeout(,0)` での遅延はしない（blockEvent 登録前のハンドラ発火を防ぐ）。
-- **ペースト挿入の順序** — `execCommand("insertText")` を最初に試す（React 等のフレームワーク対応）。失敗時のみ native setter / Range API にフォールバック。
-- **強制コピーのフォールバック** — offscreen document 側で `navigator.clipboard.writeText` が失敗した場合、同じ offscreen 内の hidden textarea + `execCommand("copy")` にフォールバック（extension context で実行するためサイト側の copy ブロッカーの影響を受けない）。
-- **メインワールドでのハンドラ除去** — `chrome.scripting.executeScript world: "MAIN"` で CSP やブラウザ独自制限を回避。
-- **contextMenus の再構築** — `ENABLED` 変更時・onStartup 時に `removeAll()` → `create()` で冪等に再構築。
-- **iframe 対応** — `content_scripts.all_frames: true` + `match_origin_as_fallback: true` で通常の iframe に加え `about:blank` / `about:srcdoc` / `data:` / `blob:` 等の関連フレームにも content script を注入（親の origin が `matches` を満たせば）。右クリックメニュー経由の `FORCE_PASTE` / `FORCE_COPY` は `chrome.contextMenus.onClicked` の `info.frameId` を `chrome.tabs.sendMessage` の `frameId` オプションに渡してクリックされたフレームに直接届ける。MW インラインハンドラ除去も `chrome.scripting.executeScript` に `allFrames: true` を指定して全フレーム対象。
-- **Offscreen Document のライフサイクル** — http:// の content script では secure context 制限で `navigator.clipboard.readText()` が reject される。`chrome.offscreen.createDocument({ reasons: ["CLIPBOARD"] })` で `src/offscreen/offscreen.html` を起動し、chrome-extension:// (secure) 側で読み取って background 経由で content script に返す。`ensureOffscreenDocument` は `getContexts` (Chrome 116+) での存在確認 + 並行作成ガード付き（"Only one offscreen document" エラー回避）。使用後 30 秒アイドルで `scheduleOffscreenClose()` により自動クローズしメモリ常駐を避ける。
-- **設定マイグレーション** — `onInstalled` で旧 `copyPasteSettings` キー（v1.0.x 以前）を削除、`enabled` 未設定時はデフォルト true で初期化。
-- **カスタム右クリック許可リスト** — Excel Online / Google Docs / Notion 等のカスタムメニュー提供サイトで `contextmenu` ブロックをスキップする。組み込みパターン（`ContextMenuAllowlist.BUILTIN_PATTERNS`）＋ユーザー追加ドメイン（`StorageKeys.CONTEXT_MENU_ALLOW_DOMAINS` 配列）の 2 層構成。ユーザー追加値は popup 側で `ContextMenuAllowlist.normalizeDomain()` を通して保存（`https://` 等のプレフィックス除去、`*.` / 先頭ドット除去、不正文字行を reject）。suffix match はドット境界付き（`example.com` は `foo.example.com` にマッチ、`barexample.com` にはマッチしない）。content script 側は `currentAllowDomains` を closure 保持し、`storage.onChanged` と `APPLY_SETTINGS_CS` の両経路で同期する。allow-list が変化したら `applyEnabled` を再実行して block/unblock を切り替える（同じイベントを再 register しないガードは `blockHandlers` Map が担う）。
+新機能追加・既存機能の改修で踏むべき原則と、過去にハマった罠の対策。詳細はファイル冒頭コメントと該当セクションを参照。
+
+### 設計の起点
+- **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する設計。FEATURES に追加すれば popup UI は自動生成される。actions.js は **`importScripts`** (background) + **manifest content_scripts** (最初のエントリで自動注入) + **`<script>` タグ** (popup.html / offscreen.html) の 4 経路で共有する古典的グローバル定数方式（ES modules ではない）。
+- **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` / `package-lock.json` の `version` フィールドおよびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
+- **デフォルト OFF 方針徹底** — 4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスタートグルなしだがスライダー 100% でリソース解放されるため「インストール直後はサイトに何も影響しない」を維持できる。
+
+### メッセージング・content script
+- **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
+- **content_scripts の二重ロード回避** — `actions.js` は最初のエントリ（`http(s)://*/*`）でのみロード。2 番目以降の YouTube / Amazon / Instagram エントリは `js` 配列に含めない（同一 isolated world で script scope 共有）。**`run_at` も最初のエントリと揃える（`document_idle`）**。先行ロード前に走ると `InstagramCleaner is not defined` 等で即死する。
+- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。
+- **iframe 多重対策** — keepalive は `shouldFireHttpPing()` でトップフレーム or クロスオリジン iframe のみ ping を発射。同一オリジン iframe はトップに任せる。
+
+### MutationObserver 取り扱い
+- **DOM 書き戻しは observer guard 必須** — `subtree: true` 監視中に自身が DOM を書き戻すと再帰発火 → 無限ループでフリーズ。Amazon 月別合計の修正で確立した **`disconnect → render → takeRecords → observe` ガード + `requestAnimationFrame` coalesce** の二重防御を新規 DOM 書き込みロジックでも踏襲する。
+
+### 音量ブースター・Offscreen Document
+- **Offscreen Document の 1 拡張 1 文書制約** — `reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。新しい用途を追加するときは既存ドキュメントに同居させること。
+- **アイドル close 抑止** — `isVolumeBoosterActive` で boost 中タブを query。SW 再起動直後など通信失敗時は安全側（active 扱い）に倒し、ブースト中の音を急に切らない。
+- **タブクローズで自動 release** — `chrome.tabs.onRemoved` は permission 不要 + SW 再起動でも永続的に発火するため、AudioContext の取り残しを防げる。
+
+### マイグレーション
+- **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `volumeBoosterEnabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。
