@@ -283,11 +283,11 @@ let offscreenState = "CLOSED";
 let offscreenCreatingPromise = null;
 let offscreenClosingPromise = null;
 let offscreenIdleTimer = null;
-// PERF-11 対策: scheduleOffscreenClose の連続再スケジュール上限。
-// `isVolumeBoosterActive()` が常に true（通信失敗で安全側に倒している間など）の場合に
-// 30 秒間隔で無限再スケジュールが続いて SW スリープを阻害するため、上限を設ける。
-// 10 回 = 5 分。boost 中タブが本当に残っている場合はそれより長く SW を生かす必要は薄い
-// （AudioContext は offscreen 側で持ち、SW が落ちても音は止まらない）。
+// scheduleOffscreenClose の連続再スケジュール回数（soft tracking 用）。
+// `isVolumeBoosterActive()` が true である限り再スケジュールを継続する設計のため、
+// このカウンタは無限増加防止のリセット境界として機能する（実際の close 停止はしない）。
+// 10 回 = 5 分。リセットしても close 試行ループ自体は継続し、
+// `isVolumeBoosterActive()` が false に戻ったタイミングで初めて close へ進む。
 const OFFSCREEN_CLOSE_RESCHEDULE_LIMIT = 10;
 let offscreenCloseRescheduleCount = 0;
 
@@ -367,14 +367,15 @@ function scheduleOffscreenClose() {
     // 音量ブースト中タブが残っていれば close を再延期する。close すると AudioContext が
     // 解放されて音が一瞬で 100% に戻ってしまうため、ユーザー体験的に NG。
     if (await isVolumeBoosterActive()) {
-      // PERF-11 対策: 通信失敗で `isVolumeBoosterActive` が常に true を返す状況で
-      // 30 秒間隔の無限再スケジュールが SW スリープを阻害し続ける問題を防ぐ上限。
+      // PERF-11 対策: 通信失敗で `isVolumeBoosterActive` が常に true を返す状況でも、
+      // 強制 close はブースト中の音を断つリスクがあるため避けて再スケジュールを継続する。
+      // カウンタは「連続再スケジュール回数」を soft tracking する目的で保持し、
+      // 上限到達時はリセットだけして次サイクルへ繰り越す（無限カウントアップ防止）。
+      // close 試行を停止すると offscreen document が永久に残ってしまうため、
+      // 上限到達後も `scheduleOffscreenClose()` を必ず呼んで cycle を維持する。
       offscreenCloseRescheduleCount += 1;
       if (offscreenCloseRescheduleCount >= OFFSCREEN_CLOSE_RESCHEDULE_LIMIT) {
-        // 上限到達: それでも close は強行せず、リセットして再カウントから始める。
-        // 強制 close はブースト中の音を断つリスクがあるため避ける。
         offscreenCloseRescheduleCount = 0;
-        return;
       }
       scheduleOffscreenClose();
       return;

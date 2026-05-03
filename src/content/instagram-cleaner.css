@@ -135,7 +135,10 @@ html.__cpa-ig-block-videos article.__cpa-ig-article-video {
   position: relative;
   overflow: hidden;
 }
-/* 動画があった場所をライト背景プレースホルダーに置換（ライト/ダーク両対応） */
+/* 動画があった場所をプレースホルダーに置換。
+   背景色は Instagram が公開している theme-aware な `--ig-secondary-background`
+   （RGB triple）を借用してダーク/ライトに自動追従させる。変数未定義の旧 IG ビルド
+   向けに `rgb(244, 244, 244)` (= #f4f4f4) をフォールバック値として保持。 */
 html.__cpa-ig-block-videos article.__cpa-ig-article-video::after {
   content: "🎬";
   position: absolute;
@@ -143,13 +146,10 @@ html.__cpa-ig-block-videos article.__cpa-ig-article-video::after {
   align-items: center;
   justify-content: center;
   inset: 0;
-  background-color: #f4f4f4;
+  background-color: rgb(var(--ig-secondary-background, 244, 244, 244));
   font-size: 2rem;
   opacity: 0.6;
   pointer-events: none;
-}
-html.__cpa-ig-block-videos.__fb-dark-mode article.__cpa-ig-article-video::after {
-  background-color: #1e1f20;
 }
 
 /* =============================================================
