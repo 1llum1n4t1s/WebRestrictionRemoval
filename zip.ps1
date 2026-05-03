@@ -1,4 +1,4 @@
-# WEB制限解除サポート 拡張機能パッケージ生成スクリプト
+# WEB閲覧アシスト 拡張機能パッケージ生成スクリプト
 # 使い方: powershell -ExecutionPolicy Bypass -File zip.ps1
 
 Write-Host "拡張機能パッケージを生成中..." -ForegroundColor Cyan
@@ -9,10 +9,10 @@ $scriptDir = Split-Path -Parent ($MyInvocation.MyCommand.Path ?? $PSCommandPath 
 if ($scriptDir) { Set-Location $scriptDir }
 
 # 依存インストール & アイコン生成
-Write-Host "依存パッケージをインストール中..." -ForegroundColor Yellow
-npm install --silent
+Write-Host "依存パッケージを lockfile どおりにインストール中..." -ForegroundColor Yellow
+npm ci --silent
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "npm install に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
+    Write-Host "npm ci に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
     exit 1
 }
 
@@ -24,7 +24,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 古いZIPファイルを削除
-$zipName = "web-restriction-remover.zip"
+$zipName = "web-viewing-assist.zip"
+$legacyZipName = "web-restriction-remover.zip"
+if (Test-Path $legacyZipName) {
+    Remove-Item $legacyZipName -Force
+    Write-Host "旧ZIPファイルを削除しました" -ForegroundColor Yellow
+}
 if (Test-Path $zipName) {
     Remove-Item $zipName -Force
     Write-Host "既存のZIPファイルを削除しました" -ForegroundColor Yellow

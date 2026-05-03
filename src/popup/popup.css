@@ -3,7 +3,7 @@
  *
  * 設計判断:
  *   - 幅 380px（旧 340px から拡大）。19 個のサブトグルと select を抱えるため余裕を確保。
- *   - アクセントは元拡張からの慣性で #C0605A（茜寄りのテラコッタ）を継承し、補色に深いインク #1f1d1b を新規導入。
+ *   - アクセントは茜寄りのテラコッタ #C0605A を採用し、補色に深いインク #1f1d1b を併用。
  *     白系 #fdfaf7 で和紙のような無彩色背景を作り、機能ブロックを溶け込ませず明確に縁取る。
  *   - Typography: 日本語は Hiragino Mincho ProN → Noto Serif JP の明朝で「読み物」感を、
  *     英数字は SF Mono / Cascadia Mono のモノで設定っぽさを出す二段構え。
@@ -378,6 +378,33 @@ body {
   display: none;
 }
 
+/* sub-block 内に置く 2 段目のトグル行（例: keepalive HTTP ping のオプトインサブトグル）。
+   sub-block の dashed border 内側に視覚的階層を作るため、フラット背景で控えめに描画。 */
+.sub-block .toggle-row--sub {
+  margin-top: 10px;
+  padding: 6px 0 2px;
+  border-top: 1px dashed var(--rule);
+  background: transparent;
+  box-shadow: none;
+}
+.sub-block .toggle-row--sub:hover,
+.sub-block .toggle-row--sub:active {
+  background: transparent;
+  box-shadow: none;
+}
+.sub-block .toggle-row--sub:has(input:checked) {
+  background: transparent;
+}
+.sub-block .toggle-row--sub .tr-icon {
+  font-size: 14px;
+}
+.sub-block .toggle-row--sub .tr-name {
+  font-size: 12px;
+}
+.sub-block .toggle-row--sub .tr-desc {
+  font-size: 10.5px;
+}
+
 .sub-head {
   display: flex;
   align-items: baseline;
@@ -626,39 +653,53 @@ body {
 
 .cat-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 8px;
+  /* 1 行 1 トグル: 名前 + 説明文を縦積みで読みやすくするため 2 列構成は廃止。
+     20 サブ機能あっても説明文があるほうが情報量として有用と判断。 */
+  grid-template-columns: 1fr;
+  gap: 2px;
   background: var(--paper-deep);
   border: 1px solid var(--rule-soft);
   border-radius: var(--radius-sm);
   padding: 6px;
 }
 
-/* 各機能トグル: コンパクト 1 行レイアウト */
+/* 各機能トグル: 1 行 1 トグル + 説明文の縦積みレイアウト。
+   左カラム = `fr-text` (ラベル + 説明文) を flex-column、右カラム = switch。 */
 .feature-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  align-items: start; /* 説明文が長くても switch を上端に揃えてレイアウト安定 */
+  gap: 8px;
+  padding: 7px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 100ms ease;
-  font-size: 11px;
   color: var(--ink);
-  /* ラベル長すぎ対策: 折り返してOK */
   min-width: 0;
+}
+
+.feature-row + .feature-row {
+  /* 行間に細い罫を入れて読みやすく（最初の行には付けない） */
+  border-top: 1px dashed var(--rule-soft);
 }
 
 .feature-row:hover {
   background: var(--paper);
 }
 
+.feature-row .fr-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .feature-row .fr-name {
+  font-size: 11.5px;
+  font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.35;
-  /* 視覚的階層: ラベルを serif にすると重すぎるためサンセリフのまま、
-     代わりにアクセント色のドットで先頭装飾 */
+  /* アクセントドット先頭装飾 */
   position: relative;
   padding-left: 11px;
 }
@@ -679,6 +720,19 @@ body {
 .feature-row:has(input:checked) .fr-name::before {
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.feature-row .fr-desc {
+  font-size: 10px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  padding-left: 11px; /* fr-name のドットインデントに揃える */
+  letter-spacing: 0.01em;
+}
+
+/* switch を行の中央高さあたりに見えるよう margin-top で微調整（fr-text は label + desc で背が高い） */
+.feature-row .switch {
+  margin-top: 2px;
 }
 
 /* マスターが OFF だと feature 全体を視覚的に dim する（実機能はストレージに残る） */
@@ -758,49 +812,6 @@ body {
 .select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-/* ---------- Textarea (allowlist) ---------- */
-.textarea {
-  display: block;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--ink);
-  resize: vertical;
-  outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-
-.textarea::placeholder {
-  color: var(--ink-faint);
-}
-
-.textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-.textarea-status {
-  margin-top: 6px;
-  min-height: 13px;
-  font-size: 10.5px;
-  color: transparent;
-  transition: color 200ms ease;
-  letter-spacing: 0.02em;
-}
-
-.textarea-status.ok {
-  color: var(--ok);
-}
-
-.textarea-status.error {
-  color: var(--warn);
 }
 
 /* ---------- Footer status ---------- */

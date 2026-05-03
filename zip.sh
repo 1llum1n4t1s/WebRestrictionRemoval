@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# WEB制限解除サポート 拡張機能パッケージ生成スクリプト
+# WEB閲覧アシスト 拡張機能パッケージ生成スクリプト
 
 cd "$(dirname "$0")" || exit 1
 echo "拡張機能パッケージを生成中..."
 
-rm -f ./web-restriction-remover.zip
+rm -f ./web-viewing-assist.zip ./web-restriction-remover.zip
 
 if [ -f scripts/generate-icons.js ]; then
   echo "アイコン生成中..."
-  if ! npm install --silent; then
-    echo "npm install に失敗しました"
+  if ! npm ci --silent; then
+    echo "npm ci に失敗しました"
     exit 1
   fi
   if ! node scripts/generate-icons.js; then
@@ -24,15 +24,15 @@ if ! command -v zip &> /dev/null; then
   exit 1
 fi
 
-zip -r ./web-restriction-remover.zip \
+zip -r ./web-viewing-assist.zip \
   manifest.json \
   icons/ \
   src/ \
   -x "*.DS_Store" "*.swp" "*~"
 
 if [ $? -eq 0 ]; then
-  echo "ZIPファイルを作成しました: web-restriction-remover.zip"
-  ls -lh ./web-restriction-remover.zip
+  echo "ZIPファイルを作成しました: web-viewing-assist.zip"
+  ls -lh ./web-viewing-assist.zip
 else
   echo "ZIPファイルの作成に失敗しました"
   exit 1

@@ -2,10 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <!-- extension の popup は MV3 既定で厳格 CSP が適用されるが、意図を明示するため宣言 -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
-  <!-- color-scheme: ブラウザに「両モード対応している」と伝え、<input>/<select> 等のネイティブ
-       UI 要素も prefers-color-scheme に合わせて自動で再着色させる。-->
   <meta name="color-scheme" content="light dark" />
   <link rel="stylesheet" href="popup.css" />
 </head>
@@ -13,48 +10,57 @@
   <div class="popup-shell">
     <!-- ===== Header ===== -->
     <header class="hdr">
-      <div class="hdr-mark" aria-hidden="true">🛡️</div>
+      <div class="hdr-mark" aria-hidden="true">📖</div>
       <div class="hdr-text">
-        <h1 class="hdr-title">WEB制限解除サポート</h1>
-        <p class="hdr-tag">解除 / 維持 / 整理 を 1 つのトグルから</p>
+        <h1 class="hdr-title">WEB閲覧アシスト</h1>
+        <p class="hdr-tag">増幅 / 整理 / 維持 を 1 つのパネルから</p>
       </div>
     </header>
 
-    <!-- ===== Core Toggles ===== -->
-    <section class="grp" aria-label="基本機能">
-      <h2 class="grp-title">基本機能</h2>
+    <!-- ===== Audio Group ===== -->
+    <section class="grp" aria-label="オーディオ">
+      <h2 class="grp-title">
+        <span class="grp-title-text">オーディオ</span>
+      </h2>
 
-      <label class="toggle-row" id="enabledToggleRow">
-        <span class="tr-icon" aria-hidden="true">⚡</span>
-        <span class="tr-text">
-          <span class="tr-name">制限解除</span>
-          <span class="tr-desc">右クリック・選択・ドラッグの自動解除</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="enabledToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
-
-      <label class="toggle-row" id="keepAliveToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔄</span>
-        <span class="tr-text">
-          <span class="tr-name">セッション維持</span>
-          <span class="tr-desc">アイドル検知をリセット + 軽量 HTTP ping</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="keepAliveToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
-
-      <!-- セッション維持 ON 時のみ表示するスライダー -->
-      <div class="sub-block hidden" id="intervalRow">
+      <!-- 音量ブースターはマスタートグルなしの常時表示。100% でリソース解放、それ以外で増幅。 -->
+      <div class="sub-block volume-track-mark" id="volumeRow">
         <div class="sub-head">
-          <span class="sub-label">ポーリング間隔</span>
-          <span class="sub-value" id="intervalValue"></span>
+          <span class="sub-label">
+            <span aria-hidden="true">🔊</span>&nbsp;音量ブースター
+          </span>
+          <span class="sub-value" id="volumeValue">100%</span>
         </div>
-        <input type="range" id="intervalSlider" class="range" step="1" />
+        <input type="range" id="volumeSlider" class="range" />
+        <div class="volume-actions">
+          <button type="button" id="volumeResetBtn" class="ghost-btn" aria-label="音量を 100% に戻す">100% に戻す</button>
+          <span class="volume-hint" id="volumeHint"></span>
+        </div>
+
+        <!-- 自動歪み防止 / 自動音量正規化（オプトイン・デフォルト OFF） -->
+        <label class="toggle-row toggle-row--sub" id="volumeAntiClipToggleRow">
+          <span class="tr-icon" aria-hidden="true">🛡️</span>
+          <span class="tr-text">
+            <span class="tr-name">自動歪み防止</span>
+            <span class="tr-desc">高い増幅率でもピークを抑え音割れを防止（DynamicsCompressor 即応リミッタ）</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="volumeAntiClipToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <label class="toggle-row toggle-row--sub" id="volumeNormalizeToggleRow">
+          <span class="tr-icon" aria-hidden="true">📊</span>
+          <span class="tr-text">
+            <span class="tr-name">自動音量正規化</span>
+            <span class="tr-desc">動画ごとの音量バラつきを緩く圧縮して均一化（DynamicsCompressor ナチュラル圧縮）</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="volumeNormalizeToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
       </div>
     </section>
 
@@ -62,26 +68,14 @@
     <section class="grp" aria-label="YouTube">
       <h2 class="grp-title">
         <span class="grp-title-text">YouTube</span>
-        <span class="grp-pill">2 機能</span>
+        <span class="grp-pill" id="searchFixerPill"></span>
       </h2>
-
-      <label class="toggle-row" id="ytShortsToggleRow">
-        <span class="tr-icon" aria-hidden="true">📺</span>
-        <span class="tr-text">
-          <span class="tr-name">Shorts 削除</span>
-          <span class="tr-desc">サイドバー / 棚を非表示 + URL リダイレクト</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="ytShortsToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
 
       <label class="toggle-row" id="searchFixerToggleRow">
         <span class="tr-icon" aria-hidden="true">🧹</span>
         <span class="tr-text">
           <span class="tr-name">YouTube クリーナー</span>
-          <span class="tr-desc">検索結果の不要要素を一括除去</span>
+          <span class="tr-desc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示など 21 サブ機能を一括管理</span>
         </span>
         <span class="switch">
           <input type="checkbox" id="searchFixerToggle" />
@@ -94,7 +88,7 @@
         <summary class="acc-summary">
           <span class="acc-icon" aria-hidden="true">⚙️</span>
           <span class="acc-label">クリーナー詳細設定</span>
-          <span class="acc-count" id="cleanerCount">0/19</span>
+          <span class="acc-count" id="cleanerCount"></span>
           <span class="acc-chevron" aria-hidden="true"></span>
         </summary>
 
@@ -119,38 +113,6 @@
       </details>
     </section>
 
-    <!-- ===== Audio Group ===== -->
-    <section class="grp" aria-label="オーディオ">
-      <h2 class="grp-title">
-        <span class="grp-title-text">オーディオ</span>
-      </h2>
-
-      <label class="toggle-row" id="volumeBoosterToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔊</span>
-        <span class="tr-text">
-          <span class="tr-name">音量ブースター</span>
-          <span class="tr-desc">アクティブタブの音量を 0〜600% で増幅</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="volumeBoosterToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
-
-      <!-- 音量ブースター ON 時のみ表示するスライダー（既存 .sub-block を再利用） -->
-      <div class="sub-block hidden" id="volumeRow">
-        <div class="sub-head">
-          <span class="sub-label">アクティブタブの音量</span>
-          <span class="sub-value" id="volumeValue">100%</span>
-        </div>
-        <input type="range" id="volumeSlider" class="range" />
-        <div class="volume-actions">
-          <button type="button" id="volumeResetBtn" class="ghost-btn" aria-label="音量を 100% に戻す">100% に戻す</button>
-          <span class="volume-hint" id="volumeHint"></span>
-        </div>
-      </div>
-    </section>
-
     <!-- ===== Amazon Group ===== -->
     <section class="grp" aria-label="Amazon">
       <h2 class="grp-title">
@@ -170,31 +132,83 @@
       </label>
     </section>
 
-    <!-- ===== Allowlist ===== -->
-    <section class="grp" aria-label="許可リスト">
-      <details class="accordion" id="allowlistRow">
+    <!-- ===== Instagram Group ===== -->
+    <section class="grp" aria-label="Instagram">
+      <h2 class="grp-title">
+        <span class="grp-title-text">Instagram</span>
+        <span class="grp-pill" id="instagramCleanerPill"></span>
+      </h2>
+
+      <label class="toggle-row" id="instagramCleanerToggleRow">
+        <span class="tr-icon" aria-hidden="true">📷</span>
+        <span class="tr-text">
+          <span class="tr-name">Instagram クリーナー</span>
+          <span class="tr-desc">Reels / Explore / Stories などの冗長 UI を一括非表示</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="instagramCleanerToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- Instagram クリーナー詳細 -->
+      <details class="accordion" id="igCleanerAccordion">
         <summary class="acc-summary">
-          <span class="acc-icon" aria-hidden="true">🖱️</span>
-          <span class="acc-label">カスタム右クリックを許可するサイト</span>
+          <span class="acc-icon" aria-hidden="true">⚙️</span>
+          <span class="acc-label">クリーナー詳細設定</span>
+          <span class="acc-count" id="igCleanerCount"></span>
           <span class="acc-chevron" aria-hidden="true"></span>
         </summary>
+
         <div class="acc-body">
           <p class="acc-hint">
-            Office / Google Docs / Notion / Figma 等は初めから許可済みです。<br />
-            追加で許可したいドメインを 1 行ずつ入力してください（例: <code>example.com</code>）。
+            マスタートグル（クリーナー）が ON のときだけ動作します。
+            個別に ON / OFF を選んでカスタマイズしてください。
           </p>
-          <textarea
-            id="allowDomainsInput"
-            class="textarea"
-            rows="4"
-            spellcheck="false"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            placeholder="example.com&#10;sub.example.org"></textarea>
-          <p class="textarea-status" id="allowlistStatus"></p>
+
+          <!-- カテゴリブロックは popup.js が生成する -->
+          <div id="igFeatureCategories"></div>
         </div>
       </details>
+    </section>
+
+    <!-- ===== Session ===== -->
+    <section class="grp" aria-label="セッション">
+      <h2 class="grp-title"><span class="grp-title-text">セッション</span></h2>
+
+      <label class="toggle-row" id="keepAliveToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔄</span>
+        <span class="tr-text">
+          <span class="tr-name">セッション維持</span>
+          <span class="tr-desc">合成イベント dispatch でアイドル検知をリセット</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="keepAliveToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- セッション維持 ON 時のみ表示するサブ設定群 -->
+      <div class="sub-block hidden" id="intervalRow">
+        <div class="sub-head">
+          <span class="sub-label">ポーリング間隔</span>
+          <span class="sub-value" id="intervalValue"></span>
+        </div>
+        <input type="range" id="intervalSlider" class="range" step="1" />
+
+        <!-- HTTP ping サブトグル（オプトイン・デフォルト OFF） -->
+        <label class="toggle-row toggle-row--sub" id="keepAliveHttpPingToggleRow">
+          <span class="tr-icon" aria-hidden="true">🌐</span>
+          <span class="tr-text">
+            <span class="tr-name">サーバーへの軽量 ping を併発</span>
+            <span class="tr-desc">同一オリジンに HEAD/GET。認証プロキシ環境では OFF 推奨</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="keepAliveHttpPingToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+      </div>
     </section>
 
     <!-- ===== Status (live region) ===== -->

@@ -1,0 +1,348 @@
+"use strict";
+
+/**
+ * Instagram クリーナー content script（独自実装）。
+ *
+ * 設定は `chrome.storage.local` の `instagramCleanerEnabled` (master) と
+ * `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理する。
+ *
+ * 役割:
+ *   - master + features に応じて document.documentElement にクラスを付け外しし、CSS 側の表示制御を駆動
+ *   - Reels / Explore / Stories の URL を有効時にホームへリダイレクト
+ *   - 投稿内 <video> をブロックする際、親 <article> にマーカークラスを付ける
+ *   - 投稿内の数値表示ボタン（いいね数等）に hide マーカークラスを付ける
+ *
+ * 設計方針:
+ *   - 隠蔽セレクタは aria-label / href / role / data-pagelet / SVG path data など
+ *     Instagram の DOM が公開している意味論的属性のみで構成（難読化 class への依存を排除）
+ *   - master OFF 時は observer / interval / 装飾クラスをすべて停止
+ *   - 寄付ボタン注入・多言語ローカライズ・フォント変更・グレースケール / 正方形化等は実装しない
+ *     （クリーンアップ目的に絞る）
+ */
+
+(() => {
+  if (window.__cpaInstagramCleanerRunning) return;
+  window.__cpaInstagramCleanerRunning = true;
+  // Instagram の埋め込み iframe では機能しないので top frame のみ
+  if (window !== window.top) return;
+
+  /** @type {boolean} master トグル */
+  let active = false;
+  /** @type {Record<string, boolean>} 個別機能フラグ（定数定義からマージ済み） */
+  let features = InstagramCleaner.mergeFeatures({});
+
+  /** @type {number|null} block_videos / vanity の DOM 監視タイマー */
+  let domSweepTimer = null;
+  /** @type {number|null} URL リダイレクト用ポーリングタイマー */
+  let urlGuardTimer = null;
+
+  // ---------- 機能アクセサ ----------
+  // master が false ならすべて false 扱い。
+  const f = (key) => active && features[key] === true;
+
+  // ---------- 状態購読 ----------
+  chrome.storage.local
+    .get([StorageKeys.INSTAGRAM_CLEANER_ENABLED, StorageKeys.INSTAGRAM_CLEANER_FEATURES])
+    .then((stored) => {
+      active = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
+      features = InstagramCleaner.mergeFeatures(stored[StorageKeys.INSTAGRAM_CLEANER_FEATURES]);
+      onSettingsChanged();
+    })
+    .catch(() => {});
+
+  chrome.runtime.onMessage.addListener((request, sender) => {
+    if (!SenderCheck.isFromBackground(sender)) return;
+    if (request?.action !== Actions.APPLY_INSTAGRAM_CLEANER_CS) return;
+    const data = request.data ?? {};
+    active = data.enabled === true;
+    features = InstagramCleaner.mergeFeatures(data.features);
+    onSettingsChanged();
+  });
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    let touched = false;
+    if (StorageKeys.INSTAGRAM_CLEANER_ENABLED in changes) {
+      active = changes[StorageKeys.INSTAGRAM_CLEANER_ENABLED].newValue === true;
+      touched = true;
+    }
+    if (StorageKeys.INSTAGRAM_CLEANER_FEATURES in changes) {
+      features = InstagramCleaner.mergeFeatures(changes[StorageKeys.INSTAGRAM_CLEANER_FEATURES].newValue);
+      touched = true;
+    }
+    if (touched) onSettingsChanged();
+  });
+
+  // ---------- 設定変更ディスパッチャ ----------
+  function onSettingsChanged() {
+    applyBodyClasses();
+    if (active) {
+      startDomSweep();
+      startUrlGuard();
+    } else {
+      stopDomSweep();
+      stopUrlGuard();
+      cleanupMarkers();
+    }
+  }
+
+  /** 各機能フラグに応じて document(.documentElement) にクラスを付け外し。 */
+  function applyBodyClasses() {
+    const root = document.documentElement;
+    if (!root) return;
+    for (const [key, className] of Object.entries(InstagramCleaner.BODY_CLASS)) {
+      root.classList.toggle(className, f(key));
+    }
+  }
+
+  // ---------- DOM 監視（block_videos / vanity） ----------
+  // 300ms ポーリングを採用。MutationObserver は Instagram の頻繁な React 再 render で
+  // コールバック発火が爆発的に増えて CPU を食いやすいため、低頻度ポーリングのほうが安定する。
+  function startDomSweep() {
+    if (domSweepTimer !== null) return;
+    sweepOnce();
+    domSweepTimer = setInterval(sweepOnce, 300);
+  }
+
+  function stopDomSweep() {
+    if (domSweepTimer === null) return;
+    clearInterval(domSweepTimer);
+    domSweepTimer = null;
+  }
+
+  function sweepOnce() {
+    // 拡張機能 reload 後のゾンビ状態検知 (#10): chrome.runtime.id にアクセスできなくなったら
+    // extension context が失効 (= 拡張機能が更新／無効化された)。沈黙したリスナーが残ると
+    // body クラスが付いたまま剥がせなくなるため、検知時点で全マーカーを掃除して
+    // タイマーも止める（次回ページリロードで新しい content script が再注入されるまで休眠）。
+    if (!chrome.runtime?.id) {
+      active = false;
+      features = InstagramCleaner.mergeFeatures({});
+      applyBodyClasses();
+      cleanupMarkers();
+      stopDomSweep();
+      stopUrlGuard();
+      return;
+    }
+    if (f("blockVideos")) markArticlesContainingVideo();
+    if (f("vanity")) markCounterButtons();
+    if (f("comments")) markCommentElements();
+  }
+
+  /**
+   * `<article>` 内に `<video>` を含む投稿に対して、親 `<article>` にマーカークラスを付与する。
+   * 動画自体の隠蔽は CSS 側の `video { display: none }` に任せる。マーカーが付いた article は
+   * CSS で再生ボタン・音声トグル等の関連 UI を非表示にし、サムネ部分にプレースホルダーを描画する。
+   *
+   * 既処理 article は `:not()` で除外して再走査コストを削減。
+   */
+  function markArticlesContainingVideo() {
+    try {
+      document
+        .querySelectorAll("article:not(." + InstagramCleaner.ARTICLE_VIDEO_CLASS + ")")
+        .forEach((article) => {
+          if (article.querySelector("video")) {
+            article.classList.add(InstagramCleaner.ARTICLE_VIDEO_CLASS);
+          }
+        });
+    } catch {
+      // 一部 SubFrame で querySelector が例外を投げるケースをサイレントスキップ
+    }
+  }
+
+  /**
+   * コメント関連要素を JS で識別し、安全な範囲で隠蔽用マーカークラスを付ける。
+   *
+   * 対象 (3 種):
+   *   1. **コメント入力フォーム** — `<textarea>` の aria-label/placeholder に "comment"/"コメント" を含む
+   *      要素の親 `<form>`。他要素を巻き込むリスクが低いため form スコープで安全。
+   *   2. **「View all N comments」/「N 件のコメントを見る」リンク** — `article` 内の `<a>` で
+   *      テキストが英語/日本語の view-all パターンにマッチ。子要素 4+ のコンテナはスキップ。
+   *   3. **コメントリスト `<ul>`** — `article` 内の `<ul>` で以下を全て満たす:
+   *      - `<li>` の数が 1〜15（それ以上は別種の UL の可能性が高い）
+   *      - 80% 以上の `<li>` がユーザープロフィールリンク (`/<username>/`) を含む
+   *
+   * 安全策（前回の「投稿本体を巻き込む」事故を防ぐ）:
+   *   - スコープを `article` に限定（`[role="dialog"]` は構造が複雑で巻き込みリスクが高いので対象外）
+   *   - `<ul>` 判定は li 数の上限 + ユーザーリンク率 80% 以上の厳格条件
+   *   - 既処理は `:not()` で除外して 300ms ごとの再走査コストを削減
+   */
+  function markCommentElements() {
+    try {
+      // 1. コメント入力フォーム
+      document.querySelectorAll("textarea[aria-label], textarea[placeholder]").forEach((textarea) => {
+        const label =
+          ((textarea.getAttribute("aria-label") ?? "") + " " +
+           (textarea.getAttribute("placeholder") ?? "")).toLowerCase();
+        if (!/comment|コメント/.test(label)) return;
+        const form = textarea.closest("form");
+        if (form && !form.classList.contains(InstagramCleaner.COMMENT_INPUT_CLASS)) {
+          form.classList.add(InstagramCleaner.COMMENT_INPUT_CLASS);
+        }
+      });
+
+      // 2. 「View all N comments」 系リンク（article スコープ）
+      document
+        .querySelectorAll("article a:not(." + InstagramCleaner.COMMENT_VIEW_CLASS + ")")
+        .forEach((a) => {
+          // 画像/動画ラッパなど子要素が多い <a> は除外（leaf-text な link のみ）
+          if (a.children.length > 3) return;
+          const text = (a.textContent ?? "").trim();
+          if (text.length === 0 || text.length > 60) return;
+          if (
+            /view\s+(all\s+)?\d+\s+(comment|repl)/i.test(text) ||
+            /^\d+\s+comments?$/i.test(text) ||
+            /^see\s+(all|more)\s+comments?/i.test(text) ||
+            /^view\s+previous\s+comments?/i.test(text) ||
+            /コメント.{0,8}件.{0,8}(見る|表示)/.test(text) ||
+            /^返信(を表示|を見る|\d+件)/.test(text) ||
+            /^(\d+)件のコメント/.test(text)
+          ) {
+            a.classList.add(InstagramCleaner.COMMENT_VIEW_CLASS);
+          }
+        });
+
+      // 3. コメントリスト UL（article スコープ・厳格条件）
+      document
+        .querySelectorAll("article ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")")
+        .forEach((ul) => {
+          const items = Array.from(ul.children).filter((c) => c.tagName === "LI");
+          // li 数 1〜15 の範囲のみ受け付け（範囲外は別種の UL）
+          if (items.length === 0 || items.length > 15) return;
+          // 各 li 内にユーザープロフィールリンク（`/<username>/` 形式）があるかカウント
+          let userLinkCount = 0;
+          for (const li of items) {
+            const link = li.querySelector("a[href^='/']");
+            const href = link?.getAttribute("href") ?? "";
+            // `/<username>/` または `/<username>` の短い英数記号パスのみマッチ
+            if (/^\/[\w.]{1,30}\/?($|\?)/.test(href)) {
+              userLinkCount++;
+            }
+          }
+          // 80% 以上が user link を持つ UL のみコメントリスト扱い
+          if (userLinkCount / items.length >= 0.8) {
+            ul.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
+          }
+        });
+    } catch {
+      // 一部 SubFrame で querySelector が例外を投げるケースをサイレントスキップ
+    }
+  }
+
+  /**
+   * 「数値表示」要素にマーカークラス `__cpa-ig-hide-counter` を付ける（CSS 側で `display:none`）。
+   *
+   * 対象 (2 系統):
+   *   1. **フィード `<article>` 内の `<button>`** — いいね数 / 再生回数等。
+   *      `^\d` 先頭の純粋な数値テキスト（カンマ・小数点・空白 + 末尾単位 k/M/万/億/千）のみ対象。
+   *      「$5」「いいね 1234」等の記号 / ラベル混在ボタンは対象外。
+   *   2. **プロフィールヘッダの `<a>` / `<span>`** — 「投稿XXX件」「フォロワーXXX人」「フォロー中XXX人」
+   *      および英語版 "N posts" / "N followers" / "N following"。
+   *      Instagram が `<a>` の href を空にしたため CSS attribute セレクタが効かず、
+   *      テキストパターン + `<header>` スコープで識別する。
+   *
+   * 安全策:
+   *   - スコープを `<article>` または `<header>` 配下に限定して誤マッチを抑制
+   *   - `<span>` は直系子 ≤1 に限定して wrapper span を除外
+   *   - テキスト長 ≤30 文字に限定
+   *   - 既処理は `:not()` で除外して 300ms 再走査コストも削減
+   */
+  function markCounterButtons() {
+    try {
+      // (1) フィード `<article>` 内の数値ボタン（いいね数 / 再生回数等）
+      document
+        .querySelectorAll("article button:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
+        .forEach((btn) => {
+          const text = (btn.innerText ?? "").trim();
+          if (!text || text.length > 30) return;
+          // 純粋な数値表現（カンマ・小数点・空白 + 末尾の単位）にマッチするか
+          // 例: "1,234" / "567" / "1.2k" / "10万" / "5 億"
+          if (/^\d[\d,.\s]*(?:k|m|b|億|万|千|t)?$/i.test(text)) {
+            btn.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
+          }
+        });
+
+      // (2) プロフィールヘッダの「投稿XXX件」「フォロワーXXX人」「フォロー中XXX人」
+      // Instagram は最近 `<a>` の href 属性を空にしたため CSS の attribute セレクタが効かず、
+      // テキストパターンで識別する必要がある。`<header>` スコープ限定で誤マッチを避ける。
+      // 例: "フォロワー7億人" / "フォロー中175人" / "1.2M followers" / "175 following" / "投稿8425件" / "8,425 posts"
+      const headerEl = document.querySelector("header");
+      if (headerEl) {
+        const prefixRe = /^(?:フォロワー|フォロー中|フォロー|投稿|followers?|following|posts?)[\s・]*[\d,.]/i;
+        const suffixRe = /^[\d,.\s]+(?:k|m|b|億|万|千)?\s*(?:件|人|followers?|following|posts?)$/i;
+        const isCounterText = (t) => prefixRe.test(t) || suffixRe.test(t);
+
+        // <a>: フォロワー / フォロー中ナビゲーションリンク（href 空）
+        headerEl
+          .querySelectorAll("a:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
+          .forEach((a) => {
+            const text = (a.textContent ?? "").trim();
+            if (!text || text.length > 30) return;
+            if (isCounterText(text)) {
+              a.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
+            }
+          });
+
+        // <span>: 投稿件数のような静的テキスト。
+        // 直系子要素 ≤1 に限定して wrapper span を除外（textContent はネストしても拾えるため）。
+        headerEl
+          .querySelectorAll("span:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
+          .forEach((s) => {
+            if (s.children.length > 1) return;
+            const text = (s.textContent ?? "").trim();
+            if (!text || text.length > 30) return;
+            if (isCounterText(text)) {
+              s.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
+            }
+          });
+      }
+    } catch {}
+  }
+
+
+  // ---------- URL リダイレクト ----------
+  // SPA の history pushState を毎度フックすると壊れやすいため、シンプルに 300ms ポーリング。
+  function startUrlGuard() {
+    if (urlGuardTimer !== null) return;
+    checkUrlRedirect();
+    urlGuardTimer = setInterval(checkUrlRedirect, 300);
+  }
+
+  function stopUrlGuard() {
+    if (urlGuardTimer === null) return;
+    clearInterval(urlGuardTimer);
+    urlGuardTimer = null;
+  }
+
+  function checkUrlRedirect() {
+    if (!active) return;
+    const path = location.pathname;
+    let shouldRedirect = false;
+    if (f("reels") && /^\/reels?(\/|$)/i.test(path)) shouldRedirect = true;
+    else if (f("explore") && /^\/explore(\/|$)/i.test(path)) shouldRedirect = true;
+    else if (f("storiesAll") && /^\/stories(\/|$)/i.test(path)) shouldRedirect = true;
+    if (!shouldRedirect) return;
+    try {
+      window.location.assign("/");
+    } catch {
+      window.location.href = "/";
+    }
+  }
+
+  // ---------- 機能 OFF 時の cleanup ----------
+  function cleanupMarkers() {
+    try {
+      const markerClasses = [
+        InstagramCleaner.ARTICLE_VIDEO_CLASS,
+        InstagramCleaner.VANITY_HIDE_CLASS,
+        InstagramCleaner.COMMENT_INPUT_CLASS,
+        InstagramCleaner.COMMENT_VIEW_CLASS,
+        InstagramCleaner.COMMENT_LIST_CLASS,
+      ];
+      for (const cls of markerClasses) {
+        document.querySelectorAll("." + cls).forEach((el) => el.classList.remove(cls));
+      }
+    } catch {}
+    // body class は applyBodyClasses で外し済み（active=false で全 false 扱い）
+  }
+})();
