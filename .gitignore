@@ -1,6 +1,7 @@
 node_modules/
 webstore/images/
 webstore/popup-render.html
+webstore/popup-shim.js
 icons/icon-*.png
 temp-build/
 *.zip

@@ -9,13 +9,14 @@ const TEMPLATE_DIR = __dirname;
 const OUTPUT_DIR = path.join(__dirname, 'images');
 const POPUP_HTML_SRC = path.join(__dirname, '..', 'src', 'popup', 'popup.html');
 const POPUP_RENDER_DST = path.join(__dirname, 'popup-render.html');
+const POPUP_SHIM_DST = path.join(__dirname, 'popup-shim.js');
 
 /**
- * `src/popup/popup.html` を読んで chrome.* API shim と相対パス調整を施した
- * `webstore/popup-render.html` を生成する。
+ * ストア素材レンダリング用の chrome.* API shim 内容。
  *
- * これにより 01-popup-ui.html が iframe で実 popup を埋め込めるようになり、
- * popup.html / popup.css / popup.js の変更が即ストア素材に反映される（drift ゼロ）。
+ * popup.html の CSP `script-src 'self'` 配下で実行できるよう、インライン script ではなく
+ * 同階層の `popup-shim.js` として外部ファイル化する。actions.js / popup.js より先に
+ * 実行されるよう、popup-render.html では `<head>` に挿入する。
  *
  * shim では:
  *   - storage は空オブジェクトを返す → 全マスタートグル OFF（install 既定状態）
@@ -23,7 +24,48 @@ const POPUP_RENDER_DST = path.join(__dirname, 'popup-render.html');
  *   - runtime.sendMessage は VOLUME_BOOSTER_GET_GAIN に対し `{ gain: null }` を返す
  *     → 音量スライダーは DEFAULT (100%) のまま
  */
+const POPUP_SHIM_CONTENT = `// ストア素材レンダリング用 chrome.* API shim（generate-screenshots.js が生成、
+// 実拡張機能では Chrome がネイティブに提供）。
+window.chrome = {
+  storage: {
+    local: {
+      get: () => Promise.resolve({}),
+      set: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
+      onChanged: { addListener: () => {}, removeListener: () => {} },
+    },
+    onChanged: { addListener: () => {}, removeListener: () => {} },
+  },
+  runtime: {
+    sendMessage: (msg) => {
+      if (msg && msg.action === "volumeBoosterGetGain") return Promise.resolve({ gain: null });
+      return Promise.resolve({ ok: true });
+    },
+    onMessage: { addListener: () => {}, removeListener: () => {} },
+    getURL: (p) => p,
+    id: "mock-render-extension",
+    lastError: null,
+  },
+  tabs: {
+    query: () => Promise.resolve([{ id: 1, url: "https://example.com/", active: true, windowId: 1 }]),
+  },
+};
+`;
+
+/**
+ * `src/popup/popup.html` を読んで chrome.* API shim と相対パス調整を施した
+ * `webstore/popup-render.html` を生成する。`popup-shim.js` も同時に書き出す。
+ *
+ * これにより 01-popup-ui.html が iframe で実 popup を埋め込めるようになり、
+ * popup.html / popup.css / popup.js の変更が即ストア素材に反映される（drift ゼロ）。
+ *
+ * popup.html の CSP `script-src 'self'` を満たすため、shim は inline ではなく
+ * 同階層の `popup-shim.js` として配置し、`<script src="popup-shim.js">` で参照する。
+ */
 function generatePopupRenderHtml() {
+  // shim を外部ファイルとして書き出し（CSP `script-src 'self'` を満たすため）。
+  fs.writeFileSync(POPUP_SHIM_DST, POPUP_SHIM_CONTENT);
+
   let html = fs.readFileSync(POPUP_HTML_SRC, 'utf-8');
 
   // 相対パス調整: `src/popup/popup.html` → `webstore/popup-render.html` へ移すと
@@ -33,40 +75,13 @@ function generatePopupRenderHtml() {
     .replace(/src="\.\.\/lib\/actions\.js"/g, 'src="../src/lib/actions.js"')
     .replace(/src="popup\.js"/g, 'src="../src/popup/popup.js"');
 
-  // chrome.* API shim を <head> 末尾に注入（actions.js / popup.js より先に実行される）。
-  const shim = `
-  <script>
-    // ストア素材レンダリング用 shim（実拡張機能では Chrome がネイティブに提供）。
-    window.chrome = {
-      storage: {
-        local: {
-          get: () => Promise.resolve({}),
-          set: () => Promise.resolve(),
-          remove: () => Promise.resolve(),
-          onChanged: { addListener: () => {}, removeListener: () => {} },
-        },
-        onChanged: { addListener: () => {}, removeListener: () => {} },
-      },
-      runtime: {
-        sendMessage: (msg) => {
-          if (msg && msg.action === "volumeBoosterGetGain") return Promise.resolve({ gain: null });
-          return Promise.resolve({ ok: true });
-        },
-        onMessage: { addListener: () => {}, removeListener: () => {} },
-        getURL: (p) => p,
-        id: "mock-render-extension",
-        lastError: null,
-      },
-      tabs: {
-        query: () => Promise.resolve([{ id: 1, url: "https://example.com/", active: true, windowId: 1 }]),
-      },
-    };
-  </script>
-`;
-  html = html.replace('</head>', `${shim}</head>`);
+  // chrome.* API shim を <head> 末尾に注入（外部 JS ファイル参照、CSP 準拠）。
+  // actions.js / popup.js より先に <head> 内で読み込まれるため shim が確実に先行する。
+  const shimTag = `  <script src="popup-shim.js"></script>\n`;
+  html = html.replace('</head>', `${shimTag}</head>`);
 
   fs.writeFileSync(POPUP_RENDER_DST, html);
-  console.log(`📝 popup-render.html を生成: ${POPUP_RENDER_DST}`);
+  console.log(`📝 popup-render.html / popup-shim.js を生成`);
 }
 
 // HTMLテンプレートから生成する画像
