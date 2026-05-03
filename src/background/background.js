@@ -578,9 +578,11 @@ async function releaseVolumeBoosterTab(tabId) {
         contextTypes: ["OFFSCREEN_DOCUMENT"],
         documentUrls: [url],
       });
+      // offscreen 不在が確定したときのみ早期 return（release 不要）。
       if (contexts.length === 0) return { ok: true };
     } catch {
-      return { ok: true };
+      // getContexts 自体の一時失敗では release を諦めない。下の sendMessage に fall-through。
+      // 受信側不在なら finally の握りつぶしで安全に終わる。
     }
   }
   try {

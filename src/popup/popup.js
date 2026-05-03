@@ -29,11 +29,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $featureCategories = document.getElementById("featureCategories");
   const $cleanerCount = document.getElementById("cleanerCount");
   const $cleanerAccordion = document.getElementById("cleanerAccordion");
+  const $searchFixerPill = document.getElementById("searchFixerPill");
   const $gridItemsSelect = document.getElementById("gridItemsSelect");
   const $instagramCleanerToggle = document.getElementById("instagramCleanerToggle");
   const $igFeatureCategories = document.getElementById("igFeatureCategories");
   const $igCleanerCount = document.getElementById("igCleanerCount");
   const $igCleanerAccordion = document.getElementById("igCleanerAccordion");
+  const $instagramCleanerPill = document.getElementById("instagramCleanerPill");
   const $status = document.getElementById("statusMsg");
 
   // ----- ローカル状態 -----
@@ -307,6 +309,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const total = featureInputs.size;
     $cleanerCount.textContent = `${on}/${total}`;
+    // pill のテキストもここで同期。actions.js の SearchFixer.FEATURES への増減に
+    // 連動して自動更新されるため HTML 側の数値ハードコードによるドリフトを防ぐ。
+    if ($searchFixerPill) $searchFixerPill.textContent = `${total} 機能`;
   }
 
   function updateCleanerDimState() {
@@ -332,6 +337,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const total = igFeatureInputs.size;
     $igCleanerCount.textContent = `${on}/${total}`;
+    // pill のテキストもここで同期（YouTube 側と同じドリフト防止策）。
+    if ($instagramCleanerPill) $instagramCleanerPill.textContent = `${total} 機能`;
   }
 
   function updateIgCleanerDimState() {
@@ -492,8 +499,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * background が返すエラーコード文字列を、ユーザー向けの短いヒントに翻訳する。
-   * デバッグしやすいよう、不明なエラーの場合は原文（短縮）も併記する。
+   * background が返すエラーコード文字列を、ユーザー向けの短い日本語ヒントに翻訳する。
+   * 不明なエラーは raw text を UI に漏らさず、汎用メッセージにフォールバックして
+   * console.warn にだけ原文を出力する（開発時の調査は DevTools 経由で行う）。
    */
   function formatVolumeError(error) {
     if (!error) return "⚠ このページでは使えません";
@@ -510,8 +518,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (/permission/i.test(s)) {
       return "⚠ 権限エラー";
     }
-    // 不明なエラーは原文の先頭 60 文字までを表示してデバッグ容易化
-    return "⚠ " + s.slice(0, 60);
+    // 不明なエラー: ユーザーには汎用メッセージのみ提示し、原文は DevTools console に。
+    // raw error text を UI に出すと内部実装が漏れるため意図的に隠す。
+    console.warn("[VolumeBooster] Unknown error:", s);
+    return "⚠ 音量設定に失敗しました";
   }
 
   /**
