@@ -7,6 +7,67 @@ const path = require('path');
 // ディレクトリパス
 const TEMPLATE_DIR = __dirname;
 const OUTPUT_DIR = path.join(__dirname, 'images');
+const POPUP_HTML_SRC = path.join(__dirname, '..', 'src', 'popup', 'popup.html');
+const POPUP_RENDER_DST = path.join(__dirname, 'popup-render.html');
+
+/**
+ * `src/popup/popup.html` を読んで chrome.* API shim と相対パス調整を施した
+ * `webstore/popup-render.html` を生成する。
+ *
+ * これにより 01-popup-ui.html が iframe で実 popup を埋め込めるようになり、
+ * popup.html / popup.css / popup.js の変更が即ストア素材に反映される（drift ゼロ）。
+ *
+ * shim では:
+ *   - storage は空オブジェクトを返す → 全マスタートグル OFF（install 既定状態）
+ *   - tabs.query はダミー http タブを返す → 「このページでは使えません」エラーを抑制
+ *   - runtime.sendMessage は VOLUME_BOOSTER_GET_GAIN に対し `{ gain: null }` を返す
+ *     → 音量スライダーは DEFAULT (100%) のまま
+ */
+function generatePopupRenderHtml() {
+  let html = fs.readFileSync(POPUP_HTML_SRC, 'utf-8');
+
+  // 相対パス調整: `src/popup/popup.html` → `webstore/popup-render.html` へ移すと
+  // 隣接リソースの相対パスがずれるため、すべて webstore からの相対パスに書き換える。
+  html = html
+    .replace(/href="popup\.css"/g, 'href="../src/popup/popup.css"')
+    .replace(/src="\.\.\/lib\/actions\.js"/g, 'src="../src/lib/actions.js"')
+    .replace(/src="popup\.js"/g, 'src="../src/popup/popup.js"');
+
+  // chrome.* API shim を <head> 末尾に注入（actions.js / popup.js より先に実行される）。
+  const shim = `
+  <script>
+    // ストア素材レンダリング用 shim（実拡張機能では Chrome がネイティブに提供）。
+    window.chrome = {
+      storage: {
+        local: {
+          get: () => Promise.resolve({}),
+          set: () => Promise.resolve(),
+          remove: () => Promise.resolve(),
+          onChanged: { addListener: () => {}, removeListener: () => {} },
+        },
+        onChanged: { addListener: () => {}, removeListener: () => {} },
+      },
+      runtime: {
+        sendMessage: (msg) => {
+          if (msg && msg.action === "volumeBoosterGetGain") return Promise.resolve({ gain: null });
+          return Promise.resolve({ ok: true });
+        },
+        onMessage: { addListener: () => {}, removeListener: () => {} },
+        getURL: (p) => p,
+        id: "mock-render-extension",
+        lastError: null,
+      },
+      tabs: {
+        query: () => Promise.resolve([{ id: 1, url: "https://example.com/", active: true, windowId: 1 }]),
+      },
+    };
+  </script>
+`;
+  html = html.replace('</head>', `${shim}</head>`);
+
+  fs.writeFileSync(POPUP_RENDER_DST, html);
+  console.log(`📝 popup-render.html を生成: ${POPUP_RENDER_DST}`);
+}
 
 // HTMLテンプレートから生成する画像
 const HTML_CONFIGS = [
@@ -60,6 +121,14 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
 
   try {
     await page.setViewport({ width, height, deviceScaleFactor: 1 });
+
+    // ストア素材は「初期インストール時の典型的見た目」をユーザーに伝えるため
+    // ライトモード強制でレンダリングする。OS のダークモード設定を継承すると
+    // popup.css の prefers-color-scheme:dark 経路が走り、和紙ベージュ背景が
+    // 墨色背景に置き換わる（実機では正しい挙動だがマーケティング素材としては不適切）。
+    await page.emulateMediaFeatures([
+      { name: 'prefers-color-scheme', value: 'light' },
+    ]);
 
     const absolutePath = path.resolve(htmlPath);
     await page.goto(`file://${absolutePath}`, {
@@ -121,6 +190,10 @@ async function main() {
   console.log('🎨 Chrome Web Store用スクリーンショットを生成中...\n');
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  // 01-popup-ui.html が iframe で読み込む popup-render.html を popup.html から動的生成。
+  // popup.html 変更時に自動追従し、ストア素材の drift を防ぐ。
+  generatePopupRenderHtml();
 
   const launchOptions = {
     headless: true,

@@ -1,5 +1,6 @@
 node_modules/
 webstore/images/
+webstore/popup-render.html
 icons/icon-*.png
 temp-build/
 *.zip
