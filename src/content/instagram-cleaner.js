@@ -230,19 +230,26 @@
   }
 
   /**
-   * 投稿内の「数値表示ボタン」（いいね数 / フォロワー数 / 再生回数等）にマーカークラスを付ける。
+   * 「数値表示」要素にマーカークラス `__cpa-ig-hide-counter` を付ける（CSS 側で `display:none`）。
    *
-   * 判定戦略（独自実装）:
-   *   - スコープ: `<article>` 内の `<button>` のみ（ナビゲーション・モーダルへの誤マッチ回避）
-   *   - 純粋な数値表現のテキストのみを対象にする:
-   *     `^\d` で先頭が数字、`[\d,.\s]*` でカンマ・ピリオド・空白を許容、末尾は単位
-   *     (k/M/万/億/千) または数字。短いテキスト (≤30 文字) に限定。
-   *   - 「$5」「いいね 1234」のような記号や非数値文字を含む混在ボタンは対象外。
+   * 対象 (2 系統):
+   *   1. **フィード `<article>` 内の `<button>`** — いいね数 / 再生回数等。
+   *      `^\d` 先頭の純粋な数値テキスト（カンマ・小数点・空白 + 末尾単位 k/M/万/億/千）のみ対象。
+   *      「$5」「いいね 1234」等の記号 / ラベル混在ボタンは対象外。
+   *   2. **プロフィールヘッダの `<a>` / `<span>`** — 「投稿XXX件」「フォロワーXXX人」「フォロー中XXX人」
+   *      および英語版 "N posts" / "N followers" / "N following"。
+   *      Instagram が `<a>` の href を空にしたため CSS attribute セレクタが効かず、
+   *      テキストパターン + `<header>` スコープで識別する。
    *
-   * 既処理ボタンは `:not()` で除外して 300ms ポーリングごとの再走査コストも削減。
+   * 安全策:
+   *   - スコープを `<article>` または `<header>` 配下に限定して誤マッチを抑制
+   *   - `<span>` は直系子 ≤1 に限定して wrapper span を除外
+   *   - テキスト長 ≤30 文字に限定
+   *   - 既処理は `:not()` で除外して 300ms 再走査コストも削減
    */
   function markCounterButtons() {
     try {
+      // (1) フィード `<article>` 内の数値ボタン（いいね数 / 再生回数等）
       document
         .querySelectorAll("article button:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
         .forEach((btn) => {
@@ -254,6 +261,41 @@
             btn.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
           }
         });
+
+      // (2) プロフィールヘッダの「投稿XXX件」「フォロワーXXX人」「フォロー中XXX人」
+      // Instagram は最近 `<a>` の href 属性を空にしたため CSS の attribute セレクタが効かず、
+      // テキストパターンで識別する必要がある。`<header>` スコープ限定で誤マッチを避ける。
+      // 例: "フォロワー7億人" / "フォロー中175人" / "1.2M followers" / "175 following" / "投稿8425件" / "8,425 posts"
+      const headerEl = document.querySelector("header");
+      if (headerEl) {
+        const prefixRe = /^(?:フォロワー|フォロー中|フォロー|投稿|followers?|following|posts?)[\s・]*[\d,.]/i;
+        const suffixRe = /^[\d,.\s]+(?:k|m|b|億|万|千)?\s*(?:件|人|followers?|following|posts?)$/i;
+        const isCounterText = (t) => prefixRe.test(t) || suffixRe.test(t);
+
+        // <a>: フォロワー / フォロー中ナビゲーションリンク（href 空）
+        headerEl
+          .querySelectorAll("a:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
+          .forEach((a) => {
+            const text = (a.textContent ?? "").trim();
+            if (!text || text.length > 30) return;
+            if (isCounterText(text)) {
+              a.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
+            }
+          });
+
+        // <span>: 投稿件数のような静的テキスト。
+        // 直系子要素 ≤1 に限定して wrapper span を除外（textContent はネストしても拾えるため）。
+        headerEl
+          .querySelectorAll("span:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
+          .forEach((s) => {
+            if (s.children.length > 1) return;
+            const text = (s.textContent ?? "").trim();
+            if (!text || text.length > 30) return;
+            if (isCounterText(text)) {
+              s.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
+            }
+          });
+      }
     } catch {}
   }
 

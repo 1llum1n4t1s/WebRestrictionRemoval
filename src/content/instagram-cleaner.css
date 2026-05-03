@@ -107,20 +107,12 @@ html.__cpa-ig-threads [aria-label="スレッド"] {
 /* =============================================================
    6. いいね数・フォロワー数非表示
    ============================================================= */
-/* JS の markCounterButtons() が動的に付与するマーカー（数値ラベル判定済み） */
+/* JS の markCounterButtons() が動的に付与するマーカー（数値ラベル判定済み）。
+   フィード <article> 内の数値ボタン + プロフィールヘッダの投稿/フォロワー/フォロー中
+   <a> / <span> を一括で隠す。Instagram が href を空にしたため、href ベースの attribute
+   セレクタは廃止し、JS 側のテキストパターン判定に一本化した。 */
 html.__cpa-ig-vanity .__cpa-ig-hide-counter {
   display: none !important;
-}
-/* プロフィールヘッダの「投稿数 / フォロワー数 / フォロー中」行 — aria-label ベース */
-html.__cpa-ig-vanity li:has(a[href$="/followers/"]),
-html.__cpa-ig-vanity li:has(a[href$="/following/"]),
-html.__cpa-ig-vanity a[href$="/followers/"] [class],
-html.__cpa-ig-vanity a[href$="/following/"] [class] {
-  visibility: hidden !important;
-}
-/* いいね数を表す button.__cpa-ig-hide-counter（数値先頭・末尾判定で JS が付与） */
-html.__cpa-ig-vanity button.__cpa-ig-hide-counter span {
-  font-size: 0 !important;
 }
 
 /* =============================================================
