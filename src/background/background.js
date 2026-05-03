@@ -149,17 +149,24 @@ async function handleApplySettings(settings) {
   await notifyContentScripts(normalized);
 }
 
-/** popup から受け取った生の settings オブジェクトを正規化（clamp / merge / boolean 化）。 */
+/**
+ * popup から受け取った生の settings オブジェクトを正規化（clamp / merge / boolean 化）。
+ *
+ * boolean フィールドは `=== true` で厳格判定する（`!!` は禁止）。
+ * 理由: storage に紛れ込んだ非 boolean 値（"false" 文字列・数値 1 など）が
+ * `!!` だと truthy 判定されて誤って ON 化されうる。デフォルト OFF 方針を堅持するため、
+ * 明示的な `true` のときだけ有効化する。
+ */
 function normalizeSettings(settings) {
   return {
-    keepAliveEnabled: !!settings?.keepAliveEnabled,
+    keepAliveEnabled: settings?.keepAliveEnabled === true,
     keepAliveIntervalMs: KeepAlive.clampIntervalMs(settings?.keepAliveIntervalMs),
-    keepAliveHttpPingEnabled: !!settings?.keepAliveHttpPingEnabled,
-    searchFixerEnabled: !!settings?.searchFixerEnabled,
+    keepAliveHttpPingEnabled: settings?.keepAliveHttpPingEnabled === true,
+    searchFixerEnabled: settings?.searchFixerEnabled === true,
     searchFixerFeatures: SearchFixer.mergeFeatures(settings?.searchFixerFeatures),
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
-    amazonDeliveryTotalEnabled: !!settings?.amazonDeliveryTotalEnabled,
-    instagramCleanerEnabled: !!settings?.instagramCleanerEnabled,
+    amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
+    instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
   };
 }
@@ -402,7 +409,9 @@ async function isVolumeBoosterActive() {
       });
       return Number(res?.activeCount ?? 0) > 0;
     } catch {
-      return false;
+      // 通信失敗時は safe side で active 扱い（同関数内の他の catch も true 返却で揃える）。
+      // false を返すとブースト中タブが残っているのに offscreen を close してしまうリスクあり。
+      return true;
     }
   }
   try {
@@ -530,19 +539,30 @@ async function getVolumeBoosterGain(tabId) {
   }
 }
 
-/** 指定タブの AudioContext を解放（スライダー 100% 復帰時に呼ぶ）。 */
+/**
+ * 指定タブの AudioContext を解放（スライダー 100% 復帰時に呼ぶ）。
+ *
+ * `chrome.runtime.getContexts` は Chrome 116+ の API で、本拡張がサポートしたい
+ * 古い Chrome では未実装。getContexts が使える場合は最適化として「offscreen 不在なら
+ * 早期 return」で無駄な sendMessage を抑制し、未実装環境では直接 release を送信して
+ * 受信側が居なければ catch で握りつぶす。
+ *
+ * 旧実装は `getContexts` 未実装環境でも early return していたため、release メッセージが
+ * 届かず AudioContext が永続的に残留する resource leak があった (CodeRabbit P2 指摘)。
+ */
 async function releaseVolumeBoosterTab(tabId) {
   if (!Number.isInteger(tabId) || tabId <= 0) return { ok: true };
-  if (typeof chrome.runtime.getContexts !== "function") return { ok: true };
-  try {
-    const url = chrome.runtime.getURL(Offscreen.PATH);
-    const contexts = await chrome.runtime.getContexts({
-      contextTypes: ["OFFSCREEN_DOCUMENT"],
-      documentUrls: [url],
-    });
-    if (contexts.length === 0) return { ok: true };
-  } catch {
-    return { ok: true };
+  if (typeof chrome.runtime.getContexts === "function") {
+    try {
+      const url = chrome.runtime.getURL(Offscreen.PATH);
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ["OFFSCREEN_DOCUMENT"],
+        documentUrls: [url],
+      });
+      if (contexts.length === 0) return { ok: true };
+    } catch {
+      return { ok: true };
+    }
   }
   try {
     await chrome.runtime.sendMessage({
@@ -551,7 +571,7 @@ async function releaseVolumeBoosterTab(tabId) {
       tabId,
     });
   } catch {
-    // 既に閉じている等は無視
+    // 既に閉じている / offscreen 不在等は無視
   } finally {
     scheduleOffscreenClose();
   }
