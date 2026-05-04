@@ -139,17 +139,19 @@ async function createAudioState(tabId, streamId) {
     const ctx = new AudioContext();
     const source = ctx.createMediaStreamSource(stream);
     const gainNode = ctx.createGain();
-    // 自動音量正規化（緩い圧縮）→ 自動歪み防止（リミッタ）の直列接続。
-    // 音響工学のセオリーに従い「平均化してからピーク抑制」の順で並べる。
+    // ノード順序: 自動音量正規化（コンプ）→ ブースト（gain）→ 自動歪み防止（リミッタ）の直列接続。
+    // 音響工学のマスタリングチェーン定石「コンプレッション → メイクアップゲイン → リミッタ」に従う。
+    // gain を先頭に置くと compressor が boost をそのまま潰して boost が効かなくなる罠があるため、
+    // **必ず** normalize → gain → anti-clip の順で並べる。
     // 両 compressor は volumeSetGain で OFF 時にバイパス設定 (ratio:1) に切り替えるので
     // 機能 OFF 時もチェーン上に残したまま実質パススルー化する（disconnect/reconnect の音切れ回避）。
     const normalizerNode = ctx.createDynamicsCompressor();
     const antiClipNode = ctx.createDynamicsCompressor();
     applyCompressorPreset(normalizerNode, VolumeBooster.COMPRESSOR_BYPASS);
     applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
-    source.connect(gainNode);
-    gainNode.connect(normalizerNode);
-    normalizerNode.connect(antiClipNode);
+    source.connect(normalizerNode);
+    normalizerNode.connect(gainNode);
+    gainNode.connect(antiClipNode);
     antiClipNode.connect(ctx.destination);
 
     // lastSetPercent は volumeGetGain の応答値として使う（gain.value はランプ中で

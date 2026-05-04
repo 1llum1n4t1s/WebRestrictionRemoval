@@ -6,9 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 6 機能を提供する：「セッション維持」「YouTube クリーナー（Shorts 削除・コメント欄非表示を含む 21 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター（自動歪み防止 / 自動音量正規化サブトグル付き）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放、サブトグル 2 種もデフォルト OFF）、カラーピッカーは popup タブとして常時利用可（履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
-> **v1.0.18 までの主な変更点（適用済み）**: v1.0.x の「制限解除」（右クリック解除 / テキスト選択解除 / 強制ペースト / 強制コピー / カスタム右クリック許可リスト）を全廃。`clipboardRead` / `clipboardWrite` / `contextMenus` / `scripting` permission も削除済み。拡張機能名は「WEB制限解除サポート」→「WEB閲覧アシスト」に改名。バージョン番号確定は `/vava` スキル経由で行う。v1.0.18 で `searchFixerFeatures.hideComments`（コメント欄非表示）追加で 20 → 21 サブ機能に。
-
-設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は日本語。**インストール直後は全マスタートグル OFF**（音量ブースターは 100% = 解放状態）。サイト挙動を勝手に書き換えないオプトイン方針。
+設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は日本語。**インストール直後は全マスタートグル OFF**（音量ブースターも 100% かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。バージョン番号は `/vava` スキル経由でのみ更新する。
 
 ## Build Commands
 
@@ -18,8 +16,7 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP パッケージ生成 (Windows)
-bash ./zip.sh                # 同上 (Unix)
+powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
 ## Development Workflow
@@ -67,8 +64,9 @@ Popup (src/popup/popup.{html,js,css})
                                     │ chrome.tabCapture.getMediaStreamId
                                     ──ACTION_VOLUME_SET_GAIN──▶ Offscreen Document
                                                                   │ getUserMedia + AudioContext
-                                                                  │ source → gainNode → normalizerNode → antiClipNode → destination
-                                                                  └ 増幅 + 圧縮して再出力
+                                                                  │ source → normalizerNode → gainNode → antiClipNode → destination
+                                                                  │ (compressor → makeup gain → limiter のマスタリング定石)
+                                                                  └ 圧縮 + 増幅して再出力
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
@@ -78,15 +76,13 @@ Popup (src/popup/popup.{html,js,css})
 
 **テーマ**: アクセントカラーは茜系（ライト `#C0605A` / ダーク `#df8983`）。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン + `@media (prefers-color-scheme: dark)` のダーク上書きの 2 層構造。色値はすべて CSS 変数経由でハードコードなし。CSP meta 明示。
 
-**音量スライダー**: input 時 120ms debounce → `VOLUME_BOOSTER_SET_GAIN`（`gain`, `antiClip`, `normalize`）送信。change（マウスアップ）で即 push。100% に戻すボタンは `pushVolumeNow(100)` で release。popup 起動時に `VOLUME_BOOSTER_GET_GAIN` で active tab の現在 gain を取得して反映。エラーは `formatVolumeError(res.error)` で人間可読な日本語メッセージに翻訳して表示。
-
-**音量サブトグル（自動歪み防止 / 自動音量正規化）**: `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` storage key で個別管理（デフォルト OFF）。トグル change → `cancelVolumePush()` → storage.set fire-and-forget → `pushVolumeNow(currentGain)` の順で即時反映（既存 AudioContext がある場合は preset bypass <-> active を切り替えるだけで音切れなし）。スライダーが UNITY (100%) かつ AudioContext 未構築のときは hint 表示で「音量スライダーを操作すると有効化される」旨を伝える。
+**音量スライダー / サブトグル**: input 時 120ms debounce → `VOLUME_BOOSTER_SET_GAIN`（`gain`, `antiClip`, `normalize`）。change（マウスアップ）で即 push、100% に戻すボタンは `pushVolumeNow(100)` で release 経路へ。popup 起動時は `VOLUME_BOOSTER_GET_GAIN` で active tab の現在 gain を取得して反映。サブトグル (`volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled`) は change で `cancelVolumePush` → storage.set fire-and-forget → `pushVolumeNow(currentGain)` の順で即時反映（既存 AudioContext があれば preset bypass↔active を切り替えるだけで音切れなし）。エラーは `formatVolumeError(res.error)` で日本語に翻訳。
 
 ### Background (`src/background/background.js`)
 Service worker。役割:
 1. **設定の集約と各 content script への配布**: `APPLY_SETTINGS` を popup から受信し、storage 保存と active tab 通知を行う。YouTube タブ / Amazon `auto-deliveries` タブ判定は URL パターンで行う。非マッチタブには receiver 不在で例外になるため `try/catch` でガード。
 2. **Offscreen Document ライフサイクル管理**: `ensureOffscreenDocument()` で並行作成ガード、`scheduleOffscreenClose()` で 30 秒アイドル後に自動クローズ。**音量ブースト中タブが残っている間は close を再延期**（`isVolumeBoosterActive` で確認、SW 再起動直後は安全側に倒す）。`reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。
-3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain)` がエントリ。スライダーが UNITY (100%) のときは `releaseVolumeBoosterTab` を呼ぶだけで `getMediaStreamId` をスキップ（リソース節約）。既存 AudioContext がある場合も streamId なしで gain 値だけ更新。
+3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain, antiClip, normalize)` がエントリ。UNITY release 条件・既存 AudioContext 経路・compressor preset の詳細は Important Patterns 参照。
 4. **Message Handler の sender 検証**: `SenderCheck.isFromPopup` / `isFromContentScript` ヘルパーで由来を検証。`APPLY_SETTINGS` / `VOLUME_BOOSTER_*` は popup 由来のみ受け付ける。
 5. **タブクローズで自動 release**: `chrome.tabs.onRemoved` で `ACTION_VOLUME_RELEASE_TAB` を offscreen に送信（permission 不要、SW 再起動でも永続的に発火する）。
 6. **設定マイグレーション**: `onInstalled` で旧キー削除 + 未設定キーの初期化（詳細は Important Patterns の「マイグレーション」を参照）。
@@ -105,9 +101,7 @@ Service worker。役割:
 HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン**（デフォルト OFF）。有効時のみ `KeepAlive.PRESET_ENDPOINTS`（SharePoint 等）の同一オリジン GET → 現在 URL に HEAD → origin root に HEAD のフォールバックを発射する。`credentials: "same-origin"` で第三者ドメインへの認証情報送信を防ぎ、`AbortSignal.timeout(5000)` で永久 pending を防止。同一オリジン iframe は `shouldFireHttpPing()` で多重発射を回避。デフォルト OFF にしている理由は認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発しうるため。
 
 ### Offscreen (`src/offscreen/offscreen.html`, `src/offscreen/offscreen.js`)
-音量ブースター専用の extension-context ドキュメント。`chrome-extension://` は常に secure context のため `getUserMedia({ chromeMediaSourceId })` が動く。`audioStates` Map で tabId → `{ ctx, gainNode, normalizerNode, antiClipNode, stream }` を保持し、5 ノードチェーン `source → gainNode → normalizerNode → antiClipNode → destination` を構築。release 時に `stream.getTracks().stop()` → `ctx.close()` をこの順で呼ぶ（逆順だと生きているソースから出力先消失でエラーになり得る）。`pagehide` / `unload` で全 audioStates を cleanup。streamId は `typeof streamId !== "string"` の型チェックのみ通してから `getUserMedia` に流す（過去に `^[a-zA-Z0-9_:.\-]{8,256}$` の正規表現検証を試したが、Chrome の `getMediaStreamId` 戻り値とマッチしないケースで誤拒否が出たため撤去）。`mandatory.chromeMediaSource = "tab"` 形式を先に試して、失敗時のみ `chromeMediaSourceId` フラット形式にフォールバック。
-
-**Compressor 即時切替**: `applyCompressorPreset(node, preset)` ヘルパーが `VolumeBooster.COMPRESSOR_BYPASS` / `ANTI_CLIP_PRESET` / `NORMALIZE_PRESET` の DynamicsCompressor パラメータを `node.threshold.value = preset.threshold` 等の直接代入で即時適用する（`setTargetAtTime` は使わない — 切替頻度が低くアタックが速いため即時代入で問題なし）。サブトグル OFF 時はノードを disconnect せず BYPASS preset (`ratio: 1`) を当てるだけ。これによりトグル切り替え時の音切れ・プチノイズを回避できる。
+音量ブースター専用の extension-context ドキュメント。`chrome-extension://` は常に secure context のため `getUserMedia({ chromeMediaSourceId })` が動く。`audioStates` Map で tabId → `{ ctx, gainNode, normalizerNode, antiClipNode, stream, lastSetPercent }` を保持。5 ノードチェーンの構築・preset 切替・gain ramp の詳細は **Important Patterns 「音量ブースター・Offscreen」** を参照。release 時は `stream.getTracks().stop()` → `ctx.close()` の順（逆順だと生きているソースから出力先消失でエラー）。`pagehide` で全 audioStates を cleanup。streamId は `typeof streamId !== "string"` の型チェックのみで `getUserMedia` に流す（過去に正規表現検証で誤拒否が出たため撤去）。`mandatory.chromeMediaSource = "tab"` 形式を先に試し、失敗時のみフラット `chromeMediaSourceId` にフォールバック。
 
 ### YouTube Shorts Removal (`src/content/youtube-shorts.js`)
 `*://*.youtube.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に注入。`window === window.top` チェックで埋め込みプレーヤーには注入せず CPU 負荷を抑える。
@@ -145,21 +139,15 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 **CSS セレクター戦略**: Instagram の難読化 class 名（`.x9f619` 等）は build ごとに変わるため**意図的に避け**、`aria-label` / `href` / `role` / `data-pagelet` / SVG path data などの意味論的属性のみで構成する。例: Reels は `a[href="/reels/"]` + `aria-label="Reels"` + 日本語ロケール用 `aria-label="リール"` + SVG path data の 4 重に重ね、どれか 1 つでもヒットすれば隠れる構造。
 
 ### 音量ブースター (`src/offscreen/offscreen.js` の Volume Booster 部分)
-Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext + GainNode + DynamicsCompressorNode × 2）のみを使ったタブ音声増幅 + 圧縮の独自実装。Equalizer や音質変更は持たず、純粋な GainNode による増幅 + 2 段 DynamicsCompressor（自動音量正規化 = ナチュラル圧縮、自動歪み防止 = 高速リミッタ）のみ。スライダーが UNITY (100%) のときは AudioContext を release してリソース返却する master トグルレス設計（`volumeBoosterEnabled` storage key も持たない）。サブトグルは `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` storage key で個別管理（OFF 時は対応する DynamicsCompressor を BYPASS preset で素通り）。
+Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext + GainNode + DynamicsCompressorNode × 2）のみを使ったタブ音声圧縮 + 増幅の独自実装。Equalizer や音質変更は持たず、純粋な 2 段 DynamicsCompressor（自動音量正規化 / 自動歪み防止）+ GainNode のみ。`volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` storage key で個別管理（OFF 時は対応する DynamicsCompressor を BYPASS preset で素通り）。マスタートグルレス設計で `volumeBoosterEnabled` storage key も持たない。
 
 **処理フロー**:
 1. popup でスライダー / サブトグル操作 → 120ms debounce → `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`, `antiClip`, `normalize`）
-2. background: gain が UNITY かつ既存 AudioContext なしなら `releaseVolumeBoosterTab` を呼んで終了。それ以外なら `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext がある場合は streamId なしで gain / preset だけ更新）
+2. background: gain が UNITY かつ全サブトグル OFF なら `releaseVolumeBoosterTab` で AudioContext 解放して終了。それ以外は `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext があれば streamId なしで gain / preset だけ更新）
 3. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`, `antiClip`, `normalize`）
-4. offscreen: 未登録タブなら `getUserMedia({mandatory:{chromeMediaSource:"tab", chromeMediaSourceId:streamId}})` で stream 取得 → `AudioContext` + `GainNode` + `normalizerNode` (DynamicsCompressor) + `antiClipNode` (DynamicsCompressor) を構築 → `mediaSource → gainNode → normalizerNode → antiClipNode → destination` の 5 ノード接続。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp + `applyCompressorPreset()` で各 DynamicsCompressor のパラメータを切替
+4. offscreen: 未登録タブなら `getUserMedia` → `source → normalizerNode → gainNode → antiClipNode → destination` の 5 ノード接続。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp + `applyCompressorPreset()` で各 DynamicsCompressor のパラメータを切替
 
-**スライダーの対数マッピング**: スライダー percent (100..600) は `VolumeBooster.percentToGain()` で実 gain 倍率に変換される。100% = 1.0x / 600% = 6.0x の anchor は維持しつつ 100..600 区間を「等距離スライダー = 等 dB ステップ (~3.1dB/100step)」に配分する対数曲線を採用。線形マッピングだと 100→200 で +6dB / 500→600 で +1.6dB と前半で爆音化する罠があるため、ドラッグ体感を均一化する目的でこの変換を導入している。100% 未満（attenuation）は使用頻度が低いため線形のまま (`percent/100`)。逆関数 `gainToPercent()` も提供しているが現状は使っておらず、popup syncCurrentTabVolume への応答は offscreen 側の `state.lastSetPercent`（最後にユーザーが指定した整数 percent）を返してラウンドトリップ誤差ゼロを担保する設計。
-
-**gain ramp**: `gainNode.gain` への直接 `.value =` 代入はサンプル境界の不連続でクリック/プチノイズを発生させる。`VolumeBooster.RAMP_TIME_CONSTANT` (0.015 秒、3τ ≈ 45ms で 95% 到達) を使った `setTargetAtTime` ramp で滑らかに遷移させる。popup の 120ms debounce より十分短いためドラッグ中の連続更新でも各 ramp は次の更新前に収束する。`cancelScheduledValues` + `setValueAtTime(現在値, now)` を先に呼んで古いランプ予約を破棄し現在値を anchor してから新しい ramp を開始するのが定石。**注意: compressor 側は `applyCompressorPreset` で `.value =` 直接代入のまま** — 切替頻度が低くアタックが速い (1〜50ms) ため即時代入で問題なく、トグル切替時の音切れも `COMPRESSOR_BYPASS` への切替で回避できる（disconnect/reconnect しない）。
-
-**Compressor preset 設計**: `VolumeBooster.NORMALIZE_PRESET` (`threshold:-24, knee:6, ratio:4, attack:0.05, release:0.3`) は緩く全体を圧縮、`VolumeBooster.ANTI_CLIP_PRESET` (`threshold:-3, knee:0, ratio:12, attack:0.001, release:0.05`) は高速リミッタ（ブリックウォール風）として音割れピークだけ瞬時に抑える。`VolumeBooster.COMPRESSOR_BYPASS` (`threshold:0, knee:0, ratio:1, attack:0.003, release:0.25`) で disconnect なしの素通り化を実現（音切れ回避）。BYPASS の attack/release は Web Audio API のデフォルト値で、`0` を渡すと Chrome の内部最小値に clamp されて DevTools 警告が出るため明示している。数値の単一情報源は `src/lib/actions.js` の `VolumeBooster` 定数 — このドキュメントの記述と齟齬が出たら必ずコードを正とすること。
-
-**ライフサイクル**: `chrome.tabs.onRemoved` でタブ閉じ release / スライダー 100% 復帰で release / アイドル close 抑止は Important Patterns 参照。
+ノード順序・対数マッピング・gain ramp・compressor preset・UNITY release 条件などの**設計上の不変条件は Important Patterns「音量ブースター・Offscreen Document」に集約**。数値の単一情報源は [`src/lib/actions.js`](src/lib/actions.js) の `VolumeBooster` 定数 — ドキュメントとコードに齟齬が出たら必ずコードを正とすること。
 
 ## Key Files
 
@@ -169,14 +157,10 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / KeepAlive / SenderCheck / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / VolumeBooster / ExtensionPaths 定数 |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
-| `src/content/youtube-shorts.js` | YouTube クリーナーの `removeShorts` サブ機能（top frame のみ）: MutationObserver + URL リダイレクト |
-| `src/content/youtube-shorts.css` | `__cpa-yt-shorts-hidden` クラス付与時に Shorts UI を `display: none` |
-| `src/content/search-fixer.js` | YouTube クリーナー（21 機能 + グリッド列数）: master + features + gridItems で駆動 |
-| `src/content/search-fixer.css` | サムネ枠装飾 / タイトル中央 / 説明文フル幅 等のクラス定義 |
-| `src/content/amazon-delivery-total.js` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 |
-| `src/content/amazon-delivery-total.css` | `.__cpa-amzn-delivery-total` の Amazon 配色合計表示スタイル |
-| `src/content/instagram-cleaner.js` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ |
-| `src/content/instagram-cleaner.css` | `html.__cpa-ig-*` 駆動の隠蔽 CSS（aria-label / href / role / data-pagelet / SVG path data ベースの意味論的セレクタのみ） |
+| `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの `removeShorts` サブ機能（top frame のみ）: MutationObserver + URL リダイレクト + `__cpa-yt-shorts-hidden` で `display: none` |
+| `src/content/search-fixer.{js,css}` | YouTube クリーナー（21 機能 + グリッド列数）: master + features + gridItems で駆動 + サムネ枠装飾等 |
+| `src/content/amazon-delivery-total.{js,css}` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 + `__cpa-amzn-delivery-total` 配色 |
+| `src/content/instagram-cleaner.{js,css}` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ + 意味論的セレクタのみ（aria-label / href / role / data-pagelet / SVG path data） |
 | `src/popup/popup.{html,js,css}` | ポップアップ UI: アシスト / カラーピッカーの 2 タブ構成。アシストタブは 4 トグル + 音量スライダー + 音量サブトグル × 2 + クリーナー詳細アコーディオン × 2（1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
 | `src/offscreen/offscreen.{html,js}` | 音量ブースター専用 offscreen document: AudioContext + GainNode + DynamicsCompressor × 2 (normalize / anti-clip) で増幅 + 圧縮 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
@@ -189,9 +173,9 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 新機能追加・既存機能の改修で踏むべき原則と、過去にハマった罠の対策。詳細はファイル冒頭コメントと該当セクションを参照。
 
 ### 設計の起点
-- **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する設計。FEATURES に追加すれば popup UI は自動生成される。actions.js は **`importScripts`** (background) + **manifest content_scripts** (最初のエントリで自動注入) + **`<script>` タグ** (popup.html / offscreen.html) の 4 経路で共有する古典的グローバル定数方式（ES modules ではない）。
+- **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する。FEATURES に追加すれば popup UI は自動生成される。actions.js は古典的グローバル定数方式（ES modules ではない）で 4 経路で共有: ① background の `importScripts()`、② manifest content_scripts の最初のエントリで全 http(s) フレームに自動注入、③ popup.html の `<script>` タグ、④ offscreen.html の `<script>` タグ。
 - **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` / `package-lock.json` の `version` フィールドおよびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
-- **デフォルト OFF 方針徹底** — 4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスタートグルなしだがスライダー 100% でリソース解放されるため「インストール直後はサイトに何も影響しない」を維持できる。
+- **デフォルト OFF 方針徹底** — 4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスタートグルなしだが「スライダー 100% かつ全サブトグル OFF」のときリソース解放される（サブトグル 2 種もデフォルト OFF なのでインストール直後は完全に無処理）。
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
@@ -203,12 +187,21 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 - **DOM 書き戻しは observer guard 必須** — `subtree: true` 監視中に自身が DOM を書き戻すと再帰発火 → 無限ループでフリーズ。Amazon 月別合計の修正で確立した **`disconnect → render → takeRecords → observe` ガード + `requestAnimationFrame` coalesce** の二重防御を新規 DOM 書き込みロジックでも踏襲する。
 
 ### 音量ブースター・Offscreen Document
-- **Offscreen Document の 1 拡張 1 文書制約** — `reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。新しい用途を追加するときは既存ドキュメントに同居させること。
-- **`minimum_chrome_version: "140"` 固定** — manifest.json で 140+ に固定しているため、`chrome.runtime.getContexts`（Chrome 116+）等の new API は **typeof チェックなしで直接呼んで良い**。legacy fallback の `if (typeof chrome.runtime.getContexts !== "function")` 分岐はバグ温床（receiver 不在エラーを active 扱いして 30 秒 cycle 無限再 schedule した Codex P2 指摘あり）なので追加しないこと。
+
+**オーディオ路の不変条件**:
+- **ノード順序は `source → normalize → gain → anti-clip → destination` に固定** — マスタリング定石「compressor → makeup gain → limiter」。gain を先頭に置く配置は禁止（v1.0.20 まで誤実装で「正規化 ON で boost が効かない」問題があった。compressor が gain 増幅後の信号を threshold 付近まで圧縮し直してしまうため）。新ノードを足すときも `source → ... → destination` の中で gain の後ろに limiter を置く順序を崩さないこと。
+- **gain は対数マッピング + `setTargetAtTime` ramp** — スライダー percent → 実 gain は `VolumeBooster.percentToGain()` で対数変換（100..600 区間で等 dB ステップ ~3.1dB/100step）。線形マッピングだと前半域で 1% ノッチが +0.086dB ずつ＝ドラッグ前半で爆音化する罠あり。`gainNode.gain` への直接 `.value =` 代入はサンプル境界の不連続でクリック発生 → 必ず `cancelScheduledValues` → `setValueAtTime(現在値, now)` → `setTargetAtTime(target, now, RAMP_TIME_CONSTANT)` の三点セットで ramp 経由（`RAMP_TIME_CONSTANT = 0.015` で 3τ ≈ 45ms 95% 到達、popup の 120ms debounce より十分短い）。
+- **DynamicsCompressor は disconnect ではなく BYPASS preset で OFF** — サブトグル OFF 時にノードを disconnect/reconnect すると AudioContext のグラフが切れて一瞬無音になりプチノイズが乗る。`COMPRESSOR_BYPASS`（`ratio:1`、threshold/knee 中立）を `applyCompressorPreset` で当てれば素通り化が無音ゼロで実現（切替頻度が低くアタックが速い 1〜50ms ため `setTargetAtTime` 不要、`.value =` 直接代入で十分）。
+- **volumeGetGain は `state.lastSetPercent` を返す** — `gain.value` はランプ中で目標値と一致しないため、ユーザーが最後に指定した整数 percent を保持して round-trip 誤差ゼロを担保。`gainToPercent(gain.value)` 経由だと使えない。
+
+**ライフサイクルの不変条件**:
+- **UNITY release 条件は「100% かつ全サブトグル OFF」** — `setVolumeBoosterGain` で UNITY 早期 return するのは `clamped === UNITY && !antiClipFlag && !normalizeFlag` のときだけ。100% でもサブトグル ON なら AudioContext 維持で compressor を効かせる。「音量は変えずに正規化だけ」「突発音だけ抑える」ユースケースの解禁 (v1.0.21+)。
 - **アイドル close 抑止** — `isVolumeBoosterActive` で boost 中タブを query。先頭で `offscreenState === "CLOSED"` を見て早期 false return すること（query 不要 + receiver 不在経路の誤判定回避）。SW 再起動直後など sendMessage が一時失敗した場合のみ安全側（active 扱い）に倒す。
-- **タブクローズで自動 release** — `chrome.tabs.onRemoved` は permission 不要 + SW 再起動でも永続的に発火するため、AudioContext の取り残しを防げる。
-- **DynamicsCompressor は disconnect ではなく BYPASS preset** — サブトグル OFF 時にノードを disconnect/reconnect すると AudioContext のグラフが切れて一瞬無音になりプチノイズが乗る。`COMPRESSOR_BYPASS`（`ratio:1`、threshold/knee 中立）を `node.threshold.value = ...` の直接代入で当てれば素通り化が無音区間ゼロで実現できる（切替頻度が低いため `setTargetAtTime` で滑らかにする必要なし）。新しいフィルタを追加するときも同じパターンで。
-- **gain は対数マッピング + `setTargetAtTime` ramp** — スライダー percent → 実 gain は `VolumeBooster.percentToGain()` で対数変換（100..600 区間で「等距離スライダー = 等 dB ステップ」）。線形マッピングだと前半域で 1% ノッチが +0.086dB ずつ＝ドラッグ前半で爆音化する罠がある。さらに `gainNode.gain` への直接 `.value =` 代入はサンプル境界の不連続でクリック/プチノイズを発生させるため、必ず `cancelScheduledValues` → `setValueAtTime(現在値, now)` → `setTargetAtTime(target, now, RAMP_TIME_CONSTANT)` の三点セットで ramp 経由にする。`RAMP_TIME_CONSTANT = 0.015` は popup の 120ms debounce より十分短く、ドラッグ中の連続更新でも各 ramp が次更新前に収束する。**対数化に伴い popup syncCurrentTabVolume への応答は `state.lastSetPercent`（最後にユーザーが指定した整数 percent）を返す**こと（gain.value はランプ中で別値、`gainToPercent(gain.value)` 経由だと round-trip 誤差が出る）。
+- **タブクローズで自動 release** — `chrome.tabs.onRemoved` は permission 不要 + SW 再起動でも永続発火するため、AudioContext の取り残しを防げる。
+
+**API / 制約**:
+- **Offscreen Document の 1 拡張 1 文書制約** — `reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。新しい用途を追加するときは既存ドキュメントに同居させること。
+- **`minimum_chrome_version: "140"` 固定** — `chrome.runtime.getContexts`（116+）等の new API は **typeof チェックなしで直接呼んで良い**。legacy fallback の `if (typeof chrome.runtime.getContexts !== "function")` 分岐はバグ温床（receiver 不在エラーを active 扱いして 30 秒 cycle 無限再 schedule した Codex P2 指摘あり）なので追加しないこと。
 
 ### マイグレーション
 - **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `volumeBoosterEnabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。

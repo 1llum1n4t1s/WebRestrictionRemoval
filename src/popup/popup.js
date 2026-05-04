@@ -326,19 +326,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   /**
-   * compressor トグル変更時の共通処理: 現在 gain を再送信 → UNITY のときだけ
-   * 「100% より上で有効」のヒントを表示する。
+   * compressor トグル変更時の共通処理: 現在 gain を再送信して AudioContext / compressor 状態を即時反映する。
    *
-   * UNITY (100%) では `setVolumeBoosterGain` が `releaseVolumeBoosterTab` を呼んで
-   * AudioContext を解放するため、compressor 設定は次回ブースト時まで反映されない。
-   * トグルを ON にしたのに音が変わらないというユーザーの誤解を防ぐためヒントを出す。
+   * UNITY (100%) でもサブトグルが ON なら background が AudioContext を維持するため、
+   * トグルだけ変えても即座に効果が出る（旧仕様の「100% より上で有効」ヒントは廃止）。
    */
   async function applyCompressorTogglePush() {
     const v = VolumeBooster.clampValue($volumeSlider.value);
     await pushVolumeNow(v).catch(() => {});
-    if (v === VolumeBooster.UNITY && ($volumeAntiClipToggle.checked || $volumeNormalizeToggle.checked)) {
-      setVolumeHint("ℹ️ 100% より上で有効になります");
-    }
   }
 
   $intervalSlider.addEventListener("input", () => {

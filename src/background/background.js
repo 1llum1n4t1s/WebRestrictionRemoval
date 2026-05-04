@@ -515,9 +515,10 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
   const antiClipFlag = antiClip === true;
   const normalizeFlag = normalize === true;
 
-  // スライダーが等倍位置 (100%) ならブースト不要 → タブを解放してリソース返却。
-  // compressor フラグは「ブースト中のみ意味を持つ」ため、ここでは反映しない（次回ブースト時に有効）。
-  if (clamped === VolumeBooster.UNITY) {
+  // スライダーが等倍位置 (100%) かつ全サブトグル OFF のときだけ release → リソース返却。
+  // 100% でも自動歪み防止 / 自動音量正規化のいずれかが ON なら compressor を効かせる必要があるため
+  // AudioContext を維持して通常経路に進む（gain は 1.0x にランプ、compressor は preset 通り適用）。
+  if (clamped === VolumeBooster.UNITY && !antiClipFlag && !normalizeFlag) {
     await releaseVolumeBoosterTab(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
   }
