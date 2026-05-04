@@ -58,7 +58,7 @@ jobs:
             -x "*.DS_Store" "*.swp" "*~"
           ls -lh web-viewing-assist.zip
 
-      - name: Chrome Web Store にアップロード & 公開
+      - name: Chrome Web Store に Draft アップロード
         env:
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -69,25 +69,25 @@ jobs:
           # chrome-webstore-upload-cli は devDependencies 経由で固定バージョン + lockfile integrity
           # 付きでインストール済み（package.json 参照）。npx はローカル node_modules/.bin を使うため
           # レジストリから再ダウンロードしない（= 実行時改ざんの経路を閉じる）。
+          #
+          # **意図的に --auto-publish を使わない**: 即審査キューに入れると Chrome Web Store の listing
+          # （説明文 / スクリーンショット / カテゴリ）が編集ロックされ、ストア掲載文を更新したい場合に
+          # 一度キャンセル → 再提出が必要になる。Draft only にしておけば Dashboard で listing を整えてから
+          # 手動で「公開」ボタンを押す運用ができ、ZIP と説明文を整合させたまま審査に出せる。
+          # CWS API には listing 更新エンドポイントが存在しない (v2 API の discovery document で確認済み)
+          # ため、Dashboard 経由のレビューが必須な以上、auto-publish は罠にしかならない。
           output=$(npx chrome-webstore-upload-cli upload \
             --source web-viewing-assist.zip \
             --extension-id "$CWS_EXTENSION_ID" \
             --client-id "$CWS_CLIENT_ID" \
             --client-secret "$CWS_CLIENT_SECRET" \
-            --refresh-token "$CWS_REFRESH_TOKEN" \
-            --auto-publish 2>&1)
+            --refresh-token "$CWS_REFRESH_TOKEN" 2>&1)
           exit_code=$?
           echo "$output"
           if [ $exit_code -eq 0 ]; then
-            echo "🎉 Chrome Web Store への公開リクエストを送信したよ〜"
+            echo "🎉 Chrome Web Store に Draft としてアップロード完了！"
+            echo "📝 次のステップ: Developer Dashboard で listing（説明文 / スクリーンショット / 権限の正当性）を確認・更新してから「公開」ボタンを押してね"
+            echo "🔗 https://chrome.google.com/webstore/devconsole"
             exit 0
           fi
-          # アップロードは成功したが auto-publish 条件を満たさないケースを warning 化。
-          # 代表例: Developer Dashboard の "Privacy practices" 未入力 (400 Bad Request)。
-          # ZIP は Draft として登録済みのため、Dashboard で手動公開すれば良い。
-          if echo "$output" | grep -qE "Publish condition not met|Privacy practices|mandatory privacy information"; then
-            echo "::warning::アップロードは成功したけど自動公開できなかったよ💦 Developer Dashboard の Privacy practices タブを埋めてから手動で公開してね (次回以降は auto-publish が通るよ)"
-            exit 0
-          fi
-          # それ以外の失敗は従来通り fail にする
           exit $exit_code
