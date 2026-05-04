@@ -6,3 +6,4 @@ icons/icon-*.png
 temp-build/
 *.zip
 .serena/
+.claude/
