@@ -85,7 +85,7 @@ const StorageKeys = Object.freeze({
    *  master が ON でもこれが OFF のときは合成イベント dispatch のみ行い HTTP ping は出さない。
    *  認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発するのを避ける用途。 */
   KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
-  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示を含む全 21 サブ機能の親） */
+  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む全 22 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -285,6 +285,12 @@ const SearchFixerFeatures = Object.freeze([
     key: "hideComments",
     label: "コメント欄非表示",
     desc: "動画ページ下部のコメントセクション（件数・並び替え・入力欄・スレッド一覧）を一括で非表示化。ライブ配信のチャット欄は対象外",
+    category: "watch_page",
+  }),
+  Object.freeze({
+    key: "hideLiveChat",
+    label: "ライブチャット欄非表示",
+    desc: "ライブ配信アーカイブの右側に表示されるライブコメント欄 (ytd-live-chat-frame) を非表示化。通常動画には影響なし",
     category: "watch_page",
   }),
   Object.freeze({

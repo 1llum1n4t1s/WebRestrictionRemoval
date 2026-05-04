@@ -17,8 +17,8 @@
 - **`keepAliveEnabled`**（真偽値）: セッション維持機能の有効/無効。
 - **`keepAliveIntervalMs`**（数値・ミリ秒）: セッション維持のポーリング間隔（1〜15 分の範囲）。
 - **`keepAliveHttpPingEnabled`**（真偽値）: セッション維持の「軽量 HTTP ping」サブ機能の有効/無効（オプトイン・デフォルト OFF）。
-- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示を含む 21 サブ機能の親）の有効/無効。
-- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 21 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 10 種 / 動画属性削除 4 種 / ハイライト 2 種 / 動画ページ整形 3 種〈タイトル中央配置・説明文フル幅・コメント欄非表示〉/ レイアウト 1 種）の個別 ON/OFF 状態。
+- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む 22 サブ機能の親）の有効/無効。
+- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 22 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 10 種 / 動画属性削除 4 種 / ハイライト 2 種 / 動画ページ整形 4 種〈タイトル中央配置・説明文フル幅・コメント欄非表示・ライブチャット非表示〉/ レイアウト 1 種）の個別 ON/OFF 状態。
 - **`searchFixerGridItems`**（数値）: YouTube ホームグリッドの列数指定（0=自動 / 4 / 5 / 6）。
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。
 - **`instagramCleanerEnabled`**（真偽値）: Instagram クリーナー機能の有効/無効。

@@ -4,7 +4,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 6 機能を提供する：「セッション維持」「YouTube クリーナー（Shorts 削除・コメント欄非表示を含む 21 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター（自動歪み防止 / 自動音量正規化サブトグル付き）」「カラーピッカー（EyeDropper API ベース）」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放、サブトグル 2 種もデフォルト OFF）、カラーピッカーは popup タブ内で完結。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 6 機能を提供する：「セッション維持」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む 22 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター（自動歪み防止 / 自動音量正規化サブトグル付き）」「カラーピッカー（EyeDropper API ベース）」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放、サブトグル 2 種もデフォルト OFF）、カラーピッカーは popup タブ内で完結。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 > **v1.0.18 までの主な変更点（適用済み）**: v1.0.x の「制限解除」（右クリック解除 / テキスト選択解除 / 強制ペースト / 強制コピー / カスタム右クリック許可リスト）を全廃。`clipboardRead` / `clipboardWrite` / `contextMenus` / `scripting` permission も削除済み。拡張機能名は「WEB制限解除サポート」→「WEB閲覧アシスト」に改名。バージョン番号確定は `/vava` スキル経由で行う。
 
@@ -44,7 +44,7 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）+ 音量ブースタースライダー（マスタートグルなしの常時表示）+ クリーナー詳細アコーディオン × 2（YouTube クリーナー 20 機能 / Instagram クリーナー 10 機能）。Shorts 削除は YouTube クリーナーのサブ機能 `removeShorts`（「サイト全体」カテゴリ）として統合済み。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信。設定は `chrome.storage.local` の各キーから復元（未設定時は全 false）。アクセントカラーは茜系（ライト `#C0605A` / ダーク `#df8983`）。CSP meta を明示。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン定義 + `@media (prefers-color-scheme: dark)` のダーク用トークン上書きの 2 層構造。色値はすべて CSS 変数経由でハードコードなし。
+4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）+ 音量ブースタースライダー（マスタートグルなしの常時表示）+ クリーナー詳細アコーディオン × 2（YouTube クリーナー 22 機能 / Instagram クリーナー 10 機能）。Shorts 削除は YouTube クリーナーのサブ機能 `removeShorts`（「サイト全体」カテゴリ）として統合済み。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信。設定は `chrome.storage.local` の各キーから復元（未設定時は全 false）。アクセントカラーは茜系（ライト `#C0605A` / ダーク `#df8983`）。CSP meta を明示。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン定義 + `@media (prefers-color-scheme: dark)` のダーク用トークン上書きの 2 層構造。色値はすべて CSS 変数経由でハードコードなし。
 
 音量ブースターは：
 - スライダー入力 → 120ms debounce → `VOLUME_BOOSTER_SET_GAIN` で background 経由で offscreen に送信
@@ -86,7 +86,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 **actions.js の二重ロード回避**: youtube.com は最初のエントリ（`http(s)://*/*`）にもマッチするため、両エントリで `actions.js` を読み込むと同じ isolated world で `const Actions = ...` が再宣言され SyntaxError になる。Chrome の同一拡張・同一ページの content scripts は同一 isolated world で「script scope」を共有するため、最初のエントリで読み込んだ `Actions` / `StorageKeys` 等の定数は 2 番目以降のエントリからも参照できる。よって 2 番目以降の `js` 配列には `actions.js` を含めない。
 
 ### YouTube クリーナー (`src/content/search-fixer.js`)
-`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。20 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`（v1.0.18 で `removeShorts` を「サイト全体」カテゴリに追加）。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**`removeShorts` サブ機能の実装は youtube-shorts.js 側に存在**（責務分離）。
+`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。22 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`（v1.0.18 で `removeShorts` を「サイト全体」カテゴリに追加、続いて `hideComments` と `hideLiveChat` を「動画ページ」カテゴリに追加）。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**`removeShorts` サブ機能の実装は youtube-shorts.js 側に存在**（責務分離）。
 
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
 `*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
@@ -143,7 +143,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/youtube-shorts.js` | YouTube クリーナーの `removeShorts` サブ機能（top frame のみ）: MutationObserver + URL リダイレクト |
 | `src/content/youtube-shorts.css` | `__cpa-yt-shorts-hidden` クラス付与時に Shorts UI を `display: none` |
-| `src/content/search-fixer.js` | YouTube クリーナー（21 機能 + グリッド列数）: master + features + gridItems で駆動 |
+| `src/content/search-fixer.js` | YouTube クリーナー（22 機能 + グリッド列数）: master + features + gridItems で駆動 |
 | `src/content/search-fixer.css` | サムネ枠装飾 / タイトル中央 / 説明文フル幅 等のクラス定義 |
 | `src/content/amazon-delivery-total.js` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 |
 | `src/content/amazon-delivery-total.css` | `.__cpa-amzn-delivery-total` の Amazon 配色合計表示スタイル |

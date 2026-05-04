@@ -442,6 +442,9 @@
     // コメント欄は遅延レンダリング（スクロールで初めて DOM 出現）するため、個別要素 toggle だと
     // 初期ロード時に空振りする。`<html>` クラスで CSS 駆動にすれば後から DOM が現れても即時適用される。
     document.documentElement.classList.toggle("__cpa-sfx-hide-comments", f("hideComments"));
+    // ライブチャットリプレイ (ytd-live-chat-frame) はライブ配信アーカイブでのみ DOM に出現する。
+    // 通常動画には存在しないためページ判定不要、`<html>` クラス駆動で CSS 側のみで処理する。
+    document.documentElement.classList.toggle("__cpa-sfx-hide-live-chat", f("hideLiveChat"));
   }
 
   // ---------- ホームのリッチグリッド列数 ----------
