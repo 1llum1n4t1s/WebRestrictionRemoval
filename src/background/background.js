@@ -48,6 +48,10 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
+    StorageKeys.COLOR_PICKER_HISTORY,
+    StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
+    StorageKeys.COLOR_PICKER_HEX_HASH,
+    StorageKeys.POPUP_LAST_TAB,
   ]);
   const defaults = {};
   if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
@@ -81,6 +85,21 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] = false;
+  }
+  // 顔料アトリエ（カラーピッカー）の新規キー: 履歴は空配列、既定形式は HEX、
+  // 最終タブは「アシスト」で初期化。後追いキーが undefined のまま UI に出ないよう
+  // 明示的に書き込む（CLAUDE.md の onInstalled 初期化方針）。
+  if (!(StorageKeys.COLOR_PICKER_HISTORY in stored)) {
+    defaults[StorageKeys.COLOR_PICKER_HISTORY] = [];
+  }
+  if (!(StorageKeys.COLOR_PICKER_DEFAULT_FORMAT in stored)) {
+    defaults[StorageKeys.COLOR_PICKER_DEFAULT_FORMAT] = ColorPicker.DEFAULT_FORMAT;
+  }
+  if (!(StorageKeys.COLOR_PICKER_HEX_HASH in stored)) {
+    defaults[StorageKeys.COLOR_PICKER_HEX_HASH] = true;
+  }
+  if (!(StorageKeys.POPUP_LAST_TAB in stored)) {
+    defaults[StorageKeys.POPUP_LAST_TAB] = ColorPicker.TAB_ASSIST;
   }
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);
@@ -219,6 +238,13 @@ async function notifyContentScripts(s) {
     })
     .catch(() => {});
 
+  // A1-2 / #11 対策: youtube-shorts / search-fixer / amazon-delivery-total / instagram-cleaner は
+  // いずれも `all_frames: false` で top frame にしか注入されない。それでも sendMessage に
+  // frameId を指定しないと Chrome は全フレームへブロードキャストしてしまうため、`{ frameId: 0 }`
+  // で top frame に明示的に絞ってメッセージング負荷を最小化する。
+  // keepalive は `all_frames: true` で全フレームに注入されるため意図的に frameId 指定なし。
+  const TOP_FRAME = { frameId: 0 };
+
   if (isYouTubeUrl(url)) {
     // Shorts 削除も YouTube クリーナーのサブ機能 (features.removeShorts) として
     // 統合されたため、メッセージは APPLY_SEARCH_FIXER_CS のみ。
@@ -232,7 +258,7 @@ async function notifyContentScripts(s) {
           features: s.searchFixerFeatures,
           gridItems: s.searchFixerGridItems,
         },
-      })
+      }, TOP_FRAME)
       .catch(() => {});
   }
 
@@ -241,7 +267,7 @@ async function notifyContentScripts(s) {
       .sendMessage(tab.id, {
         action: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS,
         data: { enabled: s.amazonDeliveryTotalEnabled },
-      })
+      }, TOP_FRAME)
       .catch(() => {});
   }
 
@@ -253,7 +279,7 @@ async function notifyContentScripts(s) {
           enabled: s.instagramCleanerEnabled,
           features: s.instagramCleanerFeatures,
         },
-      })
+      }, TOP_FRAME)
       .catch(() => {});
   }
 }
@@ -341,7 +367,12 @@ async function ensureOffscreenDocument() {
   }
 
   offscreenState = "CREATING";
-  offscreenCreatingPromise = chrome.offscreen
+  // EC-12 対策: createDocument 完了後も offscreenCreatingPromise を null に戻さず保持する。
+  // 並行 caller 群が同じ Promise を共有して await することで、初回 caller の finally と
+  // 後続 caller の `if (offscreenCreatingPromise)` チェックの間に発生する race window を
+  // 完全に消す（B1-B1 修正）。Promise の null 化は (a) 失敗時即座に / (b) closeDocument の
+  // finally で行い、「OPEN 状態のキャッシュされた成功 Promise」として再利用される。
+  const localPromise = chrome.offscreen
     .createDocument({
       url: Offscreen.PATH,
       reasons: Offscreen.REASONS,
@@ -358,15 +389,12 @@ async function ensureOffscreenDocument() {
       }
       console.warn("[WebViewingAssist] createDocument failed:", err);
       offscreenState = "CLOSED";
+      // 失敗時は即座に null 化して、次回 caller が新規 createDocument を発行できるように。
+      if (offscreenCreatingPromise === localPromise) offscreenCreatingPromise = null;
       return false;
     });
-
-  try {
-    const ok = await offscreenCreatingPromise;
-    return ok === true;
-  } finally {
-    offscreenCreatingPromise = null;
-  }
+  offscreenCreatingPromise = localPromise;
+  return await localPromise;
 }
 
 function scheduleOffscreenClose() {
@@ -402,9 +430,37 @@ function scheduleOffscreenClose() {
       .finally(() => {
         offscreenState = "CLOSED";
         offscreenClosingPromise = null;
+        // close 完了で「キャッシュされた成功 Promise」を解放し、次回 ensureOffscreenDocument
+        // が新規 createDocument を発行できるようにする（B1-B1 修正の対）。
+        offscreenCreatingPromise = null;
       });
   }, Offscreen.IDLE_MS);
 }
+
+// B1-B5 対策: SW がスリープ → 再起動すると offscreenIdleTimer / offscreenCloseRescheduleCount
+// などのモジュール変数がリセットされるため、offscreen document が残ったまま誰も close を
+// スケジュールしない状態が起きうる（onRemoved や setVolumeBoosterGain が呼ばれるまで close
+// しない）。SW 起動直後に「offscreen が残っていれば scheduleOffscreenClose を再発動」する。
+//
+// この処理は SW 再起動 / extension reload / Chrome 再起動の各経路で発火する。
+// `chrome.runtime.getContexts` は Chrome 116+ なので minimum_chrome_version 140 では
+// 直接呼んで良い（CLAUDE.md 規約）。
+(async () => {
+  try {
+    const url = chrome.runtime.getURL(Offscreen.PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (contexts.length > 0) {
+      offscreenState = "OPEN";
+      scheduleOffscreenClose();
+    }
+  } catch {
+    // 起動直後の getContexts 失敗は無視。次に setVolumeBoosterGain 等が呼ばれた時点で
+    // ensureOffscreenDocument が状態を再評価する。
+  }
+})();
 
 async function isVolumeBoosterActive() {
   // 我々が把握する offscreen state が CLOSED なら、boost 中タブが残っている可能性はゼロ
@@ -412,15 +468,21 @@ async function isVolumeBoosterActive() {
   // 30 秒間隔の `scheduleOffscreenClose()` 再 schedule cycle を確実に止める。
   if (offscreenState === "CLOSED") return false;
 
-  try {
-    const url = chrome.runtime.getURL(Offscreen.PATH);
-    const contexts = await chrome.runtime.getContexts({
-      contextTypes: ["OFFSCREEN_DOCUMENT"],
-      documentUrls: [url],
-    });
-    if (contexts.length === 0) return false;
-  } catch {
-    return true;
+  // 2-C3 最適化: offscreenState === "OPEN" の場合は getContexts をスキップして
+  // sendMessage 直行で 1 往復削減。実際に offscreen が消えていた場合は sendMessage が
+  // 失敗 → catch で safe-side の active 扱いになり、次サイクルで自然修復される。
+  // CREATING / CLOSING の中間状態のみ getContexts で実存を確認する。
+  if (offscreenState !== "OPEN") {
+    try {
+      const url = chrome.runtime.getURL(Offscreen.PATH);
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ["OFFSCREEN_DOCUMENT"],
+        documentUrls: [url],
+      });
+      if (contexts.length === 0) return false;
+    } catch {
+      return true;
+    }
   }
   try {
     const res = await chrome.runtime.sendMessage({
@@ -464,7 +526,9 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
   if (!ready) return { ok: false, error: "offscreen-unavailable" };
 
   // 既存 AudioContext があれば streamId は不要（getMediaStreamId をスキップ）。
-  const existing = await getVolumeBoosterGain(tabId);
+  // ensureOffscreenDocument が ready=true を返したので offscreen の存在は確定している。
+  // getContexts 重複呼び出しを避けるため Direct 版を使う (2-C1 修正)。
+  const existing = await getVolumeBoosterGainDirect(tabId);
   if (Number.isFinite(existing?.gain)) {
     let res;
     try {
@@ -525,18 +589,13 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
   }
 }
 
-async function getVolumeBoosterGain(tabId) {
+/**
+ * getContexts なしで offscreen に直接 GET_GAIN を送る軽量バージョン (2-C1 修正)。
+ * `ensureOffscreenDocument` が直前で ready=true を返した呼び出し経路では offscreen の
+ * 存在は確定しているため、`getContexts` 1 往復を省略して RTT を約 50% 削減できる。
+ */
+async function getVolumeBoosterGainDirect(tabId) {
   if (typeof tabId !== "number") return { gain: null };
-  try {
-    const url = chrome.runtime.getURL(Offscreen.PATH);
-    const contexts = await chrome.runtime.getContexts({
-      contextTypes: ["OFFSCREEN_DOCUMENT"],
-      documentUrls: [url],
-    });
-    if (contexts.length === 0) return { gain: null };
-  } catch {
-    return { gain: null };
-  }
   try {
     const res = await chrome.runtime.sendMessage({
       target: Offscreen.TARGET,
@@ -547,6 +606,23 @@ async function getVolumeBoosterGain(tabId) {
   } catch {
     return { gain: null };
   }
+}
+
+async function getVolumeBoosterGain(tabId) {
+  if (typeof tabId !== "number") return { gain: null };
+  // popup の syncCurrentTabVolume 経路は offscreen の存在が未確定なので getContexts で
+  // 早期 return できるようにする（無駄な sendMessage を抑制）。
+  try {
+    const url = chrome.runtime.getURL(Offscreen.PATH);
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [url],
+    });
+    if (contexts.length === 0) return { gain: null };
+  } catch {
+    return { gain: null };
+  }
+  return await getVolumeBoosterGainDirect(tabId);
 }
 
 /**

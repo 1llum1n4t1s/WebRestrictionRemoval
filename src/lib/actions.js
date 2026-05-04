@@ -85,7 +85,7 @@ const StorageKeys = Object.freeze({
    *  master が ON でもこれが OFF のときは合成イベント dispatch のみ行い HTTP ping は出さない。
    *  認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発するのを避ける用途。 */
   KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
-  /** YouTube クリーナーマスタートグル（Shorts 削除を含む全 20 サブ機能の親） */
+  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示を含む全 21 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -101,6 +101,14 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
   /** 音量ブースター: 自動音量正規化（DynamicsCompressor で緩い圧縮） */
   VOLUME_BOOSTER_NORMALIZE_ENABLED: "volumeBoosterNormalizeEnabled",
+  /** カラーピッカー: 採取した色の履歴（最新が先頭。各要素 {hex, ts} の最大 20 件） */
+  COLOR_PICKER_HISTORY: "colorPickerHistory",
+  /** カラーピッカー: 既定の保存形式 ("hex" | "rgb" | "hsl") */
+  COLOR_PICKER_DEFAULT_FORMAT: "colorPickerDefaultFormat",
+  /** カラーピッカー: HEX コピー時に # を含めるか (boolean, default true) */
+  COLOR_PICKER_HEX_HASH: "colorPickerHexHash",
+  /** ポップアップで最後に開いていたタブ ("assist" | "picker") */
+  POPUP_LAST_TAB: "popupLastTab",
 });
 
 /** @readonly セッション維持機能の定数 */
@@ -539,4 +547,49 @@ const VolumeBooster = Object.freeze({
     attack: 0.003,
     release: 0.25,
   }),
+});
+
+/**
+ * @readonly カラーピッカー（独自実装）の定数。
+ *
+ * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
+ * 画面上のピクセル色を採取し、HEX / RGB / HSL の 3 形式で表示・コピーする小さな採色机。
+ * 履歴は `chrome.storage.local` に最大 20 件まで保持し、popup を閉じても永続化される。
+ *
+ * 動作対象: 拡張機能ポップアップ (src/popup/popup.html) のタブ内のみ。Web ページに対する
+ * DOM/CSS 操作・content script 注入は一切なく、外部送信ゼロ。色形式変換はすべて独自の
+ * 数学変換（IEC 61966-2-1 sRGB の HSL 変換アルゴリズム）。
+ */
+const ColorPicker = Object.freeze({
+  /** 履歴の保存上限（FIFO：超えたら末尾から削除） */
+  HISTORY_LIMIT: 20,
+  /** 既定の出力形式（ユーザー未設定時のフォールバック） */
+  DEFAULT_FORMAT: "hex",
+  /** 利用可能な出力形式の一覧（順序は UI の表示順と一致させること） */
+  FORMATS: Object.freeze(["hex", "rgb", "hsl"]),
+  /** タブ識別子。POPUP_LAST_TAB に保存される値はこのいずれか */
+  TAB_ASSIST: "assist",
+  TAB_PICKER: "picker",
+  /** HEX 検証用。先頭 # 必須、6 桁または 3 桁短縮形を許容 */
+  HEX_RE: /^#([0-9a-f]{6}|[0-9a-f]{3})$/i,
+
+  /** "hex" / "rgb" / "hsl" のいずれかなら true */
+  isValidFormat(value) {
+    return ColorPicker.FORMATS.includes(value);
+  },
+
+  /** 不正値はデフォルト形式 "hex" にフォールバック */
+  normalizeFormat(value) {
+    return ColorPicker.isValidFormat(value) ? value : ColorPicker.DEFAULT_FORMAT;
+  },
+
+  /** "assist" / "picker" のいずれかなら true */
+  isValidTab(value) {
+    return value === ColorPicker.TAB_ASSIST || value === ColorPicker.TAB_PICKER;
+  },
+
+  /** 不正値は assist にフォールバック */
+  normalizeTab(value) {
+    return ColorPicker.isValidTab(value) ? value : ColorPicker.TAB_ASSIST;
+  },
 });

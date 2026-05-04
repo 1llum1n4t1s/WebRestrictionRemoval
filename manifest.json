@@ -56,5 +56,8 @@
     "offscreen",
     "tabCapture"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'; frame-ancestors 'none'"
+  },
   "minimum_chrome_version": "140"
 }

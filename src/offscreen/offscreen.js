@@ -161,6 +161,12 @@ async function volumeReleaseTab(tabId) {
   const pending = audioInitPromises.get(tabId);
   if (pending) {
     try { await pending; } catch {}
+    // B1-B3 修正: pending を await し終えたら必ず Map から削除する。
+    // volumeSetGain の finally 経路では削除されるが、release 経由では削除漏れになり
+    // Map に古い完了済み Promise が残留してメモリリークの種になる。
+    if (audioInitPromises.get(tabId) === pending) {
+      audioInitPromises.delete(tabId);
+    }
   }
   const state = audioStates.get(tabId);
   if (!state) return { ok: true };
@@ -197,9 +203,15 @@ function cleanupAllAudio() {
     }
   }
   audioStates.clear();
+  // B1-B4 修正: pending な初期化 Promise も clear する。
+  // offscreen が再作成されても新規 Map になるためリークではないが、現インスタンスの
+  // shutdown 中に getUserMedia が解決した場合の宙吊り Promise を明示的に切る。
+  audioInitPromises.clear();
 }
+// 3-C3 修正: Chrome 140+ では `unload` は非推奨で bfcache を無効化する。
+// `pagehide` のみで cleanup は十分（offscreen document は extension context だが
+// 将来の Chrome 仕様変更に備えて pagehide のみで運用する）。
 window.addEventListener("pagehide", cleanupAllAudio);
-window.addEventListener("unload", cleanupAllAudio);
 
 // ============================================================
 // メッセージハンドラ

@@ -4,9 +4,9 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 5 機能を提供する：「セッション維持」「YouTube クリーナー（Shorts 削除を含む 20 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 6 機能を提供する：「セッション維持」「YouTube クリーナー（Shorts 削除・コメント欄非表示を含む 21 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター（自動歪み防止 / 自動音量正規化サブトグル付き）」「カラーピッカー（EyeDropper API ベース）」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放、サブトグル 2 種もデフォルト OFF）、カラーピッカーは popup タブ内で完結。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
-> **メジャー変更（次回リリース予定）**: v1.0.x の「制限解除」（右クリック解除 / テキスト選択解除 / 強制ペースト / 強制コピー / カスタム右クリック許可リスト）を全廃。`clipboardRead` / `clipboardWrite` / `contextMenus` / `scripting` permission も削除済み。拡張機能名は「WEB制限解除サポート」→「WEB閲覧アシスト」に改名。バージョン番号確定は `/vava` スキル経由で行う。
+> **v1.0.18 までの主な変更点（適用済み）**: v1.0.x の「制限解除」（右クリック解除 / テキスト選択解除 / 強制ペースト / 強制コピー / カスタム右クリック許可リスト）を全廃。`clipboardRead` / `clipboardWrite` / `contextMenus` / `scripting` permission も削除済み。拡張機能名は「WEB制限解除サポート」→「WEB閲覧アシスト」に改名。バージョン番号確定は `/vava` スキル経由で行う。
 
 設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は日本語。**インストール直後は全マスタートグル OFF**（音量ブースターは 100% = 解放状態）。サイト挙動を勝手に書き換えないオプトイン方針。
 
@@ -143,7 +143,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/youtube-shorts.js` | YouTube クリーナーの `removeShorts` サブ機能（top frame のみ）: MutationObserver + URL リダイレクト |
 | `src/content/youtube-shorts.css` | `__cpa-yt-shorts-hidden` クラス付与時に Shorts UI を `display: none` |
-| `src/content/search-fixer.js` | YouTube クリーナー（20 機能 + グリッド列数）: master + features + gridItems で駆動 |
+| `src/content/search-fixer.js` | YouTube クリーナー（21 機能 + グリッド列数）: master + features + gridItems で駆動 |
 | `src/content/search-fixer.css` | サムネ枠装飾 / タイトル中央 / 説明文フル幅 等のクラス定義 |
 | `src/content/amazon-delivery-total.js` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 |
 | `src/content/amazon-delivery-total.css` | `.__cpa-amzn-delivery-total` の Amazon 配色合計表示スタイル |

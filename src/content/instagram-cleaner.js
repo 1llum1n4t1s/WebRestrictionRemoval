@@ -124,6 +124,10 @@
       stopUrlGuard();
       return;
     }
+    // 3-C5 最適化: タブが非表示のときは DOM スイープをスキップして CPU を節約。
+    // visibility 復帰時は visibilitychange イベントで強制発火しないが、次の 300ms 間隔で
+    // 自動的にスイープが走るため、最大 300ms 遅延の許容範囲内で大幅に低 CPU 化できる。
+    if (document.hidden) return;
     if (f("blockVideos")) markArticlesContainingVideo();
     if (f("vanity")) markCounterButtons();
     if (f("comments")) markCommentElements();
@@ -206,7 +210,9 @@
       document
         .querySelectorAll("article ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")")
         .forEach((ul) => {
-          const items = Array.from(ul.children).filter((c) => c.tagName === "LI");
+          // 1-C1 最適化: `:scope > li` で直接 LI を取得し、Array.from + filter の中間配列を省略する。
+          // 300ms ポーリングで毎回走るホットパスのため、配列アロケーション削減が GC プレッシャに効く。
+          const items = ul.querySelectorAll(":scope > li");
           // li 数 1〜15 の範囲のみ受け付け（範囲外は別種の UL）
           if (items.length === 0 || items.length > 15) return;
           // 各 li 内にユーザープロフィールリンク（`/<username>/` 形式）があるかカウント

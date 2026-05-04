@@ -76,12 +76,18 @@
 
   chrome.storage.onChanged.addListener(async (changes, areaName) => {
     if (areaName !== "local") return;
-    const touched =
-      StorageKeys.SEARCH_FIXER_ENABLED in changes ||
-      StorageKeys.SEARCH_FIXER_FEATURES in changes;
-    if (!touched) return;
-    // 片方だけ変わった場合に備えて両方再取得（変更されてないキーは undefined になるため
-    // computeActive() が誤判定する）。
+    const enabledChange = changes[StorageKeys.SEARCH_FIXER_ENABLED];
+    const featuresChange = changes[StorageKeys.SEARCH_FIXER_FEATURES];
+    if (!enabledChange && !featuresChange) return;
+    // 2-C2 fast path: handleApplySettings は両キーを 1 回の storage.local.set で書くため、
+    // 通常の popup 操作経路では両キーが同時に changes に含まれる。この場合は newValue だけで
+    // computeActive を呼べるため storage.local.get の往復を完全に省略できる。
+    if (enabledChange && featuresChange) {
+      apply(computeActive(enabledChange.newValue, featuresChange.newValue));
+      return;
+    }
+    // 片方だけ変わった場合のエッジケース（onInstalled の単独キー書き込み等）に備えて両方再取得。
+    // 変更されてないキーは undefined になるため computeActive() が誤判定する罠を回避する。
     try {
       const stored = await chrome.storage.local.get([
         StorageKeys.SEARCH_FIXER_ENABLED,

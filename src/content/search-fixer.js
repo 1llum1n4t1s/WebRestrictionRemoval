@@ -20,8 +20,11 @@
  */
 
 (() => {
-  if (window.__searchFixerRunning) return;
-  window.__searchFixerRunning = true;
+  // NAMING-1: 他 content script の `__cpa*` プレフィックス命名規則に揃える。
+  // 旧名 `__searchFixerRunning` も互換性のため一定期間チェックすると誤動作する可能性があるが、
+  // このフラグはランタイム内で完結し永続化されないため即時改名で問題ない。
+  if (window.__cpaSearchFixerRunning) return;
+  window.__cpaSearchFixerRunning = true;
   // 埋め込みプレーヤー iframe では検索結果が出ないため top のみ
   if (window !== window.top) return;
 
