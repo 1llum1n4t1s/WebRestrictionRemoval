@@ -89,7 +89,17 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize) 
       }
     }
 
-    state.gainNode.gain.value = VolumeBooster.clampValue(gainPercent) / 100;
+    // 対数マッピングで実 gain を算出 → setTargetAtTime で 45ms ramp。
+    // 直接 `.value =` 代入だとプチノイズが乗るため必ず ramp 経由にする。
+    // cancelScheduledValues で古いランプ予約を破棄してから現在値を anchor し新しいランプを開始。
+    const clamped = VolumeBooster.clampValue(gainPercent);
+    const targetGain = VolumeBooster.percentToGain(clamped);
+    const now = state.ctx.currentTime;
+    state.gainNode.gain.cancelScheduledValues(now);
+    state.gainNode.gain.setValueAtTime(state.gainNode.gain.value, now);
+    state.gainNode.gain.setTargetAtTime(targetGain, now, VolumeBooster.RAMP_TIME_CONSTANT);
+    // ユーザーが意図したスライダー位置を保持（gain.value はランプ中で別値）。
+    state.lastSetPercent = clamped;
     // 既存ノードのプロパティを書き換えるだけなので AudioContext 再構築は不要。トグル切替時も音切れなし。
     applyCompressorPreset(
       state.normalizerNode,
@@ -99,7 +109,7 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize) 
       state.antiClipNode,
       antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
     );
-    return { ok: true, gain: Math.round(state.gainNode.gain.value * 100) };
+    return { ok: true, gain: clamped };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
   }
@@ -142,7 +152,9 @@ async function createAudioState(tabId, streamId) {
     normalizerNode.connect(antiClipNode);
     antiClipNode.connect(ctx.destination);
 
-    const state = { ctx, gainNode, normalizerNode, antiClipNode, stream };
+    // lastSetPercent は volumeGetGain の応答値として使う（gain.value はランプ中で
+    // ターゲット値と一致しないため、ユーザーが意図したスライダー位置を保持する）。
+    const state = { ctx, gainNode, normalizerNode, antiClipNode, stream, lastSetPercent: VolumeBooster.UNITY };
     audioStates.set(tabId, state);
     return state;
   } catch (err) {
@@ -154,7 +166,9 @@ async function createAudioState(tabId, streamId) {
 function volumeGetGain(tabId) {
   const state = audioStates.get(tabId);
   if (!state) return { gain: null };
-  return { gain: Math.round(state.gainNode.gain.value * 100) };
+  // gain.value はランプ中の中間値になり得るため、ユーザーが最後に指定した
+  // スライダー percent を返す。round-trip 誤差ゼロでスライダー位置を再現できる。
+  return { gain: state.lastSetPercent };
 }
 
 async function volumeReleaseTab(tabId) {

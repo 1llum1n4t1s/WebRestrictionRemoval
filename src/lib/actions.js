@@ -501,12 +501,52 @@ const VolumeBooster = Object.freeze({
   /** スライダー上の「等倍ライン」。この値ではブースト処理を起動せず AudioContext を解放する。 */
   UNITY: 100,
   STEP: 1,
+  /**
+   * gain 変更時の `setTargetAtTime` time constant (秒)。
+   * 約 3τ (~45ms) で目標値の 95% に到達する設定。
+   * 直接 `.value =` 代入だとサンプル境界で不連続が発生し、クリック/プチノイズの原因になる。
+   * popup 側の debounce が 120ms なのでドラッグ中も次の更新前にランプが収束する。
+   */
+  RAMP_TIME_CONSTANT: 0.015,
   clampValue(v) {
     const n = Number(v);
     if (!Number.isFinite(n)) return VolumeBooster.DEFAULT;
     if (n < VolumeBooster.MIN) return VolumeBooster.MIN;
     if (n > VolumeBooster.MAX) return VolumeBooster.MAX;
     return Math.round(n);
+  },
+  /**
+   * スライダー percent (0..MAX) を実 gain 倍率に変換する対数マッピング。
+   *
+   * 100% = 1.0x (unity) / MAX% = 6.0x の anchor を維持しつつ、
+   * 100..MAX 区間を「等距離スライダー = 等 dB ステップ」になるよう対数で配分する。
+   * 結果として 100→200 と 500→600 で同じ ~3.1dB ずつ上がるためドラッグ体感が均一化される。
+   *
+   * 0..100 区間（attenuation）は使用頻度が低いため線形のまま (percent/100)。
+   *
+   * 例: percentToGain(200) ≈ 1.43x (+3.1dB), percentToGain(300) ≈ 2.05x (+6.2dB)
+   */
+  percentToGain(percent) {
+    const p = VolumeBooster.clampValue(percent);
+    if (p === VolumeBooster.UNITY) return 1;
+    if (p < VolumeBooster.UNITY) return p / 100;
+    const maxDb = 20 * Math.log10(VolumeBooster.MAX / 100);
+    const t = (p - VolumeBooster.UNITY) / (VolumeBooster.MAX - VolumeBooster.UNITY);
+    return Math.pow(10, (t * maxDb) / 20);
+  },
+  /**
+   * percentToGain の逆関数。実 gain 倍率からスライダー上の整数 percent を復元する。
+   * popup syncCurrentTabVolume などで AudioContext 内の現在 gain を表示値に戻すときに使う。
+   */
+  gainToPercent(gain) {
+    const g = Number(gain);
+    if (!Number.isFinite(g) || g <= 0) return VolumeBooster.MIN;
+    if (g <= 1) return Math.round(g * 100);
+    const maxGain = VolumeBooster.MAX / 100;
+    if (g >= maxGain) return VolumeBooster.MAX;
+    const maxDb = 20 * Math.log10(maxGain);
+    const t = (20 * Math.log10(g)) / maxDb;
+    return Math.round(VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY));
   },
   /**
    * 自動歪み防止用 DynamicsCompressor プリセット（ブリックウォール風リミッタ）。
