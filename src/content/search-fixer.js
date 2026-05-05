@@ -39,6 +39,12 @@
   let resultsObserver = null;
   /** @type {boolean} resultsObserver が現在 attach されているか（多重 disconnect 防止） */
   let observerAttached = false;
+  /** @type {MutationObserver|null} ライブチャット公式折りたたみ用 observer */
+  let liveChatObserver = null;
+  /** @type {boolean} liveChatObserver が現在 attach されているか */
+  let liveChatObserverAttached = false;
+  /** @type {number} ライブチャット折りたたみ処理の rAF id */
+  let liveChatCollapseRaf = 0;
 
   // 注入する <style> 要素の id（CSS 文字列を更新するときの参照キー）
   const STYLE_ID_HOME_GRID = "__cpa-sfx-home-grid-style";
@@ -135,6 +141,7 @@
       applySearchGridStyle();    // 同上
       applyDemoteStyleInjection(); // 同上 + demoted クラス剥がし
       applyWatchPageClasses();   // 動画ページ装飾クラスも撤去する
+      syncLiveChatCollapse();
       return;
     }
 
@@ -158,6 +165,7 @@
     // /watch 以外のページに遷移したときも呼んで class を確実に剥がす必要がある。
     // 個別要素 toggle (#title h1 / #description) は要素ガード済みなので空振りで害なし。
     applyWatchPageClasses();
+    syncLiveChatCollapse();
   }
 
   // ---------- MutationObserver ライフサイクル ----------
@@ -189,6 +197,71 @@
     resultsObserver?.disconnect();
     resultsObserver = null;
     observerAttached = false;
+  }
+
+  function syncLiveChatCollapse() {
+    if (!f("hideLiveChat") || !isWatchPage()) {
+      detachLiveChatObserver();
+      return;
+    }
+    attachLiveChatObserver();
+    scheduleLiveChatCollapse();
+  }
+
+  function attachLiveChatObserver() {
+    if (liveChatObserverAttached) return;
+    liveChatObserver = new MutationObserver((mutations) => {
+      if (!f("hideLiveChat") || !isWatchPage()) return;
+      const shouldCollapse = mutations.some((m) => {
+        if (m.type === "attributes") return m.attributeName === "collapsed";
+        return m.type === "childList" && m.addedNodes.length > 0;
+      });
+      if (shouldCollapse) scheduleLiveChatCollapse();
+    });
+    liveChatObserver.observe(document, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["collapsed"],
+    });
+    liveChatObserverAttached = true;
+  }
+
+  function detachLiveChatObserver() {
+    if (liveChatCollapseRaf !== 0) {
+      cancelAnimationFrame(liveChatCollapseRaf);
+      liveChatCollapseRaf = 0;
+    }
+    if (!liveChatObserverAttached) return;
+    liveChatObserver?.disconnect();
+    liveChatObserver = null;
+    liveChatObserverAttached = false;
+  }
+
+  function scheduleLiveChatCollapse() {
+    if (liveChatCollapseRaf !== 0) return;
+    liveChatCollapseRaf = requestAnimationFrame(() => {
+      liveChatCollapseRaf = 0;
+      collapseLiveChatIfNeeded();
+    });
+  }
+
+  function collapseLiveChatIfNeeded() {
+    if (!f("hideLiveChat") || !isWatchPage()) return;
+    const chatFrame = document.querySelector(
+      "ytd-live-chat-frame#chat:not([collapsed]), ytd-live-chat-frame:not([collapsed])"
+    );
+    if (!chatFrame) return;
+
+    const toggle = chatFrame.querySelector([
+      "#close-button button",
+      "#close-button [role='button']",
+      "#show-hide-button button",
+      "#show-hide-button [role='button']",
+      "#close-button",
+      "#show-hide-button",
+    ].join(", "));
+    if (typeof toggle?.click === "function") toggle.click();
   }
 
   let scanScheduled = false;
@@ -433,7 +506,7 @@
     });
   }
 
-  // ---------- 動画ページ（タイトル中央 / 説明文フル幅 / コメント欄非表示） ----------
+  // ---------- 動画ページ（タイトル中央 / 説明文フル幅 / コメント欄・ライブチャット欄非表示） ----------
   function applyWatchPageClasses() {
     const titleEl = document.querySelector("#title h1");
     if (titleEl) titleEl.classList.toggle("__cpa-sfx-title-center", f("centerTitle"));
@@ -442,8 +515,7 @@
     // コメント欄は遅延レンダリング（スクロールで初めて DOM 出現）するため、個別要素 toggle だと
     // 初期ロード時に空振りする。`<html>` クラスで CSS 駆動にすれば後から DOM が現れても即時適用される。
     document.documentElement.classList.toggle("__cpa-sfx-hide-comments", f("hideComments"));
-    // ライブチャットリプレイ (ytd-live-chat-frame) はライブ配信アーカイブでのみ DOM に出現する。
-    // 通常動画には存在しないためページ判定不要、`<html>` クラス駆動で CSS 側のみで処理する。
+    // ライブチャットは JS 側で公式トグルを押し、CSS は collapsed 状態の高さ補助だけを担う。
     document.documentElement.classList.toggle("__cpa-sfx-hide-live-chat", f("hideLiveChat"));
   }
 

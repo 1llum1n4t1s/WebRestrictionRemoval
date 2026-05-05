@@ -290,7 +290,7 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({
     key: "hideLiveChat",
     label: "ライブチャット欄非表示",
-    desc: "ライブ配信アーカイブの右側に表示されるライブコメント欄 (ytd-live-chat-frame) を非表示化。通常動画には影響なし",
+    desc: "ライブ配信アーカイブの右側に表示されるライブコメント欄を、YouTube 公式操作と同じ折りたたみで非表示化。通常動画には影響なし",
     category: "watch_page",
   }),
   Object.freeze({
