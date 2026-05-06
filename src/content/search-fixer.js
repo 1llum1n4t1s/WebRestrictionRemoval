@@ -374,31 +374,70 @@
     return null;
   }
 
-  function collapseLiveChatIfNeeded() {
-    // hideLiveChat は最終的に「frame に独自属性・独自クラスを一切付けない」設計に到達した。
-    //
-    // 経緯:
-    //   1. 独自クラス付与（旧 `__cpa-sfx-live-chat-force-hide`）+ frame 全体 display:none
-    //      → collapsed view ヘッダー（「パネルを開く」）まで消し、再展開の手段を奪う問題。
-    //   2. `setAttribute("collapsed", "")` で標準属性を立てる経路
-    //      → ライブ配信中で YouTube SPA が live-chat-present 状態を再評価し、player 再初期化を
-    //         誘発、「動画を処理しています。しばらくしてからもう一度ご確認ください。」で
-    //         再生不能になる実機事象。
-    //   3. 公式 toggle.click() 経路（ユーザー操作と等価のはず）
-    //      → 同様に SPA 副作用を起こすリスクが残る、かつ機能 ON のまま「パネルを開く」を
-    //         押すと拡張機能が即時 collapse し直してループになる。
-    //
-    // 結論: JS は frame の状態に介入しない。CSS の
-    //   `iframe.ytd-live-chat-frame { height: 0 }` だけで iframe (実チャット内容) を消す。
-    // frame ヘッダー部分（「閉じる」「もっと見る」など）は標準描画されるので、ユーザーが
-    // 公式の「閉じる」を押せば標準の collapsed view（「パネルを開く」）に切り替わる。
-    // 配信中・アーカイブ・SPA navigation すべてで同じ振る舞い。
-    //
-    // 旧バージョンで残っている可能性のある force-hide クラスのクリーンアップだけ実行する。
-    if (!f("hideLiveChat") || !isWatchPage()) return;
+  /**
+   * ライブチャット panel の close button を探す。
+   * 動画下の「パネルを開く」ボタンと連動する公式 close button を探索する。
+   *
+   * 候補:
+   *   1. engagement panel (`ytd-engagement-panel-section-list-renderer`) の close button
+   *   2. `ytd-live-chat-frame` 内の `#close-button` 直下の button
+   * いずれも `disabled` でないものだけ返す（disabled = 既に panel が closed の状態）。
+   */
+  function findLiveChatPanelCloseButton() {
+    const panels = document.querySelectorAll(
+      'ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]'
+    );
+    for (const panel of panels) {
+      const targetId = (panel.getAttribute("target-id") || "").toLowerCase();
+      if (!/chat/.test(targetId)) continue;
+      const btn = panel.querySelector(
+        'button[aria-label*="閉じる"], button[aria-label*="Close"]'
+      );
+      if (btn && !btn.disabled && typeof btn.click === "function") return btn;
+    }
     const chatFrame = document.querySelector("ytd-live-chat-frame");
-    if (!chatFrame) return;
-    chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
+    if (chatFrame) {
+      const btn = chatFrame.querySelector("#close-button button");
+      if (btn && !btn.disabled && typeof btn.click === "function") return btn;
+    }
+    return null;
+  }
+
+  function collapseLiveChatIfNeeded() {
+    // 設計: ユーザーの代わりに「マウスでパネルを閉じる」操作を JS で代行するだけ。
+    // 他には一切触らない（CSS / frame 属性 / 独自クラス / iframe 高さ全部触らない）。
+    // 公式 close button の click は user gesture と等価扱いなので YouTube SPA は整合的に
+    // 状態更新し、player 副作用ゼロ・layout も自動で整理される。
+    if (!f("hideLiveChat") || !isWatchPage()) return;
+
+    const closeBtn = findLiveChatPanelCloseButton();
+    if (!closeBtn) {
+      // close button がまだ存在しない（panel data 未ロード等）/ 既に panel が closed
+      // の場合は何もしない。観察経由で panel 出現後に再評価される。
+      return;
+    }
+
+    // P1-#4: disconnect → click → takeRecords → reattach ガードで MutationObserver の
+    // 再発火ループを遮断（panel close → DOM 更新 → observer 発火 → 再度 collapseLiveChatIfNeeded
+    // が即座に呼ばれて空振りループになるのを防ぐ）。
+    if (liveChatObserver) {
+      liveChatObserver.disconnect();
+      liveChatObserverTarget = null;
+      try {
+        closeBtn.click();
+      } finally {
+        liveChatObserver.takeRecords();
+        reAttachLiveChatObserver(true);
+      }
+    } else {
+      closeBtn.click();
+    }
+
+    // 旧バージョン残骸の force-hide クラス cleanup（過去拡張機能で frame に付与された
+    // クラスが残っている場合のみ作用、新方式では二度と付与しない）。
+    document
+      .querySelectorAll("ytd-live-chat-frame." + LIVE_CHAT_FORCE_HIDE_CLASS)
+      .forEach((el) => el.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS));
   }
 
   let scanScheduled = false;

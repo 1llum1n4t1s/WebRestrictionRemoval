@@ -43,17 +43,7 @@ html.__cpa-sfx-hide-comments ytd-comments#comments {
   display: none !important;
 }
 
-/* ---------- 動画ページ: ライブチャット欄非表示 (ライブ配信中・アーカイブ両対応) ---------- */
-/* 設計方針: JS は frame に独自属性・独自クラスを一切付けない。CSS のみで iframe
- * (実チャット内容) を `height: 0` で潰し、frame ヘッダー（「閉じる」「もっと見る」など）
- * は YouTube 標準の描画で残る。frame に介入しないため YouTube SPA の player / レイアウト
- * 処理にも副作用を出さない（過去に setAttribute("collapsed", "") で「動画を処理しています」
- * エラーが発生した実機事象を回避）。
- *
- * 配信中もアーカイブも、ライブチャットの実コンテンツ（iframe）は同じく不可視になる。
- * ユーザーが frame ヘッダーの公式「閉じる」ボタンを押せば、YouTube 標準の collapsed view
- * （「パネルを開く」）に切り替わって標準の方法で再展開できる。 */
-html.__cpa-sfx-hide-live-chat iframe.ytd-live-chat-frame {
-  height: 0 !important;
-  min-height: 0 !important;
-}
+/* hideLiveChat の挙動はすべて search-fixer.js (collapseLiveChatIfNeeded) で実装。
+ * CSS は frame・iframe・親コンテナに一切ルールを当てない（過去のあらゆる CSS 介入
+ * 経路で「動画を処理しています」エラーや UI 副作用が起きたため）。
+ * JS は engagement panel の公式 close button を user gesture 等価で click するだけ。 */
