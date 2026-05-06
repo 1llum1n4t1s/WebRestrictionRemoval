@@ -26,6 +26,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 
   // 廃止キーの削除（v1.0.x 系 + v1.0.17 + v1.0.18 で統合した ytShortsRemovalEnabled）
+  // v1.0.x: タブを 4 つに増やしてアコーディオンを廃止したので、開閉状態キーも撤去
   await chrome.storage.local
     .remove([
       "copyPasteSettings",
@@ -33,8 +34,20 @@ chrome.runtime.onInstalled.addListener(async () => {
       "volumeBoosterEnabled",
       "contextMenuAllowDomains",
       "ytShortsRemovalEnabled",
+      "popupCleanerAccordionOpen",
+      "popupIgCleanerAccordionOpen",
     ])
     .catch(() => {});
+
+  // POPUP_LAST_TAB の値マイグレーション: 旧 "assist" → 新 "tune"。
+  // 4 タブ化（調整 / YouTube / Instagram / カラーピッカー）で識別子を変更したため、
+  // 既存ユーザーの最後に開いていたタブが「不明値」扱いで TUNE に落ちないよう明示的に変換。
+  const lastTab = (await chrome.storage.local.get(StorageKeys.POPUP_LAST_TAB))[StorageKeys.POPUP_LAST_TAB];
+  if (lastTab === "assist") {
+    await chrome.storage.local
+      .set({ [StorageKeys.POPUP_LAST_TAB]: PopupTabs.TUNE })
+      .catch(() => {});
+  }
 
   const stored = await chrome.storage.local.get([
     StorageKeys.KEEP_ALIVE_ENABLED,
@@ -50,12 +63,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VIDEO_GAMMA_ENABLED,
+    StorageKeys.VIDEO_GAMMA_VALUE,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
-    StorageKeys.POPUP_CLEANER_ACCORDION_OPEN,
-    StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN,
   ]);
   const defaults = {};
   if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
@@ -96,6 +109,13 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] = false;
   }
+  // 動画ガンマ補正: master OFF / 値 1.0 で初期化（インストール直後は完全に無処理）
+  if (!(StorageKeys.VIDEO_GAMMA_ENABLED in stored)) {
+    defaults[StorageKeys.VIDEO_GAMMA_ENABLED] = false;
+  }
+  if (!(StorageKeys.VIDEO_GAMMA_VALUE in stored)) {
+    defaults[StorageKeys.VIDEO_GAMMA_VALUE] = VideoGamma.DEFAULT;
+  }
   // 顔料アトリエ（カラーピッカー）の新規キー: 履歴は空配列、既定形式は HEX、
   // 最終タブは「アシスト」で初期化。後追いキーが undefined のまま UI に出ないよう
   // 明示的に書き込む（CLAUDE.md の onInstalled 初期化方針）。
@@ -109,15 +129,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     defaults[StorageKeys.COLOR_PICKER_HEX_HASH] = true;
   }
   if (!(StorageKeys.POPUP_LAST_TAB in stored)) {
-    defaults[StorageKeys.POPUP_LAST_TAB] = ColorPicker.TAB_ASSIST;
-  }
-  // クリーナー詳細アコーディオンの開閉状態。インストール直後は閉じた状態で起動する
-  // （マスタートグル OFF 時に詳細を開いて見せる必要がないため）。
-  if (!(StorageKeys.POPUP_CLEANER_ACCORDION_OPEN in stored)) {
-    defaults[StorageKeys.POPUP_CLEANER_ACCORDION_OPEN] = false;
-  }
-  if (!(StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN in stored)) {
-    defaults[StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN] = false;
+    defaults[StorageKeys.POPUP_LAST_TAB] = PopupTabs.TUNE;
   }
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);
@@ -237,6 +249,8 @@ function normalizeSettings(settings) {
     amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
     instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
+    videoGammaEnabled: settings?.videoGammaEnabled === true,
+    videoGammaValue: VideoGamma.clampValue(settings?.videoGammaValue),
   };
 }
 
@@ -253,6 +267,8 @@ function toStorageRecord(s) {
     [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
+    [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
+    [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
   };
 }
 
@@ -278,6 +294,19 @@ async function notifyContentScripts(s) {
         keepAliveIntervalMs: s.keepAliveIntervalMs,
         keepAliveHttpPingEnabled: s.keepAliveHttpPingEnabled,
         keepAliveOrigins: s.keepAliveOrigins,
+      },
+    })
+    .catch(() => {});
+
+  // 動画ガンマ補正 content script も全 http(s) ページに注入済みなので常に通知。
+  // all_frames: true 注入のため frameId を指定せず全フレームに broadcast する
+  // （iframe 内 <video> も補正対象にするため、各フレームの content script 自身が反応する）。
+  await chrome.tabs
+    .sendMessage(tab.id, {
+      action: Actions.APPLY_VIDEO_GAMMA_CS,
+      data: {
+        enabled: s.videoGammaEnabled,
+        value: s.videoGammaValue,
       },
     })
     .catch(() => {});

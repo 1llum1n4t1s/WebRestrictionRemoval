@@ -17,25 +17,41 @@
       </div>
     </header>
 
-    <!-- ===== Tabbar ===== -->
+    <!-- ===== Tabbar =====
+         「動的拡張タブ」: 非アクティブは番号のみ、アクティブは番号 + ラベルを展開する。
+         flex-grow を transition することで横スペース問題を解決しつつ、active の存在感を強調。
+         label は max-width 0 → 200px の transition で滑らかに展開する（CSS-only）。
+    -->
     <nav class="tabbar" role="tablist" aria-label="ポップアップタブ">
-      <button type="button" id="tabAssist" class="tabbar-btn is-active"
-              role="tab" aria-selected="true" aria-controls="panelAssist" tabindex="0">
+      <button type="button" id="tabTune" class="tabbar-btn is-active"
+              role="tab" aria-selected="true" aria-controls="panelTune" tabindex="0">
         <span class="tabbar-no" aria-hidden="true">01</span>
-        <span class="tabbar-label">アシスト</span>
+        <span class="tabbar-label">調整</span>
+        <span class="tabbar-rule" aria-hidden="true"></span>
+      </button>
+      <button type="button" id="tabYoutube" class="tabbar-btn"
+              role="tab" aria-selected="false" aria-controls="panelYoutube" tabindex="-1">
+        <span class="tabbar-no" aria-hidden="true">02</span>
+        <span class="tabbar-label">YouTube</span>
+        <span class="tabbar-rule" aria-hidden="true"></span>
+      </button>
+      <button type="button" id="tabInstagram" class="tabbar-btn"
+              role="tab" aria-selected="false" aria-controls="panelInstagram" tabindex="-1">
+        <span class="tabbar-no" aria-hidden="true">03</span>
+        <span class="tabbar-label">Instagram</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabPicker" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelPicker" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">02</span>
+        <span class="tabbar-no" aria-hidden="true">04</span>
         <span class="tabbar-label">カラーピッカー</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
     </nav>
 
-    <!-- ===== Panel: Assist (本来の設定群) ===== -->
-    <div class="panel panel--assist is-active" id="panelAssist"
-         role="tabpanel" aria-labelledby="tabAssist">
+    <!-- ===== Panel: Tune (オーディオ / 映像 / Amazon / セッション) ===== -->
+    <div class="panel panel--tune is-active" id="panelTune"
+         role="tabpanel" aria-labelledby="tabTune">
 
     <!-- ===== Audio Group ===== -->
     <section class="grp" aria-label="オーディオ">
@@ -44,7 +60,7 @@
       </h2>
 
       <!-- 音量ブースターはマスタートグルなしの常時表示。100% でリソース解放、それ以外で増幅。 -->
-      <div class="sub-block volume-track-mark" id="volumeRow">
+      <div class="sub-block slider-center-mark" id="volumeRow">
         <div class="sub-head">
           <span class="sub-label">
             <span aria-hidden="true">🔊</span>&nbsp;音量ブースター
@@ -97,53 +113,38 @@
       </div>
     </section>
 
-    <!-- ===== YouTube Group ===== -->
-    <section class="grp" aria-label="YouTube">
+    <!-- ===== Video Group ===== -->
+    <section class="grp" aria-label="映像">
       <h2 class="grp-title">
-        <span class="grp-title-text">YouTube</span>
-        <span class="grp-pill" id="searchFixerPill"></span>
+        <span class="grp-title-text">映像</span>
       </h2>
 
-      <label class="toggle-row" id="searchFixerToggleRow">
-        <span class="tr-icon" aria-hidden="true">🧹</span>
+      <label class="toggle-row" id="videoGammaToggleRow">
+        <span class="tr-icon" aria-hidden="true">🎞️</span>
         <span class="tr-text">
-          <span class="tr-name">YouTube クリーナー</span>
-          <span class="tr-desc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示など 22 サブ機能を一括管理</span>
+          <span class="tr-name">動画ガンマ補正</span>
+          <span class="tr-desc">ページ上の <code class="tr-code">&lt;video&gt;</code> 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利</span>
         </span>
         <span class="switch">
-          <input type="checkbox" id="searchFixerToggle" />
+          <input type="checkbox" id="videoGammaToggle" />
           <span class="switch-track" aria-hidden="true"></span>
         </span>
       </label>
 
-      <!-- YouTube クリーナー詳細 -->
-      <details class="accordion" id="cleanerAccordion">
-        <summary class="acc-summary">
-          <span class="acc-icon" aria-hidden="true">⚙️</span>
-          <span class="acc-label">クリーナー詳細設定</span>
-          <span class="acc-count" id="cleanerCount"></span>
-          <span class="acc-chevron" aria-hidden="true"></span>
-        </summary>
-
-        <div class="acc-body">
-          <p class="acc-hint">
-            マスタートグル（クリーナー）が ON のときだけ動作します。
-            個別に ON / OFF を選んでカスタマイズしてください。
-          </p>
-
-          <!-- カテゴリブロックは popup.js が生成する -->
-          <div id="featureCategories"></div>
-
-          <!-- グリッド列数（select）。クリーナー OFF でも storage に保存されるが見た目は dim -->
-          <div class="select-row">
-            <label class="select-label" for="gridItemsSelect">
-              <span class="select-icon" aria-hidden="true">🔢</span>
-              <span class="select-name">ホーム列数</span>
-            </label>
-            <select id="gridItemsSelect" class="select"></select>
-          </div>
+      <!-- マスタートグル ON 時のみ表示するガンマスライダー。中央 (1.0) = 補正なしを罫でマーク。 -->
+      <div class="sub-block slider-center-mark hidden" id="videoGammaRow">
+        <div class="sub-head">
+          <span class="sub-label">
+            <span aria-hidden="true">γ</span>&nbsp;ガンマ値
+          </span>
+          <span class="sub-value" id="videoGammaValueLabel">1.00</span>
         </div>
-      </details>
+        <div class="tr-desc">1.0 で補正なし。1.0 未満で暗部を持ち上げて明るく、1.0 超でコントラストを上げて暗く</div>
+        <input type="range" id="videoGammaSlider" class="range" />
+        <div class="volume-actions">
+          <button type="button" id="videoGammaResetBtn" class="ghost-btn" aria-label="ガンマ値を 1.0 に戻す">1.0 に戻す</button>
+        </div>
+      </div>
     </section>
 
     <!-- ===== Amazon Group ===== -->
@@ -163,46 +164,6 @@
           <span class="switch-track" aria-hidden="true"></span>
         </span>
       </label>
-    </section>
-
-    <!-- ===== Instagram Group ===== -->
-    <section class="grp" aria-label="Instagram">
-      <h2 class="grp-title">
-        <span class="grp-title-text">Instagram</span>
-        <span class="grp-pill" id="instagramCleanerPill"></span>
-      </h2>
-
-      <label class="toggle-row" id="instagramCleanerToggleRow">
-        <span class="tr-icon" aria-hidden="true">📷</span>
-        <span class="tr-text">
-          <span class="tr-name">Instagram クリーナー</span>
-          <span class="tr-desc">Reels / Explore / Stories などの冗長 UI を一括非表示</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="instagramCleanerToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
-
-      <!-- Instagram クリーナー詳細 -->
-      <details class="accordion" id="igCleanerAccordion">
-        <summary class="acc-summary">
-          <span class="acc-icon" aria-hidden="true">⚙️</span>
-          <span class="acc-label">クリーナー詳細設定</span>
-          <span class="acc-count" id="igCleanerCount"></span>
-          <span class="acc-chevron" aria-hidden="true"></span>
-        </summary>
-
-        <div class="acc-body">
-          <p class="acc-hint">
-            マスタートグル（クリーナー）が ON のときだけ動作します。
-            個別に ON / OFF を選んでカスタマイズしてください。
-          </p>
-
-          <!-- カテゴリブロックは popup.js が生成する -->
-          <div id="igFeatureCategories"></div>
-        </div>
-      </details>
     </section>
 
     <!-- ===== Session ===== -->
@@ -244,7 +205,86 @@
       </div>
     </section>
 
-    </div><!-- /panel.assist -->
+    </div><!-- /panel.tune -->
+
+    <!-- ===== Panel: YouTube (クリーナー 22 機能 + ホーム列数) ===== -->
+    <div class="panel panel--youtube" id="panelYoutube"
+         role="tabpanel" aria-labelledby="tabYoutube" hidden>
+
+      <section class="grp" aria-label="YouTube">
+        <h2 class="grp-title">
+          <span class="grp-title-text">YouTube</span>
+          <span class="grp-pill" id="searchFixerPill"></span>
+        </h2>
+
+        <label class="toggle-row" id="searchFixerToggleRow">
+          <span class="tr-icon" aria-hidden="true">🧹</span>
+          <span class="tr-text">
+            <span class="tr-name">YouTube クリーナー</span>
+            <span class="tr-desc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示など 22 サブ機能を一括管理</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="searchFixerToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <div class="cleaner-detail">
+          <p class="cleaner-hint">
+            マスタートグル（クリーナー）が ON のときだけ動作します。
+            個別に ON / OFF を選んでカスタマイズしてください。
+          </p>
+
+          <!-- カテゴリブロックは popup.js が SearchFixer.FEATURES から生成する -->
+          <div id="featureCategories"></div>
+
+          <!-- ホーム列数（select）。クリーナー OFF でも storage には保存されるが見た目は dim -->
+          <div class="select-row">
+            <label class="select-label" for="gridItemsSelect">
+              <span class="select-icon" aria-hidden="true">🔢</span>
+              <span class="select-name">ホーム列数</span>
+            </label>
+            <select id="gridItemsSelect" class="select"></select>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /panel.youtube -->
+
+    <!-- ===== Panel: Instagram (クリーナー 10 機能) ===== -->
+    <div class="panel panel--instagram" id="panelInstagram"
+         role="tabpanel" aria-labelledby="tabInstagram" hidden>
+
+      <section class="grp" aria-label="Instagram">
+        <h2 class="grp-title">
+          <span class="grp-title-text">Instagram</span>
+          <span class="grp-pill" id="instagramCleanerPill"></span>
+        </h2>
+
+        <label class="toggle-row" id="instagramCleanerToggleRow">
+          <span class="tr-icon" aria-hidden="true">📷</span>
+          <span class="tr-text">
+            <span class="tr-name">Instagram クリーナー</span>
+            <span class="tr-desc">Reels / Explore / Stories などの冗長 UI を一括非表示</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="instagramCleanerToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <div class="cleaner-detail">
+          <p class="cleaner-hint">
+            マスタートグル（クリーナー）が ON のときだけ動作します。
+            個別に ON / OFF を選んでカスタマイズしてください。
+          </p>
+
+          <!-- カテゴリブロックは popup.js が InstagramCleaner.FEATURES から生成する -->
+          <div id="igFeatureCategories"></div>
+        </div>
+      </section>
+
+    </div><!-- /panel.instagram -->
 
     <!-- ===== Panel: Picker (顔料アトリエ) ===== -->
     <div class="panel panel--picker" id="panelPicker"

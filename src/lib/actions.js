@@ -26,6 +26,8 @@ const Actions = Object.freeze({
   APPLY_KEEP_ALIVE_CS: "applyKeepAliveCS",
   /** background → Instagram content script: Instagram クリーナー設定を反映 */
   APPLY_INSTAGRAM_CLEANER_CS: "applyInstagramCleanerCS",
+  /** background → video-gamma content script: <video> ガンマ補正設定を反映（全タブ共通設定） */
+  APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
   /** popup → background: 音量ブースターの現在 gain を指定タブで取得 */
@@ -121,18 +123,18 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_NORMALIZE_ENABLED: "volumeBoosterNormalizeEnabled",
   /** 音量ブースター: ナイトモード（ゲーム配信用途） */
   VOLUME_BOOSTER_NIGHT_MODE_ENABLED: "volumeBoosterNightModeEnabled",
+  /** 動画ガンマ補正: マスタートグル（OFF 時は SVG filter 一切注入せず completely no-op） */
+  VIDEO_GAMMA_ENABLED: "videoGammaEnabled",
+  /** 動画ガンマ補正: ガンマ値（VideoGamma.MIN..MAX、デフォルト 1.0 = 補正なし） */
+  VIDEO_GAMMA_VALUE: "videoGammaValue",
   /** カラーピッカー: 採取した色の履歴（最新が先頭。各要素 {hex, ts} の最大 20 件） */
   COLOR_PICKER_HISTORY: "colorPickerHistory",
   /** カラーピッカー: 既定の保存形式 ("hex" | "rgb" | "hsl") */
   COLOR_PICKER_DEFAULT_FORMAT: "colorPickerDefaultFormat",
   /** カラーピッカー: HEX コピー時に # を含めるか (boolean, default true) */
   COLOR_PICKER_HEX_HASH: "colorPickerHexHash",
-  /** ポップアップで最後に開いていたタブ ("assist" | "picker") */
+  /** ポップアップで最後に開いていたタブ (PopupTabs.ALL のいずれか) */
   POPUP_LAST_TAB: "popupLastTab",
-  /** ポップアップの YouTube クリーナー詳細アコーディオンが開いていたか (boolean, default false) */
-  POPUP_CLEANER_ACCORDION_OPEN: "popupCleanerAccordionOpen",
-  /** ポップアップの Instagram クリーナー詳細アコーディオンが開いていたか (boolean, default false) */
-  POPUP_IG_CLEANER_ACCORDION_OPEN: "popupIgCleanerAccordionOpen",
   /** インストール / 起動 sentinel。`onInstalled` で必ず 1 を書き込み、popup 起動時に消失していたら
    *  `chrome.storage.local` が破損・リセットされた可能性として開発者コンソールに警告を出す（#3）。
    *  接頭辞 "_" でユーザー向け設定キーと区別する。 */
@@ -697,6 +699,85 @@ const VolumeBooster = Object.freeze({
 });
 
 /**
+ * @readonly 動画ガンマ補正（独自実装）の定数。
+ *
+ * `<video>` 要素に対して SVG `<feComponentTransfer type="gamma">` フィルタを適用し、
+ * 暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えたりする画質補正。
+ *
+ * 全タブ共通の単一値（タブごと独立ではない）。マスタートグル ON 時のみ content script が
+ * SVG filter と style 要素を `<body>` に注入し、`video { filter: url(#__cpa-video-gamma) }`
+ * で適用する。マスタートグル OFF / ガンマ値 1.0 のいずれかで filter を解除（DOM クリーンアップ）。
+ *
+ * SVG ガンマ式: C' = amplitude * pow(C, exponent) + offset。amplitude=1, offset=0, exponent=N
+ * のとき純粋なガンマ補正。N < 1 で暗部を持ち上げて全体的に明るく、N > 1 で暗部を潰して暗く。
+ */
+const VideoGamma = Object.freeze({
+  MIN: 0.3,
+  MAX: 3.0,
+  /** 補正なし（filter 不適用と等価）。スライダー中央位置。 */
+  DEFAULT: 1.0,
+  /**
+   * スライダー UI の整数表現。中央 (SLIDER_DEFAULT) = ガンマ 1.0、
+   * 右端 (SLIDER_MAX) = ガンマ MIN (明るい)、左端 (SLIDER_MIN) = ガンマ MAX (暗い) という
+   * 対称配置。`<input type="range">` の `min/max/step` と直結し、左右半分で線形マッピングする。
+   */
+  SLIDER_MIN: 0,
+  SLIDER_MAX: 200,
+  SLIDER_DEFAULT: 100,
+  SLIDER_STEP: 1,
+  /** SVG filter の id（ページ側 CSS と衝突しないよう __cpa- 接頭辞）。 */
+  FILTER_ID: "__cpa-video-gamma",
+  /** 注入する style 要素の id（同上）。 */
+  STYLE_ID: "__cpa-video-gamma-style",
+  /** 注入する SVG 要素の id（同上）。 */
+  SVG_ID: "__cpa-video-gamma-svg",
+  clampValue(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return VideoGamma.DEFAULT;
+    if (n < VideoGamma.MIN) return VideoGamma.MIN;
+    if (n > VideoGamma.MAX) return VideoGamma.MAX;
+    // 0.01 単位に丸めて round-trip 誤差を抑える。
+    return Math.round(n * 100) / 100;
+  },
+  /**
+   * スライダー整数 (SLIDER_MIN..SLIDER_MAX) → 実ガンマ値 (MIN..MAX)。
+   *
+   * 中央 (SLIDER_DEFAULT) = DEFAULT (1.0) を境に左右半分で別の線形マッピングを行う:
+   *   - 左半分 [SLIDER_MIN..SLIDER_DEFAULT] → ガンマ [MAX..DEFAULT] (3.0..1.0、暗い側)
+   *   - 右半分 [SLIDER_DEFAULT..SLIDER_MAX] → ガンマ [DEFAULT..MIN] (1.0..0.3、明るい側)
+   *
+   * 「右が明るい」UX を保ちつつ、SVG filter の exponent は素直に渡せるよう
+   * UI 値 ↔ ガンマ値の変換だけここで反転させる。
+   */
+  sliderToValue(sliderInt) {
+    const n = Number(sliderInt);
+    if (!Number.isFinite(n)) return VideoGamma.DEFAULT;
+    const s = Math.min(VideoGamma.SLIDER_MAX, Math.max(VideoGamma.SLIDER_MIN, n));
+    if (s <= VideoGamma.SLIDER_DEFAULT) {
+      const t = (VideoGamma.SLIDER_DEFAULT - s) / (VideoGamma.SLIDER_DEFAULT - VideoGamma.SLIDER_MIN);
+      return VideoGamma.clampValue(VideoGamma.DEFAULT + t * (VideoGamma.MAX - VideoGamma.DEFAULT));
+    }
+    const t = (s - VideoGamma.SLIDER_DEFAULT) / (VideoGamma.SLIDER_MAX - VideoGamma.SLIDER_DEFAULT);
+    return VideoGamma.clampValue(VideoGamma.DEFAULT - t * (VideoGamma.DEFAULT - VideoGamma.MIN));
+  },
+  /** sliderToValue の逆関数。実ガンマ値 → スライダー整数。 */
+  valueToSlider(value) {
+    const v = VideoGamma.clampValue(value);
+    if (v >= VideoGamma.DEFAULT) {
+      const t = (v - VideoGamma.DEFAULT) / (VideoGamma.MAX - VideoGamma.DEFAULT);
+      return Math.round(VideoGamma.SLIDER_DEFAULT - t * (VideoGamma.SLIDER_DEFAULT - VideoGamma.SLIDER_MIN));
+    }
+    const t = (VideoGamma.DEFAULT - v) / (VideoGamma.DEFAULT - VideoGamma.MIN);
+    return Math.round(VideoGamma.SLIDER_DEFAULT + t * (VideoGamma.SLIDER_MAX - VideoGamma.SLIDER_DEFAULT));
+  },
+  /** ガンマ値が DEFAULT (1.0) と十分近いか。content script が DOM 注入をスキップする判定用。 */
+  isUnity(value) {
+    const v = VideoGamma.clampValue(value);
+    return Math.abs(v - VideoGamma.DEFAULT) < 0.005;
+  },
+});
+
+/**
  * @readonly カラーピッカー（独自実装）の定数。
  *
  * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
@@ -714,9 +795,6 @@ const ColorPicker = Object.freeze({
   DEFAULT_FORMAT: "hex",
   /** 利用可能な出力形式の一覧（順序は UI の表示順と一致させること） */
   FORMATS: Object.freeze(["hex", "rgb", "hsl"]),
-  /** タブ識別子。POPUP_LAST_TAB に保存される値はこのいずれか */
-  TAB_ASSIST: "assist",
-  TAB_PICKER: "picker",
   /** HEX 検証用。先頭 # 必須、6 桁または 3 桁短縮形を許容 */
   HEX_RE: /^#([0-9a-f]{6}|[0-9a-f]{3})$/i,
 
@@ -729,15 +807,42 @@ const ColorPicker = Object.freeze({
   normalizeFormat(value) {
     return ColorPicker.isValidFormat(value) ? value : ColorPicker.DEFAULT_FORMAT;
   },
+});
 
-  /** "assist" / "picker" のいずれかなら true */
-  isValidTab(value) {
-    return value === ColorPicker.TAB_ASSIST || value === ColorPicker.TAB_PICKER;
+/**
+ * @readonly Popup のタブ識別子。
+ *
+ * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
+ * Instagram / カラーピッカー」の 4 つに再編。アコーディオンを廃止して
+ * YouTube クリーナー (22 機能) と Instagram クリーナー (10 機能) を
+ * 専用タブで直接表示する設計に移行した。
+ *
+ * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
+ */
+const PopupTabs = Object.freeze({
+  TUNE: "tune",
+  YOUTUBE: "youtube",
+  INSTAGRAM: "instagram",
+  PICKER: "picker",
+  ALL: Object.freeze(["tune", "youtube", "instagram", "picker"]),
+
+  /** 4 つのタブ識別子のいずれかなら true */
+  isValid(value) {
+    return PopupTabs.ALL.includes(value);
   },
 
-  /** 不正値は assist にフォールバック */
-  normalizeTab(value) {
-    return ColorPicker.isValidTab(value) ? value : ColorPicker.TAB_ASSIST;
+  /** 不正値はデフォルト "tune" にフォールバック */
+  normalize(value) {
+    return PopupTabs.isValid(value) ? value : PopupTabs.TUNE;
+  },
+
+  /**
+   * 旧値 "assist" を "tune" に変換しつつ正規化。background の `onInstalled`
+   * マイグレーションと、popup 起動時のフォールバック読み出しの両方で使う。
+   */
+  migrate(value) {
+    if (value === "assist") return PopupTabs.TUNE;
+    return PopupTabs.normalize(value);
   },
 });
 
@@ -755,5 +860,7 @@ const ColorPicker = Object.freeze({
   globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
   globalThis.InstagramCleaner = InstagramCleaner;
   globalThis.VolumeBooster = VolumeBooster;
+  globalThis.VideoGamma = VideoGamma;
   globalThis.ColorPicker = ColorPicker;
+  globalThis.PopupTabs = PopupTabs;
 })();

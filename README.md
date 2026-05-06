@@ -1,6 +1,6 @@
 # 📖 WEB閲覧アシスト
 
-Web ブラウジングを快適にする 6 機能（**セッション維持** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む 22 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Instagram クリーナー** / **音量ブースター** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。
+Web ブラウジングを快適にする 7 機能（**セッション維持** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む 22 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Instagram クリーナー** / **音量ブースター** / **動画ガンマ補正** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。
 
 > **v1.0.18 までの主な変更点**: 「制限解除（右クリック / 選択 / 強制ペースト・コピー）」機能を全面廃止し、Web 閲覧支援機能のみに特化しました。あわせて拡張機能名を「**WEB制限解除サポート**」から「**WEB閲覧アシスト**」に変更しています。バージョン番号は `/vava` スキル経由でリリース時に確定します。
 
@@ -54,6 +54,10 @@ Instagram の冗長 UI を一括非表示にする **10 個のサブ機能** を
 | 処理 | offscreen ドキュメント内の `AudioContext` で `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` の 6 ノードチェーンを構築し、ラウドネス補正・圧縮・ユーザー gain・リミッタを順に適用して `destination` に再出力 |
 | 解放 | スライダーを 100% に戻し全サブトグル OFF / タブを閉じる / 拡張機能を無効化 で即時 release |
 
+### 🎞️ 動画ガンマ補正（オプトイン、デフォルト OFF）
+
+ページ上の `<video>` 要素にガンマ補正を適用します（SVG `<feComponentTransfer type="gamma">` ベースの独自実装）。マスタートグル + スライダー構成で、スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。全タブ共通設定で、iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たります。
+
 ### 🎨 カラーピッカー（常時利用可）
 
 ポップアップの「カラーピッカー」タブから `EyeDropper` API で画面上の色を採取し、HEX / RGB / HSL の 3 形式でクリップボードにコピーできます。HEX に `#` を含めるかどうかも個別に切替可能。採取した色は最大 20 件の標本箱（履歴）として `chrome.storage.local` 内にのみ保存され、外部送信は一切行いません。
@@ -65,7 +69,7 @@ Instagram の冗長 UI を一括非表示にする **10 個のサブ機能** を
 3. 音量ブースターはスライダーで増幅率を直接調整
 4. カラーピッカーは「カラーピッカー」タブで `EyeDropper` を起動
 
-設定は `chrome.storage.local` に保存され、次回以降も維持されます。保存対象は計 17 のキー（セッション維持 4 種 / YouTube クリーナー 3 種 / Amazon 合計 1 種 / Instagram クリーナー 2 種 / 音量ブースターサブトグル 3 種 / カラーピッカー 3 種 / 最後に開いていたタブ 1 種）。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Instagram クリーナー OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはスライダーが 100% かつ全サブトグル OFF の時点でリソース解放されるため「ON/OFF」概念がありません。
+設定は `chrome.storage.local` に保存され、次回以降も維持されます。保存対象は計 19 のキー（セッション維持 4 種 / YouTube クリーナー 3 種 / Amazon 合計 1 種 / Instagram クリーナー 2 種 / 音量ブースターサブトグル 3 種 / 動画ガンマ補正 2 種 / カラーピッカー 3 種 / 最後に開いていたタブ 1 種）。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Instagram クリーナー OFF / 動画ガンマ補正 OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはスライダーが 100% かつ全サブトグル OFF の時点でリソース解放されるため「ON/OFF」概念がありません。
 
 ## インストール
 
@@ -114,7 +118,7 @@ bash ./zip.sh
 Popup (src/popup/popup.{html,js,css})
   ──APPLY_SETTINGS──▶ Background (src/background/background.js)
                         │ storage 更新 +
-                        ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS / APPLY_INSTAGRAM_CLEANER_CS──▶
+                        ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS / APPLY_INSTAGRAM_CLEANER_CS / APPLY_VIDEO_GAMMA_CS──▶
                           各 Content Script
 
 [音量ブースター]

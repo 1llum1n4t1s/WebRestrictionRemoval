@@ -69,6 +69,49 @@ test("VolumeBooster.sliderPositionToPercent: SLIDER_UNITY で UNITY", () => {
   );
 });
 
+// ---------- VideoGamma ----------
+
+test("VideoGamma.clampValue: 範囲内の値はそのまま、範囲外は clamp、不正値は DEFAULT", () => {
+  assert.equal(G.VideoGamma.clampValue(1.0), 1.0);
+  assert.equal(G.VideoGamma.clampValue(0.5), 0.5);
+  assert.equal(G.VideoGamma.clampValue(2.5), 2.5);
+  assert.equal(G.VideoGamma.clampValue(-1), G.VideoGamma.MIN);
+  assert.equal(G.VideoGamma.clampValue(0.1), G.VideoGamma.MIN);
+  assert.equal(G.VideoGamma.clampValue(99), G.VideoGamma.MAX);
+  assert.equal(G.VideoGamma.clampValue(NaN), G.VideoGamma.DEFAULT);
+  assert.equal(G.VideoGamma.clampValue("abc"), G.VideoGamma.DEFAULT);
+  assert.equal(G.VideoGamma.clampValue(undefined), G.VideoGamma.DEFAULT);
+});
+
+test("VideoGamma slider ↔ value round-trip (SLIDER_MIN..SLIDER_MAX)", () => {
+  // 内部 clampValue が 0.01 単位に丸めるため、端数の slider 整数で 1 step ずれる箇所がある。
+  // VolumeBooster の round-trip テストと同じく、誤差 1 単位以内を許容する。
+  for (let s = G.VideoGamma.SLIDER_MIN; s <= G.VideoGamma.SLIDER_MAX; s += G.VideoGamma.SLIDER_STEP) {
+    const v = G.VideoGamma.sliderToValue(s);
+    const back = G.VideoGamma.valueToSlider(v);
+    assert.ok(Math.abs(back - s) <= 1, `slider=${s} round-trip got ${back} via value=${v}`);
+  }
+});
+
+test("VideoGamma.sliderToValue: SLIDER_DEFAULT で DEFAULT (1.0)", () => {
+  assert.equal(G.VideoGamma.sliderToValue(G.VideoGamma.SLIDER_DEFAULT), G.VideoGamma.DEFAULT);
+});
+
+test("VideoGamma.sliderToValue: 反転マッピング (右端=明るい / 左端=暗い)", () => {
+  // 右端: ガンマ MIN (0.3, 暗部持ち上げで明るく見える)
+  assert.equal(G.VideoGamma.sliderToValue(G.VideoGamma.SLIDER_MAX), G.VideoGamma.MIN);
+  // 左端: ガンマ MAX (3.0, 暗部潰しで暗く見える)
+  assert.equal(G.VideoGamma.sliderToValue(G.VideoGamma.SLIDER_MIN), G.VideoGamma.MAX);
+});
+
+test("VideoGamma.isUnity: DEFAULT 近傍で true、それ以外で false", () => {
+  assert.equal(G.VideoGamma.isUnity(1.0), true);
+  assert.equal(G.VideoGamma.isUnity(1.001), true); // 0.005 未満は unity 扱い
+  assert.equal(G.VideoGamma.isUnity(1.01), false);
+  assert.equal(G.VideoGamma.isUnity(0.5), false);
+  assert.equal(G.VideoGamma.isUnity(2.0), false);
+});
+
 // ---------- KeepAlive ----------
 
 test("KeepAlive.clampIntervalMs: 範囲内・範囲外・不正値の正規化", () => {
@@ -171,12 +214,25 @@ test("ColorPicker.isValidFormat / normalizeFormat", () => {
   assert.equal(G.ColorPicker.normalizeFormat("invalid"), G.ColorPicker.DEFAULT_FORMAT);
 });
 
-test("ColorPicker.isValidTab / normalizeTab", () => {
-  assert.equal(G.ColorPicker.isValidTab("assist"), true);
-  assert.equal(G.ColorPicker.isValidTab("picker"), true);
-  assert.equal(G.ColorPicker.isValidTab("xyz"), false);
-  assert.equal(G.ColorPicker.normalizeTab("picker"), "picker");
-  assert.equal(G.ColorPicker.normalizeTab("invalid"), G.ColorPicker.TAB_ASSIST);
+// ---------- PopupTabs ----------
+
+test("PopupTabs.isValid / normalize: 4 タブ識別子のみ受理、不正値は TUNE", () => {
+  for (const id of G.PopupTabs.ALL) {
+    assert.equal(G.PopupTabs.isValid(id), true, `${id} should be valid`);
+  }
+  assert.equal(G.PopupTabs.isValid("assist"), false); // 旧値は invalid 扱い
+  assert.equal(G.PopupTabs.isValid("xyz"), false);
+  assert.equal(G.PopupTabs.isValid(undefined), false);
+  assert.equal(G.PopupTabs.normalize("youtube"), "youtube");
+  assert.equal(G.PopupTabs.normalize("invalid"), G.PopupTabs.TUNE);
+  assert.equal(G.PopupTabs.normalize(undefined), G.PopupTabs.TUNE);
+});
+
+test("PopupTabs.migrate: 旧 \"assist\" は \"tune\" に変換、それ以外は normalize と同じ", () => {
+  assert.equal(G.PopupTabs.migrate("assist"), G.PopupTabs.TUNE);
+  assert.equal(G.PopupTabs.migrate("picker"), "picker");
+  assert.equal(G.PopupTabs.migrate("invalid"), G.PopupTabs.TUNE);
+  assert.equal(G.PopupTabs.migrate(undefined), G.PopupTabs.TUNE);
 });
 
 // ---------- 再評価ガードのテスト ----------
@@ -197,7 +253,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 12 個の定数を公開する", () => {
+test("actions.js は globalThis に 14 個の定数を公開する", () => {
   const required = [
     "Actions",
     "ExtensionPaths",
@@ -210,7 +266,9 @@ test("actions.js は globalThis に 12 個の定数を公開する", () => {
     "AmazonDeliveryTotal",
     "InstagramCleaner",
     "VolumeBooster",
+    "VideoGamma",
     "ColorPicker",
+    "PopupTabs",
   ];
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);

@@ -546,16 +546,18 @@ body {
   color: var(--warn);
 }
 
-/* スライダー上で 100% を視覚的にマーキング（::before の grid mark）。
+/* スライダーの中央位置（DEFAULT 値）を視覚的にマーキングする汎用クラス。
+   - 音量ブースター: 中央 = 100% (UNITY)
+   - 動画ガンマ補正: 中央 = ガンマ 1.0 (DEFAULT、補正なし)
    appearance: none の input には疑似要素を直接付けられないので、
-   親 .sub-block に重ねるグラデーション線で 100% (= 中央) 位置に細い罫を描く。 */
-.sub-block.volume-track-mark {
+   親 .sub-block に重ねるグラデーション線で中央位置に細い罫を描く。 */
+.sub-block.slider-center-mark {
   position: relative;
 }
-.sub-block.volume-track-mark::after {
+.sub-block.slider-center-mark::after {
   content: "";
   position: absolute;
-  /* スライダーの padding 分（12px）をオフセット。100% は UI スライダー中央。 */
+  /* スライダーの padding 分（12px）をオフセット。両端から等距離 = UI スライダー中央。 */
   left: calc(12px + (100% - 24px) * 0.5);
   bottom: 13px;
   width: 1px;
@@ -564,83 +566,15 @@ body {
   pointer-events: none;
 }
 
-/* ---------- Accordion ---------- */
-.accordion {
-  background: var(--paper-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  margin-bottom: 8px;
+/* ---------- Cleaner detail (panel 内に直接展開するクリーナー詳細) ----------
+ * v1.0.x: アコーディオン廃止。master toggle 直下に hint + feature リストを直接置く。
+ * cleaner-hint は旧 .acc-hint のリッジ装飾 (左罫) を引き継ぐ。
+ */
+.cleaner-detail {
+  margin-top: 4px;
 }
 
-.acc-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink);
-  list-style: none;
-  user-select: none;
-  transition: background 120ms ease;
-}
-
-.acc-summary::-webkit-details-marker {
-  display: none;
-}
-
-.acc-summary:hover {
-  background: var(--paper);
-}
-
-.acc-icon {
-  font-size: 13px;
-  line-height: 1;
-}
-
-.acc-label {
-  flex: 1;
-  min-width: 0;
-  letter-spacing: 0.01em;
-}
-
-.acc-count {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  color: var(--ink-soft);
-  background: var(--paper-deep);
-  padding: 1px 7px;
-  border-radius: 99px;
-  border: 1px solid var(--rule);
-  letter-spacing: 0.05em;
-}
-
-/* シェブロン: 三角ではなく短い罫線2本で記号化、回転で開閉表現 */
-.acc-chevron {
-  width: 9px;
-  height: 9px;
-  border-right: 1.5px solid var(--ink-soft);
-  border-bottom: 1.5px solid var(--ink-soft);
-  transform: rotate(-45deg);
-  margin-right: 2px;
-  transition: transform 200ms ease, border-color 200ms ease;
-}
-
-.accordion[open] .acc-chevron {
-  transform: rotate(45deg);
-  border-color: var(--accent);
-}
-
-.accordion[open] .acc-summary {
-  border-bottom: 1px dashed var(--rule);
-}
-
-.acc-body {
-  padding: 10px 12px 12px;
-}
-
-.acc-hint {
+.cleaner-hint {
   font-size: 11.5px;
   color: var(--ink);
   line-height: 1.55;
@@ -649,7 +583,7 @@ body {
   border-left: 2px solid var(--rule-soft);
 }
 
-.acc-hint code {
+.cleaner-hint code {
   font-family: var(--font-mono);
   font-size: 10px;
   background: var(--paper-deep);
@@ -658,7 +592,7 @@ body {
   color: var(--accent-deep);
 }
 
-/* ---------- Feature category (inside cleaner accordion) ---------- */
+/* ---------- Feature category (YouTube / Instagram タブ内に直接展開する機能リスト) ---------- */
 .cat {
   margin-bottom: 10px;
 }
@@ -894,10 +828,20 @@ body {
  *   - history は 8 列固定グリッド（460px popup × padding 18px に収まる目安）
  * ============================================================ */
 
-/* ---------- Tabbar ---------- */
+/* ---------- Tabbar (動的拡張タブ) ----------
+ * 4 タブ (調整 / YouTube / Instagram / カラーピッカー) を 460px 幅に収めるため、
+ * 非アクティブは番号 (`01`) のみ・アクティブは番号 + ラベルを展開する設計。
+ *
+ * 仕掛け:
+ *   - flex-grow を transition: 非アクティブ 0、アクティブ 1 で残り幅を吸収する
+ *   - .tabbar-label を max-width 0 → max-width 200px の transition で滑らかに展開
+ *   - タブ間に 1px の hairline separator (border-left) を立てて「目次の柱」感を出す
+ *   - active 番号は accent-deep 色 + 太字、下罫はアクセント色 2.5px の thick rule
+ *   - inactive hover では番号の色だけ深める（label は出さず、誤誘導を避ける）
+ */
 .tabbar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  align-items: stretch;
   gap: 0;
   margin: 0 0 14px;
   border-bottom: 1px solid var(--rule);
@@ -917,7 +861,18 @@ body {
   font: inherit;
   cursor: pointer;
   text-align: left;
-  transition: color 160ms ease, background 160ms ease;
+  /* 既定は number だけ収まる幅で固定。アクティブだけが grow する。 */
+  flex: 0 0 auto;
+  min-width: 0;
+  transition:
+    flex-grow 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 160ms ease,
+    background 160ms ease;
+}
+
+/* タブ間に細い柱を立てる。最初のタブには付けない（左端は popup-shell の罫が担当）。 */
+.tabbar-btn + .tabbar-btn {
+  border-left: 1px solid var(--rule-soft);
 }
 
 .tabbar-btn:hover {
@@ -938,14 +893,30 @@ body {
   letter-spacing: 0.2em;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
+  transition: color 160ms ease;
+  flex-shrink: 0;
 }
 
+/* 非アクティブ時はラベルを max-width 0 で畳む。
+   margin-left: -8px で gap 分を相殺し、本当に番号だけのコンパクトな幅にする。
+   white-space: nowrap で折り返しによる縦レイアウト崩れを防ぐ。 */
 .tabbar-label {
   font-family: var(--font-serif);
   font-size: 14px;
   letter-spacing: 0.04em;
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  margin-left: -8px;
+  transition:
+    max-width 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 220ms ease,
+    margin-left 280ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* アクセント下罫: アクティブ時のみ accent 色で出現。雑誌記事タイトル下の thick rule のイメージ。 */
 .tabbar-rule {
   position: absolute;
   left: 8px;
@@ -957,10 +928,25 @@ body {
   pointer-events: none;
 }
 
-.tabbar-btn.is-active { color: var(--ink); }
-.tabbar-btn.is-active .tabbar-no { color: var(--accent-deep); }
-.tabbar-btn.is-active .tabbar-label { font-weight: 600; }
+.tabbar-btn.is-active {
+  color: var(--ink);
+  flex: 1 1 auto;
+}
+.tabbar-btn.is-active .tabbar-no {
+  color: var(--accent-deep);
+}
+.tabbar-btn.is-active .tabbar-label {
+  font-weight: 600;
+  max-width: 240px;
+  opacity: 1;
+  margin-left: 0;
+}
 .tabbar-btn.is-active .tabbar-rule { height: 2.5px; }
+
+/* hover で番号だけ少し色を深める（inactive のときに「ここは何か」を示すサイン）。 */
+.tabbar-btn:hover .tabbar-no {
+  color: var(--accent);
+}
 
 /* ---------- Panel switching ---------- */
 .panel { display: block; }

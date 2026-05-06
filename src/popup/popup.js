@@ -43,14 +43,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $intervalValue = document.getElementById("intervalValue");
   const $keepAliveHttpPingToggle = document.getElementById("keepAliveHttpPingToggle");
   const $featureCategories = document.getElementById("featureCategories");
-  const $cleanerCount = document.getElementById("cleanerCount");
-  const $cleanerAccordion = document.getElementById("cleanerAccordion");
   const $searchFixerPill = document.getElementById("searchFixerPill");
   const $gridItemsSelect = document.getElementById("gridItemsSelect");
+  const $videoGammaToggle = document.getElementById("videoGammaToggle");
+  const $videoGammaRow = document.getElementById("videoGammaRow");
+  const $videoGammaSlider = document.getElementById("videoGammaSlider");
+  const $videoGammaValueLabel = document.getElementById("videoGammaValueLabel");
+  const $videoGammaResetBtn = document.getElementById("videoGammaResetBtn");
   const $instagramCleanerToggle = document.getElementById("instagramCleanerToggle");
   const $igFeatureCategories = document.getElementById("igFeatureCategories");
-  const $igCleanerCount = document.getElementById("igCleanerCount");
-  const $igCleanerAccordion = document.getElementById("igCleanerAccordion");
   const $instagramCleanerPill = document.getElementById("instagramCleanerPill");
   const $status = document.getElementById("statusMsg");
 
@@ -91,12 +92,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VIDEO_GAMMA_ENABLED,
+    StorageKeys.VIDEO_GAMMA_VALUE,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
-    StorageKeys.POPUP_CLEANER_ACCORDION_OPEN,
-    StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN,
     StorageKeys.INSTALL_SENTINEL,
   ]);
 
@@ -132,6 +133,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeNormalizeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
 
+  // 動画ガンマ補正の初期値設定
+  $videoGammaToggle.checked = stored[StorageKeys.VIDEO_GAMMA_ENABLED] === true;
+  $videoGammaSlider.min = String(VideoGamma.SLIDER_MIN);
+  $videoGammaSlider.max = String(VideoGamma.SLIDER_MAX);
+  $videoGammaSlider.step = String(VideoGamma.SLIDER_STEP);
+  const storedGamma = VideoGamma.clampValue(stored[StorageKeys.VIDEO_GAMMA_VALUE]);
+  $videoGammaSlider.value = String(VideoGamma.valueToSlider(storedGamma));
+  updateVideoGammaLabel(storedGamma);
+  updateVideoGammaRowVisibility();
+
   // 音量スライダー初期値設定（ブースト中なら active tab の現在値を反映）
   $volumeSlider.min = String(VolumeBooster.SLIDER_MIN);
   $volumeSlider.max = String(VolumeBooster.SLIDER_MAX);
@@ -164,32 +175,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateIgCleanerCountBadge();
   updateIgCleanerDimState();
 
-  // ----- アコーディオン開閉状態の復元 -----
-  // ストレージから前回の open 値を復元する。toggle event listener を attach する前に
-  // `details.open` を代入するため、復元の代入では toggle event は発火しても問題なし
-  // （直後の listener attach 後にトグル操作で上書きされる経路に影響を与えない）。
-  $cleanerAccordion.open = stored[StorageKeys.POPUP_CLEANER_ACCORDION_OPEN] === true;
-  $igCleanerAccordion.open = stored[StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN] === true;
-  $cleanerAccordion.addEventListener("toggle", () => {
-    chrome.storage.local
-      .set({ [StorageKeys.POPUP_CLEANER_ACCORDION_OPEN]: $cleanerAccordion.open })
-      .catch(() => {});
-  });
-  $igCleanerAccordion.addEventListener("toggle", () => {
-    chrome.storage.local
-      .set({ [StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN]: $igCleanerAccordion.open })
-      .catch(() => {});
-  });
-
   // ============================================================
   // ===== タブナビ + 顔料アトリエ（カラーピッカー） =====
   // ============================================================
 
   // ---------- DOM 参照 ----------
-  const $tabAssist = document.getElementById("tabAssist");
+  // 4 タブ構成: 調整 (tune) / YouTube / Instagram / カラーピッカー (picker)。
+  // tab/panel ペアを Map で保持し、setActiveTab / 矢印キー操作を統一的に扱う。
+  const $tabTune = document.getElementById("tabTune");
+  const $tabYoutube = document.getElementById("tabYoutube");
+  const $tabInstagram = document.getElementById("tabInstagram");
   const $tabPicker = document.getElementById("tabPicker");
-  const $panelAssist = document.getElementById("panelAssist");
+  const $panelTune = document.getElementById("panelTune");
+  const $panelYoutube = document.getElementById("panelYoutube");
+  const $panelInstagram = document.getElementById("panelInstagram");
   const $panelPicker = document.getElementById("panelPicker");
+
+  /** タブ id → { tab, panel } の対応表。順序は UI と一致させる（矢印キー巡回用）。 */
+  const TAB_REGISTRY = [
+    { id: PopupTabs.TUNE, tab: $tabTune, panel: $panelTune },
+    { id: PopupTabs.YOUTUBE, tab: $tabYoutube, panel: $panelYoutube },
+    { id: PopupTabs.INSTAGRAM, tab: $tabInstagram, panel: $panelInstagram },
+    { id: PopupTabs.PICKER, tab: $tabPicker, panel: $panelPicker },
+  ];
   const $specimenCard = document.getElementById("specimenCard");
   const $specimenSwatch = document.getElementById("specimenSwatch");
   const $specimenNo = document.getElementById("specimenNo");
@@ -246,39 +254,40 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---------- タブ初期化 ----------
-  const lastTab = ColorPicker.normalizeTab(pickerStored[StorageKeys.POPUP_LAST_TAB]);
+  // 旧 "assist" 値が残っていても PopupTabs.migrate で "tune" に正規化する。
+  const lastTab = PopupTabs.migrate(pickerStored[StorageKeys.POPUP_LAST_TAB]);
   setActiveTab(lastTab, { persist: false, focus: false });
 
-  $tabAssist.addEventListener("click", () => setActiveTab(ColorPicker.TAB_ASSIST));
-  $tabPicker.addEventListener("click", () => setActiveTab(ColorPicker.TAB_PICKER));
-
-  // ←/→ 矢印キーでタブ切替（WAI-ARIA Authoring Practices 準拠）
-  for (const btn of [$tabAssist, $tabPicker]) {
-    btn.addEventListener("keydown", (ev) => {
-      if (ev.key === "ArrowLeft" || ev.key === "ArrowRight") {
-        ev.preventDefault();
-        const next = ev.target === $tabAssist ? ColorPicker.TAB_PICKER : ColorPicker.TAB_ASSIST;
-        setActiveTab(next, { focus: true });
-      }
+  for (const entry of TAB_REGISTRY) {
+    entry.tab.addEventListener("click", () => setActiveTab(entry.id));
+    // ←/→ 矢印キーで前後に巡回（WAI-ARIA Authoring Practices 準拠）。最後で → なら最初に折返し。
+    entry.tab.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+      ev.preventDefault();
+      const idx = TAB_REGISTRY.findIndex((e) => e.id === entry.id);
+      if (idx < 0) return;
+      const delta = ev.key === "ArrowRight" ? 1 : -1;
+      const nextIdx = (idx + delta + TAB_REGISTRY.length) % TAB_REGISTRY.length;
+      setActiveTab(TAB_REGISTRY[nextIdx].id, { focus: true });
     });
   }
 
   function setActiveTab(tabId, { persist = true, focus = false } = {}) {
-    const isPicker = tabId === ColorPicker.TAB_PICKER;
-    $tabAssist.classList.toggle("is-active", !isPicker);
-    $tabPicker.classList.toggle("is-active", isPicker);
-    $tabAssist.setAttribute("aria-selected", String(!isPicker));
-    $tabPicker.setAttribute("aria-selected", String(isPicker));
-    $tabAssist.tabIndex = isPicker ? -1 : 0;
-    $tabPicker.tabIndex = isPicker ? 0 : -1;
-    $panelAssist.classList.toggle("is-active", !isPicker);
-    $panelPicker.classList.toggle("is-active", isPicker);
-    $panelAssist.hidden = isPicker;
-    $panelPicker.hidden = !isPicker;
-    if (focus) (isPicker ? $tabPicker : $tabAssist).focus();
+    const target = PopupTabs.normalize(tabId);
+    let activeEntry = null;
+    for (const entry of TAB_REGISTRY) {
+      const isActive = entry.id === target;
+      entry.tab.classList.toggle("is-active", isActive);
+      entry.tab.setAttribute("aria-selected", String(isActive));
+      entry.tab.tabIndex = isActive ? 0 : -1;
+      entry.panel.classList.toggle("is-active", isActive);
+      entry.panel.hidden = !isActive;
+      if (isActive) activeEntry = entry;
+    }
+    if (focus && activeEntry) activeEntry.tab.focus();
     if (persist) {
       chrome.storage.local
-        .set({ [StorageKeys.POPUP_LAST_TAB]: tabId })
+        .set({ [StorageKeys.POPUP_LAST_TAB]: target })
         .catch(() => {});
     }
   }
@@ -319,18 +328,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   $keepAliveHttpPingToggle.addEventListener("change", apply);
   $searchFixerToggle.addEventListener("change", () => {
     updateCleanerDimState();
-    if ($searchFixerToggle.checked && !$cleanerAccordion.open) {
-      $cleanerAccordion.open = true;
-    }
     apply();
   });
   $amazonDeliveryToggle.addEventListener("change", apply);
 
   $instagramCleanerToggle.addEventListener("change", () => {
     updateIgCleanerDimState();
-    if ($instagramCleanerToggle.checked && !$igCleanerAccordion.open) {
-      $igCleanerAccordion.open = true;
-    }
+    apply();
+  });
+
+  // 動画ガンマ補正: master toggle / slider / 1.0 戻すボタン
+  $videoGammaToggle.addEventListener("change", () => {
+    updateVideoGammaRowVisibility();
+    apply();
+  });
+  $videoGammaSlider.addEventListener("input", () => {
+    updateVideoGammaLabel(currentVideoGammaValue());
+  });
+  $videoGammaSlider.addEventListener("change", apply);
+  $videoGammaResetBtn.addEventListener("click", () => {
+    $videoGammaSlider.value = String(VideoGamma.SLIDER_DEFAULT);
+    updateVideoGammaLabel(VideoGamma.DEFAULT);
     apply();
   });
 
@@ -509,10 +527,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (input.checked) on++;
     }
     const total = featureInputs.size;
-    $cleanerCount.textContent = `${on}/${total}`;
-    // pill のテキストもここで同期。actions.js の SearchFixer.FEATURES への増減に
-    // 連動して自動更新されるため HTML 側の数値ハードコードによるドリフトを防ぐ。
-    if ($searchFixerPill) $searchFixerPill.textContent = `${total} 機能`;
+    // section title の grp-pill に「ON 数 / 全数 機能」を集約表示する。
+    // アコーディオン廃止に伴い旧 .acc-count バッジは削除し、pill 1 つに情報を統合。
+    if ($searchFixerPill) $searchFixerPill.textContent = `${on}/${total} 機能`;
   }
 
   function updateCleanerDimState() {
@@ -537,9 +554,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (input.checked) on++;
     }
     const total = igFeatureInputs.size;
-    $igCleanerCount.textContent = `${on}/${total}`;
-    // pill のテキストもここで同期（YouTube 側と同じドリフト防止策）。
-    if ($instagramCleanerPill) $instagramCleanerPill.textContent = `${total} 機能`;
+    // section title の grp-pill に「ON 数 / 全数 機能」を集約表示（YouTube 側と同じ集約方針）。
+    if ($instagramCleanerPill) $instagramCleanerPill.textContent = `${on}/${total} 機能`;
   }
 
   function updateIgCleanerDimState() {
@@ -564,6 +580,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
+    const videoGammaEnabled = $videoGammaToggle.checked;
+    const videoGammaValue = currentVideoGammaValue();
     const minutes = clampMinutes(Number($intervalSlider.value));
     const keepAliveIntervalMs = minutes * KeepAlive.MS_PER_MIN;
     const searchFixerFeatures = collectFeatureValues();
@@ -585,6 +603,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           amazonDeliveryTotalEnabled,
           instagramCleanerEnabled,
           instagramCleanerFeatures,
+          videoGammaEnabled,
+          videoGammaValue,
         },
       });
       if (seq !== applySeq) return;
@@ -594,7 +614,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             keepAliveSiteEnabled,
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
-            instagramCleanerEnabled
+            instagramCleanerEnabled,
+            videoGammaEnabled
           ),
           "ok"
         );
@@ -627,13 +648,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     keepAliveEnabled,
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
-    instagramCleanerEnabled
+    instagramCleanerEnabled,
+    videoGammaEnabled
   ) {
     const parts = [];
     if (keepAliveEnabled) parts.push("セッション維持");
     if (searchFixerEnabled) parts.push("YT クリーナー");
     if (amazonDeliveryTotalEnabled) parts.push("Amazon");
     if (instagramCleanerEnabled) parts.push("Instagram");
+    if (videoGammaEnabled) parts.push("映像補正");
     if (parts.length === 0) return "⏹  すべて停止";
     return "✓  " + parts.join("  /  ");
   }
@@ -645,6 +668,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function updateIntervalRowVisibility() {
     $intervalRow.classList.toggle("hidden", !$keepAliveToggle.checked);
+  }
+
+  // ----- 動画ガンマ補正 ヘルパー -----
+  function currentVideoGammaValue() {
+    return VideoGamma.sliderToValue($videoGammaSlider.value);
+  }
+
+  function updateVideoGammaLabel(value) {
+    const v = VideoGamma.clampValue(value);
+    $videoGammaValueLabel.textContent = v.toFixed(2);
+  }
+
+  function updateVideoGammaRowVisibility() {
+    $videoGammaRow.classList.toggle("hidden", !$videoGammaToggle.checked);
   }
 
   // ----- 音量ブースター ヘルパー -----
