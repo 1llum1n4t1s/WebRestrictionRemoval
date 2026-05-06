@@ -118,6 +118,8 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 **`hideComments` 実装上の注意**: `applyWatchPageClasses()` は `<html>` に `__cpa-sfx-hide-comments` クラスを付け外しする実装で、**`isWatchPage()` 判定を経由せず無条件に呼ぶ**こと。watch page 限定にすると SPA で video → home に遷移したとき `<html>` クラスが残置されて他ページに副作用が出る（CodeRabbit レビューで実際に指摘された罠）。CSS 側は `html.__cpa-sfx-hide-comments ytd-comments#comments { display: none !important; }` で watch page 以外には影響しないため、JS は無条件 toggle で良い。
 
+**`hideLiveChat` 実装上の注意**: hideLiveChat の close 操作はすべて JS 経由で行い、**CSS は何も書かない**。実装は `ytd-live-chat-frame` 配下の iframe (`youtube.com/live_chat_replay`) 内の `yt-live-chat-header-renderer #close-button button[aria-label="閉じる"]` を **`iframe.contentDocument` 経由で取得し**、`fireUserLikeClick` で **full pointer/mouse event sequence** (`pointerdown → mousedown → pointerup → mouseup → click`) を発火するだけ。youtube.com same-origin かつ sandbox 制約なしなので contentDocument にアクセス可能。**frame・iframe・親 `#chat-container`・theater 用 `--ytd-watch-flexy-sidebar-width` には一切触らない**（過去にこれらを CSS や独自属性で操作するたびに player 再初期化 / レイアウト崩れ / 「動画を処理しています」エラー / 再展開不能などの副作用を起こした経緯）。close button が見つからない場合は何もしない。MutationObserver は cross-document な iframe 内 DOM 変化を観察できないため、`iframe.addEventListener("load", ...)` を `__cpaLiveChatLoadAttached` marker で idempotent に hook し、load 後 300ms で `collapseLiveChatIfNeeded` を再実行することで close button が ready になったタイミングを取りこぼさない。fireUserLikeClick は `btn.ownerDocument.defaultView` 経由で iframe の window から `PointerEvent`/`MouseEvent` constructor を取得する（別 realm の event 扱いを避けるため）。
+
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
 `*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
 
@@ -190,6 +192,22 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 
 ### MutationObserver 取り扱い
 - **DOM 書き戻しは observer guard 必須** — `subtree: true` 監視中に自身が DOM を書き戻すと再帰発火 → 無限ループでフリーズ。Amazon 月別合計の修正で確立した **`disconnect → render → takeRecords → observe` ガード + `requestAnimationFrame` coalesce** の二重防御を新規 DOM 書き込みロジックでも踏襲する。
+- **cross-document な iframe 内 DOM 変化は MutationObserver で観察できない** — `subtree: true` でも iframe の中身は別ドキュメント扱いで届かない。iframe 内要素を相手にする場合は `iframe.addEventListener("load", ...)` で再評価タイミングを別経路で確保する（hideLiveChat の close button click はこのパターンに該当）。
+
+### hideLiveChat（YouTube ライブチャット非表示）
+hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を集約した最小設計に到達している。新機能を足すときに **絶対に復活させてはいけない過去の失敗経路** が複数あるため、ここで明文化しておく。
+
+採用パターン:
+- `findLiveChatPanelCloseButton` → `iframe.contentDocument` 経由で `yt-live-chat-header-renderer #close-button button` を取得
+- `fireUserLikeClick` で iframe の window から取った `PointerEvent`/`MouseEvent` で full sequence 発火
+- `iframe.addEventListener("load", ...)` の idempotent hook で load 後 300ms に再評価
+
+復活禁止の失敗パターン:
+- 独自クラス `__cpa-sfx-live-chat-force-hide` を frame に付与 → frame ごと `display: none` で collapsed view ヘッダー（「パネルを開く」）まで消し、SPA 副作用も誘発
+- `setAttribute("collapsed", "")` で標準属性を直接立てる → ライブ配信中で player 再初期化 →「動画を処理しています」エラー
+- CSS `iframe.ytd-live-chat-frame { height: 0 }` (collapsed 条件付き or 無条件いずれも) → SPA panel state が不整合で player 副作用
+- CSS `#chat-container:has(...) { display: none }` / `--ytd-watch-flexy-sidebar-width: 0` → 同上 + ユーザーが「パネルを開く」を再表示できなくなる
+- frame 内の `#close-button` を top frame から `document.querySelector` で探す → そもそも iframe の中なので届かない（`iframe.contentDocument` 必須）
 
 ### 音量ブースター・Offscreen Document
 
