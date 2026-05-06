@@ -43,22 +43,17 @@ html.__cpa-sfx-hide-comments ytd-comments#comments {
   display: none !important;
 }
 
-/* ---------- 動画ページ: ライブチャット欄非表示 (ライブ配信アーカイブ用) ---------- */
-/* 設計方針: search-fixer.js が公式トグルクリック or `collapsed` 属性付与で必ず
- * `ytd-live-chat-frame` を YouTube 標準の collapsed 状態にする。CSS はその collapsed
- * 状態の iframe (実チャット内容) だけを `height: 0` で潰す責務に絞る。
+/* ---------- 動画ページ: ライブチャット欄非表示 (ライブ配信中・アーカイブ両対応) ---------- */
+/* 設計方針: JS は frame に独自属性・独自クラスを一切付けない。CSS のみで iframe
+ * (実チャット内容) を `height: 0` で潰し、frame ヘッダー（「閉じる」「もっと見る」など）
+ * は YouTube 標準の描画で残る。frame に介入しないため YouTube SPA の player / レイアウト
+ * 処理にも副作用を出さない（過去に setAttribute("collapsed", "") で「動画を処理しています」
+ * エラーが発生した実機事象を回避）。
  *
- * 過去にあった `__cpa-sfx-live-chat-force-hide` クラスや `#chat-container:has(...)`
- * を使った frame 全体の `display: none` 経路は撤去済み。理由は 2 点:
- *   1. frame ごと消すと collapsed view ヘッダー（「チャットのリプレイ」「パネルを開く」
- *      ボタン）まで消え、ユーザーが手動で再展開する手段を奪っていた。
- *   2. frame の display 切り替えは YouTube SPA が live-chat-present 状態を再判定する
- *      トリガになり、player 再初期化を誘発して「動画を処理しています」エラーで
- *      再生不能になるケースが実機で発生していた。
- *
- * frame 自体には何も触らないことで YouTube の player / レイアウト処理に副作用を出さない。
- * 「パネルを開く」ヘッダーは YouTube 標準の描画でそのまま見え、ユーザーが押せば再展開できる。 */
-html.__cpa-sfx-hide-live-chat ytd-live-chat-frame#chat[collapsed] iframe.ytd-live-chat-frame {
+ * 配信中もアーカイブも、ライブチャットの実コンテンツ（iframe）は同じく不可視になる。
+ * ユーザーが frame ヘッダーの公式「閉じる」ボタンを押せば、YouTube 標準の collapsed view
+ * （「パネルを開く」）に切り替わって標準の方法で再展開できる。 */
+html.__cpa-sfx-hide-live-chat iframe.ytd-live-chat-frame {
   height: 0 !important;
   min-height: 0 !important;
 }

@@ -375,57 +375,29 @@
   }
 
   function collapseLiveChatIfNeeded() {
+    // hideLiveChat は最終的に「frame に独自属性・独自クラスを一切付けない」設計に到達した。
+    //
+    // 経緯:
+    //   1. 独自クラス付与（旧 `__cpa-sfx-live-chat-force-hide`）+ frame 全体 display:none
+    //      → collapsed view ヘッダー（「パネルを開く」）まで消し、再展開の手段を奪う問題。
+    //   2. `setAttribute("collapsed", "")` で標準属性を立てる経路
+    //      → ライブ配信中で YouTube SPA が live-chat-present 状態を再評価し、player 再初期化を
+    //         誘発、「動画を処理しています。しばらくしてからもう一度ご確認ください。」で
+    //         再生不能になる実機事象。
+    //   3. 公式 toggle.click() 経路（ユーザー操作と等価のはず）
+    //      → 同様に SPA 副作用を起こすリスクが残る、かつ機能 ON のまま「パネルを開く」を
+    //         押すと拡張機能が即時 collapse し直してループになる。
+    //
+    // 結論: JS は frame の状態に介入しない。CSS の
+    //   `iframe.ytd-live-chat-frame { height: 0 }` だけで iframe (実チャット内容) を消す。
+    // frame ヘッダー部分（「閉じる」「もっと見る」など）は標準描画されるので、ユーザーが
+    // 公式の「閉じる」を押せば標準の collapsed view（「パネルを開く」）に切り替わる。
+    // 配信中・アーカイブ・SPA navigation すべてで同じ振る舞い。
+    //
+    // 旧バージョンで残っている可能性のある force-hide クラスのクリーンアップだけ実行する。
     if (!f("hideLiveChat") || !isWatchPage()) return;
     const chatFrame = document.querySelector("ytd-live-chat-frame");
     if (!chatFrame) return;
-
-    // 既に collapsed なら何もしない（公式状態が既に閉じている）。
-    if (chatFrame.hasAttribute("collapsed")) {
-      // force-hide クラスは collapsed と排他。collapsed が公式付与されているなら CSS の
-      // `[collapsed] iframe { height:0 }` で十分なので、force-hide は外しておく。
-      chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
-      return;
-    }
-
-    const toggle = findLiveChatToggle(chatFrame);
-    if (toggle) {
-      // フル展開状態 → 公式トグルを click して折りたたむ。これで frame に `collapsed` 属性が
-      // 付与され、CSS 側 `ytd-live-chat-frame#chat[collapsed] iframe` が高さ 0 にする。
-      // 公式状態を使うため動画レイアウトは YouTube が自動拡幅。
-      // P1-#4: disconnect → click → takeRecords → reattach ガードで再発火ループを遮断。
-      if (liveChatObserver) {
-        liveChatObserver.disconnect();
-        liveChatObserverTarget = null;
-        try {
-          toggle.click();
-        } finally {
-          liveChatObserver.takeRecords();
-          reAttachLiveChatObserver(true);
-        }
-      } else {
-        toggle.click();
-      }
-      // click 直後は collapsed 属性が付くので force-hide は不要。剥がす。
-      chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
-      return;
-    }
-
-    // toggle が見つからない = ライブ配信アーカイブで「チャットのリプレイを表示」のような
-    // 「既デフォルト折りたたみヘッダ」状態（= 既に `collapsed` 属性が立っている）か、
-    // YouTube が toggle を未描画の状態。
-    //
-    // ここでは frame 自体には一切触らない。理由は以下のとおり:
-    //   1. 旧方式の独自クラス付与（`__cpa-sfx-live-chat-force-hide`）は frame に
-    //      `display: none` を当てて collapsed view ヘッダー（「パネルを開く」）も消し、
-    //      ユーザーが再展開する手段を奪っていた。
-    //   2. `setAttribute("collapsed", "")` で属性を直接立てる経路は、ライブ配信中の動画で
-    //      YouTube SPA が live-chat-present 状態を再評価して player 再初期化を誘発し、
-    //      「動画を処理しています。しばらくしてからもう一度ご確認ください。」で再生不能に
-    //      なる実機事象が報告された。
-    //
-    // → frame に独自属性・独自クラスを足さない。元から `collapsed` 状態なら CSS の
-    //    `[collapsed] iframe { height: 0 }` で十分。元から expanded で toggle も無い場合は
-    //    諦めて何もしない（YouTube が後から toggle を出してきたら observer 経由で再評価）。
     chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
   }
 
