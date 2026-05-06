@@ -112,16 +112,30 @@ WEB閲覧アシスト
 ■ 権限の正当性（簡潔版・40〜60 文字目安）
 
   activeTab:
-  ポップアップで設定を反映する際、現在のタブを参照するため。
+  ポップアップから現在のタブに設定を反映し、音量ブースター対象タブの判定に使うため。
 
   storage:
-  機能トグルとユーザー設定を端末内に保存するため。
+  機能トグル・スライダー設定・カラーピッカー履歴を端末内 (chrome.storage.local) に保存するため。
 
   offscreen:
-  音量ブースターの AudioContext を SW 外で維持するため。
+  音量ブースターの AudioContext / GainNode / DynamicsCompressor チェーンを Service Worker 外で維持するため。
 
   tabCapture:
-  音量ブースター（0〜300%）でアクティブタブの音声を取得するため。
+  音量ブースターでタブ音声を取得し、AudioContext で 0〜300% の音量補正・正規化・圧縮を行うため。
+
+■ ホスト権限の正当性
+
+  http://*/* および https://*/*:
+  セッション維持機能のため、全 http(s) サイトに content script を注入する必要がある。注入された content script は、ユーザーが popup で許可した origin (keepAliveOrigins allowlist) でのみポーラーを起動し、合成 mousemove / pointermove / scroll / focus を dispatch する。HTTP ping は別サブトグル（デフォルト OFF）で、ON 時のみ同一オリジン HEAD / GET を発射する。ページ DOM の読み取り・書き換え・外部送信は一切行わない。
+
+  *://*.youtube.com/*:
+  YouTube クリーナー（22 サブ機能・Shorts 削除を含む）のため。検索結果ノイズ除去・動画ページ装飾（タイトル中央 / 説明文フル幅 / コメント欄非表示 / ライブチャット折りたたみ）・ホームグリッド列数調整・/shorts/<id> → /watch?v=<id> リダイレクトを DOM/CSS 操作のみで実装。読み取り情報は端末外へ送信しない。
+
+  *://www.amazon.co.jp/auto-deliveries*:
+  Amazon 定期おトク便の月別合計表示のため。配送月ごとの subscription-price を読み取って合計値を計算し、同ページに挿入する。amazon.co.jp 全体ではなく /auto-deliveries 配下のみに限定。読み取り情報は端末外へ送信しない。
+
+  *://*.instagram.com/*:
+  Instagram クリーナー（10 サブ機能）のため。Reels / Explore / ストーリー段 / Threads 誘導 / いいね数・フォロワー数 / 動画再生 / コメント欄 / Notes / メッセージカウンターの非表示を、aria-label / href / role / data-pagelet / SVG path data ベースの意味論的セレクタで実装。/reels/ / /explore/ 等の URL リダイレクトもオプトイン。読み取り情報は端末外へ送信しない。
 
 ■ リモートコードを使用していますか？
 いいえ
