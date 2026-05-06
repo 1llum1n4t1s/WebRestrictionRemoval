@@ -299,7 +299,39 @@
       liveChatCollapseRaf = 0;
       // frame 出現していれば observer を frame 直接観察に冪等に切り替える（状態遷移）。
       reAttachLiveChatObserver();
+      // iframe.load 後に再評価できるよう load listener を attach（idempotent）。
+      // MutationObserver は cross-document な iframe 内 DOM 変化を観察できないため、
+      // close button が iframe 内に出現するタイミング（panel data load 完了）は
+      // iframe の load event 経由でのみ確実に取れる。
+      attachLiveChatIframeLoadListener();
       collapseLiveChatIfNeeded();
+    });
+  }
+
+  /**
+   * `ytd-live-chat-frame iframe.ytd-live-chat-frame` の load event に collapse 再試行を hook する。
+   * iframe 出現直後は contentDocument が空 / readyState != complete のことがあり、
+   * その状態で collapseLiveChatIfNeeded を呼ぶと close button 未ロードでスキップされる。
+   * load 後にもう 1 度 scheduleLiveChatCollapse を呼ぶことで、close button が確実に
+   * ready になったタイミングで click できる。
+   *
+   * 同じ iframe に複数回 listener を attach しないよう、要素自身に WeakSet 風 marker
+   * (`__cpaLiveChatLoadAttached`) を立てて idempotent 化する。
+   */
+  function attachLiveChatIframeLoadListener() {
+    const iframe = document.querySelector(
+      "ytd-live-chat-frame iframe.ytd-live-chat-frame"
+    );
+    if (!iframe || iframe.__cpaLiveChatLoadAttached === true) return;
+    iframe.__cpaLiveChatLoadAttached = true;
+    iframe.addEventListener("load", () => {
+      // load 直後は YouTube 側の hydration が走っている最中なので、少し待ってから再評価。
+      // ChromeMCP の検証では load 後数百ms 以内に close button が ready になる挙動を確認。
+      setTimeout(() => {
+        if (f("hideLiveChat") && isWatchPage()) {
+          collapseLiveChatIfNeeded();
+        }
+      }, 300);
     });
   }
 
