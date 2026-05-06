@@ -129,6 +129,10 @@ const StorageKeys = Object.freeze({
   COLOR_PICKER_HEX_HASH: "colorPickerHexHash",
   /** ポップアップで最後に開いていたタブ ("assist" | "picker") */
   POPUP_LAST_TAB: "popupLastTab",
+  /** ポップアップの YouTube クリーナー詳細アコーディオンが開いていたか (boolean, default false) */
+  POPUP_CLEANER_ACCORDION_OPEN: "popupCleanerAccordionOpen",
+  /** ポップアップの Instagram クリーナー詳細アコーディオンが開いていたか (boolean, default false) */
+  POPUP_IG_CLEANER_ACCORDION_OPEN: "popupIgCleanerAccordionOpen",
   /** インストール / 起動 sentinel。`onInstalled` で必ず 1 を書き込み、popup 起動時に消失していたら
    *  `chrome.storage.local` が破損・リセットされた可能性として開発者コンソールに警告を出す（#3）。
    *  接頭辞 "_" でユーザー向け設定キーと区別する。 */

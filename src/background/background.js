@@ -54,6 +54,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
+    StorageKeys.POPUP_CLEANER_ACCORDION_OPEN,
+    StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN,
   ]);
   const defaults = {};
   if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
@@ -108,6 +110,14 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.POPUP_LAST_TAB in stored)) {
     defaults[StorageKeys.POPUP_LAST_TAB] = ColorPicker.TAB_ASSIST;
+  }
+  // クリーナー詳細アコーディオンの開閉状態。インストール直後は閉じた状態で起動する
+  // （マスタートグル OFF 時に詳細を開いて見せる必要がないため）。
+  if (!(StorageKeys.POPUP_CLEANER_ACCORDION_OPEN in stored)) {
+    defaults[StorageKeys.POPUP_CLEANER_ACCORDION_OPEN] = false;
+  }
+  if (!(StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN in stored)) {
+    defaults[StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN] = false;
   }
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);

@@ -95,6 +95,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
+    StorageKeys.POPUP_CLEANER_ACCORDION_OPEN,
+    StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN,
     StorageKeys.INSTALL_SENTINEL,
   ]);
 
@@ -161,6 +163,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateCleanerDimState();
   updateIgCleanerCountBadge();
   updateIgCleanerDimState();
+
+  // ----- アコーディオン開閉状態の復元 -----
+  // ストレージから前回の open 値を復元する。toggle event listener を attach する前に
+  // `details.open` を代入するため、復元の代入では toggle event は発火しても問題なし
+  // （直後の listener attach 後にトグル操作で上書きされる経路に影響を与えない）。
+  $cleanerAccordion.open = stored[StorageKeys.POPUP_CLEANER_ACCORDION_OPEN] === true;
+  $igCleanerAccordion.open = stored[StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN] === true;
+  $cleanerAccordion.addEventListener("toggle", () => {
+    chrome.storage.local
+      .set({ [StorageKeys.POPUP_CLEANER_ACCORDION_OPEN]: $cleanerAccordion.open })
+      .catch(() => {});
+  });
+  $igCleanerAccordion.addEventListener("toggle", () => {
+    chrome.storage.local
+      .set({ [StorageKeys.POPUP_IG_CLEANER_ACCORDION_OPEN]: $igCleanerAccordion.open })
+      .catch(() => {});
+  });
 
   // ============================================================
   // ===== タブナビ + 顔料アトリエ（カラーピッカー） =====
