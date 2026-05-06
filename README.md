@@ -12,11 +12,11 @@ Web ブラウジングを快適にする 6 機能（**セッション維持** / 
 
 | 動作 | 説明 |
 |------|------|
-| 合成アクティビティ（デフォルト） | 全サイトで定期的に `mousemove` / `pointermove` / `scroll` / `focus` を安全寄りに dispatch して JS 側のアイドル検知をリセット。ネットワーク通信は発生しない |
-| 同一オリジン ping（オプトイン・デフォルト OFF） | サブトグル「サーバーへの軽量 ping を併発」を ON にした場合のみ、SharePoint (`*.sharepoint.{com,cn,de,us}`) では `/_api/web` に GET、その他サイトでは現在 URL / origin root に軽量 `HEAD` を試してサーバー側セッション維持を補助 |
+| 合成アクティビティ（デフォルト） | ポップアップで有効化した現在のサイト（origin）の top frame だけで、定期的に `mousemove` / `pointermove` / `scroll` / `focus` を安全寄りに dispatch して JS 側のアイドル検知をリセット。ネットワーク通信は発生しない |
+| 同一オリジン ping（オプトイン・デフォルト OFF） | サブトグル「サーバーへの軽量 ping を併発」を ON にした場合のみ、有効化したサイトの top frame から、SharePoint (`*.sharepoint.{com,cn,de,us}`) では `/_api/web` に GET、その他サイトでは現在 URL / origin root に軽量 `HEAD` を試してサーバー側セッション維持を補助 |
 | 間隔設定 | ポップアップのスライダーで 1〜15 分の範囲で調整可能（デフォルト 4 分） |
 
-外部（第三者）サーバーへの通信は発生せず、HTTP ping をオンにした場合でもアクセス中のサイト自身への同一オリジン `HEAD` / `GET` のみです。
+外部（第三者）サーバーへの通信は発生せず、HTTP ping をオンにした場合でもユーザーが有効化したサイト自身への同一オリジン `HEAD` / `GET` のみです。
 
 **HTTP ping をデフォルト OFF にしている理由**: 認証プロキシ環境（Zscaler 等）では `/_api/web` への自動アクセスが 401/302 ループを誘発したり、企業の SIEM/WAF ログにアラートを残すことがあるため、副作用を理解したユーザーのみが有効化する設計にしています。
 
@@ -46,13 +46,13 @@ Instagram の冗長 UI を一括非表示にする **10 個のサブ機能** を
 
 ### 🔊 音量ブースター（常時オン、デフォルト 100%）
 
-アクティブタブの音量を **0〜600%** で増幅します。**マスタートグルなし**でスライダーのみの構成で、100% のときは AudioContext を解放してリソースを返却し、それ以外の値で増幅処理を起動します。サブトグル「自動歪み防止」「自動音量正規化」（いずれもデフォルト OFF）で 2 段の `DynamicsCompressor` が個別に有効化されます。
+アクティブタブの音量を **0〜300%** で増幅します。**マスタートグルなし**でスライダーのみの構成で、100% のときは AudioContext を解放してリソースを返却し、それ以外の値で増幅処理を起動します。サブトグル「自動歪み防止」「自動音量正規化」「ナイトモード」（いずれもデフォルト OFF）で各音響ノードが個別に有効化されます。自動音量正規化は `AnalyserNode` による短時間 RMS 測定 + 自動 `GainNode` で実装し、自動歪み防止とナイトモードは `DynamicsCompressor` で実装します。
 
 | 動作 | 説明 |
 |------|------|
 | 取得 | `chrome.tabCapture.getMediaStreamId` で active tab の音声 stream を取得 |
-| 処理 | offscreen ドキュメント内の `AudioContext` + `GainNode` + 2 段 `DynamicsCompressor`（normalize / anti-clip）で増幅・圧縮して `destination` に再出力 |
-| 解放 | スライダーを 100% に戻す / タブを閉じる / 拡張機能を無効化 で即時 release |
+| 処理 | offscreen ドキュメント内の `AudioContext` で `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` の 6 ノードチェーンを構築し、ラウドネス補正・圧縮・ユーザー gain・リミッタを順に適用して `destination` に再出力 |
+| 解放 | スライダーを 100% に戻し全サブトグル OFF / タブを閉じる / 拡張機能を無効化 で即時 release |
 
 ### 🎨 カラーピッカー（常時利用可）
 
@@ -65,7 +65,7 @@ Instagram の冗長 UI を一括非表示にする **10 個のサブ機能** を
 3. 音量ブースターはスライダーで増幅率を直接調整
 4. カラーピッカーは「カラーピッカー」タブで `EyeDropper` を起動
 
-設定は `chrome.storage.local` に保存され、次回以降も維持されます。保存対象は計 15 のキー（セッション維持 3 種 / YouTube クリーナー 3 種 / Amazon 合計 1 種 / Instagram クリーナー 2 種 / 音量ブースターサブトグル 2 種 / カラーピッカー 3 種 / 最後に開いていたタブ 1 種）。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Instagram クリーナー OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはスライダーが 100% の時点でリソース解放されるため「ON/OFF」概念がありません。
+設定は `chrome.storage.local` に保存され、次回以降も維持されます。保存対象は計 17 のキー（セッション維持 4 種 / YouTube クリーナー 3 種 / Amazon 合計 1 種 / Instagram クリーナー 2 種 / 音量ブースターサブトグル 3 種 / カラーピッカー 3 種 / 最後に開いていたタブ 1 種）。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Instagram クリーナー OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはスライダーが 100% かつ全サブトグル OFF の時点でリソース解放されるため「ON/OFF」概念がありません。
 
 ## インストール
 
@@ -118,17 +118,18 @@ Popup (src/popup/popup.{html,js,css})
                           各 Content Script
 
 [音量ブースター]
-  Popup ──VOLUME_BOOSTER_SET_GAIN──▶ Background
+  Popup ──VOLUME_BOOSTER_SET_GAIN (gain, antiClip, normalize, nightMode)──▶ Background
                                     │ chrome.tabCapture.getMediaStreamId
                                     ──ACTION_VOLUME_SET_GAIN──▶ Offscreen Document
                                                                   │ getUserMedia + AudioContext
-                                                                  │ source → GainNode → normalizerNode (DynamicsCompressor) → antiClipNode (DynamicsCompressor) → destination
-                                                                  └ 増幅 + 圧縮して再出力
+                                                                  │ source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination
+                                                                  │ (短時間RMS正規化 → ナイトモード圧縮 → 手動ゲイン → リミッタ)
+                                                                  └ 自動ゲイン補正 + 圧縮 + 増幅して再出力
 ```
 
 ### セッション維持の仕組み
 
-- `setInterval` ベースのポーラーで合成アクティビティ束（`mousemove` / `pointermove` / `scroll` / `focus`）を dispatch し、同一オリジン HTTP ping を補助的に発射
+- `setInterval` ベースのポーラーで、有効化済み origin の top frame だけに合成アクティビティ束（`mousemove` / `pointermove` / `scroll` / `focus`）を dispatch し、同一オリジン HTTP ping を補助的に発射
 - SharePoint は専用 GET、その他サイトは軽量 `HEAD` fallback を使う
 - 同一オリジン iframe での多重発射はクロスオリジン判定で回避
 - Memory Saver で freeze されたタブでは自然停止
@@ -136,7 +137,7 @@ Popup (src/popup/popup.{html,js,css})
 ### 音量ブースターの仕組み
 
 - Chrome は 1 拡張あたり 1 つの offscreen document しか開けないため、`tabCapture` (USER_MEDIA) と AudioContext 出力 (AUDIO_PLAYBACK) を同居させる
-- スライダーが UNITY (100%) の値の場合、`getMediaStreamId` を呼ばず AudioContext を release してリソース返却
+- スライダーが UNITY (100%) かつ全サブトグル (自動歪み防止 / 自動音量正規化 / ナイトモード) が OFF の場合のみ、`getMediaStreamId` を呼ばず AudioContext を release してリソース返却。100% でもサブトグル ON なら AudioContext を維持して自動補正を効かせる
 - タブを閉じると `chrome.tabs.onRemoved` で即座に release（永続的に発火する API のため Service Worker 再起動の影響を受けない）
 - 音量ブースト中は offscreen のアイドル close を抑止し、AudioContext を保持し続ける
 

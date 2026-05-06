@@ -1,3 +1,19 @@
+"use strict";
+
+// P0-#2: content_scripts のスコープ共有依存を断つため IIFE wrap + globalThis 公開方式に変更。
+// 旧設計は「Chrome の同一拡張・同一ページの content scripts は同一 isolated world で script scope 共有」
+// という Chrome の文書化されていない実装詳細に依存していた（Chrome 公式 API ドキュメントに記述なし）。
+// 新設計:
+//   1. 全定数を IIFE で wrap し、`globalThis.X` にアサインして明示的に共有する
+//   2. 同一ファイルが複数 content_scripts エントリ経由で再評価されても `__cpaActionsLoaded` ガードで安全
+//   3. manifest.json の各 content_scripts エントリで `actions.js` を先頭に追加して、スコープ共有に
+//      頼らずとも各エントリ単独で全定数にアクセスできる
+//   4. background は `importScripts` で 1 度だけ読み、再評価しない
+// `Actions.X` のような bare 名アクセスは globalThis のプロパティとして JS 言語仕様上そのまま動く。
+(() => {
+  if (globalThis.__cpaActionsLoaded === true) return;
+  globalThis.__cpaActionsLoaded = true;
+
 /** @readonly メッセージアクション定義 */
 const Actions = Object.freeze({
   /** ポップアップ → background: 設定変更を反映 */
@@ -85,6 +101,8 @@ const StorageKeys = Object.freeze({
    *  master が ON でもこれが OFF のときは合成イベント dispatch のみ行い HTTP ping は出さない。
    *  認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発するのを避ける用途。 */
   KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
+  /** セッション維持を許可した origin 一覧（例: https://example.com）。サイト単位で効かせる。 */
+  KEEP_ALIVE_ORIGINS: "keepAliveOrigins",
   /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む全 22 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
@@ -99,8 +117,10 @@ const StorageKeys = Object.freeze({
   INSTAGRAM_CLEANER_FEATURES: "instagramCleanerFeatures",
   /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
-  /** 音量ブースター: 自動音量正規化（DynamicsCompressor で緩い圧縮） */
+  /** 音量ブースター: 自動音量正規化（短時間RMSを測って自動ゲイン調整） */
   VOLUME_BOOSTER_NORMALIZE_ENABLED: "volumeBoosterNormalizeEnabled",
+  /** 音量ブースター: ナイトモード（ゲーム配信用途） */
+  VOLUME_BOOSTER_NIGHT_MODE_ENABLED: "volumeBoosterNightModeEnabled",
   /** カラーピッカー: 採取した色の履歴（最新が先頭。各要素 {hex, ts} の最大 20 件） */
   COLOR_PICKER_HISTORY: "colorPickerHistory",
   /** カラーピッカー: 既定の保存形式 ("hex" | "rgb" | "hsl") */
@@ -109,6 +129,10 @@ const StorageKeys = Object.freeze({
   COLOR_PICKER_HEX_HASH: "colorPickerHexHash",
   /** ポップアップで最後に開いていたタブ ("assist" | "picker") */
   POPUP_LAST_TAB: "popupLastTab",
+  /** インストール / 起動 sentinel。`onInstalled` で必ず 1 を書き込み、popup 起動時に消失していたら
+   *  `chrome.storage.local` が破損・リセットされた可能性として開発者コンソールに警告を出す（#3）。
+   *  接頭辞 "_" でユーザー向け設定キーと区別する。 */
+  INSTALL_SENTINEL: "_installSentinel",
 });
 
 /** @readonly セッション維持機能の定数 */
@@ -132,6 +156,31 @@ const KeepAlive = Object.freeze({
     if (ms < KeepAlive.MIN_INTERVAL_MS) return KeepAlive.MIN_INTERVAL_MS;
     if (ms > KeepAlive.MAX_INTERVAL_MS) return KeepAlive.MAX_INTERVAL_MS;
     return ms;
+  },
+  normalizeOrigin(value) {
+    if (typeof value !== "string") return null;
+    try {
+      const u = new URL(value);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+      return u.origin;
+    } catch {
+      return null;
+    }
+  },
+  normalizeOrigins(value) {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set();
+    for (const raw of value) {
+      const origin = KeepAlive.normalizeOrigin(raw);
+      if (origin) seen.add(origin);
+      if (seen.size >= 100) break;
+    }
+    return Array.from(seen);
+  },
+  isOriginAllowed(origins, origin) {
+    const normalized = KeepAlive.normalizeOrigin(origin);
+    if (!normalized) return false;
+    return KeepAlive.normalizeOrigins(origins).includes(normalized);
   },
 });
 
@@ -469,6 +518,8 @@ const InstagramCleaner = Object.freeze({
   ARTICLE_VIDEO_CLASS: "__cpa-ig-article-video",
   /** vanity 機能で数字ボタンに追加する非表示マーカークラス */
   VANITY_HIDE_CLASS: "__cpa-ig-hide-counter",
+  /** vanity 機能で検査済み要素に追加するマーカークラス（再スキャン抑制用） */
+  VANITY_CHECKED_CLASS: "__cpa-ig-counter-checked",
   /** comments 機能でコメント入力フォームに追加するマーカー */
   COMMENT_INPUT_CLASS: "__cpa-ig-comment-input",
   /** comments 機能で「View all N comments」/「N 件のコメントを見る」リンクに追加するマーカー */
@@ -503,9 +554,15 @@ const VolumeBooster = Object.freeze({
   MIN: 0,
   /** デフォルト音量 (%)。100 で原音そのまま（gain 1.0、リソース解放状態）。 */
   DEFAULT: 100,
-  MAX: 600,
+  MAX: 300,
   /** スライダー上の「等倍ライン」。この値ではブースト処理を起動せず AudioContext を解放する。 */
   UNITY: 100,
+  /** UI スライダーの内部最小値。実音量 percent とは別に扱い、100% を中央へ置く。 */
+  SLIDER_MIN: 0,
+  /** UI スライダーの中央/等倍位置。 */
+  SLIDER_UNITY: 100,
+  /** UI スライダーの内部最大値。左半分 0..100% / 右半分 100..300% に割り当てる。 */
+  SLIDER_MAX: 200,
   STEP: 1,
   /**
    * gain 変更時の `setTargetAtTime` time constant (秒)。
@@ -524,13 +581,13 @@ const VolumeBooster = Object.freeze({
   /**
    * スライダー percent (0..MAX) を実 gain 倍率に変換する対数マッピング。
    *
-   * 100% = 1.0x (unity) / MAX% = 6.0x の anchor を維持しつつ、
+   * 100% = 1.0x (unity) / MAX% = 3.0x の anchor を維持しつつ、
    * 100..MAX 区間を「等距離スライダー = 等 dB ステップ」になるよう対数で配分する。
-   * 結果として 100→200 と 500→600 で同じ ~3.1dB ずつ上がるためドラッグ体感が均一化される。
+   * 結果として 100→200 と 200→300 で同じ ~4.8dB ずつ上がるためドラッグ体感が均一化される。
    *
    * 0..100 区間（attenuation）は使用頻度が低いため線形のまま (percent/100)。
    *
-   * 例: percentToGain(200) ≈ 1.43x (+3.1dB), percentToGain(300) ≈ 2.05x (+6.2dB)
+   * 例: percentToGain(200) ≈ 1.73x (+4.8dB), percentToGain(300) = 3.0x (+9.5dB)
    */
   percentToGain(percent) {
     const p = VolumeBooster.clampValue(percent);
@@ -555,6 +612,32 @@ const VolumeBooster = Object.freeze({
     return Math.round(VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY));
   },
   /**
+   * UI スライダー位置 (0..200) を実音量 percent (0..300) に変換する。
+   * 100% を中央へ置くため、下げる側は 0..100、上げる側は 100..300 に分ける。
+   */
+  sliderPositionToPercent(position) {
+    const n = Number(position);
+    const p = Number.isFinite(n) ? n : VolumeBooster.SLIDER_UNITY;
+    const clamped = Math.min(VolumeBooster.SLIDER_MAX, Math.max(VolumeBooster.SLIDER_MIN, p));
+    if (clamped <= VolumeBooster.SLIDER_UNITY) {
+      return VolumeBooster.clampValue(clamped);
+    }
+    const t = (clamped - VolumeBooster.SLIDER_UNITY) /
+      (VolumeBooster.SLIDER_MAX - VolumeBooster.SLIDER_UNITY);
+    return VolumeBooster.clampValue(
+      VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY)
+    );
+  },
+  /** 実音量 percent (0..300) から UI スライダー位置 (0..200) を復元する。 */
+  percentToSliderPosition(percent) {
+    const p = VolumeBooster.clampValue(percent);
+    if (p <= VolumeBooster.UNITY) return p;
+    const t = (p - VolumeBooster.UNITY) / (VolumeBooster.MAX - VolumeBooster.UNITY);
+    return Math.round(
+      VolumeBooster.SLIDER_UNITY + t * (VolumeBooster.SLIDER_MAX - VolumeBooster.SLIDER_UNITY)
+    );
+  },
+  /**
    * 自動歪み防止用 DynamicsCompressor プリセット（ブリックウォール風リミッタ）。
    * threshold:-3dBFS / ratio:12 で実質的な hard limiter として動作し、
    * attack:1ms / release:50ms で過渡応答を最優先（瞬間ピークを確実に抑える）。
@@ -566,17 +649,31 @@ const VolumeBooster = Object.freeze({
     attack: 0.001,
     release: 0.05,
   }),
+  /** 自動音量正規化: 目標RMS。厳密な LUFS ではなく、リアルタイム用途の短時間ラウドネス近似。 */
+  NORMALIZE_TARGET_RMS_DB: -24,
+  /** 自動音量正規化: これ未満は無音/ノイズ扱いにして増幅しない。 */
+  NORMALIZE_SILENCE_GATE_DB: -50,
+  /** 自動音量正規化: 小さい音源を持ち上げる最大量。 */
+  NORMALIZE_MAX_GAIN_DB: 9,
+  /** 自動音量正規化: 大きい音源を下げる最大量。 */
+  NORMALIZE_MIN_GAIN_DB: -12,
+  /** 自動音量正規化: 音量測定とゲイン更新の間隔。 */
+  NORMALIZE_UPDATE_MS: 250,
+  /** 自動音量正規化: 音が大きいときに下げる追従速度。 */
+  NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 0.35,
+  /** 自動音量正規化: 音が小さいときに上げる追従速度。 */
+  NORMALIZE_GAIN_UP_TIME_CONSTANT: 1.2,
   /**
-   * 自動音量正規化用 DynamicsCompressor プリセット（ナチュラル圧縮）。
-   * threshold:-24dBFS / ratio:4 で広いダイナミックレンジを緩く圧縮し、
-   * knee:6dB のソフトニー + attack:50ms / release:300ms で pumping artifact を抑制。
+   * ナイトモード用コンプレッサー（ゲーム音のダイナミックレンジを縮める）。
+   * threshold:-18dBFS / ratio:2.5 でピークを抑えつつ可逆的な声域を残し、
+   * attack:20ms / release:400ms で自然な追従にする。
    */
-  NORMALIZE_PRESET: Object.freeze({
-    threshold: -24,
-    knee: 6,
-    ratio: 4,
-    attack: 0.05,
-    release: 0.3,
+  NIGHT_MODE_PRESET: Object.freeze({
+    threshold: -18,
+    knee: 8,
+    ratio: 2.5,
+    attack: 0.02,
+    release: 0.4,
   }),
   /**
    * compressor 機能 OFF 時のバイパス設定（ratio:1 で実質パススルー）。
@@ -639,3 +736,20 @@ const ColorPicker = Object.freeze({
     return ColorPicker.isValidTab(value) ? value : ColorPicker.TAB_ASSIST;
   },
 });
+
+  // P0-#2: 全定数を globalThis に明示的に公開する。これで content scripts / popup / offscreen /
+  // background が `Actions.X` の bare 名でアクセスできる（globalThis のプロパティは bare 名で
+  // 参照可能という JS 言語仕様）。Chrome 実装の script scope 共有に依存しない安全な設計。
+  globalThis.Actions = Actions;
+  globalThis.ExtensionPaths = ExtensionPaths;
+  globalThis.SenderCheck = SenderCheck;
+  globalThis.Offscreen = Offscreen;
+  globalThis.StorageKeys = StorageKeys;
+  globalThis.KeepAlive = KeepAlive;
+  globalThis.YouTubeShorts = YouTubeShorts;
+  globalThis.SearchFixer = SearchFixer;
+  globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
+  globalThis.InstagramCleaner = InstagramCleaner;
+  globalThis.VolumeBooster = VolumeBooster;
+  globalThis.ColorPicker = ColorPicker;
+})();

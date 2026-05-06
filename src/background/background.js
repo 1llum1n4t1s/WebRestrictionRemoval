@@ -40,6 +40,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
     StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
+    StorageKeys.KEEP_ALIVE_ORIGINS,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
@@ -48,6 +49,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
@@ -61,6 +63,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED in stored)) {
     // HTTP ping は副作用大（認証プロキシ環境で 401/302 ループ誘発）のためデフォルト OFF
     defaults[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] = false;
+  }
+  if (!(StorageKeys.KEEP_ALIVE_ORIGINS in stored)) {
+    defaults[StorageKeys.KEEP_ALIVE_ORIGINS] = [];
   }
   if (!(StorageKeys.SEARCH_FIXER_ENABLED in stored)) {
     defaults[StorageKeys.SEARCH_FIXER_ENABLED] = false;
@@ -86,6 +91,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] = false;
   }
+  if (!(StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] = false;
+  }
   // 顔料アトリエ（カラーピッカー）の新規キー: 履歴は空配列、既定形式は HEX、
   // 最終タブは「アシスト」で初期化。後追いキーが undefined のまま UI に出ないよう
   // 明示的に書き込む（CLAUDE.md の onInstalled 初期化方針）。
@@ -104,6 +112,13 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (Object.keys(defaults).length > 0) {
     await chrome.storage.local.set(defaults);
   }
+
+  // P0-#3 storage 破損検知: install / update のたびに sentinel を必ず書き込む。
+  // popup 起動時にこのキーが消えていたら chrome.storage.local がリセット・破損した可能性として
+  // 開発者コンソールに警告（外部送信ゼロ方針なので telemetry は出さない）。
+  await chrome.storage.local
+    .set({ [StorageKeys.INSTALL_SENTINEL]: 1 })
+    .catch(() => {});
 });
 
 // ---------- メッセージハンドラ ----------
@@ -117,7 +132,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
     // popup が user gesture を持つので、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
     if (!SenderCheck.isFromPopup(sender)) return;
-    setVolumeBoosterGain(request.data?.tabId, request.data?.gain, request.data?.antiClip, request.data?.normalize)
+    setVolumeBoosterGain(
+      request.data?.tabId,
+      request.data?.gain,
+      request.data?.antiClip,
+      request.data?.normalize,
+      request.data?.nightMode
+    )
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
@@ -138,6 +159,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // ---------- タブクローズで音量ブーストを解放 ----------
 chrome.tabs.onRemoved.addListener((tabId) => {
+  rememberRemovedVolumeBoosterTab(tabId);
+  // P2-#19: タブが閉じられた時点でブースト中状態は確実に終了するため、ローカルキャッシュから即削除。
+  // in-flight の set 処理が後から完了した場合も、removedVolumeBoosterTabIds で再登録を弾く。
+  boostedTabIds.delete(tabId);
   chrome.runtime
     .sendMessage({
       target: Offscreen.TARGET,
@@ -183,12 +208,19 @@ async function handleApplySettings(settings) {
  * 理由: storage に紛れ込んだ非 boolean 値（"false" 文字列・数値 1 など）が
  * `!!` だと truthy 判定されて誤って ON 化されうる。デフォルト OFF 方針を堅持するため、
  * 明示的な `true` のときだけ有効化する。
+ *
+ * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / Normalize / NightMode) は
+ * APPLY_SETTINGS の対象外**: popup が VOLUME_BOOSTER_SET_GAIN メッセージで gain と一緒に
+ * 渡してくるため、storage.set は popup 側で直接行う。content script への配信も不要なので
+ * normalizeSettings / toStorageRecord には含めない。新しい音量関連 storage key を増やすときは
+ * この方針を維持するか、APPLY_SETTINGS 経路に統合するかを先に判断すること。
  */
 function normalizeSettings(settings) {
   return {
     keepAliveEnabled: settings?.keepAliveEnabled === true,
     keepAliveIntervalMs: KeepAlive.clampIntervalMs(settings?.keepAliveIntervalMs),
     keepAliveHttpPingEnabled: settings?.keepAliveHttpPingEnabled === true,
+    keepAliveOrigins: KeepAlive.normalizeOrigins(settings?.keepAliveOrigins),
     searchFixerEnabled: settings?.searchFixerEnabled === true,
     searchFixerFeatures: SearchFixer.mergeFeatures(settings?.searchFixerFeatures),
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
@@ -204,6 +236,7 @@ function toStorageRecord(s) {
     [StorageKeys.KEEP_ALIVE_ENABLED]: s.keepAliveEnabled,
     [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: s.keepAliveIntervalMs,
     [StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED]: s.keepAliveHttpPingEnabled,
+    [StorageKeys.KEEP_ALIVE_ORIGINS]: s.keepAliveOrigins,
     [StorageKeys.SEARCH_FIXER_ENABLED]: s.searchFixerEnabled,
     [StorageKeys.SEARCH_FIXER_FEATURES]: s.searchFixerFeatures,
     [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: s.searchFixerGridItems,
@@ -234,6 +267,7 @@ async function notifyContentScripts(s) {
         keepAliveEnabled: s.keepAliveEnabled,
         keepAliveIntervalMs: s.keepAliveIntervalMs,
         keepAliveHttpPingEnabled: s.keepAliveHttpPingEnabled,
+        keepAliveOrigins: s.keepAliveOrigins,
       },
     })
     .catch(() => {});
@@ -332,6 +366,34 @@ let offscreenIdleTimer = null;
 const OFFSCREEN_CLOSE_RESCHEDULE_LIMIT = 10;
 let offscreenCloseRescheduleCount = 0;
 
+// P2-#19: ブースト中タブの background 側ローカルキャッシュ。
+// `setVolumeBoosterGain` が成功するたびに add、`releaseVolumeBoosterTab` 完了 / `chrome.tabs.onRemoved`
+// で delete する。`isVolumeBoosterActive` はこの Set のサイズを優先確認することで、30 秒間隔の
+// `scheduleOffscreenClose` cycle で発生していた sendMessage IPC RTT を排除する。
+// SW 再起動直後は Set が空だが、その時点で `offscreenState === "OPEN"` なら従来通り offscreen に
+// query してフォールバックする（hydrate）。
+/** @type {Set<number>} */
+const boostedTabIds = new Set();
+/** @type {Set<number>} setVolumeBoosterGain の in-flight 完了より先に閉じられたタブ ID */
+const removedVolumeBoosterTabIds = new Set();
+
+function rememberRemovedVolumeBoosterTab(tabId) {
+  if (!Number.isInteger(tabId) || tabId <= 0) return;
+  removedVolumeBoosterTabIds.add(tabId);
+  setTimeout(() => {
+    removedVolumeBoosterTabIds.delete(tabId);
+  }, 5 * 60 * 1000);
+}
+
+async function markVolumeBoosterTabActive(tabId) {
+  if (removedVolumeBoosterTabIds.has(tabId)) {
+    await releaseVolumeBoosterTab(tabId).catch(() => {});
+    return false;
+  }
+  boostedTabIds.add(tabId);
+  return true;
+}
+
 async function ensureOffscreenDocument() {
   if (!chrome.offscreen) return false;
 
@@ -421,6 +483,16 @@ function scheduleOffscreenClose() {
       scheduleOffscreenClose();
       return;
     }
+    // P2-#12 TOCTOU 対策: `await isVolumeBoosterActive()` (sendMessage 往復で数十〜数百 ms かかる)
+    // の最中に setVolumeBoosterGain → ensureOffscreenDocument が走り、新しい AudioContext が
+    // 作られているかもしれない。offscreenState が OPEN 以外 (CREATING / CLOSING / CLOSED) に
+    // 変化している場合は close を諦めて次サイクルに先送りし、確立直後の AudioContext を
+    // 不意打ちで close しないようにする。
+    if (offscreenState !== "OPEN") {
+      if (offscreenState === "CLOSED") return;
+      scheduleOffscreenClose();
+      return;
+    }
     // ここまで到達 = boost なし → カウンタリセットして close へ
     offscreenCloseRescheduleCount = 0;
     offscreenState = "CLOSING";
@@ -468,10 +540,16 @@ async function isVolumeBoosterActive() {
   // 30 秒間隔の `scheduleOffscreenClose()` 再 schedule cycle を確実に止める。
   if (offscreenState === "CLOSED") return false;
 
+  // P2-#19: background 側ローカルキャッシュが「ブースト中タブあり」と知っているなら IPC ゼロで返答。
+  // 30 秒間隔の close cycle で sendMessage RTT を継続消費していた問題を解消する。
+  if (boostedTabIds.size > 0) return true;
+
   // 2-C3 最適化: offscreenState === "OPEN" の場合は getContexts をスキップして
   // sendMessage 直行で 1 往復削減。実際に offscreen が消えていた場合は sendMessage が
   // 失敗 → catch で safe-side の active 扱いになり、次サイクルで自然修復される。
   // CREATING / CLOSING の中間状態のみ getContexts で実存を確認する。
+  // SW 再起動直後で boostedTabIds が空でも、offscreen に audioStates が残っている可能性が
+  // あるため、ここから先のフォールバック query で hydrate される。
   if (offscreenState !== "OPEN") {
     try {
       const url = chrome.runtime.getURL(Offscreen.PATH);
@@ -507,18 +585,25 @@ async function isVolumeBoosterActive() {
  * offscreen 側で各 compressor のパラメータを切り替える。両 OFF 時もチェーンには残し
  * ratio:1 のバイパス設定にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode) {
+  // P2-#13: tabId は popup origin（SenderCheck.isFromPopup で検証済み）から渡されるが、
+  // popup の中では `getActiveHttpTab()` 経由で active tab の id を入れて送ってくる。
+  // popup CSP (`script-src 'self'`) で外部スクリプトが popup 内で動くことは事実上不可能なため、
+  // popup が悪意ある tabId を送る経路は現状塞がれている。Number.isInteger + 正数の型検証だけで
+  // 十分な信頼境界。将来 popup CSP が緩む / popup XSS が成立する場合は、
+  // chrome.tabs.get(tabId) で url が http(s) に限定されているかを追加検証する案を検討する。
   if (!Number.isInteger(tabId) || tabId <= 0) {
     return { ok: false, error: "invalid-tab-id" };
   }
   const clamped = VolumeBooster.clampValue(gain);
   const antiClipFlag = antiClip === true;
   const normalizeFlag = normalize === true;
+  const nightModeFlag = nightMode === true;
 
   // スライダーが等倍位置 (100%) かつ全サブトグル OFF のときだけ release → リソース返却。
   // 100% でも自動歪み防止 / 自動音量正規化のいずれかが ON なら compressor を効かせる必要があるため
   // AudioContext を維持して通常経路に進む（gain は 1.0x にランプ、compressor は preset 通り適用）。
-  if (clamped === VolumeBooster.UNITY && !antiClipFlag && !normalizeFlag) {
+  if (clamped === VolumeBooster.UNITY && !antiClipFlag && !normalizeFlag && !nightModeFlag) {
     await releaseVolumeBoosterTab(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
   }
@@ -541,18 +626,27 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
         gain: clamped,
         antiClip: antiClipFlag,
         normalize: normalizeFlag,
+        nightMode: nightModeFlag,
       });
     } catch (err) {
       // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー
-    } finally {
-      scheduleOffscreenClose();
     }
     // EC-2 対策: getVolumeBoosterGain で「state あり」と判定後に audioStates が削除される
     // race（onRemoved や release 経路と同時操作）に対して、offscreen が
     // `invalid-stream-id` を返した場合は fresh 取得経路に自動フォールスルーして自己修復する。
-    if (res?.ok) return res;
-    if (res && res.error !== "invalid-stream-id") return res;
-    // res が undefined or invalid-stream-id → fresh 取得経路へ
+    // P2-#11: scheduleOffscreenClose は呼出側で 1 回だけ。fresh 取得経路にフォールスルーすると
+    // 末尾 finally で呼ばれるので、ここでは早期 return パスでのみ明示的に呼ぶ。
+    if (res?.ok) {
+      // P2-#19: 成功確認後にローカルキャッシュへ追加（既存 state 経路ではすでに add 済みかもしれないが冪等）。
+      await markVolumeBoosterTabActive(tabId);
+      scheduleOffscreenClose();
+      return res;
+    }
+    if (res && res.error !== "invalid-stream-id") {
+      scheduleOffscreenClose();
+      return res;
+    }
+    // res が undefined or invalid-stream-id → fresh 取得経路へ（末尾 finally で 1 回 schedule）
   }
 
   // 新規接続: tabCapture から streamId を取得。
@@ -581,7 +675,11 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize) {
       gain: clamped,
       antiClip: antiClipFlag,
       normalize: normalizeFlag,
+      nightMode: nightModeFlag,
     });
+    // P2-#19: 成功時のみローカルキャッシュに登録。失敗（offscreen エラー / no-response）の場合は
+    // ブースト中状態にならないため Set には追加しない。
+    if (res?.ok) await markVolumeBoosterTabActive(tabId);
     return res ?? { ok: false, error: "no-response" };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
@@ -635,6 +733,9 @@ async function getVolumeBoosterGain(tabId) {
  */
 async function releaseVolumeBoosterTab(tabId) {
   if (!Number.isInteger(tabId) || tabId <= 0) return { ok: true };
+  // P2-#19: release 経路に入った時点でローカルキャッシュからは確実に外す。offscreen 側の
+  // sendMessage が失敗しても次回 setVolumeBoosterGain で正常に再 add されるため、楽観削除で OK。
+  boostedTabIds.delete(tabId);
   try {
     const url = chrome.runtime.getURL(Offscreen.PATH);
     const contexts = await chrome.runtime.getContexts({

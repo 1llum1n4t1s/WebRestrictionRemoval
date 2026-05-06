@@ -548,15 +548,15 @@ body {
 
 /* スライダー上で 100% を視覚的にマーキング（::before の grid mark）。
    appearance: none の input には疑似要素を直接付けられないので、
-   親 .sub-block に重ねるグラデーション線で 100% (= 1/6) 位置に細い罫を描く。 */
+   親 .sub-block に重ねるグラデーション線で 100% (= 中央) 位置に細い罫を描く。 */
 .sub-block.volume-track-mark {
   position: relative;
 }
 .sub-block.volume-track-mark::after {
   content: "";
   position: absolute;
-  /* スライダーの padding 分（12px）をオフセット。100/600 ≒ 16.67% 地点に縦線。 */
-  left: calc(12px + (100% - 24px) * (100 / 600));
+  /* スライダーの padding 分（12px）をオフセット。100% は UI スライダー中央。 */
+  left: calc(12px + (100% - 24px) * 0.5);
   bottom: 13px;
   width: 1px;
   height: 9px;

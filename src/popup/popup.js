@@ -37,6 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeHint = document.getElementById("volumeHint");
   const $volumeAntiClipToggle = document.getElementById("volumeAntiClipToggle");
   const $volumeNormalizeToggle = document.getElementById("volumeNormalizeToggle");
+  const $volumeNightModeToggle = document.getElementById("volumeNightModeToggle");
   const $intervalRow = document.getElementById("intervalRow");
   const $intervalSlider = document.getElementById("intervalSlider");
   const $intervalValue = document.getElementById("intervalValue");
@@ -75,10 +76,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ----- 現在状態を復元 -----
   // 3-C4 最適化: アシスト系 + カラーピッカー系の storage key を 1 回の get で並列取得し、
   // popup 起動時の直列 RTT (旧: 2 回 await) を 1 回に削減する。
+  // P0-#3: INSTALL_SENTINEL も同じ get に乗せて storage 破損 / リセットを検知する。
   const stored = await chrome.storage.local.get([
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
     StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
+    StorageKeys.KEEP_ALIVE_ORIGINS,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
@@ -87,25 +90,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
+    StorageKeys.INSTALL_SENTINEL,
   ]);
 
-  $keepAliveToggle.checked = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
+  // P0-#3 storage 破損検知: onInstalled で必ず書き込まれる sentinel が消えていれば、
+  // chrome.storage.local がリセット・破損した可能性。本番ユーザーへ telemetry 送信は行わず
+  // 開発者コンソールに警告のみ出して、自動的にセンチネルを再書き込みする（次回以降は警告なし）。
+  if (stored[StorageKeys.INSTALL_SENTINEL] !== 1) {
+    console.warn(
+      "[WebViewingAssist] storage センチネルが見つかりません。chrome.storage.local が" +
+        "リセットまたは破損された可能性があります。設定が初期状態（全マスタートグル OFF）に" +
+        "戻っている場合は再度トグルを有効化してください。"
+    );
+    chrome.storage.local
+      .set({ [StorageKeys.INSTALL_SENTINEL]: 1 })
+      .catch(() => {});
+  }
+
+  let keepAliveOrigins = KeepAlive.normalizeOrigins(stored[StorageKeys.KEEP_ALIVE_ORIGINS]);
+  const currentKeepAliveOrigin = await getActiveHttpOrigin();
+  $keepAliveToggle.checked =
+    stored[StorageKeys.KEEP_ALIVE_ENABLED] === true &&
+    currentKeepAliveOrigin !== null &&
+    KeepAlive.isOriginAllowed(keepAliveOrigins, currentKeepAliveOrigin);
+  if (!currentKeepAliveOrigin) {
+    $keepAliveToggle.disabled = true;
+    $keepAliveHttpPingToggle.disabled = true;
+  }
   $keepAliveHttpPingToggle.checked = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNormalizeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
+  $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
 
   // 音量スライダー初期値設定（ブースト中なら active tab の現在値を反映）
-  $volumeSlider.min = String(VolumeBooster.MIN);
-  $volumeSlider.max = String(VolumeBooster.MAX);
+  $volumeSlider.min = String(VolumeBooster.SLIDER_MIN);
+  $volumeSlider.max = String(VolumeBooster.SLIDER_MAX);
   $volumeSlider.step = String(VolumeBooster.STEP);
-  $volumeSlider.value = String(VolumeBooster.DEFAULT);
+  $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(VolumeBooster.DEFAULT));
   updateVolumeLabel(VolumeBooster.DEFAULT);
   syncCurrentTabVolume().catch(() => {});
 
@@ -288,19 +317,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 音量スライダー: input でラベル + debounced push、change（マウスアップ）で即送信
   $volumeSlider.addEventListener("input", () => {
-    const v = VolumeBooster.clampValue($volumeSlider.value);
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     updateVolumeLabel(v);
     scheduleVolumePush(v);
   });
   $volumeSlider.addEventListener("change", () => {
-    const v = VolumeBooster.clampValue($volumeSlider.value);
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     cancelVolumePush();
     pushVolumeNow(v).catch(() => {});
   });
 
   $volumeResetBtn.addEventListener("click", async () => {
     cancelVolumePush();
-    $volumeSlider.value = String(VolumeBooster.DEFAULT);
+    $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(VolumeBooster.DEFAULT));
     updateVolumeLabel(VolumeBooster.DEFAULT);
     await pushVolumeNow(VolumeBooster.DEFAULT);
   });
@@ -324,6 +353,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }).catch(() => {});
     applyCompressorTogglePush();
   });
+  $volumeNightModeToggle.addEventListener("change", () => {
+    cancelVolumePush();
+    chrome.storage.local.set({
+      [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
+    }).catch(() => {});
+    applyCompressorTogglePush();
+  });
 
   /**
    * compressor トグル変更時の共通処理: 現在 gain を再送信して AudioContext / compressor 状態を即時反映する。
@@ -332,7 +368,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * トグルだけ変えても即座に効果が出る（旧仕様の「100% より上で有効」ヒントは廃止）。
    */
   async function applyCompressorTogglePush() {
-    const v = VolumeBooster.clampValue($volumeSlider.value);
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     await pushVolumeNow(v).catch(() => {});
   }
 
@@ -494,7 +530,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- 適用 -----
   async function apply() {
-    const keepAliveEnabled = $keepAliveToggle.checked;
+    const keepAliveSiteEnabled = $keepAliveToggle.checked;
+    const nextKeepAliveOrigins = new Set(keepAliveOrigins);
+    if (currentKeepAliveOrigin) {
+      if (keepAliveSiteEnabled) {
+        nextKeepAliveOrigins.add(currentKeepAliveOrigin);
+      } else {
+        nextKeepAliveOrigins.delete(currentKeepAliveOrigin);
+      }
+    }
+    keepAliveOrigins = KeepAlive.normalizeOrigins(Array.from(nextKeepAliveOrigins));
+    const keepAliveEnabled = keepAliveOrigins.length > 0;
     const keepAliveHttpPingEnabled = $keepAliveHttpPingToggle.checked;
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
@@ -513,6 +559,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           keepAliveEnabled,
           keepAliveIntervalMs,
           keepAliveHttpPingEnabled,
+          keepAliveOrigins,
           searchFixerEnabled,
           searchFixerFeatures,
           searchFixerGridItems,
@@ -525,7 +572,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (res?.ok) {
         showStatus(
           buildOkMessage(
-            keepAliveEnabled,
+            keepAliveSiteEnabled,
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
             instagramCleanerEnabled
@@ -632,6 +679,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           gain: value,
           antiClip: $volumeAntiClipToggle.checked,
           normalize: $volumeNormalizeToggle.checked,
+          nightMode: $volumeNightModeToggle.checked,
         },
       });
       if (res?.ok) {
@@ -691,11 +739,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         data: { tabId: tab.id },
       });
       const v = Number.isFinite(res?.gain) ? VolumeBooster.clampValue(res.gain) : VolumeBooster.DEFAULT;
-      $volumeSlider.value = String(v);
+      $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(v));
       updateVolumeLabel(v);
       setVolumeHint("");
     } catch {
-      $volumeSlider.value = String(VolumeBooster.DEFAULT);
+      $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(VolumeBooster.DEFAULT));
       updateVolumeLabel(VolumeBooster.DEFAULT);
     }
   }
@@ -714,6 +762,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch {
       return null;
     }
+  }
+
+  async function getActiveHttpOrigin() {
+    const tab = await getActiveHttpTab();
+    if (!tab?.url) return null;
+    return KeepAlive.normalizeOrigin(tab.url);
   }
 
   function clampMinutes(min) {

@@ -5,44 +5,125 @@
   <title>Promo Marquee - 1400x560</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --paper: #fff8ea;
+      --ink: #201b19;
+      --akane: #c0605a;
+      --akane-dark: #7d3936;
+      --gold: #d9a441;
+    }
     body {
-      width: 1400px; height: 560px;
-      background: linear-gradient(135deg, #C0605A 0%, #A8524D 100%);
-      display: flex; align-items: center; justify-content: center;
-      font-family: -apple-system, "Segoe UI", sans-serif;
-      overflow: hidden; color: #fff;
+      width: 1400px;
+      height: 560px;
+      overflow: hidden;
+      color: var(--ink);
+      font-family: "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      background:
+        radial-gradient(circle at 90% 14%, rgba(192, 96, 90, 0.28), transparent 28%),
+        radial-gradient(circle at 12% 80%, rgba(217, 164, 65, 0.22), transparent 30%),
+        linear-gradient(120deg, #fffaf0 0%, #eed6bd 100%);
+      display: grid;
+      place-items: center;
     }
-    .container {
-      display: flex; align-items: center; gap: 80px;
+    .stage {
+      position: relative;
+      width: 1260px;
+      height: 430px;
+      border-radius: 42px;
+      background: rgba(255, 248, 234, 0.82);
+      box-shadow: 0 34px 80px rgba(76, 49, 39, 0.2), inset 0 0 0 1px rgba(255,255,255,0.7);
+      display: grid;
+      grid-template-columns: 500px 1fr;
+      align-items: center;
+      gap: 56px;
+      padding: 46px 58px;
+      overflow: hidden;
     }
-    .left { max-width: 520px; }
-    h1 { font-size: 52px; font-weight: 800; margin-bottom: 16px; line-height: 1.2; }
-    p { font-size: 20px; opacity: 0.9; line-height: 1.6; }
-    .features {
-      display: flex; flex-direction: column; gap: 16px;
+    .stage::after {
+      content: "LOCAL ONLY";
+      position: absolute;
+      right: 38px;
+      top: 32px;
+      color: rgba(32, 27, 25, 0.13);
+      font: 900 42px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      letter-spacing: 0.08em;
+    }
+    .copy {
+      position: relative;
+      z-index: 1;
+    }
+    .eyebrow {
+      color: var(--akane-dark);
+      font-weight: 900;
+      letter-spacing: 0.17em;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+      font-size: 60px;
+      line-height: 1.04;
+      letter-spacing: -0.06em;
+      margin-bottom: 18px;
+    }
+    p {
+      color: #685853;
+      font-size: 18px;
+      line-height: 1.78;
+    }
+    .rail {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
     }
     .feat {
-      background: rgba(255,255,255,0.15); border-radius: 12px;
-      padding: 16px 20px; display: flex; align-items: center; gap: 14px;
-      backdrop-filter: blur(10px);
+      min-height: 104px;
+      border-radius: 24px;
+      padding: 19px;
+      background: rgba(255, 255, 255, 0.76);
+      box-shadow: 0 18px 34px rgba(80, 52, 42, 0.12);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
-    .feat .icon { font-size: 28px; }
-    .feat .text { font-size: 16px; font-weight: 600; }
+    .feat b {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--ink);
+      font-size: 13px;
+    }
+    .feat span {
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+    .feat:nth-child(2), .feat:nth-child(5) { background: #f7e0dc; }
+    .feat:nth-child(3) { background: #e9f0e7; }
+    .feat:nth-child(4) { background: #e8eff4; }
+    .feat:nth-child(6) { background: #fff1cf; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="left">
-      <h1>WEB閲覧アシスト</h1>
-      <p>閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Chrome 拡張機能。</p>
-    </div>
-    <div class="features">
-      <div class="feat"><span class="icon">🔄</span><span class="text">セッション維持</span></div>
-      <div class="feat"><span class="icon">🧹</span><span class="text">YouTube クリーナー</span></div>
-      <div class="feat"><span class="icon">📦</span><span class="text">Amazon 月別合計</span></div>
-      <div class="feat"><span class="icon">📷</span><span class="text">Instagram クリーナー</span></div>
-      <div class="feat"><span class="icon">🔊</span><span class="text">タブ音量ブースター</span></div>
-    </div>
-  </div>
+  <main class="stage">
+    <section class="copy">
+      <div class="eyebrow">WEB VIEWING ASSIST</div>
+      <h1>閲覧を、<br>自分の手元で整える。</h1>
+      <p>セッション維持、動画・SNS の整理、月別合計、音量補正、色採取まで。外部送信なしの Chrome 拡張機能。</p>
+    </section>
+    <section class="rail" aria-label="主要機能">
+      <div class="feat"><b>01</b><span>現在サイトだけ<br>セッション維持</span></div>
+      <div class="feat"><b>02</b><span>YouTube<br>22 機能クリーナー</span></div>
+      <div class="feat"><b>03</b><span>Amazon<br>月別合計</span></div>
+      <div class="feat"><b>04</b><span>Instagram<br>集中モード</span></div>
+      <div class="feat"><b>05</b><span>音量 0〜300%<br>ナイトモード</span></div>
+      <div class="feat"><b>06</b><span>カラーピッカー<br>履歴ローカル保存</span></div>
+    </section>
+  </main>
 </body>
 </html>

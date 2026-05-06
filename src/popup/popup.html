@@ -51,6 +51,7 @@
           </span>
           <span class="sub-value" id="volumeValue">100%</span>
         </div>
+        <div class="tr-desc">動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです</div>
         <input type="range" id="volumeSlider" class="range" />
         <div class="volume-actions">
           <button type="button" id="volumeResetBtn" class="ghost-btn" aria-label="音量を 100% に戻す">100% に戻す</button>
@@ -62,7 +63,7 @@
           <span class="tr-icon" aria-hidden="true">🛡️</span>
           <span class="tr-text">
             <span class="tr-name">自動歪み防止</span>
-            <span class="tr-desc">高い増幅率でもピークを抑え音割れを防止（DynamicsCompressor 即応リミッタ）</span>
+            <span class="tr-desc">突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="volumeAntiClipToggle" />
@@ -74,10 +75,22 @@
           <span class="tr-icon" aria-hidden="true">📊</span>
           <span class="tr-text">
             <span class="tr-name">自動音量正規化</span>
-            <span class="tr-desc">動画ごとの音量バラつきを緩く圧縮して均一化（DynamicsCompressor ナチュラル圧縮）</span>
+            <span class="tr-desc">動画や配信ごとの平均音量を測り、自動ゲインで聞こえ方をそろえます</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="volumeNormalizeToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <label class="toggle-row toggle-row--sub" id="volumeNightModeToggleRow">
+          <span class="tr-icon" aria-hidden="true">🌙</span>
+          <span class="tr-text">
+            <span class="tr-name">ナイトモード</span>
+            <span class="tr-desc">大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="volumeNightModeToggle" />
             <span class="switch-track" aria-hidden="true"></span>
           </span>
         </label>
@@ -197,11 +210,11 @@
       <h2 class="grp-title"><span class="grp-title-text">セッション</span></h2>
 
       <label class="toggle-row" id="keepAliveToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔄</span>
-        <span class="tr-text">
-          <span class="tr-name">セッション維持</span>
-          <span class="tr-desc">合成イベント dispatch でアイドル検知をリセット</span>
-        </span>
+          <span class="tr-icon" aria-hidden="true">🔄</span>
+          <span class="tr-text">
+            <span class="tr-name">セッション維持</span>
+            <span class="tr-desc">現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット</span>
+          </span>
         <span class="switch">
           <input type="checkbox" id="keepAliveToggle" />
           <span class="switch-track" aria-hidden="true"></span>
@@ -221,7 +234,7 @@
           <span class="tr-icon" aria-hidden="true">🌐</span>
           <span class="tr-text">
             <span class="tr-name">サーバーへの軽量 ping を併発</span>
-            <span class="tr-desc">同一オリジンに HEAD/GET。認証プロキシ環境では OFF 推奨</span>
+            <span class="tr-desc">このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="keepAliveHttpPingToggle" />

@@ -50,7 +50,9 @@ function createKeepAlive({ intervalMs, httpPingEnabled = false }) {
   }
 
   function collectHttpPingCandidates() {
-    // iframe 多重発射を避けつつ「アプリ本体が iframe 内にある」ケースは許可する。
+    // セッション維持は popup で許可した top-level origin にだけ効かせる。
+    // iframe 由来の第三者 origin へ ping を出すと、ユーザーが意図していない埋め込み先の
+    // セッション延命や監査ログ生成につながるため、HTTP ping 候補は top frame のみで作る。
     if (!shouldFireHttpPing()) return [];
 
     let currentUrl = null;
@@ -100,6 +102,12 @@ function createKeepAlive({ intervalMs, httpPingEnabled = false }) {
   }
 
   function dispatchSyntheticActivity() {
+    // 合成イベントは top frame のみで dispatch する。iframe 内で全 http(s) フレームに mousemove を
+    // 撃ち続けると企業環境 DLP/SIEM が「ユーザー操作なしの mousemove 連発」をボット行動として
+    // 検知するルールに引っかかりうる。HTTP ping も shouldFireHttpPing() で top frame のみに
+    // 絞っているため、合成イベントも同等の保守的な範囲に揃える。
+    if (window !== window.top) return;
+
     const bubbleTargets = [document, window];
     dispatchEventToTargets(
       bubbleTargets,
@@ -139,11 +147,16 @@ function createKeepAlive({ intervalMs, httpPingEnabled = false }) {
       // ブラウザが自動付与する）。
       // タイムアウト追加 (#21): ネットワーク断でリクエストが永遠に解決されず pingInFlight が
       // ロックされるのを防ぐため、5 秒で abort する。
+      // redirect: "manual" 採用: SharePoint 等の `/_api/web` GET が認証プロキシで第三者オリジンに
+      // 302 された場合、Fetch Standard 上 `credentials: "same-origin"` だけでは Cookie 送信が
+      // 仕様上曖昧（実装依存）。redirect を手動扱いにすれば opaqueredirect 応答を `ok: false` として
+      // 弾くことでクロスオリジン Cookie 漏洩経路を完全に閉じる。同一オリジン 200 のみ成功扱い。
       const response = await fetch(candidate.url, {
         method: candidate.method,
         credentials: "same-origin",
         cache: "no-store",
         keepalive: true,
+        redirect: "manual",
         signal: AbortSignal.timeout(5000),
       });
       return response.ok;
@@ -222,27 +235,10 @@ function createKeepAlive({ intervalMs, httpPingEnabled = false }) {
 
 /**
  * 現在フレームから HTTP ping を発射すべきかを判定する。
- *
- * 狙い:
- *   - 同一オリジンの多重発射を回避（例: SharePoint トップ + その内部 iframe で10倍に膨らむ問題）
- *   - かつ「アプリ本体が iframe 内で動く」ケースでも ping を止めない
- *     （例: 社内ポータル <iframe src="*.box.com"> のように top と frame のオリジンが違う）
- *
- * ルール:
- *   - トップフレームなら常に発射（同一/異オリジン iframe の重複判定はそちらに任せる）
- *   - iframe では、トップフレームの hostname が取れて自フレームと一致するなら発射しない
- *     （同一オリジン iframe: トップが発射するので重複回避）
- *   - hostname 取得が SecurityError で失敗（= トップがクロスオリジン）なら発射する
- *     （トップからは自フレームのオリジンへ ping を撃てないため、代わりに自分が撃つ）
+ * サイト単位オプトインの境界を守るため、top frame のみ発射する。
  */
 function shouldFireHttpPing() {
-  if (window === window.top) return true;
-  try {
-    return window.top.location.hostname !== location.hostname;
-  } catch {
-    // クロスオリジン: トップからは presets が自フレームに適用できないので、ここで発射する
-    return true;
-  }
+  return window === window.top;
 }
 
 // ============================================================
@@ -269,10 +265,11 @@ function shouldFireHttpPing() {
     return keeper;
   }
 
-  function applyState(enabled, intervalMs, httpPingEnabled) {
+  function applyState(enabled, intervalMs, httpPingEnabled, origins) {
     const ms = KeepAlive.clampIntervalMs(intervalMs);
     const ping = httpPingEnabled === true;
-    if (enabled) {
+    const siteEnabled = enabled === true && KeepAlive.isOriginAllowed(origins, location.origin);
+    if (siteEnabled) {
       ensureKeeper(ms, ping).start();
     } else if (keeper) {
       keeper.stop();
@@ -285,6 +282,7 @@ function shouldFireHttpPing() {
       StorageKeys.KEEP_ALIVE_ENABLED,
       StorageKeys.KEEP_ALIVE_INTERVAL_MS,
       StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
+      StorageKeys.KEEP_ALIVE_ORIGINS,
     ])
     .then((stored) => {
       const enabled = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
@@ -292,7 +290,8 @@ function shouldFireHttpPing() {
         ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
         : KeepAlive.DEFAULT_INTERVAL_MS;
       const httpPing = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
-      applyState(enabled, ms, httpPing);
+      const origins = KeepAlive.normalizeOrigins(stored[StorageKeys.KEEP_ALIVE_ORIGINS]);
+      applyState(enabled, ms, httpPing, origins);
     })
     .catch(() => {});
 
@@ -305,7 +304,8 @@ function shouldFireHttpPing() {
       ? request.data.keepAliveIntervalMs
       : KeepAlive.DEFAULT_INTERVAL_MS;
     const httpPing = request.data?.keepAliveHttpPingEnabled === true;
-    applyState(enabled, ms, httpPing);
+    const origins = KeepAlive.normalizeOrigins(request.data?.keepAliveOrigins);
+    applyState(enabled, ms, httpPing, origins);
   });
 
   // 全タブ・全フレーム横断の同期 (onChanged は MV3 で全 frame に発火する)
@@ -314,35 +314,42 @@ function shouldFireHttpPing() {
     const enabledChange = changes[StorageKeys.KEEP_ALIVE_ENABLED];
     const intervalChange = changes[StorageKeys.KEEP_ALIVE_INTERVAL_MS];
     const httpPingChange = changes[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED];
-    if (!enabledChange && !intervalChange && !httpPingChange) return;
+    const originsChange = changes[StorageKeys.KEEP_ALIVE_ORIGINS];
+    if (!enabledChange && !intervalChange && !httpPingChange && !originsChange) return;
 
-    // 通常パス: handleApplySettings 経由で 3 キーすべてが同時変化する場合は newValue を直接使い、
-    // 不要な storage.get IPC ラウンドトリップを節約する（全 http(s) フレーム × 全タブ分の節約効果）。
-    if (enabledChange && intervalChange && httpPingChange) {
-      const enabled = enabledChange.newValue === true;
-      const ms = Number.isFinite(intervalChange.newValue)
+    // P3-#24: 変化したキーは newValue を即利用し、欠損キーのみ storage.get で補完する選択的補完方式。
+    // 旧実装は「3 キーすべて変化」のみ高速パス、それ以外は全 3 キーを get していた。
+    // この変更で「2 キー変化 / 1 キー変化」のエッジケースでも RTT を最小化できる
+    // （全 http(s) フレーム × 全タブ分の節約効果）。
+    const missingKeys = [];
+    if (!enabledChange) missingKeys.push(StorageKeys.KEEP_ALIVE_ENABLED);
+    if (!intervalChange) missingKeys.push(StorageKeys.KEEP_ALIVE_INTERVAL_MS);
+    if (!httpPingChange) missingKeys.push(StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED);
+    if (!originsChange) missingKeys.push(StorageKeys.KEEP_ALIVE_ORIGINS);
+
+    const apply = (filled) => {
+      const enabled = enabledChange
+        ? enabledChange.newValue === true
+        : filled[StorageKeys.KEEP_ALIVE_ENABLED] === true;
+      const intervalRaw = intervalChange
         ? intervalChange.newValue
+        : filled[StorageKeys.KEEP_ALIVE_INTERVAL_MS];
+      const ms = Number.isFinite(intervalRaw)
+        ? intervalRaw
         : KeepAlive.DEFAULT_INTERVAL_MS;
-      const httpPing = httpPingChange.newValue === true;
-      applyState(enabled, ms, httpPing);
+      const httpPing = httpPingChange
+        ? httpPingChange.newValue === true
+        : filled[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
+      const origins = originsChange
+        ? KeepAlive.normalizeOrigins(originsChange.newValue)
+        : KeepAlive.normalizeOrigins(filled[StorageKeys.KEEP_ALIVE_ORIGINS]);
+      applyState(enabled, ms, httpPing, origins);
+    };
+
+    if (missingKeys.length === 0) {
+      apply({});
       return;
     }
-
-    // エッジケース（一部のキーだけ変化）: 変化していない側の最新値を取得するため storage.get で補完。
-    chrome.storage.local
-      .get([
-        StorageKeys.KEEP_ALIVE_ENABLED,
-        StorageKeys.KEEP_ALIVE_INTERVAL_MS,
-        StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-      ])
-      .then((stored) => {
-        const enabled = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
-        const ms = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
-          ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
-          : KeepAlive.DEFAULT_INTERVAL_MS;
-        const httpPing = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
-        applyState(enabled, ms, httpPing);
-      })
-      .catch(() => {});
+    chrome.storage.local.get(missingKeys).then(apply).catch(() => {});
   });
 })();

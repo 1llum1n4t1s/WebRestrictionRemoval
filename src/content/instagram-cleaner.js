@@ -36,6 +36,16 @@
   /** @type {number|null} URL リダイレクト用ポーリングタイマー */
   let urlGuardTimer = null;
 
+  // i18n / セレクタ崩壊の watch dog (#10): href ベースセレクタが DOM にマッチしないとき
+  // Instagram の DOM 構造／aria-label/href が変わった可能性があるので開発者コンソールに 1 度だけ警告。
+  // ユーザーへの直接通知は出さず、本番ユーザーが DevTools を開いたときの診断補助に留める。
+  /** @type {Set<string>} 警告済み機能キー */
+  const i18nWarned = new Set();
+  const I18N_WATCHDOG_SELECTORS = Object.freeze({
+    reels: 'a[href="/reels/"]',
+    explore: 'a[href="/explore/"]',
+  });
+
   // ---------- 機能アクセサ ----------
   // master が false ならすべて false 扱い。
   const f = (key) => active && features[key] === true;
@@ -93,6 +103,26 @@
     for (const [key, className] of Object.entries(InstagramCleaner.BODY_CLASS)) {
       root.classList.toggle(className, f(key));
     }
+    checkI18nWatchdog();
+  }
+
+  /**
+   * 機能 ON なのに対応セレクタが DOM に見当たらない場合、Instagram 側の UI 変更で機能が
+   * silent failure している可能性を開発者コンソールに 1 度だけ警告する (#10)。
+   * 警告は機能キーごとに 1 回限りで、本番ユーザーへの直接通知は出さない。
+   */
+  function checkI18nWatchdog() {
+    if (!active) return;
+    if (!document.body || document.body.children.length === 0) return;
+    for (const [key, selector] of Object.entries(I18N_WATCHDOG_SELECTORS)) {
+      if (i18nWarned.has(key)) continue;
+      if (!features[key]) continue;
+      if (document.querySelector(selector)) continue;
+      i18nWarned.add(key);
+      console.warn(
+        `[Instagram cleaner] 機能 "${key}" のセレクタ "${selector}" が DOM にマッチしません。Instagram の UI 変更でセレクタが古くなっている可能性があります。`
+      );
+    }
   }
 
   // ---------- DOM 監視（block_videos / vanity） ----------
@@ -128,6 +158,10 @@
     // visibility 復帰時は visibilitychange イベントで強制発火しないが、次の 300ms 間隔で
     // 自動的にスイープが走るため、最大 300ms 遅延の許容範囲内で大幅に低 CPU 化できる。
     if (document.hidden) return;
+    // P2-#14: 全 sweep 機能 OFF なら 10 個の document-wide querySelectorAll をすべてスキップする。
+    // Instagram フィードは記事 50 件 × 各 ~2000 ノード = 10万ノードを 300ms ごとに走査するので
+    // OFF 時のスキップによる省 CPU 効果は大きい。
+    if (!f("blockVideos") && !f("vanity") && !f("comments")) return;
     if (f("blockVideos")) markArticlesContainingVideo();
     if (f("vanity")) markCounterButtons();
     if (f("comments")) markCommentElements();
@@ -257,9 +291,16 @@
     try {
       // (1) フィード `<article>` 内の数値ボタン（いいね数 / 再生回数等）
       document
-        .querySelectorAll("article button:not(." + InstagramCleaner.VANITY_HIDE_CLASS + ")")
+        .querySelectorAll(
+          "article button:not(." +
+            InstagramCleaner.VANITY_HIDE_CLASS +
+            "):not(." +
+            InstagramCleaner.VANITY_CHECKED_CLASS +
+            ")"
+        )
         .forEach((btn) => {
-          const text = (btn.innerText ?? "").trim();
+          const text = (btn.textContent ?? "").trim();
+          btn.classList.add(InstagramCleaner.VANITY_CHECKED_CLASS);
           if (!text || text.length > 30) return;
           // 純粋な数値表現（カンマ・小数点・空白 + 末尾の単位）にマッチするか
           // 例: "1,234" / "567" / "1.2k" / "10万" / "5 億"
@@ -322,6 +363,10 @@
 
   function checkUrlRedirect() {
     if (!active) return;
+    // P2-#18: タブが非表示のときはリダイレクトをスキップ。Battery Saver / Background Throttling で
+    // setInterval 間隔が伸びる環境でもバックグラウンドの不要な location.assign を抑える。
+    // visibility 復帰時は visibilitychange リスナーで即時再評価する。
+    if (document.hidden) return;
     const path = location.pathname;
     let shouldRedirect = false;
     if (f("reels") && /^\/reels?(\/|$)/i.test(path)) shouldRedirect = true;
@@ -335,19 +380,30 @@
     }
   }
 
+  // 非表示タブから復帰したら即時 1 回チェック（次の 300ms 周期を待たずにリダイレクト判定）。
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && active) checkUrlRedirect();
+  });
+
   // ---------- 機能 OFF 時の cleanup ----------
   function cleanupMarkers() {
     try {
       const markerClasses = [
         InstagramCleaner.ARTICLE_VIDEO_CLASS,
         InstagramCleaner.VANITY_HIDE_CLASS,
+        InstagramCleaner.VANITY_CHECKED_CLASS,
         InstagramCleaner.COMMENT_INPUT_CLASS,
         InstagramCleaner.COMMENT_VIEW_CLASS,
         InstagramCleaner.COMMENT_LIST_CLASS,
       ];
-      for (const cls of markerClasses) {
-        document.querySelectorAll("." + cls).forEach((el) => el.classList.remove(cls));
-      }
+      // P3-#25: 5 回の document.querySelectorAll を `:is(...)` で 1 回に統合。
+      // 1 要素が複数マーカーを持つ可能性は低いが、念のため for ループで全クラスを試行する。
+      const selector = ":is(" + markerClasses.map((c) => "." + c).join(",") + ")";
+      document.querySelectorAll(selector).forEach((el) => {
+        for (const cls of markerClasses) {
+          el.classList.remove(cls);
+        }
+      });
     } catch {}
     // body class は applyBodyClasses で外し済み（active=false で全 false 扱い）
   }

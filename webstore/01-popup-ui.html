@@ -3,72 +3,192 @@
 <head>
   <meta charset="UTF-8">
   <title>Screenshot 1 - Popup UI</title>
-  <!--
-    マーケティング素材 (1280×800)。右側に実際の popup を iframe で埋め込み、
-    popup.html / popup.css / popup.js の変更が自動的にスクショに反映される設計。
-    `popup-render.html` は generate-screenshots.js が popup.html から動的生成する
-    （chrome.* shim 注入 + 相対パス調整）。
-  -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #25201f;
+      --muted: #6f5f5a;
+      --paper: #fff7ec;
+      --paper-deep: #efd8c1;
+      --akane: #c0605a;
+      --akane-dark: #8f433f;
+      --gold: #d9a441;
+      --shadow: rgba(61, 39, 33, 0.28);
+    }
     body {
-      width: 1280px; height: 800px;
-      background: linear-gradient(135deg, #C0605A 0%, #A8524D 100%);
-      display: flex; align-items: center; justify-content: center;
-      font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+      width: 1280px;
+      height: 800px;
       overflow: hidden;
-      gap: 64px;
-      padding: 0 48px;
+      color: var(--ink);
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+      background:
+        radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.92), transparent 24%),
+        radial-gradient(circle at 88% 12%, rgba(217, 164, 65, 0.25), transparent 26%),
+        radial-gradient(circle at 80% 88%, rgba(192, 96, 90, 0.34), transparent 34%),
+        linear-gradient(135deg, #fffaf0 0%, #f2dac2 48%, #ba665b 100%);
+      display: grid;
+      place-items: center;
     }
-    .text-area {
-      color: #fff;
-      max-width: 480px;
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(90deg, rgba(37, 32, 31, 0.025) 0 1px, transparent 1px 7px),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 11px);
+      mix-blend-mode: multiply;
+      pointer-events: none;
     }
-    .text-area .badge {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.18);
-      color: #fff;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      backdrop-filter: blur(10px);
+    .sheet {
+      position: relative;
+      width: 1136px;
+      height: 690px;
+      border-radius: 38px;
+      background: rgba(255, 247, 236, 0.82);
+      box-shadow: 0 42px 90px var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.62);
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 68px;
+      align-items: center;
+      padding: 54px 72px;
+      overflow: hidden;
     }
-    .text-area h1 {
-      font-size: 44px; font-weight: 800; margin-bottom: 16px; line-height: 1.25;
-      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    .sheet::before {
+      content: "";
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      right: -180px;
+      top: -190px;
+      border-radius: 50%;
+      border: 72px solid rgba(192, 96, 90, 0.17);
     }
-    .text-area p {
-      font-size: 18px; opacity: 0.92; line-height: 1.7;
+    .sheet::after {
+      content: "";
+      position: absolute;
+      left: 54px;
+      bottom: 46px;
+      width: 280px;
+      height: 12px;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--akane), transparent);
+      opacity: 0.42;
     }
-    /* 実 popup を iframe で埋め込むフレーム。クリッピングで縦スクロールを隠し、
-       実機の popup と同じ 380px 幅で見せる。 */
+    .copy {
+      position: relative;
+      z-index: 1;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .kicker {
+      display: inline-flex;
+      width: max-content;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 15px;
+      border-radius: 999px;
+      color: var(--akane-dark);
+      background: rgba(192, 96, 90, 0.11);
+      border: 1px solid rgba(192, 96, 90, 0.2);
+      font: 700 14px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      letter-spacing: 0.08em;
+      margin-bottom: 28px;
+    }
+    .kicker::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--akane);
+      box-shadow: 16px 0 0 var(--gold);
+    }
+    h1 {
+      font-size: 72px;
+      line-height: 0.98;
+      letter-spacing: -0.06em;
+      font-weight: 800;
+      margin-bottom: 26px;
+    }
+    h1 span {
+      color: var(--akane-dark);
+    }
+    p {
+      max-width: 520px;
+      font: 500 21px/1.85 "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      color: var(--muted);
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 34px;
+      max-width: 520px;
+    }
+    .chip {
+      padding: 10px 13px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #513d38;
+      font: 700 13px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      box-shadow: inset 0 0 0 1px rgba(143, 67, 63, 0.14);
+    }
+    .popup-wrap {
+      position: relative;
+      z-index: 1;
+    }
+    .popup-wrap::before {
+      content: "LOCAL ONLY";
+      position: absolute;
+      right: -48px;
+      top: -22px;
+      rotate: 8deg;
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: var(--ink);
+      color: #fff7ec;
+      font: 800 13px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      letter-spacing: 0.14em;
+      box-shadow: 0 18px 34px rgba(37, 32, 31, 0.25);
+    }
     .popup-frame {
       width: 380px;
       height: 720px;
       overflow: hidden;
-      border-radius: 14px;
+      border-radius: 24px;
+      background: #fff;
       box-shadow:
-        0 30px 80px rgba(0, 0, 0, 0.35),
-        0 8px 24px rgba(0, 0, 0, 0.2);
+        0 42px 80px rgba(73, 40, 33, 0.32),
+        0 0 0 9px rgba(255, 255, 255, 0.55),
+        inset 0 0 0 1px rgba(37, 32, 31, 0.08);
     }
     .popup-frame iframe {
       width: 380px;
-      height: 1100px; /* popup の全長を確保（accordion 閉じた状態でも余裕）*/
+      height: 1100px;
       border: 0;
       display: block;
     }
   </style>
 </head>
 <body>
-  <div class="text-area">
-    <span class="badge">Chrome 拡張機能</span>
-    <h1>WEB閲覧アシスト</h1>
-    <p>セッション維持・YouTube クリーナー・Amazon 月別合計・Instagram クリーナー・音量ブースターを 1 つのパネルから切り替え。すべてオプトイン、データ収集ゼロ。</p>
-  </div>
-  <div class="popup-frame">
-    <iframe src="popup-render.html" title="WEB閲覧アシスト ポップアップ"></iframe>
-  </div>
+  <main class="sheet">
+    <section class="copy">
+      <div class="kicker">Chrome 拡張機能</div>
+      <h1>WEB閲覧<br><span>アシスト</span></h1>
+      <p>見やすさ、聞きやすさ、作業の続きやすさを 1 つのパネルで調整。必要なサイトだけ、必要な機能だけをローカルで適用します。</p>
+      <div class="chips" aria-label="主な特徴">
+        <span class="chip">データ収集ゼロ</span>
+        <span class="chip">全機能オプトイン</span>
+        <span class="chip">音量 0〜300%</span>
+        <span class="chip">ナイトモード対応</span>
+      </div>
+    </section>
+    <aside class="popup-wrap" aria-label="ポップアップ画面">
+      <div class="popup-frame">
+        <iframe src="popup-render.html" title="WEB閲覧アシスト ポップアップ"></iframe>
+      </div>
+    </aside>
+  </main>
 </body>
 </html>

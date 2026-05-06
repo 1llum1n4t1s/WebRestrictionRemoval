@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  publish:
-    name: Chrome Web Store 公開
+  package:
+    name: ZIP パッケージ作成
     runs-on: ubuntu-latest
     steps:
       # サプライチェーン攻撃対策で SHA ピン留め (#6)。タグは指すコミットを書き換え可能なため
@@ -47,7 +47,13 @@ jobs:
         # lockfile の整合性を強制するため npm ci のみ。`|| npm install` フォールバックは
         # lockfile を迂回して最新依存を取得するため、サプライチェーン攻撃の経路になりうる。
         # lockfile が古い場合は CI を失敗させ、開発者に更新を促す。
+        env:
+          # publish workflow ではスクリーンショット生成をしないため、Puppeteer のブラウザ取得は不要。
+          PUPPETEER_SKIP_DOWNLOAD: "1"
         run: npm ci
+
+      - name: テスト実行
+        run: npm test
 
       - name: アイコン生成
         run: node scripts/generate-icons.js
@@ -58,6 +64,25 @@ jobs:
             -x "*.DS_Store" "*.swp" "*~"
           ls -lh web-viewing-assist.zip
 
+      - name: ZIP artifact を保存
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-viewing-assist-zip
+          path: web-viewing-assist.zip
+          if-no-files-found: error
+
+  publish:
+    name: Chrome Web Store Draft アップロード
+    runs-on: ubuntu-latest
+    needs: package
+    environment: chrome-web-store
+    steps:
+      - name: ZIP artifact を取得
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-viewing-assist-zip
+          path: .
+
       - name: Chrome Web Store に Draft アップロード
         env:
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
@@ -65,29 +90,35 @@ jobs:
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
-          set +e
-          # chrome-webstore-upload-cli は devDependencies 経由で固定バージョン + lockfile integrity
-          # 付きでインストール済み（package.json 参照）。npx はローカル node_modules/.bin を使うため
-          # レジストリから再ダウンロードしない（= 実行時改ざんの経路を閉じる）。
-          #
           # **意図的に --auto-publish を使わない**: 即審査キューに入れると Chrome Web Store の listing
           # （説明文 / スクリーンショット / カテゴリ）が編集ロックされ、ストア掲載文を更新したい場合に
           # 一度キャンセル → 再提出が必要になる。Draft only にしておけば Dashboard で listing を整えてから
           # 手動で「公開」ボタンを押す運用ができ、ZIP と説明文を整合させたまま審査に出せる。
           # CWS API には listing 更新エンドポイントが存在しない (v2 API の discovery document で確認済み)
           # ため、Dashboard 経由のレビューが必須な以上、auto-publish は罠にしかならない。
-          output=$(npx chrome-webstore-upload-cli upload \
-            --source web-viewing-assist.zip \
-            --extension-id "$CWS_EXTENSION_ID" \
-            --client-id "$CWS_CLIENT_ID" \
-            --client-secret "$CWS_CLIENT_SECRET" \
-            --refresh-token "$CWS_REFRESH_TOKEN" 2>&1)
-          exit_code=$?
-          echo "$output"
-          if [ $exit_code -eq 0 ]; then
-            echo "🎉 Chrome Web Store に Draft としてアップロード完了！"
-            echo "📝 次のステップ: Developer Dashboard で listing（説明文 / スクリーンショット / 権限の正当性）を確認・更新してから「公開」ボタンを押してね"
-            echo "🔗 https://chrome.google.com/webstore/devconsole"
-            exit 0
-          fi
-          exit $exit_code
+          #
+          # upload job は npm ci / npx / checkout を行わず、Secrets を第三者 npm lifecycle の後段に置かない。
+          # package job が作った ZIP artifact だけを fresh runner で受け取り、CWS API へ直接アップロードする。
+          #
+          # **stdout/stderr は直接ストリームする**: `output=$(... 2>&1)` で一旦変数に取り込んで echo すると、
+          # GitHub Actions の自動マスキングは「シークレット文字列がそのまま出力された場合」のみ働くため、
+          # CLI が OAuth Bearer Token をエラーメッセージに混ぜてくると平文でログ残存しうる。
+          # 直接ストリームすれば Actions ランナー側のマスキングが各シークレットを `***` に置換できる。
+          set -euo pipefail
+          token_response=$(curl -fsS \
+            -X POST "https://oauth2.googleapis.com/token" \
+            --data-urlencode "client_id=${CWS_CLIENT_ID}" \
+            --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
+            --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
+            --data-urlencode "grant_type=refresh_token")
+          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<< "$token_response")
+          curl -fsS \
+            -X PUT \
+            -H "Authorization: Bearer ${access_token}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Type: application/zip" \
+            --data-binary @web-viewing-assist.zip \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}"
+          echo "🎉 Chrome Web Store に Draft としてアップロード完了！"
+          echo "📝 次のステップ: Developer Dashboard で listing（説明文 / スクリーンショット / 権限の正当性）を確認・更新してから「公開」ボタンを押してね"
+          echo "🔗 https://chrome.google.com/webstore/devconsole"

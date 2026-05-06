@@ -169,13 +169,30 @@
   }
 
   function purgeShortsDom() {
+    // P2-#15: 旧実装は SELECTORS_REMOVE の 6 セレクタを個別に querySelectorAll していた（うち 5 つは
+    // `:has()` を含む高コストセレクタ）。`:is(...)` で 1 回の querySelectorAll に統合し、chip ラベル
+    // チェックだけ個別判定する。`:has()` を `:is()` 内にネストする構文は CSS Selectors Level 4 の
+    // 標準で minimum_chrome_version 140 では問題なくサポートされる。万一の SyntaxError に備えて
+    // 個別ループへフォールバックするため、外側 try/catch を残す（防御的）。
+    try {
+      const combined = ":is(" + YouTubeShorts.SELECTORS_REMOVE.join(",") + ")";
+      const nodes = document.querySelectorAll(combined);
+      for (const node of nodes) {
+        // チップは text が "Shorts" のものだけ消す（他のチップを巻き込まない）
+        if (node.matches('yt-chip-cloud-chip-renderer')) {
+          const text = node.querySelector('#text')?.textContent?.trim();
+          if (text !== YouTubeShorts.CHIP_LABEL) continue;
+        }
+        node.remove();
+      }
+      return;
+    } catch {
+      // `:is(...)` 内の `:has()` ネストが万一サポートされていない環境向けフォールバック
+    }
     for (const selector of YouTubeShorts.SELECTORS_REMOVE) {
-      // `:has()` 非対応バージョンでは querySelectorAll が SyntaxError になりうるため try で囲う。
-      // 1 セレクタの失敗で他のセレクタも失敗扱いにしないよう、ループ内で個別に握り潰す。
       try {
         const nodes = document.querySelectorAll(selector);
         for (const node of nodes) {
-          // チップは text が "Shorts" のものだけ消す（他のチップを巻き込まない）
           if (selector.startsWith('yt-chip-cloud-chip-renderer')) {
             const text = node.querySelector('#text')?.textContent?.trim();
             if (text !== YouTubeShorts.CHIP_LABEL) continue;

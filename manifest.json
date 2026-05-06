@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WEB閲覧アシスト",
   "description": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整える Chrome 拡張機能。",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -25,26 +25,25 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["src/lib/actions.js", "src/content/keepalive.js"],
       "run_at": "document_idle",
-      "all_frames": true,
-      "match_origin_as_fallback": true
+      "all_frames": false
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/content/youtube-shorts.js", "src/content/search-fixer.js"],
+      "js": ["src/lib/actions.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js"],
       "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://www.amazon.co.jp/auto-deliveries*"],
-      "js": ["src/content/amazon-delivery-total.js"],
+      "js": ["src/lib/actions.js", "src/content/amazon-delivery-total.js"],
       "css": ["src/content/amazon-delivery-total.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://*.instagram.com/*"],
-      "js": ["src/content/instagram-cleaner.js"],
+      "js": ["src/lib/actions.js", "src/content/instagram-cleaner.js"],
       "css": ["src/content/instagram-cleaner.css"],
       "run_at": "document_idle",
       "all_frames": false

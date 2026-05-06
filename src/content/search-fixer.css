@@ -49,3 +49,22 @@ html.__cpa-sfx-hide-live-chat ytd-live-chat-frame#chat[collapsed] iframe.ytd-liv
   height: 0 !important;
   min-height: 0 !important;
 }
+/* 公式トグルで閉じられない動画（ライブ配信アーカイブで「チャットのリプレイを表示」状態など）の
+ * フォールバック: search-fixer.js が `__cpa-sfx-live-chat-force-hide` クラスを付与した frame を
+ * frame ごと display:none で完全非表示にする。 */
+html.__cpa-sfx-hide-live-chat ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide {
+  display: none !important;
+}
+/* frame の親 `#chat-container` も同時に隠して空きスペース・装飾の残骸を除去。
+ * `:has()` は Chrome 105+ で minimum_chrome_version 140 では問題なくサポートされる。 */
+html.__cpa-sfx-hide-live-chat #chat-container:has(> ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide) {
+  display: none !important;
+}
+/* theater モードでは YouTube Polymer が ytd-watch-flexy の inline style に
+ * `--ytd-watch-flexy-sidebar-width: 402px` を継続的に書き込んで右側にチャット用領域を確保し続ける
+ * （`live-chat-present-and-expanded` 属性ベースの計算）。stylesheet 側の !important で上書きして
+ * 動画プレーヤーを画面全幅に拡張する。non-theater モードは関連動画レイアウトを壊したくないので
+ * 適用しない（frame / chat-container を消すだけで通常レイアウトは保たれる）。 */
+html.__cpa-sfx-hide-live-chat ytd-watch-flexy[theater]:has(ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide) {
+  --ytd-watch-flexy-sidebar-width: 0px !important;
+}

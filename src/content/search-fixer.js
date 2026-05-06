@@ -20,9 +20,7 @@
  */
 
 (() => {
-  // NAMING-1: 他 content script の `__cpa*` プレフィックス命名規則に揃える。
-  // 旧名 `__searchFixerRunning` も互換性のため一定期間チェックすると誤動作する可能性があるが、
-  // このフラグはランタイム内で完結し永続化されないため即時改名で問題ない。
+  // 他 content script の `__cpa*` プレフィックス命名規則と統一（ランタイム内で完結するため互換は不要）。
   if (window.__cpaSearchFixerRunning) return;
   window.__cpaSearchFixerRunning = true;
   // 埋め込みプレーヤー iframe では検索結果が出ないため top のみ
@@ -43,6 +41,9 @@
   let liveChatObserver = null;
   /** @type {boolean} liveChatObserver が現在 attach されているか */
   let liveChatObserverAttached = false;
+  /** @type {Node|null} liveChatObserver が現在観察しているターゲット（document or frame）。
+   *  `reAttachLiveChatObserver` の冪等チェック用。 */
+  let liveChatObserverTarget = null;
   /** @type {number} ライブチャット折りたたみ処理の rAF id */
   let liveChatCollapseRaf = 0;
 
@@ -197,6 +198,11 @@
     resultsObserver?.disconnect();
     resultsObserver = null;
     observerAttached = false;
+    if (scanRaf !== 0) {
+      cancelAnimationFrame(scanRaf);
+      scanRaf = 0;
+    }
+    scanScheduled = false;
   }
 
   function syncLiveChatCollapse() {
@@ -210,21 +216,64 @@
 
   function attachLiveChatObserver() {
     if (liveChatObserverAttached) return;
-    liveChatObserver = new MutationObserver((mutations) => {
-      if (!f("hideLiveChat") || !isWatchPage()) return;
-      const shouldCollapse = mutations.some((m) => {
-        if (m.type === "attributes") return m.attributeName === "collapsed";
-        return m.type === "childList" && m.addedNodes.length > 0;
-      });
-      if (shouldCollapse) scheduleLiveChatCollapse();
-    });
-    liveChatObserver.observe(document, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["collapsed"],
-    });
+    // P1-#4: 旧実装は document 全体を childList:true + subtree:true で監視していたため、
+    // YouTube watch ページの数十/秒の childList mutation すべてがコールバックを起動していた。
+    // 新実装は 2 段階観察:
+    //   状態 1 (chat frame 未出現): document を childList:true + subtree:true で frame 出現を待つ
+    //   状態 2 (chat frame 存在):   frame **配下のみ** を childList + subtree + attributes:["collapsed"] で監視
+    //                                （frame 出現直後は #close-button などの内部 UI がまだ DOM に無いため
+    //                                subtree childList で内部 UI 出現を待つ必要がある）
+    // 旧実装と比べ、状態 2 では監視範囲が frame 配下に限定されるため YouTube watch ページの大半の
+    // DOM 変更ではコールバックが起動しなくなる。
+    liveChatObserver = new MutationObserver(handleLiveChatMutations);
+    reAttachLiveChatObserver();
     liveChatObserverAttached = true;
+  }
+
+  /**
+   * `liveChatObserver` の観察対象を「frame があるなら frame」「無ければ document」に切り替える。
+   * 同じターゲットへの再 observe は冪等にスキップ。`force=true` で前回の disconnect 直後の再 attach を強制。
+   */
+  function reAttachLiveChatObserver(force) {
+    if (!liveChatObserver) return;
+    const frame = document.querySelector("ytd-live-chat-frame");
+    const newTarget = frame ?? document;
+    if (!force && newTarget === liveChatObserverTarget) return;
+    liveChatObserver.disconnect();
+    liveChatObserverTarget = newTarget;
+    if (frame) {
+      // 状態 2: frame 配下の childList + subtree + attribute["collapsed"] を監視。
+      // frame 出現直後は #close-button などの内部 UI がまだ DOM に無いため、subtree childList で
+      // 内部 UI の出現を待ち、出現次第 scheduleLiveChatCollapse → collapseLiveChatIfNeeded を駆動する。
+      liveChatObserver.observe(frame, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["collapsed"],
+      });
+    } else {
+      // 状態 1: frame 出現を待つため document を childList watch
+      liveChatObserver.observe(document, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  }
+
+  function handleLiveChatMutations(mutations) {
+    if (!f("hideLiveChat") || !isWatchPage()) return;
+    // 関連する mutation があれば次フレームで collapse 試行 + observer 再アタッチ判定。
+    // frame 出現 / 内部 UI 出現 / collapsed 属性変化のいずれもトリガーとして扱う。
+    for (const m of mutations) {
+      if (m.type === "attributes" && m.attributeName === "collapsed") {
+        scheduleLiveChatCollapse();
+        return;
+      }
+      if (m.type === "childList" && m.addedNodes.length > 0) {
+        scheduleLiveChatCollapse();
+        return;
+      }
+    }
   }
 
   function detachLiveChatObserver() {
@@ -232,43 +281,149 @@
       cancelAnimationFrame(liveChatCollapseRaf);
       liveChatCollapseRaf = 0;
     }
+    // hideLiveChat OFF / 別ページ遷移時は force-hide クラスを剥がして元の表示状態に戻す。
+    // クラスを残したままだと、機能 OFF 後もライブチャット枠が表示されないバグになる。
+    document
+      .querySelectorAll("ytd-live-chat-frame." + LIVE_CHAT_FORCE_HIDE_CLASS)
+      .forEach((el) => el.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS));
     if (!liveChatObserverAttached) return;
     liveChatObserver?.disconnect();
     liveChatObserver = null;
     liveChatObserverAttached = false;
+    liveChatObserverTarget = null;
   }
 
   function scheduleLiveChatCollapse() {
     if (liveChatCollapseRaf !== 0) return;
     liveChatCollapseRaf = requestAnimationFrame(() => {
       liveChatCollapseRaf = 0;
+      // frame 出現していれば observer を frame 直接観察に冪等に切り替える（状態遷移）。
+      reAttachLiveChatObserver();
       collapseLiveChatIfNeeded();
     });
   }
 
-  function collapseLiveChatIfNeeded() {
-    if (!f("hideLiveChat") || !isWatchPage()) return;
-    const chatFrame = document.querySelector(
-      "ytd-live-chat-frame#chat:not([collapsed]), ytd-live-chat-frame:not([collapsed])"
-    );
-    if (!chatFrame) return;
+  // hideLiveChat: 「toggle 見つからない & frame 存在」のときに付与する強制非表示クラス。
+  // ライブ配信アーカイブで「チャットのリプレイを表示」ボタンしか出ない動画など、
+  // 公式トグルで閉じられない状態を CSS で frame ごと display:none する。
+  const LIVE_CHAT_FORCE_HIDE_CLASS = "__cpa-sfx-live-chat-force-hide";
 
-    const toggle = chatFrame.querySelector([
+  // 「表示する」系のボタンラベル（=既に折りたたみ済みで、押すと開いてしまうので絶対 click 禁止）。
+  // 「を表示」「のリプレイを表示」「Show chat」「Show chat replay」などの末尾パターンを広めに拾う。
+  const SHOW_BUTTON_RE = /(を表示|リプレイを表示|show chat|show replay)/i;
+  // 「非表示にする」系のボタンラベル（=現在チャットが開いていて、押すと折りたたまれる）。
+  // 「を非表示」「Hide chat」「Close chat」など。SHOW にもマッチする可能性があるので SHOW を先に判定する。
+  const HIDE_BUTTON_RE = /(非表示|閉じる|たたむ|hide chat|close chat|collapse chat)/i;
+
+  function findLiveChatToggle(chatFrame) {
+    // 検索スコープ: chatFrame 自身に加えて、隣接親 (`#chat-container`, `ytd-watch-grid`, `ytd-watch-flexy`)
+    // も探す。YouTube は折りたたみボタンを frame の外（隣接ヘッダー）に置くケースがあり、
+    // chatFrame.querySelector のみだと見逃す。
+    const scopes = new Set();
+    scopes.add(chatFrame);
+    let p = chatFrame.parentElement;
+    let depth = 0;
+    while (p && depth < 4) {
+      // 親方向に最大 4 階層遡って toggle を探す
+      scopes.add(p);
+      if (
+        p.id === "chat-container" ||
+        p.tagName === "YTD-WATCH-GRID" ||
+        p.tagName === "YTD-WATCH-FLEXY"
+      ) break;
+      p = p.parentElement;
+      depth += 1;
+    }
+
+    // legacy ID セレクタ。ただし `#show-hide-button` は「表示」「非表示」両方の状態で同じ ID を持つため、
+    // ヒットしてもそのまま click せず、aria-label / textContent で「非表示にする」状態のみ採用する。
+    const idSelectors = [
       "#close-button button",
       "#close-button [role='button']",
       "#show-hide-button button",
       "#show-hide-button [role='button']",
       "#close-button",
       "#show-hide-button",
-    ].join(", "));
-    if (typeof toggle?.click === "function") toggle.click();
+    ];
+
+    /** 候補 button が「閉じる」アクション (=hide) かどうかを aria/text で判定 */
+    const isHideAction = (el) => {
+      const aria = (el.getAttribute("aria-label") ?? "").trim();
+      const text = (el.textContent ?? "").trim().slice(0, 50);
+      // 「表示する」系を最優先で除外（誤クリックすると逆に開いてしまう）
+      if (SHOW_BUTTON_RE.test(aria) || SHOW_BUTTON_RE.test(text)) return false;
+      // 「非表示」系を採用
+      if (HIDE_BUTTON_RE.test(aria) || HIDE_BUTTON_RE.test(text)) return true;
+      // ラベルが空 / 不明な場合は安全側で false（無闇に click しない）
+      return false;
+    };
+
+    for (const scope of scopes) {
+      // 1. legacy ID 経路（ヒット時もアクション判定で hide のみ採用）
+      for (const sel of idSelectors) {
+        const el = scope.querySelector(sel);
+        if (el && typeof el.click === "function" && isHideAction(el)) return el;
+      }
+      // 2. aria-label / textContent による全 button スキャン
+      const candidates = scope.querySelectorAll("button, [role='button']");
+      for (const c of candidates) {
+        if (typeof c.click !== "function") continue;
+        if (isHideAction(c)) return c;
+      }
+    }
+    return null;
+  }
+
+  function collapseLiveChatIfNeeded() {
+    if (!f("hideLiveChat") || !isWatchPage()) return;
+    const chatFrame = document.querySelector("ytd-live-chat-frame");
+    if (!chatFrame) return;
+
+    // 既に collapsed なら何もしない（公式状態が既に閉じている）。
+    if (chatFrame.hasAttribute("collapsed")) {
+      // force-hide クラスは collapsed と排他。collapsed が公式付与されているなら CSS の
+      // `[collapsed] iframe { height:0 }` で十分なので、force-hide は外しておく。
+      chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
+      return;
+    }
+
+    const toggle = findLiveChatToggle(chatFrame);
+    if (toggle) {
+      // フル展開状態 → 公式トグルを click して折りたたむ。これで frame に `collapsed` 属性が
+      // 付与され、CSS 側 `ytd-live-chat-frame#chat[collapsed] iframe` が高さ 0 にする。
+      // 公式状態を使うため動画レイアウトは YouTube が自動拡幅。
+      // P1-#4: disconnect → click → takeRecords → reattach ガードで再発火ループを遮断。
+      if (liveChatObserver) {
+        liveChatObserver.disconnect();
+        liveChatObserverTarget = null;
+        try {
+          toggle.click();
+        } finally {
+          liveChatObserver.takeRecords();
+          reAttachLiveChatObserver(true);
+        }
+      } else {
+        toggle.click();
+      }
+      // click 直後は collapsed 属性が付くので force-hide は不要。剥がす。
+      chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
+      return;
+    }
+
+    // toggle が見つからない = ライブ配信アーカイブで「チャットのリプレイを表示」のような
+    // 「既デフォルト折りたたみヘッダ」状態。公式トグルで閉じられないので、frame ごと
+    // CSS で完全非表示にするマーカークラスを付与する。CSS 側で display:none → YouTube が
+    // 動画レイアウトを自動拡幅してくれる。
+    chatFrame.classList.add(LIVE_CHAT_FORCE_HIDE_CLASS);
   }
 
   let scanScheduled = false;
+  let scanRaf = 0;
   function scheduleScan() {
     if (scanScheduled) return;
     scanScheduled = true;
-    queueMicrotask(() => {
+    scanRaf = requestAnimationFrame(() => {
+      scanRaf = 0;
       scanScheduled = false;
       if (!active || !isResultsPage()) return;
       removeDistractions();
