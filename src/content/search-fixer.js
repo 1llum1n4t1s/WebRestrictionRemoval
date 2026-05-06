@@ -411,10 +411,38 @@
     }
 
     // toggle が見つからない = ライブ配信アーカイブで「チャットのリプレイを表示」のような
-    // 「既デフォルト折りたたみヘッダ」状態。公式トグルで閉じられないので、frame ごと
-    // CSS で完全非表示にするマーカークラスを付与する。CSS 側で display:none → YouTube が
-    // 動画レイアウトを自動拡幅してくれる。
-    chatFrame.classList.add(LIVE_CHAT_FORCE_HIDE_CLASS);
+    // 「既デフォルト折りたたみヘッダ」状態。公式トグルで閉じられないので、`collapsed`
+    // 属性を直接付与して YouTube 標準の collapsed view を発動させる。
+    //
+    // この方式に変えた理由（旧方式 `__cpa-sfx-live-chat-force-hide` クラス付与の問題）:
+    //   1. frame に独自クラスを付けて CSS で `display: none` する経路だと、collapsed view
+    //      ヘッダー（「チャットのリプレイ」「パネルを開く」）ごと消えてしまい、ユーザーが
+    //      手動で再展開する手段を奪う。
+    //   2. frame の display を切り替えると YouTube SPA が live-chat-present 状態を再判定して
+    //      player 再初期化を試み、結果として「動画を処理しています」エラーで再生不能になる
+    //      ケースが報告された。
+    //
+    // 標準属性 `collapsed` を立てれば YouTube 自身が collapsed view を描画し、CSS は
+    // `[collapsed] iframe { height: 0 }` で iframe 部分だけを潰すだけで済む。frame 自体は
+    // 表示状態のままなので player への副作用も避けられる。
+    //
+    // P1-#4 と同じ disconnect → setAttribute → takeRecords → reattach ガードで MutationObserver
+    // の再発火ループを遮断。
+    if (liveChatObserver) {
+      liveChatObserver.disconnect();
+      liveChatObserverTarget = null;
+      try {
+        chatFrame.setAttribute("collapsed", "");
+      } finally {
+        liveChatObserver.takeRecords();
+        reAttachLiveChatObserver(true);
+      }
+    } else {
+      chatFrame.setAttribute("collapsed", "");
+    }
+    // 旧バージョンで付いていた `__cpa-sfx-live-chat-force-hide` クラスのクリーンアップ。
+    // 新方式では二度と付与しないが、過去拡張機能で残ったクラスを取り除く保険。
+    chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
   }
 
   let scanScheduled = false;
