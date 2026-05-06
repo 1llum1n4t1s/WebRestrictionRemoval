@@ -411,37 +411,21 @@
     }
 
     // toggle が見つからない = ライブ配信アーカイブで「チャットのリプレイを表示」のような
-    // 「既デフォルト折りたたみヘッダ」状態。公式トグルで閉じられないので、`collapsed`
-    // 属性を直接付与して YouTube 標準の collapsed view を発動させる。
+    // 「既デフォルト折りたたみヘッダ」状態（= 既に `collapsed` 属性が立っている）か、
+    // YouTube が toggle を未描画の状態。
     //
-    // この方式に変えた理由（旧方式 `__cpa-sfx-live-chat-force-hide` クラス付与の問題）:
-    //   1. frame に独自クラスを付けて CSS で `display: none` する経路だと、collapsed view
-    //      ヘッダー（「チャットのリプレイ」「パネルを開く」）ごと消えてしまい、ユーザーが
-    //      手動で再展開する手段を奪う。
-    //   2. frame の display を切り替えると YouTube SPA が live-chat-present 状態を再判定して
-    //      player 再初期化を試み、結果として「動画を処理しています」エラーで再生不能になる
-    //      ケースが報告された。
+    // ここでは frame 自体には一切触らない。理由は以下のとおり:
+    //   1. 旧方式の独自クラス付与（`__cpa-sfx-live-chat-force-hide`）は frame に
+    //      `display: none` を当てて collapsed view ヘッダー（「パネルを開く」）も消し、
+    //      ユーザーが再展開する手段を奪っていた。
+    //   2. `setAttribute("collapsed", "")` で属性を直接立てる経路は、ライブ配信中の動画で
+    //      YouTube SPA が live-chat-present 状態を再評価して player 再初期化を誘発し、
+    //      「動画を処理しています。しばらくしてからもう一度ご確認ください。」で再生不能に
+    //      なる実機事象が報告された。
     //
-    // 標準属性 `collapsed` を立てれば YouTube 自身が collapsed view を描画し、CSS は
-    // `[collapsed] iframe { height: 0 }` で iframe 部分だけを潰すだけで済む。frame 自体は
-    // 表示状態のままなので player への副作用も避けられる。
-    //
-    // P1-#4 と同じ disconnect → setAttribute → takeRecords → reattach ガードで MutationObserver
-    // の再発火ループを遮断。
-    if (liveChatObserver) {
-      liveChatObserver.disconnect();
-      liveChatObserverTarget = null;
-      try {
-        chatFrame.setAttribute("collapsed", "");
-      } finally {
-        liveChatObserver.takeRecords();
-        reAttachLiveChatObserver(true);
-      }
-    } else {
-      chatFrame.setAttribute("collapsed", "");
-    }
-    // 旧バージョンで付いていた `__cpa-sfx-live-chat-force-hide` クラスのクリーンアップ。
-    // 新方式では二度と付与しないが、過去拡張機能で残ったクラスを取り除く保険。
+    // → frame に独自属性・独自クラスを足さない。元から `collapsed` 状態なら CSS の
+    //    `[collapsed] iframe { height: 0 }` で十分。元から expanded で toggle も無い場合は
+    //    諦めて何もしない（YouTube が後から toggle を出してきたら observer 経由で再評価）。
     chatFrame.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS);
   }
 
