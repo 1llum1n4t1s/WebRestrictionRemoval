@@ -44,27 +44,26 @@ html.__cpa-sfx-hide-comments ytd-comments#comments {
 }
 
 /* ---------- 動画ページ: ライブチャット欄非表示 (ライブ配信アーカイブ用) ---------- */
-/* JS 側で YouTube 公式トグルを押し、ここでは collapsed iframe の高さだけ補助する */
-html.__cpa-sfx-hide-live-chat ytd-live-chat-frame#chat[collapsed] iframe.ytd-live-chat-frame {
+/* JS 側で YouTube 公式トグルを押し、ここでは iframe の高さだけ補助する。
+ *
+ * 設計方針: 「パネルを開く」ヘッダー (collapsed 状態の見出し: 「チャットのリプレイ」
+ * 「この動画のライブ配信時のコメントを見る」「パネルを開く」ボタン) は YouTube が
+ * `ytd-live-chat-frame` 直下に描画するため、frame 自体を `display: none` にすると
+ * ヘッダーごと消え、ユーザーが「パネルを開く」を押して再展開する手段を奪ってしまう。
+ *
+ * そこで iframe 部分（実チャット内容）だけを `height: 0` にして、frame の collapsed
+ * ヘッダーは残す。 collapsed と force-hide の 2 ルートで同じ挙動にする。 */
+html.__cpa-sfx-hide-live-chat ytd-live-chat-frame#chat[collapsed] iframe.ytd-live-chat-frame,
+html.__cpa-sfx-hide-live-chat ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide iframe.ytd-live-chat-frame {
   height: 0 !important;
   min-height: 0 !important;
-}
-/* 公式トグルで閉じられない動画（ライブ配信アーカイブで「チャットのリプレイを表示」状態など）の
- * フォールバック: search-fixer.js が `__cpa-sfx-live-chat-force-hide` クラスを付与した frame を
- * frame ごと display:none で完全非表示にする。 */
-html.__cpa-sfx-hide-live-chat ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide {
-  display: none !important;
-}
-/* frame の親 `#chat-container` も同時に隠して空きスペース・装飾の残骸を除去。
- * `:has()` は Chrome 105+ で minimum_chrome_version 140 では問題なくサポートされる。 */
-html.__cpa-sfx-hide-live-chat #chat-container:has(> ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide) {
-  display: none !important;
 }
 /* theater モードでは YouTube Polymer が ytd-watch-flexy の inline style に
  * `--ytd-watch-flexy-sidebar-width: 402px` を継続的に書き込んで右側にチャット用領域を確保し続ける
  * （`live-chat-present-and-expanded` 属性ベースの計算）。stylesheet 側の !important で上書きして
- * 動画プレーヤーを画面全幅に拡張する。non-theater モードは関連動画レイアウトを壊したくないので
- * 適用しない（frame / chat-container を消すだけで通常レイアウトは保たれる）。 */
+ * 動画プレーヤーを画面全幅に拡張する。collapsed / force-hide のどちらでも sidebar 幅を 0 にする
+ * （theater 中は「パネルを開く」ヘッダーよりプレーヤー全幅を優先するユースケースを想定）。 */
+html.__cpa-sfx-hide-live-chat ytd-watch-flexy[theater]:has(ytd-live-chat-frame#chat[collapsed]),
 html.__cpa-sfx-hide-live-chat ytd-watch-flexy[theater]:has(ytd-live-chat-frame.__cpa-sfx-live-chat-force-hide) {
   --ytd-watch-flexy-sidebar-width: 0px !important;
 }

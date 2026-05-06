@@ -44,10 +44,13 @@ html.__cpa-ig-reels [role="tablist"] > * :has(path[d^="M2 12.001v3.449c0 2.849"]
 html.__cpa-ig-explore a[href="/explore/"],
 html.__cpa-ig-explore a[href^="/explore/"],
 html.__cpa-ig-explore [aria-label="Explore"],
-html.__cpa-ig-explore [aria-label="検索"],
 html.__cpa-ig-explore [aria-label="発見"] {
   display: none !important;
 }
+/* 注意: `[aria-label="検索"]` は Explore (発見) ではなく
+ * 左サイドバーの「検索パネルを開く」ボタン (Search panel toggle) に対応する。
+ * 日本語 UI では Explore = 「発見」/ Search = 「検索」と別ラベルなので、
+ * Explore 削除セレクタに含めると Search パネルボタンを誤って隠してしまう。 */
 /* モバイルナビ: 虫眼鏡アイコンの SVG points 形状 */
 @media only screen and (max-width: 768px) {
   html.__cpa-ig-explore svg:has(polyline[points^="13.941 13.953"]),
