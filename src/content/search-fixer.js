@@ -376,14 +376,25 @@
 
   /**
    * ライブチャット panel の close button を探す。
-   * 動画下の「パネルを開く」ボタンと連動する公式 close button を探索する。
    *
-   * 候補:
-   *   1. engagement panel (`ytd-engagement-panel-section-list-renderer`) の close button
-   *   2. `ytd-live-chat-frame` 内の `#close-button` 直下の button
-   * いずれも `disabled` でないものだけ返す（disabled = 既に panel が closed の状態）。
+   * 戦略を 3 段階で試す（先頭ほどユーザー体感の「マウスでパネルを閉じる」操作に近い）:
+   *   1. 動画下のカルーセル内 button で textContent が「パネルを閉じる」/ "Close panel"。
+   *      panel opened 時にテキスト切り替えで現れる正規 UI。「パネルを開く」と同じ DOM 位置。
+   *   2. engagement panel (`ytd-engagement-panel-section-list-renderer[visibility="...EXPANDED"]`)
+   *      で target-id に chat を含むものの header close button (`aria-label="閉じる"`)。
+   *   3. `ytd-live-chat-frame` の `#close-button` 配下の button。
+   * いずれも disabled でないものだけ返す（disabled = 既に panel が closed の状態）。
    */
   function findLiveChatPanelCloseButton() {
+    // 戦略 1: 動画下の「パネルを閉じる」 button (panel opened 時にテキストが切り替わる正規 UI)
+    const allBtns = document.querySelectorAll("button");
+    for (const btn of allBtns) {
+      if (btn.disabled) continue;
+      const txt = (btn.textContent || "").trim();
+      if (txt === "パネルを閉じる" || txt === "Close panel") return btn;
+    }
+
+    // 戦略 2: engagement panel の header close button
     const panels = document.querySelectorAll(
       'ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]'
     );
@@ -393,14 +404,37 @@
       const btn = panel.querySelector(
         'button[aria-label*="閉じる"], button[aria-label*="Close"]'
       );
-      if (btn && !btn.disabled && typeof btn.click === "function") return btn;
+      if (btn && !btn.disabled) return btn;
     }
+
+    // 戦略 3: ytd-live-chat-frame の #close-button
     const chatFrame = document.querySelector("ytd-live-chat-frame");
     if (chatFrame) {
       const btn = chatFrame.querySelector("#close-button button");
-      if (btn && !btn.disabled && typeof btn.click === "function") return btn;
+      if (btn && !btn.disabled) return btn;
     }
+
     return null;
+  }
+
+  /**
+   * 「ユーザーがマウスで click した」のと等価な event sequence を発火する。
+   *
+   * `element.click()` は programmatic click で `isTrusted: false`、かつ pointer/mouse 系の
+   * 中間イベントを発火しない。YouTube の一部ハンドラは `pointerdown`/`mousedown` を起点に
+   * 動作するため、フル sequence (`pointerdown → mousedown → pointerup → mouseup → click`)
+   * を順に dispatch することで、可能な限りユーザー操作と等価な扱いにする。
+   *
+   * `isTrusted` 自体は spoofing 不可能なので「100% ユーザー操作」にはならないが、
+   * YouTube の典型的なハンドラ（特に panel close 系）は dispatch 経由でも反応する。
+   */
+  function fireUserLikeClick(btn) {
+    const init = { bubbles: true, cancelable: true, view: window, button: 0 };
+    try { btn.dispatchEvent(new PointerEvent("pointerdown", init)); } catch {}
+    try { btn.dispatchEvent(new MouseEvent("mousedown", init)); } catch {}
+    try { btn.dispatchEvent(new PointerEvent("pointerup", init)); } catch {}
+    try { btn.dispatchEvent(new MouseEvent("mouseup", init)); } catch {}
+    try { btn.click(); } catch {}
   }
 
   function collapseLiveChatIfNeeded() {
@@ -424,13 +458,13 @@
       liveChatObserver.disconnect();
       liveChatObserverTarget = null;
       try {
-        closeBtn.click();
+        fireUserLikeClick(closeBtn);
       } finally {
         liveChatObserver.takeRecords();
         reAttachLiveChatObserver(true);
       }
     } else {
-      closeBtn.click();
+      fireUserLikeClick(closeBtn);
     }
 
     // 旧バージョン残骸の force-hide クラス cleanup（過去拡張機能で frame に付与された
