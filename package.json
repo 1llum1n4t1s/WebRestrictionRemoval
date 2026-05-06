@@ -1,6 +1,6 @@
 {
   "name": "web-viewing-assist",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "type": "commonjs",
   "description": "Chrome extension that bundles session keep-alive, YouTube cleaner, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WEB閲覧アシスト",
   "description": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整える Chrome 拡張機能。",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
