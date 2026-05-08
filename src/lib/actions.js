@@ -435,7 +435,7 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({
     key: "subsAllShortcut",
     label: "「すべての登録チャンネル」ショートカット",
-    desc: "左サイドバーの「登録チャンネル」見出し横に /feed/channels への 1 クリックボタンを追加",
+    desc: "左サイドバーの「登録チャンネル」セクションの最上に /feed/channels への 1 クリックエントリを公式メニュー風に追加",
     category: "menu_ui",
   }),
   Object.freeze({

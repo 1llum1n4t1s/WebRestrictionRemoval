@@ -1130,7 +1130,16 @@
   // leftnav 注入時にアイコンが欠落するバグがあった。v3 では ytInitialData JSON から
   // thumbnail URL を取り出すため空 URL は出ない。旧 v2 cache は schema bump で破棄する。
   const SUBS_CACHE_LIST_KEY = "__cpa_subs_list_v3";
-  const SUBS_CACHE_THUMB_PREFIX = "__cpa_subs_thumb_v3::";
+  // v5 bump 理由: thumbnail URL を hqdefault.jpg (480x360, 4:3) から maxresdefault.jpg
+  // (1280x720, 16:9) に切り替え。hqdefault は 4:3 のため avatar-section 16:9 枠に
+  // object-fit:cover で入れると上下 cropping が発生し、ホーム画面の 16:9 サムネと
+  // 見た目が揃わず「左上に寄って見える」UX 事故が出ていた (実機検証で確定)。
+  //
+  // v4 (1 つ前): YouTube が `/feeds/videos.xml` エンドポイントを廃止 (404)。
+  // 旧コードは Stage2 で RSS から最新動画 thumbnail を取りに行っていたが、全件 thumbUrl=null
+  // で cache に書き込まれサムネ表示が完全停止する退行が発生したため、Stage2 RSS fetch を
+  // 撤去して `/${handle}` HTML 内の最初の "videoId":"..." を抽出する版に切替。
+  const SUBS_CACHE_THUMB_PREFIX = "__cpa_subs_thumb_v5::";
   const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
   // 名前順ソート用の collator。日本語 + 数値混在を自然に並べる。
@@ -1156,34 +1165,14 @@
   let subsGridResizeListener = null;
   /** @type {number} resize debounce timer */
   let subsGridResizeTimer = 0;
-  /**
-   * ネイティブ sort dropdown 操作後の cooldown 期限 (Date.now() ベース epoch ms)。
-   * subsGridCardsObserver の callback がこの期限内なら scheduleSubsGridScan / applySubsGridFilter /
-   * placeSubsGridToolbar 等の DOM 操作系を skip する。
-   *
-   * 必要性: native sort 直後は YouTube が Polymer の data-binding で combobox text + #contents
-   * を batch 更新する。我々の MutationObserver が同じ window で発火して DOM を触ると、
-   * Polymer の batch update が干渉を受けて combobox label の更新が rollback される
-   * (実機で「新しいアクティビティを選んだのに表示が "関連度順" のまま」というバグを観測)。
-   *
-   * 2 つの trigger で cooldown を制御:
-   *   - **sort dropdown 関連 click を capture phase で listen** → 即時 cooldown 設定（最も信頼できる primary trigger）
-   *   - **`yt-popup-closed`** → 長めの fallback cooldown（保険 / Polymer label 更新の真の完了 signal）
-   *
-   * yt-reload-continuation-finish は **使わない**:
-   *   Claude_in_Chrome MCP 実機検証で reload-continuation-finish (t=117101) が発火しても
-   *   yt-popup-closed (t=119641) まで 2.5 秒間 Polymer が combobox label を batch update して
-   *   いることを確認。reload-finish を「DOM settled signal」と扱って cooldown を短縮すると
-   *   その後の Polymer batch update を巻き込んで label rollback バグが起きる。
-   *   popup-closed が Polymer 更新完了の真の signal なので、これだけを後段 trigger に使う。
-   */
-  let subsGridSortCooldownUntil = 0;
-  /** @type {((this: Document, ev: Event) => void) | null} yt-popup-closed リスナー */
-  let subsGridPopupClosedListener = null;
-  /** @type {((this: Document, ev: MouseEvent) => void) | null} sort dropdown 関連 click listener (capture) */
-  let subsGridSortClickListener = null;
-  /** sort cooldown 期間 (click capture / popup-closed どちらでも同じ長さ) */
-  const SUBS_GRID_SORT_COOLDOWN_MS = 3000;
+  // sort dropdown 操作の cooldown / click capture / popup-closed listener はすべて 2026-05 に撤去。
+  // 動機: 「初回 sort dropdown 切替で label が rollback する」YouTube 側 bug を補正しようとして
+  //   click capture + cooldown gate + post-cooldown re-scan を入れていたが、実機検証 (extension OFF
+  //   で検証) で **bug は YouTube 側で extension では補正不能** と判明。
+  //   さらに ON 時は cooldown listener が dropdown popup の Polymer state に干渉して
+  //   「2 回目以降 popup が再開しない」という別 bug を生んでしまっていた (extension OFF 時は
+  //    2 回目以降が正常に切り替わることで切り分け確定)。
+  //   よって最善策は「extension は何もせず、YouTube に任せる」=== これら全撤去。
   /** @type {MutationObserver|null} leftnav の subs section #items を監視して再注入する observer */
   let leftnavInjectObserver = null;
   /** @type {Element|null} 観察中の subs section（同一 section への重複 attach 防止） */
@@ -1773,21 +1762,79 @@
       return;
     }
     if (existing) return; // idempotent
-    const headerEntry = findSubsHeaderEntry();
-    if (!headerEntry) return;
-    const btn = document.createElement("a");
-    btn.className = SUBS_SHORTCUT_MARKER;
-    btn.href = "/feed/channels";
-    btn.title = "すべての登録チャンネル";
-    btn.setAttribute("aria-label", "すべての登録チャンネル");
-    // SVG アイコン（外部画像ロードを避けて軽量化）
-    btn.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
-      '<path fill="currentColor" d="M3 5h14v2H3V5zm0 6h14v2H3v-2zm0 6h14v2H3v-2zm17-12h2v2h-2V5zm0 6h2v2h-2v-2zm0 6h2v2h-2v-2z"/>' +
-      "</svg>";
-    // header-entry の親 (#header) に append。CSS で右端に float
-    const parent = headerEntry.parentElement || headerEntry;
-    parent.appendChild(btn);
+    // 「登録チャンネル」section の **最初のチャンネル entry の直前** = `<h3>` 見出しの直下、
+    // チャンネルリストの最上に entry として挿入する。
+    //
+    // ゆろさんの希望「YouTube 公式メニューの一部なんじゃないかみたいな感じで」を満たすため、
+    // 旧実装 (見出し横の SVG 小ボタン) は廃止して通常の leftnav entry 風に作り変えた。
+    //
+    // **section の sibling として insertBefore してはいけない**:
+    //   試しに `section.parentElement.insertBefore(entry, section)` で sibling 挿入したところ、
+    //   Polymer dom-repeat が「section list の構造が変わった」と検知して内部 reordering を発動し、
+    //   subs section が leftnav の **末尾に移動** してしまう退行が起きた (実機検証で確定 2026-05-08
+    //   ゆろさん環境)。`<a>` を Polymer 管理下の section 兄弟として inject するのは fragile すぎる。
+    //
+    // **subs section の DOM 構造 (実機計測で確定):**
+    //   <ytd-guide-section-renderer>
+    //     <h3>登録チャンネル</h3>                                        ← 見出し
+    //     <div #items>
+    //       <ytd-guide-collapsible-section-entry-renderer>             ← idx 0 (「もっと見る」expander)
+    //       <ytd-guide-entry-renderer>小柳ロウ</...>                   ← idx 1 (最初のチャンネル)
+    //       <ytd-guide-entry-renderer>リバース☆さっきー</...>          ← idx 2
+    //       ...
+    //     </div>
+    //   </ytd-guide-section-renderer>
+    //
+    //   `#items.firstElementChild` は collapsible (expander) なので、その前に入れると
+    //   「もっと見る」より上 = 見た目「登録チャンネル」の上に entry が置かれてしまう。
+    //   **最初の `<ytd-guide-entry-renderer>` 直前**に挿入すれば「見出し → expander → 我々 → 小柳ロウ → ...」
+    //   ではなく「見出し → 我々 → 小柳ロウ → ... → 末尾の expander」の自然な並びになる。
+    //   ※ collapsible entry が末尾にあるか先頭にあるかは YouTube のレイアウト次第だが、
+    //     `:not(#header-entry)` で expander や headerEntry を除外する保険つき。
+    //
+    // この手法は subsLeftnavInjectAll が採用している「Polymer dom-repeat 配下に `<a>` を直接
+    // inject」と同じ安全パターン。Polymer は section 構造を破壊しない。
+    const section = findSubsSection();
+    if (!section) return;
+    const itemsDiv = section.querySelector("#items");
+    if (!itemsDiv) return;
+    const entry = document.createElement("a");
+    entry.className = SUBS_SHORTCUT_MARKER;
+    entry.href = "/feed/channels";
+    entry.title = "すべての登録チャンネル";
+    entry.setAttribute("aria-label", "すべての登録チャンネル");
+    // SVG アイコン (リスト風) + ラベルの横並び。CSS 側で公式 entry サイズ (高さ 40px / icon 12+12 / text 72) に揃える。
+    // YouTube は Trusted Types policy を有効化しているため innerHTML 代入は弾かれる。
+    // content script の isolated world では制約が緩いが、安全側に倒して createElement で構築する。
+    const iconSpan = document.createElement("span");
+    iconSpan.className = `${SUBS_SHORTCUT_MARKER}-icon`;
+    iconSpan.setAttribute("aria-hidden", "true");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "24");
+    svg.setAttribute("height", "24");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("fill", "currentColor");
+    path.setAttribute(
+      "d",
+      "M3 5h14v2H3V5zm0 6h14v2H3v-2zm0 6h14v2H3v-2zm17-12h2v2h-2V5zm0 6h2v2h-2v-2zm0 6h2v2h-2v-2z"
+    );
+    svg.appendChild(path);
+    iconSpan.appendChild(svg);
+    const labelSpan = document.createElement("span");
+    labelSpan.className = `${SUBS_SHORTCUT_MARKER}-label`;
+    labelSpan.textContent = "すべての登録チャンネル";
+    entry.appendChild(iconSpan);
+    entry.appendChild(labelSpan);
+    // 最初のチャンネル entry の直前に挿入。collapsible (expander) や header-entry は除外する。
+    const firstChannel = itemsDiv.querySelector(
+      "ytd-guide-entry-renderer:not(#header-entry)"
+    );
+    if (firstChannel) {
+      itemsDiv.insertBefore(entry, firstChannel);
+    } else {
+      itemsDiv.appendChild(entry);
+    }
   }
 
   // ----- C: /feed/channels グリッド化 + 検索 + ソート + lazy fetch -----
@@ -1802,99 +1849,9 @@
     ensureSubsGridToolbar();
     syncSubsGridItemsPerRow();
     startSubsGridResizeListener();
-    startSubsGridSortCooldownListener();
     scheduleSubsGridScan();
     startSubsGridCardsObserver();
     applySubsGridFilter();
-  }
-
-  /**
-   * native sort dropdown 操作完了時 (`yt-popup-closed`) に subsGridSortCooldownUntil を
-   * 設定して、subsGridCardsObserver の callback が cooldown 期間中は DOM 操作系 (toolbar
-   * 配置 / scheduleSubsGridScan / applySubsGridFilter) を skip するようにする。
-   *
-   * 背景 (実機計測):
-   *   native sort 直後、YouTube が Polymer の data-binding で combobox text と #contents を
-   *   batch 更新する。同じ window で我々の MutationObserver 発火 → DOM 操作すると、Polymer の
-   *   batch update が干渉を受けて combobox label が rollback される
-   *   (「新しいアクティビティを選んだのに表示が "関連度順" のまま」というユーザ報告のバグを観測)。
-   *
-   * cooldown 中も新カードに対する inject (#avatar move 等) は遅延されるが、cooldown 終了後に
-   * subsGridCardsObserver は次の mutation で再発火 (yt-reload-continuation-finish 後の child
-   * 追加で確実に発火する) するか、念のため cooldown 終了時に scheduleSubsGridScan を 1 度走らせる。
-   */
-  function startSubsGridSortCooldownListener() {
-    if (subsGridPopupClosedListener) return;
-    // post-cooldown scan 共通ロジック。cooldown が更に延長されていたら何もしない。
-    // section-list 物理置換 (sort で wipe) で toolbar が detached になるケースがあるため、
-    // toolbar 在/不在を確認して欠けていれば再生成する。これを忘れると「sort したら検索 UI が
-    // 消えたまま戻らない」UX 事故になる（Codex P2 指摘）。
-    const runPostCooldownScan = () => {
-      if (!subsGridState) return;
-      if (Date.now() < subsGridSortCooldownUntil) return;
-      const toolbarMissing = !document.getElementById(SUBS_TOOLBAR_ID);
-      if (toolbarMissing) {
-        if (subsGridState) {
-          subsGridState.toolbar = null;
-          subsGridState.search = null;
-        }
-        ensureSubsGridToolbar();
-        // section-list 置換時はネイティブが既存カードの DOM ノードを物理移動だけで並び替える
-        // ケースもあり、SUBS_CARD_MARKER_ATTR が残ったままだと新しい IntersectionObserver
-        // (subsGridState 再生成で作られる) に再 attach されない罠がある。MARKER をクリアして
-        // 全カードを fresh に observe させる。
-        document
-          .querySelectorAll(`ytd-channel-renderer[${SUBS_CARD_MARKER_ATTR}]`)
-          .forEach((c) => c.removeAttribute(SUBS_CARD_MARKER_ATTR));
-      } else {
-        // toolbar 存在するが配置が崩れている場合に正しい位置に戻す
-        placeSubsGridToolbar();
-      }
-      scheduleSubsGridScan();
-      applySubsGridFilter();
-    };
-    // sort dropdown 関連 click capture: yt-popup-closed の発火タイミングや有無に依存せず、
-    // ユーザーが sort UI に触れた瞬間に cooldown を立てる primary trigger。
-    subsGridSortClickListener = (e) => {
-      if (!subsGridState) return;
-      const target = e.target;
-      if (!target || typeof target.closest !== "function") return;
-      // YouTube の sort dropdown 関連 (button / chip / 選択肢 listbox / iron-dropdown 等) を広めに拾う
-      if (
-        target.closest("ytd-sort-filter-sub-menu-renderer") ||
-        target.closest("yt-sort-filter-sub-menu-renderer") ||
-        target.closest("tp-yt-iron-dropdown") ||
-        target.closest("tp-yt-paper-listbox") ||
-        target.closest("yt-dropdown-menu") ||
-        target.closest('[role="combobox"]') ||
-        target.closest('[role="listbox"]')
-      ) {
-        subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_MS;
-        setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_MS + 50);
-      }
-    };
-    subsGridPopupClosedListener = () => {
-      // popup-closed は Polymer の combobox label batch update が完了したことを示す
-      // 真の signal。実機検証で popup-closed まで Polymer は label を更新中なので、
-      // ここから更に COOLDOWN_MS の paint buffer を取って scan/filter を走らせる。
-      // sort 以外の popup (例: 別 menu 閉鎖) も拾うが、scan 遅延が伸びるだけで副作用は小さい。
-      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_MS;
-      setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_MS + 50);
-    };
-    document.addEventListener("click", subsGridSortClickListener, true); // capture phase
-    document.addEventListener("yt-popup-closed", subsGridPopupClosedListener);
-  }
-
-  function stopSubsGridSortCooldownListener() {
-    if (subsGridSortClickListener) {
-      document.removeEventListener("click", subsGridSortClickListener, true);
-      subsGridSortClickListener = null;
-    }
-    if (subsGridPopupClosedListener) {
-      document.removeEventListener("yt-popup-closed", subsGridPopupClosedListener);
-      subsGridPopupClosedListener = null;
-    }
-    subsGridSortCooldownUntil = 0;
   }
 
   /**
@@ -1914,11 +1871,6 @@
       subsGridCardsScanTimer = setTimeout(() => {
         subsGridCardsScanTimer = 0;
         if (!subsGridState) return;
-        // native sort dropdown 操作直後 (yt-popup-closed から SUBS_GRID_SORT_COOLDOWN_MS 内) は
-        // skip。Polymer の combobox label batch update が我々の DOM 操作で rollback される
-        // バグを回避するため。cooldown 期限切れ後に startSubsGridSortCooldownListener が
-        // setTimeout で改めて scheduleSubsGridScan / applySubsGridFilter を 1 度走らせる。
-        if (Date.now() < subsGridSortCooldownUntil) return;
         // ネイティブ sort dropdown (左上「関連度順 / 新しいアクティビティ / 名前順」) を操作すると
         // YouTube は `yt-reload-continuation-finish` でサーバー再取得 → `ytd-section-list-renderer`
         // **要素ごと** 置換されたり、`#primary` 配下が大きく組み替えられるケースがある。
@@ -1978,7 +1930,6 @@
     if (tb) tb.remove();
     stopSubsGridCardsObserver();
     stopSubsGridResizeListener();
-    stopSubsGridSortCooldownListener();
     if (subsGridState?.observer) {
       try {
         subsGridState.observer.disconnect();
@@ -2157,13 +2108,6 @@
 
   function scheduleSubsGridScan() {
     if (!subsGridState) return;
-    // cooldown 中は scan 完全 skip。applyGridCardInlineStyle のデータ更新フェーズが
-    // 毎スキャン全カード (171 件) に setAttribute("data-cpa-clean-name", newName) を発射し、
-    // 初回 sort 時は新データにより全件 setAttribute されるため Polymer の batch update に
-    // 干渉して combobox label rollback を起こしていた（実機検証で確定した根本原因）。
-    // subsGridCardsObserver callback 経由は元々 cooldown gate あるが、本関数を直接呼ぶ
-    // applySubsChannelsGrid / runPostCooldownScan 経路には gate がなかった。
-    if (Date.now() < subsGridSortCooldownUntil) return;
     if (!subsGridState.observer) {
       subsGridState.observer = new IntersectionObserver(
         (entries) => {
@@ -2421,41 +2365,36 @@
       channelId = cached.channelId;
     } else {
       try {
-        // Stage 1: channel page → externalId
+        // Stage 1 のみで完結: channel page HTML → externalId + 最新動画 videoId。
+        // 旧 Stage 2 (`/feeds/videos.xml?channel_id=...`) は YouTube が 2026-05 までに 404 化したため撤去。
+        // チャンネルページ HTML には ytInitialData が embed されており、最初に出る `"videoId":"..."`
+        // は "Featured" / 「ホーム」タブで最上段に置かれる動画 (= ほぼ最新動画 or pinned)。完全な
+        // "最新公開動画" を取りたければ `/channel/${cid}/videos` を別途 fetch すればよいが、
+        // HTML 1.1MB を全カード分追加で取得するコストが高く、見た目用途には Featured で十分とした。
         const res = await fetch(`/${handle}`, { credentials: "same-origin" });
         if (!res.ok) return;
         const html = await res.text();
         const channelIdMatch = html.match(/"externalId":"(UC[\w-]{20,30})"/);
         channelId = channelIdMatch?.[1] || null;
-
-        // Stage 2: RSS feed → 最新動画 thumbnail
-        if (channelId) {
-          try {
-            const rssRes = await fetch(
-              `/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`,
-              { credentials: "same-origin" }
-            );
-            if (rssRes.ok) {
-              const rssText = await rssRes.text();
-              // RSS feed の最初の <media:thumbnail url="..."> が最新動画
-              const thumbMatch = rssText.match(/<media:thumbnail\s+url="([^"]+)"/i);
-              thumbUrl = thumbMatch?.[1] || null;
-            }
-          } catch {
-            // RSS 失敗は無視 (thumbUrl は null のままで cache に書く)
-          }
-        }
-        writeSubsThumbCache(handle, { thumbUrl: thumbUrl || null, channelId, ts: Date.now() });
+        // 最初の videoId 出現 = ホームタブ Featured 動画。11 文字の YouTube videoId 形式に厳密マッチ。
+        const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+        const videoId = videoIdMatch?.[1] || null;
+        // 解像度選択: maxresdefault.jpg は 1280x720 で **16:9 ネイティブ**。hqdefault.jpg は 480x360 で
+        // **4:3** のため 16:9 の avatar-section 枠に object-fit:cover で入れると上下 cropping が発生し、
+        // ホーム画面の動画カード (16:9 サムネ) と見た目が揃わない (実機検証で「左上に寄って見える」と確定)。
+        // maxresdefault は HD upload された動画のみ存在し古い動画では 404 だが、img.onerror で
+        // mqdefault.jpg (320x180, 16:9 で必ず存在) にフォールバックするので破綻はしない。
+        thumbUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : null;
+        writeSubsThumbCache(handle, { thumbUrl, channelId, ts: Date.now() });
       } catch {
         return;
       }
     }
     if (!thumbUrl) return;
-    // post-await guard（Codex P2 指摘）: 2 段の fetch を await している間に
+    // post-await guard（Codex P2 指摘）: fetch を await している間に
     //   - ユーザーが subsChannelsGrid を OFF にした (`detachSubsChannelsGrid` で subsGridState=null)
     //   - /feed/channels から離脱して card が DOM から外れた (`card.isConnected` false)
-    // が起きている可能性がある。この場合 thumbnail を append すると detach 後の cleanup を経ずに
-    // 残置してしまうため、append 直前で再チェックする。
+    // が起きている可能性があるため、append 直前で再チェックする。
     if (subsGridState === null) return;
     if (!card.isConnected) return;
     if (card.querySelector(`.${SUBS_THUMB_CLASS}`)) return;
@@ -2464,6 +2403,15 @@
     img.src = normalizeAvatarUrl(thumbUrl);
     img.loading = "lazy";
     img.alt = "";
+    // 404 fallback: maxresdefault.jpg は HD アップロード動画のみ存在し古い動画では 404 を返す。
+    // 失敗時は mqdefault.jpg (320x180, 16:9 で全動画必須) に切り替える。低解像度になるが
+    // object-fit:cover で 16:9 比率は維持されるので「左上寄り」レイアウト崩れは出ない。
+    // onerror を null clear するのは fallback 自体が再度 404 になった場合の無限ループ回避。
+    img.onerror = () => {
+      img.onerror = null;
+      const fallback = img.src.replace(/\/maxresdefault\.jpg([?#].*)?$/, "/mqdefault.jpg$1");
+      if (fallback !== img.src) img.src = fallback;
+    };
     // 挿入位置: #avatar-section の中（サムネ枠 16:9 全埋め用）。
     // feed カード準拠レイアウトではアバターは別途 #info-section の左に move 済みなので、
     // ここで #avatar 内に挿入すると 16:9 枠ではなくアバター 36px 円の上に乗ってしまう。
