@@ -2238,11 +2238,14 @@
    */
   function clearGridCardInlineStyle(card) {
     card.removeAttribute("data-cpa-subs-styled");
+    // applyGridCardInlineStyle が `!important` で setProperty した全 prop を網羅する。
+    // `display: flex` が剥がれれば flex 系 prop は無効化されるが、`gap` は grid container でも
+    // 有効で、`position: relative` も positioning context として残るため、徹底的に剥がす（Codex P2 指摘）。
     const props = [
-      "display", "flex", "min-height", "max-height", "line-height", "font-size",
-      "font-weight", "overflow", "white-space", "word-break", "width", "margin",
-      "padding", "-webkit-line-clamp", "-webkit-box-orient", "text-overflow", "max-width",
-      "color", "letter-spacing", "border", "padding-top", "border-top",
+      "display", "flex", "flex-direction", "gap", "position", "min-height", "max-height",
+      "line-height", "font-size", "font-weight", "overflow", "white-space", "word-break",
+      "width", "margin", "padding", "-webkit-line-clamp", "-webkit-box-orient", "text-overflow",
+      "max-width", "color", "letter-spacing", "border", "padding-top", "border-top",
       "font-feature-settings", "grid-template-columns", "column-gap", "row-gap",
       "align-items", "grid-column", "grid-row",
     ];
