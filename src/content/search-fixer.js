@@ -2336,6 +2336,13 @@
       }
     }
     if (!thumbUrl) return;
+    // post-await guard（Codex P2 指摘）: 2 段の fetch を await している間に
+    //   - ユーザーが subsChannelsGrid を OFF にした (`detachSubsChannelsGrid` で subsGridState=null)
+    //   - /feed/channels から離脱して card が DOM から外れた (`card.isConnected` false)
+    // が起きている可能性がある。この場合 thumbnail を append すると detach 後の cleanup を経ずに
+    // 残置してしまうため、append 直前で再チェックする。
+    if (subsGridState === null) return;
+    if (!card.isConnected) return;
     if (card.querySelector(`.${SUBS_THUMB_CLASS}`)) return;
     const img = document.createElement("img");
     img.className = SUBS_THUMB_CLASS;
