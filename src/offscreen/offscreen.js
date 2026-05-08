@@ -76,6 +76,12 @@ function scheduleNormalizerGain(state, targetGain, options) {
     const deltaDb = Math.abs(20 * Math.log10(clamped / previousTarget));
     if (deltaDb < VolumeBooster.NORMALIZE_DEAD_ZONE_DB) return;
   }
+  // 同じ target への再 schedule はスキップ。silence-gate 経路は 400ms 毎に force=true で
+  // unity (1) を要求してくるが、既に target=1 で ramp 中の状態で再度 setTargetAtTime すると、
+  // direction 判定が `clamped < previousTarget` で false になって UP_TIME_CONSTANT (8s) に
+  // 切り替わり、せっかくの fast DOWN ramp が遅い ramp に上書きされて silence/noise が長時間
+  // boosted のままになる事故を起こす (Codex P2 指摘 2026-05-08)。
+  if (clamped === previousTarget) return;
   const timeConstant = clamped < previousTarget
     ? VolumeBooster.NORMALIZE_GAIN_DOWN_TIME_CONSTANT
     : VolumeBooster.NORMALIZE_GAIN_UP_TIME_CONSTANT;
