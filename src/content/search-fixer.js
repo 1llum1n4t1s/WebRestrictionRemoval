@@ -2326,9 +2326,16 @@
       }
     }
     if (!thumbUrl) return;
-    // post-await guard: detach / 離脱 / 重複 inject を fence する。
+    // post-await guard: detach / 離脱 / 重複 inject / **カード DOM 再利用** を fence する。
+    // YouTube の native sort/re-hydration で `ytd-channel-renderer` が物理移動だけで並び替わる
+    // ケースがあり、`#main-link` の href が別チャンネルに書き換わった card に古いチャンネルの
+    // サムネを append してしまう race condition を防ぐ (Codex P2 指摘 2026-05-08)。
     if (subsGridState === null) return;
     if (!card.isConnected) return;
+    const currentHandle = extractHandleFromHref(
+      card.querySelector("#main-link")?.getAttribute("href") || ""
+    );
+    if (currentHandle !== handle) return;
     if (card.querySelector(`.${SUBS_THUMB_CLASS}`)) return;
     const img = document.createElement("img");
     img.className = SUBS_THUMB_CLASS;
