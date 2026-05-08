@@ -164,7 +164,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / KeepAlive / SenderCheck / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / VolumeBooster / ExtensionPaths 定数 |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
-| `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの `removeShorts` サブ機能（top frame のみ）: MutationObserver + URL リダイレクト + `__cpa-yt-shorts-hidden` で `display: none` |
+| `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの 4 サブ機能（shelf / chip / sidebar / redirect、top frame のみ）: MutationObserver + URL リダイレクト + 機能ごとの `__cpa-yt-shorts-hide-{shelf,chip,sidebar}` / `__cpa-yt-shorts-redirect-active` クラスで `display: none` |
 | `src/content/search-fixer.{js,css}` | YouTube クリーナー（22 機能 + グリッド列数）: master + features + gridItems で駆動 + サムネ枠装飾等 |
 | `src/content/amazon-delivery-total.{js,css}` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 + `__cpa-amzn-delivery-total` 配色 |
 | `src/content/instagram-cleaner.{js,css}` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ + 意味論的セレクタのみ（aria-label / href / role / data-pagelet / SVG path data） |
