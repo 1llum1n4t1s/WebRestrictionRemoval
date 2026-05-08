@@ -169,14 +169,120 @@ test("SearchFixer.mergeFeatures: undefined / null / 不正型は DEFAULT_FEATURE
 });
 
 test("SearchFixer.mergeFeatures: partial オブジェクトは欠損キーを default で埋める", () => {
-  const merged = G.SearchFixer.mergeFeatures({ removeShorts: true });
-  assert.equal(merged.removeShorts, true);
+  const merged = G.SearchFixer.mergeFeatures({ removeShortsShelf: true });
+  assert.equal(merged.removeShortsShelf, true);
   // 他のキーは default (false) が補完される
   for (const feature of G.SearchFixer.FEATURES) {
-    if (feature.key !== "removeShorts") {
+    if (feature.key !== "removeShortsShelf") {
       assert.equal(typeof merged[feature.key], "boolean");
     }
   }
+});
+
+test("SearchFixer.isFeedPath: ホーム / 登録 / 急上昇 等は true、それ以外は false", () => {
+  // フィードページ
+  assert.equal(G.SearchFixer.isFeedPath("/"), true);
+  assert.equal(G.SearchFixer.isFeedPath("/feed/subscriptions"), true);
+  assert.equal(G.SearchFixer.isFeedPath("/feed/trending"), true);
+  assert.equal(G.SearchFixer.isFeedPath("/feed/explore"), true);
+  assert.equal(G.SearchFixer.isFeedPath("/feed/history"), true);
+  assert.equal(G.SearchFixer.isFeedPath("/feed/library"), true);
+  assert.equal(G.SearchFixer.isFeedPath("/feed/subscriptions?u=1"), true);
+  // フィードではない
+  assert.equal(G.SearchFixer.isFeedPath("/results"), false);
+  assert.equal(G.SearchFixer.isFeedPath("/watch"), false);
+  assert.equal(G.SearchFixer.isFeedPath("/shorts/abc"), false);
+  assert.equal(G.SearchFixer.isFeedPath("/@channel"), false);
+  // 不正型
+  assert.equal(G.SearchFixer.isFeedPath(undefined), false);
+  assert.equal(G.SearchFixer.isFeedPath(null), false);
+  assert.equal(G.SearchFixer.isFeedPath(123), false);
+});
+
+test("SearchFixer.FEATURES: 旧 removeShorts は 4 機能に解体され Shorts カテゴリは廃止", () => {
+  // 旧キー removeShorts は存在せず、4 機能に分離されている
+  const removeShorts = G.SearchFixer.FEATURES.find((f) => f.key === "removeShorts");
+  assert.equal(removeShorts, undefined, "旧 removeShorts キーは廃止");
+
+  const removeShortsShelf = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsShelf");
+  const removeShortsChip = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsChip");
+  const removeShortsSidebar = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsSidebar");
+  const redirectShortsUrl = G.SearchFixer.FEATURES.find((f) => f.key === "redirectShortsUrl");
+  assert.ok(removeShortsShelf);
+  assert.ok(removeShortsChip);
+  assert.ok(removeShortsSidebar);
+  assert.ok(redirectShortsUrl);
+
+  // それぞれの分離先カテゴリ
+  assert.equal(removeShortsShelf.category, "video_filter");
+  assert.equal(removeShortsChip.category, "search_only");
+  assert.equal(removeShortsSidebar.category, "menu_ui");
+  assert.equal(redirectShortsUrl.category, "watch_page");
+});
+
+test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only の 4 個", () => {
+  const ids = G.SearchFixer.CATEGORIES.map((c) => c.id);
+  assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only"]);
+});
+
+test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/watched + removeShortsShelf + removeTopicsSection", () => {
+  const expectedVideoFilterKeys = [
+    "playlist", "mix", "shortsBtn", "live", "watched",
+    "removeShortsShelf", "removeTopicsSection",
+  ];
+  for (const key of expectedVideoFilterKeys) {
+    const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
+    assert.ok(feature, `feature ${key} exists`);
+    assert.equal(feature.category, "video_filter", `${key} is in video_filter`);
+  }
+});
+
+test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only にまとめられている", () => {
+  const expectedSearchOnlyKeys = [
+    "shelf", "cardList", "course", "channel", "reel", "secondary", "chapter",
+    "verified", "artist",
+    "demoteUnmatched", "highlightThumb",
+    "searchGrid",
+    "removeShortsChip",
+  ];
+  for (const key of expectedSearchOnlyKeys) {
+    const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
+    assert.ok(feature, `feature ${key} exists`);
+    assert.equal(feature.category, "search_only", `${key} is in search_only`);
+  }
+});
+
+test("SearchFixer.FEATURES: 動画ページ系 + redirectShortsUrl が watch_page に集約", () => {
+  const expectedWatchPageKeys = [
+    "centerTitle", "fullWidthDesc", "hideComments", "hideLiveChat", "redirectShortsUrl",
+  ];
+  for (const key of expectedWatchPageKeys) {
+    const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
+    assert.ok(feature, `feature ${key} exists`);
+    assert.equal(feature.category, "watch_page", `${key} is in watch_page`);
+  }
+});
+
+test("SearchFixer.FEATURES: メニュー/UI カテゴリは removeShortsSidebar を含む", () => {
+  const removeShortsSidebar = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsSidebar");
+  assert.ok(removeShortsSidebar);
+  assert.equal(removeShortsSidebar.category, "menu_ui");
+});
+
+test("YouTubeShorts: SELECTORS が 3 分割されている (SHELF / CHIP / SIDEBAR)", () => {
+  assert.ok(Array.isArray(G.YouTubeShorts.SELECTORS_SHELF));
+  assert.ok(Array.isArray(G.YouTubeShorts.SELECTORS_CHIP));
+  assert.ok(Array.isArray(G.YouTubeShorts.SELECTORS_SIDEBAR));
+  // 旧 SELECTORS_REMOVE は廃止
+  assert.equal(G.YouTubeShorts.SELECTORS_REMOVE, undefined);
+  // SHELF: 棚系
+  assert.ok(G.YouTubeShorts.SELECTORS_SHELF.includes("ytd-reel-shelf-renderer"));
+  assert.ok(G.YouTubeShorts.SELECTORS_SHELF.includes("ytd-rich-shelf-renderer[is-shorts]"));
+  // CHIP: チップ系
+  assert.ok(G.YouTubeShorts.SELECTORS_CHIP.some((s) => s.includes("yt-chip-cloud-chip-renderer")));
+  // SIDEBAR: サイドバーメニュー
+  assert.ok(G.YouTubeShorts.SELECTORS_SIDEBAR.some((s) => s.includes("ytd-guide-entry-renderer")));
+  assert.ok(G.YouTubeShorts.SELECTORS_SIDEBAR.some((s) => s.includes("ytd-mini-guide-entry-renderer")));
 });
 
 // ---------- InstagramCleaner ----------

@@ -47,3 +47,535 @@ html.__cpa-sfx-hide-comments ytd-comments#comments {
  * CSS は frame・iframe・親コンテナに一切ルールを当てない（過去のあらゆる CSS 介入
  * 経路で「動画を処理しています」エラーや UI 副作用が起きたため）。
  * JS は engagement panel の公式 close button を user gesture 等価で click するだけ。 */
+
+/* ==========================================================================
+ * 登録チャンネル拡張（subsLeftnavInjectAll / subsAllShortcut / subsChannelsGrid）
+ *
+ * テーマ追従戦略:
+ *   YouTube は最新版で `--yt-spec-text-secondary` 等のテーマ変数を空文字で返すように
+ *   なったため、`var()` ベースの追従が機能しない。代わりに以下の二重戦略で確実に対応:
+ *     1) `<html dark>` 属性: ユーザーが手動でダーク/ライトを切り替えた状態を反映
+ *     2) `@media (prefers-color-scheme: dark)`: OS テーマ追従モードを反映
+ *   両方に同値の color を割り当てることで、どの経路で dark/light が決まっても色が追従する。
+ * ========================================================================== */
+
+/* ライトテーマ用の色定数（CSS 変数で集約してダークセクションで上書き） */
+html.__cpa-sfx-subs-grid,
+ytd-app:has(a.__cpa-sfx-subs-injected),
+ytd-app:has(a.__cpa-sfx-subs-shortcut) {
+  --cpa-subs-fg-primary: #0f0f0f;
+  --cpa-subs-fg-secondary: #606060;
+  --cpa-subs-bg-card: rgba(0, 0, 0, 0.04);
+  --cpa-subs-bg-card-hover: rgba(0, 0, 0, 0.08);
+  --cpa-subs-bg-thumb: #d9d9d9;
+  --cpa-subs-divider: rgba(0, 0, 0, 0.1);
+  --cpa-subs-bg-page: #ffffff;
+  --cpa-subs-bg-toolbar: rgba(255, 255, 255, 0.96);
+  --cpa-subs-bg-input: rgba(0, 0, 0, 0.05);
+  --cpa-subs-bg-input-hover: rgba(0, 0, 0, 0.08);
+  --cpa-subs-masthead-h: 56px;
+}
+/* ダークテーマ: html[dark] 属性 (YouTube 手動切替) */
+html[dark].__cpa-sfx-subs-grid,
+html[dark] ytd-app:has(a.__cpa-sfx-subs-injected),
+html[dark] ytd-app:has(a.__cpa-sfx-subs-shortcut) {
+  --cpa-subs-fg-primary: #f1f1f1;
+  --cpa-subs-fg-secondary: #aaaaaa;
+  --cpa-subs-bg-card: rgba(255, 255, 255, 0.06);
+  --cpa-subs-bg-card-hover: rgba(255, 255, 255, 0.12);
+  --cpa-subs-bg-thumb: #272727;
+  --cpa-subs-divider: rgba(255, 255, 255, 0.12);
+  --cpa-subs-bg-page: #0f0f0f;
+  --cpa-subs-bg-toolbar: rgba(15, 15, 15, 0.96);
+  --cpa-subs-bg-input: rgba(255, 255, 255, 0.08);
+  --cpa-subs-bg-input-hover: rgba(255, 255, 255, 0.14);
+}
+/* ダークテーマ: prefers-color-scheme (OS テーマ追従モード) */
+@media (prefers-color-scheme: dark) {
+  html.__cpa-sfx-subs-grid,
+  ytd-app:has(a.__cpa-sfx-subs-injected),
+  ytd-app:has(a.__cpa-sfx-subs-shortcut) {
+    --cpa-subs-fg-primary: #f1f1f1;
+    --cpa-subs-fg-secondary: #aaaaaa;
+    --cpa-subs-bg-card: rgba(255, 255, 255, 0.06);
+    --cpa-subs-bg-card-hover: rgba(255, 255, 255, 0.12);
+    --cpa-subs-bg-thumb: #272727;
+    --cpa-subs-divider: rgba(255, 255, 255, 0.12);
+    --cpa-subs-bg-page: #0f0f0f;
+    --cpa-subs-bg-toolbar: rgba(15, 15, 15, 0.96);
+    --cpa-subs-bg-input: rgba(255, 255, 255, 0.08);
+    --cpa-subs-bg-input-hover: rgba(255, 255, 255, 0.14);
+  }
+}
+
+/* ---------- A1: leftnav 全件注入 ---------- */
+/* JS が leftnav の subs section #items の「もっと見る」expander 直前に挿入する独自 <a>。
+ * native ytd-guide-entry-renderer の `<a>` は padding:0 / margin:0 で、内部要素のマージンで
+ * アイコン位置を作っている。これに揃えるため、私の <a> 自体は padding:0、
+ * 内部 img の margin でアイコン位置 (左から 28px) を作り、ネイティブと完全に揃う。 */
+a.__cpa-sfx-subs-injected {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  height: 40px !important;
+  margin: 0 !important;
+  text-decoration: none !important;
+  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
+  font-size: 1.4rem !important;
+  line-height: 2rem !important;
+  font-family: "Roboto", "Arial", sans-serif !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+html[dark] a.__cpa-sfx-subs-injected {
+  color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+}
+@media (prefers-color-scheme: dark) {
+  a.__cpa-sfx-subs-injected {
+    color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+  }
+}
+a.__cpa-sfx-subs-injected:hover {
+  background: var(--cpa-subs-bg-card-hover, rgba(0, 0, 0, 0.08)) !important;
+}
+/* アイコン: native は icon が画面左から 24px、text が 72px の位置。
+ * 実機計測で <a> 自体が #items 内で offsetLeft=12px の位置に配置されるため、
+ * img margin-left=12 で icon を 24px、margin-right=24 で text を 72px に正確一致させる。
+ * background はロード中・失敗時の見栄え保険。 */
+a.__cpa-sfx-subs-injected > img {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  border-radius: 50% !important;
+  flex: 0 0 24px !important;
+  object-fit: cover !important;
+  display: block !important;
+  margin: 0 24px 0 12px !important;
+  background: var(--cpa-subs-bg-thumb, #d9d9d9) !important;
+}
+/* avatarUrl が取れなかったチャンネル用のプレースホルダ (頭文字 1 文字を円形背景に重ねる)。
+ * img と同サイズ・同マージンで配置され、ネイティブ並びと干渉しない。 */
+a.__cpa-sfx-subs-injected > .__cpa-sfx-leftnav-fallback {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  border-radius: 50% !important;
+  flex: 0 0 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 24px 0 12px !important;
+  background: var(--cpa-subs-bg-thumb, #d9d9d9) !important;
+  color: var(--cpa-subs-fg-secondary, #606060) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+  user-select: none !important;
+  font-family: "Roboto", "Arial", sans-serif !important;
+}
+a.__cpa-sfx-subs-injected > span {
+  flex: 1 1 auto !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
+  padding-right: 24px !important;
+  color: inherit !important;
+}
+
+/* ---------- A2: 「すべての登録チャンネル」ショートカットボタン ---------- */
+/* leftnav の subs header (#header-entry) の隣に append される。
+ * SVG 内 `<path fill="currentColor">` が ↓ の color に追従するため、確実なテーマ追従。 */
+a.__cpa-sfx-subs-shortcut {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin-left: auto !important;
+  border-radius: 50% !important;
+  color: var(--cpa-subs-fg-secondary, #606060) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  flex: 0 0 32px !important;
+  opacity: 0.85 !important;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease !important;
+}
+html[dark] a.__cpa-sfx-subs-shortcut {
+  color: var(--cpa-subs-fg-secondary, #aaaaaa) !important;
+}
+@media (prefers-color-scheme: dark) {
+  a.__cpa-sfx-subs-shortcut {
+    color: var(--cpa-subs-fg-secondary, #aaaaaa) !important;
+  }
+}
+a.__cpa-sfx-subs-shortcut:hover {
+  background: var(--cpa-subs-bg-card-hover, rgba(0, 0, 0, 0.08)) !important;
+  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
+  opacity: 1 !important;
+}
+html[dark] a.__cpa-sfx-subs-shortcut:hover {
+  color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+}
+@media (prefers-color-scheme: dark) {
+  a.__cpa-sfx-subs-shortcut:hover {
+    color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+  }
+}
+a.__cpa-sfx-subs-shortcut svg {
+  display: block !important;
+}
+
+/* ==========================================================================
+ * C: /feed/channels グリッド化 — YouTube feed カード準拠レイアウト
+ *
+ * 設計方針 (ゆろさん要件 2026-05-07):
+ *   "レイアウトは feed と全く同じでいい。サムネイル下にアイコンと、動画タイトルの代わりに
+ *    チャンネル名、次の行に再生数の代わりにチャンネル登録者数"
+ *   = YouTube ホーム / 登録フィードの動画カードレイアウトを、チャンネル一覧として転用する。
+ *
+ * カード構造:
+ *   ┌──────────────────────────┐
+ *   │  サムネ 16:9 (角丸 12px)  │  ← #avatar-section
+ *   │ (取得失敗時グレー枠のみ)  │
+ *   └──────────────────────────┘
+ *   [●36px] チャンネル名 (2 行)    ← #info-section (position 駆動)
+ *           チャンネル登録者数
+ *
+ * 実装ポイント:
+ *   1. JS (applyGridCardInlineStyle) が `#avatar` 要素を `#info-section` の先頭に移動する。
+ *      CSS だけでは要素の親変更ができないため。OFF 切替時 (clearGridCardInlineStyle) で復元。
+ *   2. `#info-section` は `position: relative` + `padding-left: 48px` の flex column。
+ *      `#avatar` を `position: absolute; left: 0; top: 12px` で左に固定配置、テキスト
+ *      (#main-link, #video-count) は通常 flow で縦並びで右側に出す。
+ *      = grid-row: span 99 を使うと暗黙 grid 99 行確保でカード全体高さが破綻する罠を回避。
+ *   3. `#subscribers` (ハンドル) は JS で display:none。feed 動画カードは「タイトル + 再生数」
+ *      の 2 行構造なので、こちらも「名前 + 登録者数」の 2 行に合わせる。
+ *   4. カード本体は透明背景・border なし・hover effect なし。サムネ枠だけ角丸 12px。
+ *
+ * セレクタ範囲は <html> クラス __cpa-sfx-subs-grid に紐付けて、/feed/channels 以外で副作用を
+ * 出さない（ytd-expanded-shelf-contents-renderer は他ページに存在しないため安全）。
+ * ========================================================================== */
+
+/* ---------- グリッドツールバー ----------
+ * ytd-section-list-renderer 内の最初の shelf 直前に JS が挿入する。
+ * top: 56px (YouTube masthead の高さ) で sticky させて、ヘッダーに食われないようにする。 */
+html.__cpa-sfx-subs-grid #__cpa-sfx-subs-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 24px;
+  margin: 0 0 8px;
+  position: sticky;
+  top: var(--cpa-subs-masthead-h, 56px);
+  z-index: 30;
+  background: var(--cpa-subs-bg-toolbar, rgba(255, 255, 255, 0.96));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--cpa-subs-divider, rgba(0, 0, 0, 0.1));
+  color: var(--cpa-subs-fg-primary, #0f0f0f);
+  font-family: "Roboto", "Arial", sans-serif;
+}
+html.__cpa-sfx-subs-grid #__cpa-sfx-subs-toolbar input[type="search"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--cpa-subs-bg-input, rgba(0, 0, 0, 0.05));
+  color: var(--cpa-subs-fg-primary, #0f0f0f);
+  font-size: 1.4rem;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+html.__cpa-sfx-subs-grid #__cpa-sfx-subs-toolbar input[type="search"]:hover {
+  background: var(--cpa-subs-bg-input-hover, rgba(0, 0, 0, 0.08));
+}
+html.__cpa-sfx-subs-grid #__cpa-sfx-subs-toolbar input[type="search"]::placeholder {
+  color: var(--cpa-subs-fg-secondary, #606060);
+}
+html.__cpa-sfx-subs-grid #__cpa-sfx-subs-toolbar input[type="search"]:focus {
+  outline: none;
+  border-color: var(--cpa-subs-fg-secondary, #606060);
+  background: var(--cpa-subs-bg-input-hover, rgba(0, 0, 0, 0.08));
+}
+/* sort UI は YouTube ネイティブ「名前順」combobox (`<button role="combobox">` 左上) と
+ * 完全に役割が被るため拡張側からは出さない。よって select / option / sort-label の
+ * スタイルは持たない。検索フィルタだけがネイティブにない機能なので残す。 */
+
+/* ---------- container 幅を /feed/subscriptions 相当に拡張 ----------
+ * ネイティブ ytd-section-list-renderer の max-width: 928px を解除して、#primary 全幅
+ * (デスクトップで 1500-1700px) を活かす。これで feed と同じ 4-5 列が実現でき、左右の
+ * 大きい余白も解消される。 */
+html.__cpa-sfx-subs-grid ytd-section-list-renderer {
+  max-width: none !important;
+  /* section-list ネイティブの `padding: 0 48px` は /feed/channels で
+   * カードを左に 24px 余分にインセットさせる。feed/subscriptions の
+   * grid renderer は 24px の左オフセットなので、こちらもそれに合わせる。
+   *   240 (primary x) + 24 (我々の padding) = 264 (= feed first card x) */
+  padding: 0 24px !important;
+}
+
+/* ---------- shelf header / 余白の圧縮 ----------
+ * ネイティブの ytd-shelf-renderer は section ごとに大きい padding を持つため、
+ * /feed/channels では shelf 切り替えで巨大な空白が出る。feed カード相当の連続感を
+ * 出すため shelf header をコンパクトにし、shelf 間の margin を引き締める。 */
+html.__cpa-sfx-subs-grid ytd-shelf-renderer {
+  padding: 0 !important;
+  margin: 0 0 16px !important;
+}
+html.__cpa-sfx-subs-grid ytd-shelf-renderer #title-container {
+  /* feed/subscriptions の H2 は first card と x=264 で完全整列。
+   * section-list padding を 24 にしたので、title-container の horizontal padding は
+   * 0 にして title text が card 左端に整列するようにする (shelf 見出しの 24px ズレ防止)。 */
+  padding: 16px 0 4px !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+html.__cpa-sfx-subs-grid ytd-shelf-renderer #title,
+html.__cpa-sfx-subs-grid ytd-shelf-renderer h2,
+html.__cpa-sfx-subs-grid ytd-shelf-renderer yt-formatted-string#title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+  letter-spacing: 0 !important;
+  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
+  font-family: "Roboto", "Arial", sans-serif !important;
+}
+
+/* ---------- グリッドレイアウト ----------
+ * `/feed/subscriptions` と完全に同じレスポンシブ列数にする。
+ *
+ * 重要発見: YouTube は **`html` (document root) に `--ytd-rich-grid-items-per-row` を
+ * グローバル設定している**。これは viewport 幅に応じて YouTube が動的に計算した値で、
+ *   1920+ vw → 4 / 1100-1900 → 3 / 700-1100 → 2 / それ以下 → 1 のような分布。
+ *   実機計測 (vw=2048) で itemsPerRow=4 を確認。
+ *
+ * /feed/channels には `ytd-rich-grid-renderer` が無いが、CSS 変数は html から継承
+ * されるので `var(--ytd-rich-grid-items-per-row)` で feed と同じ値を取得できる。
+ *
+ * これにより feed のレスポンシブ挙動と **完全同期** する。auto-fit + 自前 min-width で
+ * breakpoint を独自定義する旧設計は、feed の breakpoint とズレて「なんで横の枚数が違う」
+ * と指摘される問題があった。YouTube 公式の値を直接使うのが最も正しい。
+ *
+ * minmax(0, 1fr) は min-width 0 を明示してカードが column 内で overflow しないよう保護。
+ * fallback 3 は CSS 変数が未設定の極端なケース用 (通常 YouTube が必ず設定する)。
+ * gap は feed と同じ 83px / 16px。 */
+html.__cpa-sfx-subs-grid ytd-expanded-shelf-contents-renderer {
+  padding: 0 !important;
+  margin: 0 !important;
+  display: block !important;
+}
+html.__cpa-sfx-subs-grid ytd-expanded-shelf-contents-renderer #grid-container,
+html.__cpa-sfx-subs-grid ytd-expanded-shelf-contents-renderer #items {
+  display: grid !important;
+  /* `--cpa-sfx-subs-items-per-row` は search-fixer.js の syncSubsGridItemsPerRow() が
+   * window.innerWidth から動的計算して html に設定する独自変数。
+   * 注: YouTube が html に設定する `--ytd-rich-grid-items-per-row` は実機計測の結果
+   * **STALE な値 (常に 4)** で viewport に追従しなかった。実際の responsive 値は
+   * `ytd-rich-grid-renderer` の inline style にしかなく、/feed/channels には
+   * その element が存在しないので参照不能 → 自前計算が必要だった。 */
+  grid-template-columns: repeat(var(--cpa-sfx-subs-items-per-row, 3), minmax(0, 1fr)) !important;
+  /* /feed/home 実機計測 (vw=2048): row gap 32px / column gap 16px / padding 24px 0 0
+   * 注: 旧設計の 83px は /feed/subscriptions で c0 → c4 を測ったときの「もっと見る ボタン
+   * を跨いだ偽の gap」だった。同じ shelf 内の連続行では feed は 32px が正解。 */
+  gap: 32px 16px !important;
+  padding: 24px 0 0 !important;
+  margin: 0 !important;
+  align-items: stretch !important;
+  justify-items: stretch !important;
+}
+
+/* ---------- カード本体: feed 動画カード準拠 ----------
+ * grid cell として動作。幅は親の grid-template-columns で決まる。
+ * hover 時に薄い背景色 (feed と同じ挙動) と cursor: pointer をつけて、
+ * カード全体がチャンネルリンクとしてクリック可能であることを示す
+ * (空白部分の click は applyGridCardInlineStyle 内で main-link.click() に転送)。 */
+html.__cpa-sfx-subs-grid ytd-channel-renderer {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: unset !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  /* feed カードは padding 0 (margin: 0 8px で gap を margin で実現)。
+   * mine は grid-template-columns + gap で gap を持つので margin 不要、
+   * かつ card に padding 0 を当てて feed と同じ「カードが grid cell 全幅を占める」
+   * 見た目にする。padding 8px だとカードが grid cell 内で内側にインセットされ、
+   * cells 間に視覚的な余分の隙間が出てしまう (= ゆろさん指摘「全然レイアウト違う」の主犯)。 */
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  align-items: stretch !important;
+  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
+  cursor: pointer !important;
+  transition: background-color 120ms ease !important;
+}
+html.__cpa-sfx-subs-grid ytd-channel-renderer:hover {
+  background: var(--cpa-subs-bg-input-hover, rgba(0, 0, 0, 0.08)) !important;
+}
+html.__cpa-sfx-subs-grid ytd-channel-renderer[hidden] {
+  display: none !important;
+}
+
+/* #content-section: サムネ枠 + 情報部の縦並び */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #content-section {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  align-items: stretch !important;
+}
+
+/* ---------- #avatar-section: 純粋なサムネ枠 (16:9 角丸 12px) ----------
+ * サムネ取得成功時は __cpa-sfx-subs-thumb が absolute で全埋めしてくれる。
+ * 取得失敗時は単色グレー枠のまま (チャンネル識別は info-section の 36px アバターに任せる)。 */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #avatar-section {
+  position: relative !important;
+  width: 100% !important;
+  aspect-ratio: 16 / 9 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  background: var(--cpa-subs-bg-thumb, #d9d9d9) !important;
+  flex: 0 0 auto !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+}
+html.__cpa-sfx-subs-grid .__cpa-sfx-subs-thumb {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  z-index: 1 !important;
+  border-radius: 0 !important;
+}
+
+/* ---------- #info-section: position 駆動レイアウト (左 absolute アバター + 右 flow テキスト) ----------
+ * 過去 grid-template-columns: 36px 1fr + grid-row: 1/span 99 で実装したが、span 99 が
+ * 暗黙 grid を 99 行確保してカード全体の高さが破綻する罠があったため、よりシンプルで
+ * 罠の少ない `position: absolute` レイアウトに切替。
+ *
+ * 結果は feed 動画カードと完全に同じ:
+ *   左 (absolute): #avatar 36px 円
+ *   右 (flow):     #main-link (チャンネル名 2 行) → #video-count (登録者数 1 行) */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #info-section {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  width: 100% !important;
+  padding: 12px 0 4px 48px !important;  /* 左 48px = avatar 36px + gap 12px */
+  margin: 0 !important;
+  text-align: left !important;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+  min-height: 0 !important;
+}
+
+/* JS が #avatar を #info-section の先頭に move。position: absolute で左に固定配置。
+ * top: 12px は #info-section の padding-top と揃える（main-link の top と一致）。 */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #info-section > #avatar {
+  position: absolute !important;
+  left: 0 !important;
+  top: 12px !important;
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  background: transparent !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+/* yt-img-shadow > img を 36px 円に強制。サムネ取得失敗時はグレー背景が見えるが、
+ * Polymer の img.src が hydrate されると画像が乗る。 */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #info-section > #avatar yt-img-shadow,
+html.__cpa-sfx-subs-grid ytd-channel-renderer #info-section > #avatar yt-img-shadow img,
+html.__cpa-sfx-subs-grid ytd-channel-renderer #info-section > #avatar > img {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  background: var(--cpa-subs-bg-thumb, #d9d9d9) !important;
+  position: relative !important;
+  inset: auto !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: auto !important;
+}
+
+/* ---------- チャンネル名 (#main-link) — feed カードの動画タイトル相当 ----------
+ * Polymer の二重テキスト対策で JS が #main-link を `font-size: 0` にし、`data-cpa-clean-name`
+ * 属性に正規化済みの 1 個分の名前を持たせる。CSS は ::before でその属性値を表示する。
+ *
+ * `min-height: 2.7em` で **常に 2 行分の高さを予約** する。feed カードの動画タイトルが
+ * 2 行 (line-clamp:2) で 44px 高さを取るため、こちらもそれに揃えてカード全体の高さが
+ * feed と一致するようにする (短いチャンネル名で info-section が縮んで「カードが浮いて
+ * 見える」問題への対策)。 */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::before {
+  content: attr(data-cpa-clean-name);
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
+  text-align: left !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: hidden !important;
+  min-height: 2.7em !important;
+  max-height: 2.7em !important;
+  letter-spacing: 0 !important;
+  font-feature-settings: "palt" 1 !important;
+  font-family: "Roboto", "Arial", sans-serif !important;
+}
+html[dark] html.__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::before,
+html[dark].__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::before {
+  color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+}
+@media (prefers-color-scheme: dark) {
+  html.__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::before {
+    color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+  }
+}
+
+/* ---------- 登録者数 (#video-count) — feed カードの再生数 · ago 相当 ---------- */
+html.__cpa-sfx-subs-grid ytd-channel-renderer #video-count {
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  color: var(--cpa-subs-fg-secondary, #606060) !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  font-feature-settings: "tnum" 1 !important;
+}
+
+/* shelf 全カード hidden 時の見出しも隠す（applySubsGridFilter が data-cpa-shelf-empty 属性を付与） */
+html.__cpa-sfx-subs-grid ytd-shelf-renderer[data-cpa-shelf-empty][hidden] {
+  display: none !important;
+}

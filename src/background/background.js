@@ -25,8 +25,41 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.local.set(migrate).catch(() => {});
   }
 
+  // v1.0.x マイグレーション: 旧 removeShorts を 4 機能に分離。
+  // 旧 removeShorts は「Shorts 棚 / チップ / 左サイドバーメニュー削除 + URL リダイレクト」を
+  // すべて含む 1 トグルだったが、Shorts を単独カテゴリで特別扱いする UI が分かりにくかったため
+  // 機能を以下に解体し、それぞれを既存カテゴリ（動画フィルタ / 検索結果 / 動画ページ /
+  // メニュー UI）に振り分けた:
+  //   - removeShortsShelf:    Shorts 棚（ホーム + 検索）
+  //   - removeShortsChip:     検索ページの Shorts フィルタチップ
+  //   - removeShortsSidebar:  左サイドバーの「ショート」メニュー
+  //   - redirectShortsUrl:    /shorts/ URL → /watch リダイレクト
+  // 旧 `removeShorts: true` ユーザーは 4 機能とも未設定のとき自動で全部 true に転写する。
+  // （前段マイグレーションで redirectShortsUrl だけ既に転写されているケースもあるため、
+  //  各キーごとに「未設定なら埋める」方式で重複転写を避ける）
+  const featuresForShortsSplit = await chrome.storage.local
+    .get(StorageKeys.SEARCH_FIXER_FEATURES)
+    .then((s) => s[StorageKeys.SEARCH_FIXER_FEATURES])
+    .catch(() => undefined);
+  if (featuresForShortsSplit && typeof featuresForShortsSplit === "object") {
+    if (featuresForShortsSplit.removeShorts === true) {
+      const merged = SearchFixer.mergeFeatures(featuresForShortsSplit);
+      // 既に書き込まれている値（true / false）は尊重し、未設定（undefined）の場合のみ
+      // 旧 removeShorts:true の意図を引き継いで true にする。
+      if (featuresForShortsSplit.removeShortsShelf === undefined) merged.removeShortsShelf = true;
+      if (featuresForShortsSplit.removeShortsChip === undefined) merged.removeShortsChip = true;
+      if (featuresForShortsSplit.removeShortsSidebar === undefined) merged.removeShortsSidebar = true;
+      if (featuresForShortsSplit.redirectShortsUrl === undefined) merged.redirectShortsUrl = true;
+      // 旧キー removeShorts は新構造に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
+      await chrome.storage.local
+        .set({ [StorageKeys.SEARCH_FIXER_FEATURES]: merged })
+        .catch(() => {});
+    }
+  }
+
   // 廃止キーの削除（v1.0.x 系 + v1.0.17 + v1.0.18 で統合した ytShortsRemovalEnabled）
   // v1.0.x: タブを 4 つに増やしてアコーディオンを廃止したので、開閉状態キーも撤去
+  // v1.0.x: 動画フィルタの「適用範囲」セレクタを廃止し常時 feed 動作に固定したので searchFixerScope も撤去
   await chrome.storage.local
     .remove([
       "copyPasteSettings",
@@ -36,6 +69,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       "ytShortsRemovalEnabled",
       "popupCleanerAccordionOpen",
       "popupIgCleanerAccordionOpen",
+      "searchFixerScope",
     ])
     .catch(() => {});
 

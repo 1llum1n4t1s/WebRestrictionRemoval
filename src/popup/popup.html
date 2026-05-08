@@ -235,17 +235,9 @@
             個別に ON / OFF を選んでカスタマイズしてください。
           </p>
 
-          <!-- カテゴリブロックは popup.js が SearchFixer.FEATURES から生成する -->
+          <!-- カテゴリブロックは popup.js が SearchFixer.FEATURES から生成する。
+               ホーム列数 (gridItemsSelect) はメニュー/UI カテゴリの末尾に動的に挿入される。 -->
           <div id="featureCategories"></div>
-
-          <!-- ホーム列数（select）。クリーナー OFF でも storage には保存されるが見た目は dim -->
-          <div class="select-row">
-            <label class="select-label" for="gridItemsSelect">
-              <span class="select-icon" aria-hidden="true">🔢</span>
-              <span class="select-name">ホーム列数</span>
-            </label>
-            <select id="gridItemsSelect" class="select"></select>
-          </div>
         </div>
       </section>
 
