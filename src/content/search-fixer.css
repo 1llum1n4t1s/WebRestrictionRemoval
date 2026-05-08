@@ -188,15 +188,8 @@ a.__cpa-sfx-subs-injected > span {
 }
 
 /* ---------- A2: 「すべての登録チャンネル」ショートカット (leftnav entry 風) ----------
- * 「登録チャンネル」section の **#items 最上** に entry として挿入される。
- * subsLeftnavInjectAll と同じく Polymer dom-repeat 配下に直接 inject する安全パターン。
- * 高さ 40px / icon 12+12=24px / text 72px の位置を YouTube 公式 entry と揃える。
- *
- * 旧実装の遍歴:
- *   v1: #header-entry 横の SVG 小ボタン (32x32) → 「分かりづらい」UX 課題
- *   v2: section の **直前** に sibling 挿入 → Polymer dom-repeat が reorder 発動 →
- *       subs section が leftnav 末尾に移動する退行 (ゆろさん環境で実機検証で確定 2026-05-08)
- *   v3 (現行): section の **#items 最上 entry** として inject → 安全 */
+ * subs section の `#items` 内、最初のチャンネル entry の直前に挿入される。
+ * 高さ 40px / icon 12+12=24px / text 72px で YouTube 公式 entry と揃える。 */
 a.__cpa-sfx-subs-shortcut {
   display: flex !important;
   align-items: center !important;

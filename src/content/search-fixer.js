@@ -1130,32 +1130,17 @@
   // leftnav 注入時にアイコンが欠落するバグがあった。v3 では ytInitialData JSON から
   // thumbnail URL を取り出すため空 URL は出ない。旧 v2 cache は schema bump で破棄する。
   const SUBS_CACHE_LIST_KEY = "__cpa_subs_list_v3";
-  // v5 bump 理由: thumbnail URL を hqdefault.jpg (480x360, 4:3) から maxresdefault.jpg
-  // (1280x720, 16:9) に切り替え。hqdefault は 4:3 のため avatar-section 16:9 枠に
-  // object-fit:cover で入れると上下 cropping が発生し、ホーム画面の 16:9 サムネと
-  // 見た目が揃わず「左上に寄って見える」UX 事故が出ていた (実機検証で確定)。
-  //
-  // v4 (1 つ前): YouTube が `/feeds/videos.xml` エンドポイントを廃止 (404)。
-  // 旧コードは Stage2 で RSS から最新動画 thumbnail を取りに行っていたが、全件 thumbUrl=null
-  // で cache に書き込まれサムネ表示が完全停止する退行が発生したため、Stage2 RSS fetch を
-  // 撤去して `/${handle}` HTML 内の最初の "videoId":"..." を抽出する版に切替。
+  // v5: maxresdefault.jpg (16:9) URL を保存するため、hqdefault (4:3) を保存していた v4 を invalidate。
   const SUBS_CACHE_THUMB_PREFIX = "__cpa_subs_thumb_v5::";
   const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-  // 名前順ソート用の collator。日本語 + 数値混在を自然に並べる。
-  // 第 1 引数には valid な locale string か object を渡す必要があり、undefined を
-  // 配列に混ぜると `Language ID should be string or object` でコンストラクタが throw する
-  // (これで IIFE 全体が落ちて全機能停止するという致命バグを起こした履歴あり)。
-  // "ja" 単体を渡し、未対応環境では JS エンジンが自動でフォールバックする。
-  const subsCollator = new Intl.Collator("ja", {
-    sensitivity: "base",
-    numeric: true,
-    usage: "sort",
-  });
-
   /** @type {Promise<Array<{handle:string,name:string,href:string,avatarUrl:string}>>|null} */
   let subsListFetchInFlight = null;
-  /** @type {{toolbar:HTMLElement,search:HTMLInputElement,sort:HTMLSelectElement,observer:IntersectionObserver|null}|null} */
+  /** sort-wipe 経路でカードの SUBS_CARD_MARKER_ATTR を一括 clear して再 observe するときに、
+   * 直前の fetch がまだ in-flight なハンドルが再 trigger されて重複 fetch + 重複 cache write
+   * を起こすバグを防ぐ。fetch 開始時に add、finally で delete。*/
+  const subsThumbFetchingHandles = new Set();
+  /** @type {{toolbar:HTMLElement,search:HTMLInputElement,observer:IntersectionObserver|null}|null} */
   let subsGridState = null;
   /** @type {MutationObserver|null} ネイティブ sort dropdown 操作後の card 再 hydrate を検出する observer */
   let subsGridCardsObserver = null;
@@ -1288,17 +1273,6 @@
     return null;
   }
 
-  /** leftnav の「登録チャンネル」見出し ytd-guide-entry-renderer を返す。 */
-  function findSubsHeaderEntry() {
-    const headers = document.querySelectorAll("ytd-guide-entry-renderer#header-entry");
-    for (const e of headers) {
-      const a = e.querySelector("a");
-      const t = a?.getAttribute("title");
-      if (t === "登録チャンネル" || t === "Subscriptions") return e;
-    }
-    return null;
-  }
-
   /** "/@handle" 形式の href から @handle 部分を抽出。 */
   function extractHandleFromHref(href) {
     if (!href) return null;
@@ -1323,35 +1297,6 @@
     return (card.querySelector("#main-link")?.textContent || "").trim();
   }
 
-  /**
-   * /feed/channels の ytd-channel-renderer 内では ID 名と内容が歴史的に交差しており、
-   * `#video-count` 要素のテキストに「チャンネル登録者数 N万人」が入る。
-   * 日本語 (万/億/千) と英語 (K/M/B) の両形式を解析して整数を返す。
-   */
-  function getSubsCardSubscribersCount(card) {
-    const txt = (card.querySelector("#video-count")?.textContent || "").trim();
-    return parseSubscriberCountText(txt);
-  }
-
-  function parseSubscriberCountText(txt) {
-    if (!txt) return 0;
-    const t = txt.replace(/[\s,]/g, "");
-    let m = t.match(/(\d+(?:\.\d+)?)億/);
-    if (m) return Math.round(parseFloat(m[1]) * 100_000_000);
-    m = t.match(/(\d+(?:\.\d+)?)万/);
-    if (m) return Math.round(parseFloat(m[1]) * 10_000);
-    m = t.match(/(\d+(?:\.\d+)?)千/);
-    if (m) return Math.round(parseFloat(m[1]) * 1_000);
-    m = t.match(/(\d+(?:\.\d+)?)B\b/i);
-    if (m) return Math.round(parseFloat(m[1]) * 1_000_000_000);
-    m = t.match(/(\d+(?:\.\d+)?)M\b/i);
-    if (m) return Math.round(parseFloat(m[1]) * 1_000_000);
-    m = t.match(/(\d+(?:\.\d+)?)K\b/i);
-    if (m) return Math.round(parseFloat(m[1]) * 1_000);
-    m = t.match(/(\d+)/);
-    if (m) return parseInt(m[1], 10) || 0;
-    return 0;
-  }
 
   // ----- A1: leftnav 全件注入 -----
 
@@ -1762,38 +1707,11 @@
       return;
     }
     if (existing) return; // idempotent
-    // 「登録チャンネル」section の **最初のチャンネル entry の直前** = `<h3>` 見出しの直下、
-    // チャンネルリストの最上に entry として挿入する。
-    //
-    // ゆろさんの希望「YouTube 公式メニューの一部なんじゃないかみたいな感じで」を満たすため、
-    // 旧実装 (見出し横の SVG 小ボタン) は廃止して通常の leftnav entry 風に作り変えた。
-    //
-    // **section の sibling として insertBefore してはいけない**:
-    //   試しに `section.parentElement.insertBefore(entry, section)` で sibling 挿入したところ、
-    //   Polymer dom-repeat が「section list の構造が変わった」と検知して内部 reordering を発動し、
-    //   subs section が leftnav の **末尾に移動** してしまう退行が起きた (実機検証で確定 2026-05-08
-    //   ゆろさん環境)。`<a>` を Polymer 管理下の section 兄弟として inject するのは fragile すぎる。
-    //
-    // **subs section の DOM 構造 (実機計測で確定):**
-    //   <ytd-guide-section-renderer>
-    //     <h3>登録チャンネル</h3>                                        ← 見出し
-    //     <div #items>
-    //       <ytd-guide-collapsible-section-entry-renderer>             ← idx 0 (「もっと見る」expander)
-    //       <ytd-guide-entry-renderer>小柳ロウ</...>                   ← idx 1 (最初のチャンネル)
-    //       <ytd-guide-entry-renderer>リバース☆さっきー</...>          ← idx 2
-    //       ...
-    //     </div>
-    //   </ytd-guide-section-renderer>
-    //
-    //   `#items.firstElementChild` は collapsible (expander) なので、その前に入れると
-    //   「もっと見る」より上 = 見た目「登録チャンネル」の上に entry が置かれてしまう。
-    //   **最初の `<ytd-guide-entry-renderer>` 直前**に挿入すれば「見出し → expander → 我々 → 小柳ロウ → ...」
-    //   ではなく「見出し → 我々 → 小柳ロウ → ... → 末尾の expander」の自然な並びになる。
-    //   ※ collapsible entry が末尾にあるか先頭にあるかは YouTube のレイアウト次第だが、
-    //     `:not(#header-entry)` で expander や headerEntry を除外する保険つき。
-    //
-    // この手法は subsLeftnavInjectAll が採用している「Polymer dom-repeat 配下に `<a>` を直接
-    // inject」と同じ安全パターン。Polymer は section 構造を破壊しない。
+    // subs section の sibling として insertBefore すると Polymer dom-repeat が reorder を発動して
+    // section が leftnav 末尾に飛ばされるため、`#items` 配下に inject する (subsLeftnavInjectAll
+    // と同じパターン)。`#items.firstElementChild` は collapsible expander で見出しっぽく振る舞う
+    // ので、それより後ろの最初のチャンネル entry の直前に挿入することで「見出し直下、リスト最上」
+    // 位置になる。`#header-entry` は別の `#header` div 内で `#items` の外。
     const section = findSubsSection();
     if (!section) return;
     const itemsDiv = section.querySelector("#items");
@@ -1803,9 +1721,7 @@
     entry.href = "/feed/channels";
     entry.title = "すべての登録チャンネル";
     entry.setAttribute("aria-label", "すべての登録チャンネル");
-    // SVG アイコン (リスト風) + ラベルの横並び。CSS 側で公式 entry サイズ (高さ 40px / icon 12+12 / text 72) に揃える。
-    // YouTube は Trusted Types policy を有効化しているため innerHTML 代入は弾かれる。
-    // content script の isolated world では制約が緩いが、安全側に倒して createElement で構築する。
+    // YouTube の Trusted Types policy で innerHTML 文字列代入は弾かれうるので createElement で構築。
     const iconSpan = document.createElement("span");
     iconSpan.className = `${SUBS_SHORTCUT_MARKER}-icon`;
     iconSpan.setAttribute("aria-hidden", "true");
@@ -1826,7 +1742,6 @@
     labelSpan.textContent = "すべての登録チャンネル";
     entry.appendChild(iconSpan);
     entry.appendChild(labelSpan);
-    // 最初のチャンネル entry の直前に挿入。collapsible (expander) や header-entry は除外する。
     const firstChannel = itemsDiv.querySelector(
       "ytd-guide-entry-renderer:not(#header-entry)"
     );
@@ -1975,7 +1890,6 @@
         subsGridState = {
           toolbar: existingTb,
           search: existingTb.querySelector("input"),
-          sort: null,
           observer: null,
         };
       }
@@ -2008,7 +1922,7 @@
     // (`<button role="combobox">`) と完全に役割が被るため拡張側からは出さない。
     // ネイティブ sort 操作後の card 再 hydrate には observeSubsGridCardAdditions が追従する。
     toolbar.append(search);
-    subsGridState = { toolbar, search, sort: null, observer: null };
+    subsGridState = { toolbar, search, observer: null };
     // 挿入位置: 「最初の shelf の直前」が最も確実。最新 YouTube DOM では
     // `ytd-section-list-renderer #contents` 構造が必ずしも存在しないため shelf 直前を最優先。
     // shelf がまだ hydrate されてない場合は MutationObserver で待って再配置する。
@@ -2366,12 +2280,10 @@
   }
 
   /**
-   * カードがビューポートに入ったタイミングで、対応するチャンネルの最新動画サムネを取得。
-   * 2 段階 fetch:
-   *   Stage 1: `/{handle}` (チャンネルページ HTML) から externalId (UCxxx) を抽出
-   *   Stage 2: `/feeds/videos.xml?channel_id={externalId}` (RSS feed) から
-   *            最新動画の `<media:thumbnail url="...">` を抽出
-   * og:image はチャンネルアバターでしかなく動画サムネにならないため、RSS feed が必須。
+   * カードがビューポートに入ったタイミングで、対応するチャンネルの Featured 動画サムネを取得。
+   * `/${handle}` HTML 内の最初の `"videoId":"..."` を抽出して
+   * `https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg` を組み立てる (16:9, 1280x720)。
+   * 旧 Stage2 (`/feeds/videos.xml?channel_id=...`) は YouTube が 2026-05 までに 404 化したため撤去。
    * 失敗時は thumbUrl=null でも cache に保存して同じハンドルへの再 fetch を抑止。
    */
   async function fetchAndInjectThumbnail(card) {
@@ -2385,37 +2297,29 @@
       thumbUrl = cached.thumbUrl;
       channelId = cached.channelId;
     } else {
+      // 同じ handle に対する重複 fetch を抑止（sort-wipe 経路で marker 一括 clear → 再 observe
+      // で同じカードが in-flight 中に再 trigger されると、`readSubsThumbCache` は cache miss
+      // を返すため fetch が複数走ってしまう）。
+      if (subsThumbFetchingHandles.has(handle)) return;
+      subsThumbFetchingHandles.add(handle);
       try {
-        // Stage 1 のみで完結: channel page HTML → externalId + 最新動画 videoId。
-        // 旧 Stage 2 (`/feeds/videos.xml?channel_id=...`) は YouTube が 2026-05 までに 404 化したため撤去。
-        // チャンネルページ HTML には ytInitialData が embed されており、最初に出る `"videoId":"..."`
-        // は "Featured" / 「ホーム」タブで最上段に置かれる動画 (= ほぼ最新動画 or pinned)。完全な
-        // "最新公開動画" を取りたければ `/channel/${cid}/videos` を別途 fetch すればよいが、
-        // HTML 1.1MB を全カード分追加で取得するコストが高く、見た目用途には Featured で十分とした。
         const res = await fetch(`/${handle}`, { credentials: "same-origin" });
         if (!res.ok) return;
         const html = await res.text();
         const channelIdMatch = html.match(/"externalId":"(UC[\w-]{20,30})"/);
         channelId = channelIdMatch?.[1] || null;
-        // 最初の videoId 出現 = ホームタブ Featured 動画。11 文字の YouTube videoId 形式に厳密マッチ。
         const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
         const videoId = videoIdMatch?.[1] || null;
-        // 解像度選択: maxresdefault.jpg は 1280x720 で **16:9 ネイティブ**。hqdefault.jpg は 480x360 で
-        // **4:3** のため 16:9 の avatar-section 枠に object-fit:cover で入れると上下 cropping が発生し、
-        // ホーム画面の動画カード (16:9 サムネ) と見た目が揃わない (実機検証で「左上に寄って見える」と確定)。
-        // maxresdefault は HD upload された動画のみ存在し古い動画では 404 だが、img.onerror で
-        // mqdefault.jpg (320x180, 16:9 で必ず存在) にフォールバックするので破綻はしない。
         thumbUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : null;
         writeSubsThumbCache(handle, { thumbUrl, channelId, ts: Date.now() });
       } catch {
         return;
+      } finally {
+        subsThumbFetchingHandles.delete(handle);
       }
     }
     if (!thumbUrl) return;
-    // post-await guard（Codex P2 指摘）: fetch を await している間に
-    //   - ユーザーが subsChannelsGrid を OFF にした (`detachSubsChannelsGrid` で subsGridState=null)
-    //   - /feed/channels から離脱して card が DOM から外れた (`card.isConnected` false)
-    // が起きている可能性があるため、append 直前で再チェックする。
+    // post-await guard: detach / 離脱 / 重複 inject を fence する。
     if (subsGridState === null) return;
     if (!card.isConnected) return;
     if (card.querySelector(`.${SUBS_THUMB_CLASS}`)) return;
@@ -2424,19 +2328,14 @@
     img.src = normalizeAvatarUrl(thumbUrl);
     img.loading = "lazy";
     img.alt = "";
-    // 404 fallback: maxresdefault.jpg は HD アップロード動画のみ存在し古い動画では 404 を返す。
-    // 失敗時は mqdefault.jpg (320x180, 16:9 で全動画必須) に切り替える。低解像度になるが
-    // object-fit:cover で 16:9 比率は維持されるので「左上寄り」レイアウト崩れは出ない。
-    // onerror を null clear するのは fallback 自体が再度 404 になった場合の無限ループ回避。
+    // maxresdefault.jpg は HD upload のみ存在し古い動画では 404。失敗時は mqdefault.jpg
+    // (320x180, 16:9 で全動画必須) に切替。`onerror = null` で fallback 失敗時の無限ループを防ぐ。
     img.onerror = () => {
       img.onerror = null;
       const fallback = img.src.replace(/\/maxresdefault\.jpg([?#].*)?$/, "/mqdefault.jpg$1");
       if (fallback !== img.src) img.src = fallback;
     };
-    // 挿入位置: #avatar-section の中（サムネ枠 16:9 全埋め用）。
-    // feed カード準拠レイアウトではアバターは別途 #info-section の左に move 済みなので、
-    // ここで #avatar 内に挿入すると 16:9 枠ではなくアバター 36px 円の上に乗ってしまう。
-    // 必ず #avatar-section 直下に置くこと。
+    // #avatar-section 直下に置く。`#avatar` 内に置くとアバター 36px 円の上に乗ってしまう。
     const slot = card.querySelector("#avatar-section") || card;
     slot.appendChild(img);
   }
@@ -2508,48 +2407,4 @@
     });
   }
 
-  /**
-   * shelf 単位でソート。「すべて」「購入済み」など複数 shelf 間は分離したまま、
-   * 各 shelf 内の ytd-channel-renderer に CSS `order` プロパティを設定して
-   * 仮想並び替えする（DOM 改変なしで safe）。
-   */
-  function applySubsGridSort() {
-    if (!subsGridState) return;
-    const key = subsGridState.sort?.value || "order";
-    const shelfContents = document.querySelectorAll(
-      "ytd-expanded-shelf-contents-renderer"
-    );
-    if (shelfContents.length === 0) {
-      // shelf がない場合は section-list 直下にカードがあるケース
-      sortCardsWithin(document.querySelectorAll("ytd-channel-renderer"), key);
-      return;
-    }
-    shelfContents.forEach((shelf) => {
-      sortCardsWithin(shelf.querySelectorAll(":scope > ytd-channel-renderer"), key);
-    });
-  }
-
-  function sortCardsWithin(cards, key) {
-    const list = Array.from(cards);
-    if (list.length === 0) return;
-    if (key === "order") {
-      list.forEach((c) => {
-        c.style.order = "";
-      });
-      return;
-    }
-    const items = list.map((c) => ({
-      el: c,
-      name: getSubsCardName(c),
-      subs: getSubsCardSubscribersCount(c),
-    }));
-    if (key === "name") {
-      items.sort((a, b) => subsCollator.compare(a.name, b.name));
-    } else if (key === "subs") {
-      items.sort((a, b) => b.subs - a.subs);
-    }
-    items.forEach((item, i) => {
-      item.el.style.order = String(i);
-    });
-  }
 })();
