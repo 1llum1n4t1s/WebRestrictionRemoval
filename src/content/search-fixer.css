@@ -569,7 +569,7 @@ html.__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::b
   color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
   text-align: left !important;
   white-space: normal !important;
-  word-break: break-word !important;
+  overflow-wrap: break-word !important;
   overflow: hidden !important;
   min-height: 2.7em !important;
   max-height: 2.7em !important;
@@ -577,7 +577,6 @@ html.__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::b
   font-feature-settings: "palt" 1 !important;
   font-family: "Roboto", "Arial", sans-serif !important;
 }
-html[dark] html.__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::before,
 html[dark].__cpa-sfx-subs-grid ytd-channel-renderer #main-link[data-cpa-clean-name]::before {
   color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
 }
