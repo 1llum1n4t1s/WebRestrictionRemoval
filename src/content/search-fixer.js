@@ -1981,6 +1981,19 @@
       }
       return;
     }
+    // 古い IntersectionObserver を disconnect してから state を上書きする (重要)。
+    // section-list 物理置換で toolbar が detach された経路では `subsGridState.toolbar = null` 後に
+    // 本関数が呼ばれて `subsGridState = { ..., observer: null }` で state を完全上書きするが、
+    // 古い observer の参照を破棄するだけでは observer 自体は生きていて observe 中のカードを
+    // 監視し続ける。callback が mutable な subsGridState を読むため重複 inject や、grid 機能
+    // disable 後の `subsGridState === null` dereference を起こす (Codex P2 指摘 2026-05-08)。
+    if (subsGridState?.observer) {
+      try {
+        subsGridState.observer.disconnect();
+      } catch {
+        // disconnect は通常 throw しないが念のため
+      }
+    }
     const toolbar = document.createElement("div");
     toolbar.id = SUBS_TOOLBAR_ID;
 
