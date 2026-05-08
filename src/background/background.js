@@ -25,8 +25,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.local.set(migrate).catch(() => {});
   }
 
-  // v1.0.x マイグレーション: 旧 removeShorts を 4 機能に分離。
-  // 旧 removeShorts は「Shorts 棚 / チップ / 左サイドバーメニュー削除 + URL リダイレクト」を
+  // v1.0.x マイグレーション: 旧 removeShorts を 5 機能に分離。
+  // 旧 removeShorts は「Shorts 棚 / チップ / 左サイドバーメニュー削除 + URL リダイレクト
+  //  + 個別 Shorts 動画カード（ytd-video-renderer:has(a[href*="/shorts/"])）削除」を
   // すべて含む 1 トグルだったが、Shorts を単独カテゴリで特別扱いする UI が分かりにくかったため
   // 機能を以下に解体し、それぞれを既存カテゴリ（動画フィルタ / 検索結果 / 動画ページ /
   // メニュー UI）に振り分けた:
@@ -34,7 +35,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   //   - removeShortsChip:     検索ページの Shorts フィルタチップ
   //   - removeShortsSidebar:  左サイドバーの「ショート」メニュー
   //   - redirectShortsUrl:    /shorts/ URL → /watch リダイレクト
-  // 旧 `removeShorts: true` ユーザーは 4 機能とも未設定のとき自動で全部 true に転写する。
+  //   - shortsBtn:            個別 Shorts 動画カード（旧 SELECTORS_REMOVE 相当 → 動画フィルタ）
+  // 旧 `removeShorts: true` ユーザーは 5 機能とも未設定のとき自動で全部 true に転写する。
+  // shortsBtn を含めないと、「Shorts 棚は隠せても /results 等で個別 Shorts カードが復活する」
+  // 退行が起きる（Codex P2 review 指摘）ため必須。
   // （前段マイグレーションで redirectShortsUrl だけ既に転写されているケースもあるため、
   //  各キーごとに「未設定なら埋める」方式で重複転写を避ける）
   const featuresForShortsSplit = await chrome.storage.local
@@ -50,6 +54,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       if (featuresForShortsSplit.removeShortsChip === undefined) merged.removeShortsChip = true;
       if (featuresForShortsSplit.removeShortsSidebar === undefined) merged.removeShortsSidebar = true;
       if (featuresForShortsSplit.redirectShortsUrl === undefined) merged.redirectShortsUrl = true;
+      if (featuresForShortsSplit.shortsBtn === undefined) merged.shortsBtn = true;
       // 旧キー removeShorts は新構造に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
       await chrome.storage.local
         .set({ [StorageKeys.SEARCH_FIXER_FEATURES]: merged })

@@ -2131,11 +2131,14 @@
     //   現状 `#avatar-section <a>` は height 0、`#info-section #main-link` は文字部分 320×19 のみクリック可能で、
     //   info-section の空白部分・サムネ枠・登録者数テキストは死領域だった。
     //   → カード自身に click を bind して、ターゲットがどの anchor 内でもなければ #main-link.click() で転送する。
-    //   重複登録防止に data-cpa-card-click marker を使用。 OFF 切替時 (clearGridCardInlineStyle) では
-    //   element ごと再生成 or 拡張機能リロードで剥がれるため明示削除は不要。
+    //   重複登録防止に data-cpa-card-click marker を使用。
+    //   listener の冒頭で `subsGridState` を見て、機能 OFF 切替後は no-op に倒す（Codex P2 指摘）。
+    //   listener 自体を removeEventListener で剥がす方針も検討したが、card 単位で handler 参照を
+    //   保持する必要があるのとカード再生成で自然消滅するため、closure 越しの state gate を採用。
     if (!card.hasAttribute("data-cpa-card-click")) {
       card.setAttribute("data-cpa-card-click", "");
       card.addEventListener("click", (e) => {
+        if (subsGridState === null) return; // 機能 OFF 時は stale listener として no-op
         if (e.target.closest("a")) return; // 元々の anchor クリックは尊重
         const ml = card.querySelector("#main-link");
         if (ml) ml.click();
