@@ -1711,6 +1711,15 @@
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.list)) return null;
       if (Date.now() - (data.ts || 0) > SUBS_CACHE_TTL_MS) return null;
+      // アカウント識別子が cache と現在ページで食い違うなら別アカウント切替後とみなして invalidate。
+      // sessionStorage はタブ単位で persist するため、サインアウト → 別アカウントログインの reload を
+      // 跨いでも残る。識別子無しで信用すると 24h 古いアカウントの subscriptions を leftnav に
+      // 注入する事故が起きる（Codex P2 指摘）。
+      // どちらかの ID 取得に失敗した場合は安全側に倒して cache を信用する（旧挙動互換）。
+      if (data.accountId) {
+        const currentId = getCurrentYouTubeAccountId();
+        if (currentId && currentId !== data.accountId) return null;
+      }
       return data.list;
     } catch {
       return null;
@@ -1720,13 +1729,39 @@
   function writeSubsListCache(list) {
     if (!Array.isArray(list) || list.length === 0) return;
     try {
+      const accountId = getCurrentYouTubeAccountId();
       sessionStorage.setItem(
         SUBS_CACHE_LIST_KEY,
-        JSON.stringify({ list, ts: Date.now() })
+        JSON.stringify({ list, ts: Date.now(), accountId })
       );
     } catch {
       // QuotaExceeded 等は無視
     }
+  }
+
+  /**
+   * 現在ログイン中の YouTube アカウントを識別する文字列を返す。`<script>` タグ内の
+   * `ytcfg.set({...})` 経由で埋め込まれている DELEGATED_SESSION_ID（unique hash）を最優先で、
+   * 見つからなければ SESSION_INDEX（"0" = デフォルトアカウント、"1" "2" ... = 追加アカウント）に
+   * フォールバックする。content script は page world の `window.ytcfg` に直接アクセスできない
+   * ため、SSR で埋め込まれた script tag を正規表現で読み取る方式を採る。
+   *
+   * 取得不能なら null を返す。読み取り側はこのときキャッシュ検証をスキップする (graceful fallback)。
+   */
+  function getCurrentYouTubeAccountId() {
+    try {
+      for (const s of document.querySelectorAll("script")) {
+        const t = s.textContent || "";
+        if (t.indexOf("DELEGATED_SESSION_ID") === -1 && t.indexOf("SESSION_INDEX") === -1) continue;
+        let m = t.match(/"DELEGATED_SESSION_ID":\s*"([^"]+)"/);
+        if (m) return "ds:" + m[1];
+        m = t.match(/"SESSION_INDEX":\s*"([^"]*)"/);
+        if (m) return "si:" + m[1];
+      }
+    } catch {
+      // 失敗時は null で安全側に倒す
+    }
+    return null;
   }
 
   // ----- A2: ショートカットボタン -----
