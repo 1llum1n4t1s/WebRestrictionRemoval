@@ -1317,12 +1317,19 @@
     if (!f("subsLeftnavInjectAll")) return;
 
     // 旧 schema で注入された entry（説明文丸ごと span に入っている等）を撤去する。
-    // 期待する正規形式: <a><img><span>{name}</span></a>。span が 80 文字超 or img 不在なら旧形式。
+    // 正規形式: <a><img><span class="(name)">{name}</span></a>
+    //   または <a><span class="__cpa-sfx-leftnav-fallback">{頭文字}</span><span>{name}</span></a>
+    //     (avatarUrl 取得失敗時の fallback。img なしでも正規エントリなので削除してはいけない —
+    //      Codex P2 指摘 2026-05-08: 以前は `!img` で legacy 判定していたため fallback も
+    //      毎 cycle 削除・再生成されて flicker していた。)
     itemsDiv.querySelectorAll(`.${SUBS_INJECT_MARKER}`).forEach((el) => {
-      const span = el.querySelector(":scope > span");
       const img = el.querySelector(":scope > img");
-      const spanText = (span?.textContent || "").trim();
-      if (!img || !span || spanText.length > 80) {
+      const fallback = el.querySelector(":scope > .__cpa-sfx-leftnav-fallback");
+      const nameSpan = el.querySelector(":scope > span:not(.__cpa-sfx-leftnav-fallback)");
+      const nameText = (nameSpan?.textContent || "").trim();
+      // 旧 schema = アイコン領域 (img も fallback も) 無い、または name span 不在、
+      // または name span に説明文丸ごと入って 80 字超
+      if ((!img && !fallback) || !nameSpan || nameText.length > 80) {
         el.remove();
       }
     });
