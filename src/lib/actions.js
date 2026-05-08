@@ -818,9 +818,12 @@ const VolumeBooster = Object.freeze({
    * 旧 ratio:2.5 / release:0.4 はゲーム配信で爆音抑制する用途には合うが、BGM + ナレーションの
    * 動画では「喋りが圧縮 → やめた瞬間に release で BGM が立ち上がる」現象が起きやすい。
    *
-   * ratio:2.0 / release:1.2s に緩和して、語間の音量変動を耳に付かない速度に落とす。
-   * 1.2s release は「喋り句末から次の喋り出しまで」(典型 200〜800ms) より十分長く、
-   * 圧縮量が文の途中で戻りきらないため BGM の立ち上がりも知覚されにくい。
+   * ratio:2.0 / release:1.0s に緩和して、語間の音量変動を耳に付かない速度に落とす。
+   * Web Audio API の DynamicsCompressorNode.release は **nominal range [0, 1]** で
+   * 1.2 を渡すと Chrome が "outside nominal range; value will be clamped" 警告を出して
+   * 1.0 に clamp する。元々 1.2s を狙っていた理由（喋り句末から次の喋り出しまでより長い
+   * release で BGM の立ち上がりを抑える）は、上限の 1.0s でもほぼ達成できる
+   * （典型句末-次句頭が 200〜800ms なので 1.0s でも文の途中では release し切らない）。
    * threshold/knee/attack は変更なし（瞬間ピーク抑制の役割は維持）。
    */
   NIGHT_MODE_PRESET: Object.freeze({
@@ -828,7 +831,7 @@ const VolumeBooster = Object.freeze({
     knee: 8,
     ratio: 2.0,
     attack: 0.02,
-    release: 1.2,
+    release: 1.0,
   }),
   /**
    * compressor 機能 OFF 時のバイパス設定（ratio:1 で実質パススルー）。
