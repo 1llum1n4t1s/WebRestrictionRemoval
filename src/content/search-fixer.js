@@ -1950,6 +1950,8 @@
   }
 
   function detachSubsChannelsGrid() {
+    // light cleanup は idempotent (toolbar / observer は存在チェック付き、class remove も冪等) なので
+    // subsGridState の有無に関わらず実行して構わない。
     document.documentElement.classList.remove(SUBS_GRID_CLASS);
     const tb = document.getElementById(SUBS_TOOLBAR_ID);
     if (tb) tb.remove();
@@ -1963,16 +1965,20 @@
         // disconnect は throw しないが念のため
       }
     }
-    // クエリは union で SUBS_CARD_MARKER_ATTR / data-cpa-subs-styled / hidden のいずれかを持つカードを拾う。
-    // SUBS_CARD_MARKER_ATTR だけだと、applyGridCardInlineStyle のデータ更新フェーズで
-    // href 変化検知時に marker だけ剥がしている経路があり、data-cpa-subs-styled が残ったカードが
-    // 取りこぼされる。再 attach 時に applyGridCardInlineStyle 構造 styling phase が
-    // data-cpa-subs-styled gate で skip されてグリッドが復元されないバグになる（Codex P2 指摘）。
+    // card 単位の cleanup は grid が一度でも active になっていたときだけ実行する。
+    // ・別ページ (/feed/subscriptions 等) で popup の grid トグルを操作したり、別機能を toggle した
+    //   ときも applySubsChannelsGrid 経由で detach が呼ばれるが、その場ではカード DOM に何も
+    //   触れていないので cleanup する対象も無い。
+    // ・ここで全 ytd-channel-renderer を query すると YouTube native state で hidden な card を
+    //   誤って unhide する事故が起きる（Codex P2 指摘）。
+    if (!subsGridState) return;
+    // union クエリは「我々が付与した marker のいずれかを持つカード」のみに限定。
+    // [hidden] は我々が必ず set/remove するときに上記 marker のいずれかも持っているため
+    // hidden 単体で query する必要は無く、native hidden を巻き込むリスクを排除できる。
     document
       .querySelectorAll(
         `ytd-channel-renderer[${SUBS_CARD_MARKER_ATTR}],` +
-          ` ytd-channel-renderer[data-cpa-subs-styled],` +
-          ` ytd-channel-renderer[hidden]`
+          ` ytd-channel-renderer[data-cpa-subs-styled]`
       )
       .forEach((card) => {
         card.removeAttribute(SUBS_CARD_MARKER_ATTR);
