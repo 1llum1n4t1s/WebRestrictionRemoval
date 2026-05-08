@@ -2276,6 +2276,10 @@
         if (c && c.style) c.style.removeProperty("display");
       });
     }
+    // fetchAndInjectThumbnail が #avatar-section 配下に追加した <img.__cpa-sfx-subs-thumb> を撤去。
+    // __cpa-sfx-subs-grid クラスが剥がれると CSS の支配下から外れて、ネイティブ avatar 画像と
+    // 重なった状態でカードに残ってしまうため明示削除が必要（Codex P2 指摘で追加）。
+    card.querySelectorAll(`.${SUBS_THUMB_CLASS}`).forEach((img) => img.remove());
   }
 
   /**
