@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 6 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む 22 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター（自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。前 4 機能は独立オプトイントグル（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放、サブトグル 3 種もデフォルト OFF）、カラーピッカーは popup タブとして常時利用可（履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 7 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 25 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー」「音量ブースター（自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。前 4 機能 + 動画ガンマ補正の 5 つはマスタートグル付きオプトイン（**全てデフォルト OFF**）、音量ブースターのみマスタートグルなしの常時表示型（スライダー 100% でリソース解放、サブトグル 3 種もデフォルト OFF）、カラーピッカーは popup タブとして常時利用可（履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は日本語。**インストール直後は全マスタートグル OFF**（音量ブースターも 100% かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。バージョン番号は `/vava` スキル経由でのみ更新する。
 
@@ -75,7 +75,7 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）+ 音量ブースタースライダー（マスタートグルなしの常時表示）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ クリーナー詳細アコーディオン × 2（YouTube クリーナー 22 機能 / Instagram クリーナー 10 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShorts` / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。
+5 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / 動画ガンマ補正）+ 音量ブースタースライダー（マスタートグルなしの常時表示）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ クリーナー詳細アコーディオン × 2（YouTube クリーナー 25 機能 / Instagram クリーナー 10 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShorts` / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。
 
 **クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
@@ -111,14 +111,28 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 ### YouTube Shorts Removal (`src/content/youtube-shorts.js`)
 `*://*.youtube.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に注入。`window === window.top` チェックで埋め込みプレーヤーには注入せず CPU 負荷を抑える。
 
-**YouTube クリーナーへの統合**: 独立 storage key と独自メッセージは持たず、YouTube クリーナーのサブ機能 `searchFixerFeatures.removeShorts` として動作。アクティブ判定は `searchFixerEnabled === true` AND `features.removeShorts === true` の AND。`APPLY_SEARCH_FIXER_CS` メッセージを search-fixer.js と共に購読する（同一 isolated world で同じメッセージを 2 ファイルが受けて、それぞれの責務に応じて反応する設計）。`storage.onChanged` は片方の key だけ変わった場合に備え、両 key を再取得してから `computeActive()` で判定する（変更されてないキーが undefined になる罠を回避）。
+**5 サブ機能 + 1 グローバル nav**: Shelf / Chip / Sidebar / Redirect / Btn の 5 サブ機能と「ホーム / Shorts / 登録チャンネル」global nav を 1 ファイルで担当。CSS は機能ごとに `__cpa-yt-shorts-hide-shelf` / `__cpa-yt-shorts-hide-chip` / `__cpa-yt-shorts-hide-sidebar` / `__cpa-yt-shorts-redirect-active` クラスを `<html>` に付け外し（per-feature 独立化、Codex P2 指摘で v1.0.18 にて分割済）。
+
+**YouTube クリーナーへの統合**: 独立 storage key と独自メッセージは持たず、YouTube クリーナーのサブ機能として動作（`searchFixerFeatures.removeShortsShelf` / `removeShortsChip` / `removeShortsSidebar` / `redirectShortsUrl` / `removeShortsBtn`）。アクティブ判定は `searchFixerEnabled === true` AND 各 features フラグの AND。`APPLY_SEARCH_FIXER_CS` メッセージを search-fixer.js と共に購読する（同一 isolated world で同じメッセージを 2 ファイルが受けて、それぞれの責務に応じて反応する設計）。`storage.onChanged` は片方の key だけ変わった場合に備え、両 key を再取得してから `computeActive()` で判定する（変更されてないキーが undefined になる罠を回避）。
+
+**サイドバー 多言語対応**: `aria-label="Shorts"` (英語) と `aria-label="ショート"` (日本語) を CSS selector に併記する。日本語ロケールの初期 flash を CSS で即時非表示にするため。`title` 属性も同様。
 
 ### YouTube クリーナー (`src/content/search-fixer.js`)
-`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。22 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`（v1.0.18 で `removeShorts` を「サイト全体」カテゴリに追加 19 → 20、続いて `hideComments` を「動画ページ」カテゴリに追加 20 → 21、その後 `hideLiveChat` を「動画ページ」カテゴリに追加 21 → 22）。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**`removeShorts` サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
+`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。25 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
 
 **`hideComments` 実装上の注意**: `applyWatchPageClasses()` は `<html>` に `__cpa-sfx-hide-comments` クラスを付け外しする実装で、**`isWatchPage()` 判定を経由せず無条件に呼ぶ**こと。watch page 限定にすると SPA で video → home に遷移したとき `<html>` クラスが残置されて他ページに副作用が出る（CodeRabbit レビューで実際に指摘された罠）。CSS 側は `html.__cpa-sfx-hide-comments ytd-comments#comments { display: none !important; }` で watch page 以外には影響しないため、JS は無条件 toggle で良い。
 
 **`hideLiveChat` 実装上の注意**: hideLiveChat の close 操作はすべて JS 経由で行い、**CSS は何も書かない**。実装は `ytd-live-chat-frame` 配下の iframe (`youtube.com/live_chat_replay`) 内の `yt-live-chat-header-renderer #close-button button[aria-label="閉じる"]` を **`iframe.contentDocument` 経由で取得し**、`fireUserLikeClick` で **full pointer/mouse event sequence** (`pointerdown → mousedown → pointerup → mouseup → click`) を発火するだけ。youtube.com same-origin かつ sandbox 制約なしなので contentDocument にアクセス可能。**frame・iframe・親 `#chat-container`・theater 用 `--ytd-watch-flexy-sidebar-width` には一切触らない**（過去にこれらを CSS や独自属性で操作するたびに player 再初期化 / レイアウト崩れ / 「動画を処理しています」エラー / 再展開不能などの副作用を起こした経緯）。close button が見つからない場合は何もしない。MutationObserver は cross-document な iframe 内 DOM 変化を観察できないため、`iframe.addEventListener("load", ...)` を `__cpaLiveChatLoadAttached` marker で idempotent に hook し、load 後 300ms で `collapseLiveChatIfNeeded` を再実行することで close button が ready になったタイミングを取りこぼさない。fireUserLikeClick は `btn.ownerDocument.defaultView` 経由で iframe の window から `PointerEvent`/`MouseEvent` constructor を取得する（別 realm の event 扱いを避けるため）。
+
+**登録チャンネル拡張（v1.0.27 で完成）**: 3 機能セットで構成される。
+1. **`subsChannelsGrid`**: `/feed/channels` をレスポンシブグリッドに変形 + 検索ボックス。各カードは IntersectionObserver で viewport 進入時 lazy fetch でチャンネルページ HTML から最初の `"videoId":"..."` (Featured 動画) を抽出して `https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg` (16:9, 1280x720) を表示。404 で `mqdefault.jpg` (320x180, 16:9) フォールバック。`sessionStorage` に handle 単位 24h cache (prefix `__cpa_subs_thumb_v5::`)。**サムネ取得は YouTube が `/feeds/videos.xml` を 404 化したため HTML 内 videoId 抽出方式に切替済（v1.0.27）**。
+2. **`subsLeftnavInjectAll`**: YouTube が表示上限で隠す登録チャンネルも全件 leftnav に inline 注入。`/feed/channels` から同一オリジン取得、24h cache。`#items` の中（Polymer dom-repeat 配下）に `<a>` を直接 inject する安全パターン。
+3. **`subsAllShortcut`**: `/feed/channels` への 1 クリックエントリを「登録チャンネル」section の `#items` 内、最初のチャンネル entry の直前に entry エントリ風（高さ 40px / icon 24px / text 72px 位置）で挿入し、公式メニューの一部に見せる。
+
+**sort dropdown 関連の補正コードは入れない (再発禁止)**: 1 回目 sort 切替で label rollback / 「新しいアクティビティ」再選択で並び戻らない / 2 回目以降の挙動などは **YouTube 側 bug で extension では補正不能**。実機検証 (extension OFF/ON 比較) で確定済み。cooldown / click capture / popup-closed listener / scan gate / observer scoping は **逆効果**でしかなかったため全撤去 (v1.0.27)。
+
+### 動画ガンマ補正 (`src/content/video-gamma.js`)
+全 http(s) ページに `all_frames: true` で注入される content script。`videoGammaEnabled` (master) + `videoGammaValue` (数値 0.3〜3.0、初期 1.0) で管理。SVG `<feComponentTransfer type="gamma">` ベースの独自実装で、CSS `filter: url(#__cpa-video-gamma)` を `<video>` 要素に当てて全タブ共通のガンマ補正を適用する。スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たる。動画データの読み取りや保存は行わない（filter 適用のみ）。
 
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
 `*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
@@ -164,10 +178,11 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/lib/actions.js` | `Object.freeze` された Actions / Offscreen / StorageKeys / KeepAlive / SenderCheck / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / VolumeBooster / ExtensionPaths 定数 |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
-| `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの 4 サブ機能（shelf / chip / sidebar / redirect、top frame のみ）: MutationObserver + URL リダイレクト + 機能ごとの `__cpa-yt-shorts-hide-{shelf,chip,sidebar}` / `__cpa-yt-shorts-redirect-active` クラスで `display: none` |
-| `src/content/search-fixer.{js,css}` | YouTube クリーナー（22 機能 + グリッド列数）: master + features + gridItems で駆動 + サムネ枠装飾等 |
+| `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの Shorts 5 サブ機能（Shelf / Chip / Sidebar / Redirect / Btn、top frame のみ）: MutationObserver + URL リダイレクト + 機能ごとの `__cpa-yt-shorts-hide-{shelf,chip,sidebar}` / `__cpa-yt-shorts-redirect-active` クラスで `display: none` |
+| `src/content/search-fixer.{js,css}` | YouTube クリーナー（25 機能 + グリッド列数 + 登録チャンネル拡張 3 機能）: master + features + gridItems で駆動、`/feed/channels` グリッド化 / leftnav 全件展開 / すべての登録チャンネルショートカットを含む |
 | `src/content/amazon-delivery-total.{js,css}` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 + `__cpa-amzn-delivery-total` 配色 |
 | `src/content/instagram-cleaner.{js,css}` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ + 意味論的セレクタのみ（aria-label / href / role / data-pagelet / SVG path data） |
+| `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
 | `src/popup/popup.{html,js,css}` | ポップアップ UI: アシスト / カラーピッカーの 2 タブ構成。アシストタブは 4 トグル + 音量スライダー + 音量サブトグル × 3 + クリーナー詳細アコーディオン × 2（1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
 | `src/offscreen/offscreen.{html,js}` | 音量ブースター専用 offscreen document: AudioContext + AnalyserNode + 自動 GainNode + 手動 GainNode + DynamicsCompressor × 2 (night mode / anti-clip) で正規化 + 増幅 + 圧縮 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
@@ -182,7 +197,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 ### 設計の起点
 - **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する。FEATURES に追加すれば popup UI は自動生成される。actions.js は古典的グローバル定数方式（ES modules ではない）で 4 経路で共有: ① background の `importScripts()`、② manifest content_scripts の最初のエントリで全 http(s) フレームに自動注入、③ popup.html の `<script>` タグ、④ offscreen.html の `<script>` タグ。
 - **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` / `package-lock.json` の `version` フィールドおよびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
-- **デフォルト OFF 方針徹底** — 4 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスタートグルなしだが「スライダー 100% かつ全サブトグル OFF」のときリソース解放される（サブトグル 2 種もデフォルト OFF なのでインストール直後は完全に無処理）。
+- **デフォルト OFF 方針徹底** — 5 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / 動画ガンマ補正）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスタートグルなしだが「スライダー 100% かつ全サブトグル OFF」のときリソース解放される（サブトグル 3 種もデフォルト OFF なのでインストール直後は完全に無処理）。
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
@@ -226,6 +241,24 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 **API / 制約**:
 - **Offscreen Document の 1 拡張 1 文書制約** — `reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。新しい用途を追加するときは既存ドキュメントに同居させること。
 - **`minimum_chrome_version: "140"` 固定** — `chrome.runtime.getContexts`（116+）等の new API は **typeof チェックなしで直接呼んで良い**。legacy fallback の `if (typeof chrome.runtime.getContexts !== "function")` 分岐はバグ温床（receiver 不在エラーを active 扱いして 30 秒 cycle 無限再 schedule した Codex P2 指摘あり）なので追加しないこと。
+
+### YouTube DOM の罠（v1.0.27 で得た知見）
+- **YouTube `/feeds/videos.xml` は廃止済み (404)** — credentials 有無 / channel_id を変えても全部 404。代替は `/${handle}` HTML 内の `"videoId":"..."` から `https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg` を組む方式。
+- **thumbnail URL のアスペクト比は要確認** — `hqdefault.jpg` (480x360, **4:3** = letterbox あり) は 16:9 枠で違和感が出るので使わない。`maxresdefault.jpg` (1280x720, 16:9) を第一候補、404 で `mqdefault.jpg` (320x180, 16:9, 全動画必須) フォールバック。
+- **YouTube native CSS の `max-width` 制約** — `[use-bigger-thumbs] #avatar-section { max-width: 500px }` のような制約は `width: 100% !important` だけでは超えられない。card 全幅にしたい場合は **`max-width: none !important`** を明示する。
+- **Polymer dom-repeat 配下に `<a>` を sibling 挿入してはいけない** — `ytd-guide-section-renderer` 等の Polymer 管理下に外部から sibling として `<a>` を挿入すると、Polymer が「list 構造が変わった」と検知して内部 reorder を発動し、想定外の section 移動が起こる。代わりに **`#items` の中**に `<a>` を inject する（`subsLeftnavInjectAll` / `subsAllShortcut` のパターン）。
+- **subs section の DOM 構造**: `#header-entry` は別の `#header` div、`#items.firstElementChild` は collapsible (見出しっぽい expander)。`querySelector("ytd-guide-entry-renderer:not(#header-entry)")` で最初のチャンネル entry を取得して直前に挿入するのが正解。
+- **Trusted Types policy 対応**: YouTube は Trusted Types を有効化しているため、`innerHTML` 文字列代入は MAIN world で弾かれる。content script の isolated world では制約緩いが、安全側で **`createElement` ベース**で構築。SVG は `createElementNS` を使う。
+
+### Observer / async の罠
+- **MutationObserver / IntersectionObserver の callback は stale の前提で書く** — `disconnect()` を呼んでも **既に queue 入りした notification は cancel されない** (IO/MO 共通仕様)。observer インスタンスは **closure に capture** + callback 冒頭で **state null guard** を入れる。
+- **state 完全上書き前に古い observer を必ず disconnect** — `state = { ..., observer: null }` のように state object を完全上書きする経路では、上書き前に古い `state.observer.disconnect()` を呼ぶ。参照を null にするだけでは observer 自体は GC 対象にならず、callback が継続発火する。
+- **in-flight fetch には dedup ガードを付ける** — sort-wipe 経路で marker 一括 clear → 再 observe で同 handle に対する重複 fetch が走るパターンは要注意。`Set` ベースの in-flight tracking で重複を防ぐ。
+- **async fetch の post-await guard には「caller の identity」もチェック** — DOM 要素を await 越しで操作する場合、その要素が別 entity に書き換わってる可能性を考える。`ytd-channel-renderer` は YouTube の Polymer dom-repeat で物理移動だけで並び替わるケースがあり、`#main-link` の href が別チャンネルに切り替わる。await 前に capture した identity (handle / id / key) を保存して await 後に比較。`isConnected` / `has-already` 系の guard だけでは不十分。
+- **legacy schema cleanup は「正規形式の全バリアント」を考慮する** — 旧形式判定で単純条件 (`!img` 等) を使うと、img を持たない正規 fallback entry を巻き込んで毎 cycle 削除・再生成 → flicker。正規形式の全バリアントを網羅した判定にする。
+
+### 多言語ロケール
+- **`aria-label` / `title` は両言語で書く** — YouTube は ja / en で `Shorts` ⇔ `ショート` のように label が変わる。CSS selector で要素を hide する場合、両言語版を併記しないと初期 flash が出る（JS による DOM 削除が走るまで素のまま見える）。
 
 ### マイグレーション
 - **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `volumeBoosterEnabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。
