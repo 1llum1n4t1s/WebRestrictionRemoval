@@ -1158,23 +1158,30 @@
   let subsGridResizeTimer = 0;
   /**
    * ネイティブ sort dropdown 操作後の cooldown 期限 (Date.now() ベース epoch ms)。
-   * `yt-popup-closed` イベントで `Date.now() + COOLDOWN_MS` に設定し、subsGridCardsObserver
-   * の callback がこの期限内なら scheduleSubsGridScan / applySubsGridFilter / placeSubsGridToolbar
-   * 等の DOM 操作系を skip する。
+   * subsGridCardsObserver の callback がこの期限内なら scheduleSubsGridScan / applySubsGridFilter /
+   * placeSubsGridToolbar 等の DOM 操作系を skip する。
    *
    * 必要性: native sort 直後は YouTube が Polymer の data-binding で combobox text + #contents
    * を batch 更新する。我々の MutationObserver が同じ window で発火して DOM を触ると、
    * Polymer の batch update が干渉を受けて combobox label の更新が rollback される
    * (実機で「新しいアクティビティを選んだのに表示が "関連度順" のまま」というバグを観測)。
    *
-   * cooldown 値 1500ms は実機で yt-popup-closed → yt-reload-continuation-finish → DOM 確定
-   * までの観測値 (~400-800ms) に余裕を見て決定。
+   * 2 つのイベントで cooldown を制御する:
+   *   - `yt-popup-closed` → `Date.now() + COOLDOWN_FALLBACK_MS` (long safety net)
+   *   - `yt-reload-continuation-finish` → `Date.now() + SETTLE_BUFFER_MS` (短縮: 実 DOM settle の authoritative signal)
+   * 初回 sort で cold cache / 遅いネットワーク時は popup-closed → reload-finish が 1.5s を超えて
+   * fallback setTimeout が DOM 操作中に走るため「最初の切り替えで切り替わらない」バグが起きていた。
+   * yt-reload-continuation-finish で settle 確認後、短い buffer を経て scan を走らせる方式で解決。
    */
   let subsGridSortCooldownUntil = 0;
   /** @type {((this: Document, ev: Event) => void) | null} yt-popup-closed リスナー */
   let subsGridPopupClosedListener = null;
-  /** sort cooldown ms (= popup-closed から DOM 操作を skip する期間) */
-  const SUBS_GRID_SORT_COOLDOWN_MS = 1500;
+  /** @type {((this: Document, ev: Event) => void) | null} yt-reload-continuation-finish リスナー */
+  let subsGridReloadFinishListener = null;
+  /** popup-closed から DOM 操作を skip する fallback 期間 (yt-reload-continuation-finish が来なかったとき用) */
+  const SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS = 3000;
+  /** yt-reload-continuation-finish 後の paint 待ち buffer */
+  const SUBS_GRID_SORT_SETTLE_BUFFER_MS = 200;
   /** @type {MutationObserver|null} leftnav の subs section #items を監視して再注入する observer */
   let leftnavInjectObserver = null;
   /** @type {Element|null} 観察中の subs section（同一 section への重複 attach 防止） */
@@ -1781,26 +1788,41 @@
    */
   function startSubsGridSortCooldownListener() {
     if (subsGridPopupClosedListener) return;
+    // post-cooldown scan 共通ロジック。cooldown が更に延長されていたら何もしない。
+    const runPostCooldownScan = () => {
+      if (!subsGridState) return;
+      if (Date.now() < subsGridSortCooldownUntil) return;
+      scheduleSubsGridScan();
+      applySubsGridFilter();
+    };
     subsGridPopupClosedListener = () => {
-      // native sort dropdown 以外の popup-closed (例: 別 menu 閉鎖) も拾うが、cooldown 中の
-      // skip 動作は副作用が小さい (1.5 秒 scan 遅延するだけ) なので問題ない。
-      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_MS;
-      // cooldown 終了後に必ず 1 回 scan を走らせる (DOM 確定後の新カードを styling するため)。
-      // setTimeout の方が cooldown 中のすべての mutation を吸収して 1 回にまとめられる。
-      setTimeout(() => {
-        if (!subsGridState) return;
-        if (Date.now() < subsGridSortCooldownUntil) return; // 別の popup-closed が後発で延長していたら何もしない
-        scheduleSubsGridScan();
-        applySubsGridFilter();
-      }, SUBS_GRID_SORT_COOLDOWN_MS + 50);
+      // 安全側: 長めの fallback cooldown。yt-reload-continuation-finish が来れば短縮される。
+      // sort 以外の popup (例: 別 menu 閉鎖) も拾うが、scan 遅延が伸びるだけで副作用は小さい。
+      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS;
+      // fallback 期限後に必ず 1 回 scan。yt-reload-continuation-finish 経路が走れば早くにキャンセルされる
+      // (cooldownUntil が更新されないため runPostCooldownScan が早期 return する)。
+      setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS + 50);
+    };
+    subsGridReloadFinishListener = () => {
+      // YouTube が sort/reload を完了 → DOM が確定。短い paint buffer を置いて scan/filter を走らせる。
+      // popup-closed の長めの fallback は **短縮** する (Date.now() + SETTLE_BUFFER) — これで
+      // observer の cooldown gate も settle buffer 後すぐに解除される。
+      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_SETTLE_BUFFER_MS;
+      setTimeout(runPostCooldownScan, SUBS_GRID_SORT_SETTLE_BUFFER_MS + 50);
     };
     document.addEventListener("yt-popup-closed", subsGridPopupClosedListener);
+    document.addEventListener("yt-reload-continuation-finish", subsGridReloadFinishListener);
   }
 
   function stopSubsGridSortCooldownListener() {
-    if (!subsGridPopupClosedListener) return;
-    document.removeEventListener("yt-popup-closed", subsGridPopupClosedListener);
-    subsGridPopupClosedListener = null;
+    if (subsGridPopupClosedListener) {
+      document.removeEventListener("yt-popup-closed", subsGridPopupClosedListener);
+      subsGridPopupClosedListener = null;
+    }
+    if (subsGridReloadFinishListener) {
+      document.removeEventListener("yt-reload-continuation-finish", subsGridReloadFinishListener);
+      subsGridReloadFinishListener = null;
+    }
     subsGridSortCooldownUntil = 0;
   }
 
