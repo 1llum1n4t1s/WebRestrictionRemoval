@@ -1178,6 +1178,8 @@
   let subsGridPopupClosedListener = null;
   /** @type {((this: Document, ev: Event) => void) | null} yt-reload-continuation-finish リスナー */
   let subsGridReloadFinishListener = null;
+  /** @type {((this: Document, ev: MouseEvent) => void) | null} sort dropdown 関連 click listener (capture) */
+  let subsGridSortClickListener = null;
   /** popup-closed から DOM 操作を skip する fallback 期間 (yt-reload-continuation-finish が来なかったとき用) */
   const SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS = 3000;
   /** yt-reload-continuation-finish 後の paint 待ち buffer */
@@ -1795,26 +1797,50 @@
       scheduleSubsGridScan();
       applySubsGridFilter();
     };
+    // sort dropdown click capture: 「yt-popup-closed が初回 sort で発火しない / タイミングがズレる」
+    // ケースに備えて、click event を capture phase で先に拾って cooldown を立てる。
+    // 旧設計は yt-popup-closed のみに依存していたが、ゆろさん実機で「初回 sort 切替が反映されない」
+    // 報告があり、cooldown trigger の取りこぼしが疑われたため click 経路を追加した。
+    subsGridSortClickListener = (e) => {
+      if (!subsGridState) return;
+      const target = e.target;
+      if (!target || typeof target.closest !== "function") return;
+      // YouTube の sort dropdown 関連 (button / 選択肢 listbox / iron-dropdown 等) を広めに拾う
+      if (
+        target.closest("ytd-sort-filter-sub-menu-renderer") ||
+        target.closest("yt-sort-filter-sub-menu-renderer") ||
+        target.closest("tp-yt-iron-dropdown") ||
+        target.closest("tp-yt-paper-listbox") ||
+        target.closest("yt-dropdown-menu") ||
+        target.closest('[role="combobox"]') ||
+        target.closest('[role="listbox"]')
+      ) {
+        // capture phase で先に立てるので、yt-popup-closed より早く / 仮に発火しなくても効く
+        subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS;
+        setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS + 50);
+      }
+    };
     subsGridPopupClosedListener = () => {
       // 安全側: 長めの fallback cooldown。yt-reload-continuation-finish が来れば短縮される。
       // sort 以外の popup (例: 別 menu 閉鎖) も拾うが、scan 遅延が伸びるだけで副作用は小さい。
       subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS;
-      // fallback 期限後に必ず 1 回 scan。yt-reload-continuation-finish 経路が走れば早くにキャンセルされる
-      // (cooldownUntil が更新されないため runPostCooldownScan が早期 return する)。
       setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS + 50);
     };
     subsGridReloadFinishListener = () => {
       // YouTube が sort/reload を完了 → DOM が確定。短い paint buffer を置いて scan/filter を走らせる。
-      // popup-closed の長めの fallback は **短縮** する (Date.now() + SETTLE_BUFFER) — これで
-      // observer の cooldown gate も settle buffer 後すぐに解除される。
       subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_SETTLE_BUFFER_MS;
       setTimeout(runPostCooldownScan, SUBS_GRID_SORT_SETTLE_BUFFER_MS + 50);
     };
+    document.addEventListener("click", subsGridSortClickListener, true); // capture phase
     document.addEventListener("yt-popup-closed", subsGridPopupClosedListener);
     document.addEventListener("yt-reload-continuation-finish", subsGridReloadFinishListener);
   }
 
   function stopSubsGridSortCooldownListener() {
+    if (subsGridSortClickListener) {
+      document.removeEventListener("click", subsGridSortClickListener, true);
+      subsGridSortClickListener = null;
+    }
     if (subsGridPopupClosedListener) {
       document.removeEventListener("yt-popup-closed", subsGridPopupClosedListener);
       subsGridPopupClosedListener = null;
@@ -2410,16 +2436,23 @@
     //   - フィルタ active 中に sort/再 hydrate で新カードが入っても再評価されず、
     //     新カードが filter 条件を無視して表示される罠があった
     //   - 171 cards × textContent 取得は数 ms 程度の実コストで毎回回しても許容範囲
+    //
+    // hidden 属性の set/remove は **状態が変わるときのみ** 行う。no-op の setAttribute /
+    // removeAttribute でも MutationRecord は積まれて Polymer の data-binding listener に
+    // 通知が飛ぶため、初回 hydrate 中の race condition を悪化させる原因になる（ゆろさん実機の
+    // 「初回 sort 切替失敗」バグ調査で追加したガード）。
     document.querySelectorAll("ytd-channel-renderer").forEach((card) => {
+      const isHidden = card.hasAttribute("hidden");
       if (!q) {
-        card.removeAttribute("hidden");
+        if (isHidden) card.removeAttribute("hidden");
         return;
       }
       const name = getSubsCardName(card).toLowerCase();
       const handleSlot = (card.querySelector("#subscribers")?.textContent || "").toLowerCase();
-      if (name.includes(q) || handleSlot.includes(q)) {
+      const shouldShow = name.includes(q) || handleSlot.includes(q);
+      if (shouldShow && isHidden) {
         card.removeAttribute("hidden");
-      } else {
+      } else if (!shouldShow && !isHidden) {
         card.setAttribute("hidden", "");
       }
     });
@@ -2428,10 +2461,11 @@
       const cards = shelf.querySelectorAll("ytd-channel-renderer");
       if (cards.length === 0) return;
       const visible = Array.from(cards).some((c) => !c.hasAttribute("hidden"));
-      if (visible) {
+      const shelfHidden = shelf.hasAttribute("hidden");
+      if (visible && shelfHidden) {
         shelf.removeAttribute("hidden");
         shelf.removeAttribute("data-cpa-shelf-empty");
-      } else {
+      } else if (!visible && !shelfHidden) {
         shelf.setAttribute("hidden", "");
         shelf.setAttribute("data-cpa-shelf-empty", "");
       }
