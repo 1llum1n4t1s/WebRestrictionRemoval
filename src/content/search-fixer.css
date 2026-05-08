@@ -187,47 +187,75 @@ a.__cpa-sfx-subs-injected > span {
   color: inherit !important;
 }
 
-/* ---------- A2: 「すべての登録チャンネル」ショートカットボタン ---------- */
-/* leftnav の subs header (#header-entry) の隣に append される。
- * SVG 内 `<path fill="currentColor">` が ↓ の color に追従するため、確実なテーマ追従。 */
+/* ---------- A2: 「すべての登録チャンネル」ショートカット (leftnav entry 風) ----------
+ * 「登録チャンネル」section の **#items 最上** に entry として挿入される。
+ * subsLeftnavInjectAll と同じく Polymer dom-repeat 配下に直接 inject する安全パターン。
+ * 高さ 40px / icon 12+12=24px / text 72px の位置を YouTube 公式 entry と揃える。
+ *
+ * 旧実装の遍歴:
+ *   v1: #header-entry 横の SVG 小ボタン (32x32) → 「分かりづらい」UX 課題
+ *   v2: section の **直前** に sibling 挿入 → Polymer dom-repeat が reorder 発動 →
+ *       subs section が leftnav 末尾に移動する退行 (ゆろさん環境で実機検証で確定 2026-05-08)
+ *   v3 (現行): section の **#items 最上 entry** として inject → 安全 */
 a.__cpa-sfx-subs-shortcut {
-  display: inline-flex !important;
+  display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  width: 32px !important;
-  height: 32px !important;
-  margin-left: auto !important;
-  border-radius: 50% !important;
-  color: var(--cpa-subs-fg-secondary, #606060) !important;
+  width: auto !important;
+  height: 40px !important;
+  /* native ytd-guide-entry-renderer は #items 内で margin:0、左右 padding なし。
+   * 我々の <a> は guide-section の **直前** に挿入されるので親の padding 影響を受ける。
+   * 多くの場合 padding 0 だが、念のため margin 0 で位置リセット。 */
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  font-family: "Roboto", "Arial", sans-serif !important;
+  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
   text-decoration: none !important;
   cursor: pointer !important;
-  flex: 0 0 32px !important;
-  opacity: 0.85 !important;
-  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease !important;
+  box-sizing: border-box !important;
+  transition: background-color 120ms ease !important;
 }
 html[dark] a.__cpa-sfx-subs-shortcut {
-  color: var(--cpa-subs-fg-secondary, #aaaaaa) !important;
+  color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
 }
 @media (prefers-color-scheme: dark) {
   a.__cpa-sfx-subs-shortcut {
-    color: var(--cpa-subs-fg-secondary, #aaaaaa) !important;
+    color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
   }
 }
 a.__cpa-sfx-subs-shortcut:hover {
   background: var(--cpa-subs-bg-card-hover, rgba(0, 0, 0, 0.08)) !important;
-  color: var(--cpa-subs-fg-primary, #0f0f0f) !important;
-  opacity: 1 !important;
 }
-html[dark] a.__cpa-sfx-subs-shortcut:hover {
-  color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
+/* アイコン: native は icon が画面左から 24px、text が 72px の位置 (subsLeftnavInjected 同様)。
+ * 我々の <a> も 同じ 12+12 の位置に icon、24 right margin で text 72px に揃える。 */
+a.__cpa-sfx-subs-shortcut .__cpa-sfx-subs-shortcut-icon {
+  flex: 0 0 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  margin-left: 12px !important;
+  margin-right: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: inherit !important;
 }
-@media (prefers-color-scheme: dark) {
-  a.__cpa-sfx-subs-shortcut:hover {
-    color: var(--cpa-subs-fg-primary, #f1f1f1) !important;
-  }
-}
-a.__cpa-sfx-subs-shortcut svg {
+a.__cpa-sfx-subs-shortcut .__cpa-sfx-subs-shortcut-icon svg {
   display: block !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+a.__cpa-sfx-subs-shortcut .__cpa-sfx-subs-shortcut-label {
+  flex: 1 1 auto !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  user-select: none !important;
+  font-family: "Roboto", "Arial", sans-serif !important;
+  color: inherit !important;
 }
 
 /* ==========================================================================
@@ -447,6 +475,11 @@ html.__cpa-sfx-subs-grid ytd-channel-renderer #content-section {
 html.__cpa-sfx-subs-grid ytd-channel-renderer #avatar-section {
   position: relative !important;
   width: 100% !important;
+  /* YouTube ネイティブが `[use-bigger-thumbs] #avatar-section { max-width: 500px }` を当てており、
+   * card 幅 528px に対し avatar-section が 500px でクランプされて右に 28px の余白が出る。
+   * hover 時に余白部分だけ card 背景色がついて「サムネが左寄り」と見える UX 事故になっていた
+   * (実機検証で確定 2026-05-08)。max-width 制約を解除して card 全幅に広げる。 */
+  max-width: none !important;
   aspect-ratio: 16 / 9 !important;
   height: auto !important;
   margin: 0 !important;
