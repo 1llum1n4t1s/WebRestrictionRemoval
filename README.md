@@ -34,8 +34,8 @@ YouTube の検索結果・動画ページ・ホームグリッドのクリーン
 - 📐 **レイアウト**: 検索結果グリッド表示 + ホーム列数（自動 / 4 / 5 / 6 列）
 - 📋 **登録チャンネル拡張**:
     - **左メニューに全件展開**: YouTube が表示上限で隠す登録チャンネルも全件 leftnav に inline 注入（/feed/channels から同一オリジン取得、`sessionStorage` に 24h キャッシュ）
-    - **「すべての登録チャンネル」ショートカット**: 左サイドバー見出し横に `/feed/channels` への 1 クリックボタン追加
-    - **/feed/channels グリッド化**: 縦長 1 列を動画 feed と同様のレスポンシブグリッドに変形 + 検索ボックス + ソート切替（登録順 / 名前順 / 登録者数順）。各カードは viewport 進入時に lazy fetch でチャンネルページから最新動画サムネを取得（`og:image` 抽出、24h キャッシュ）
+    - **「すべての登録チャンネル」ショートカット**: 左サイドバー「登録チャンネル」セクション内、見出し直下にチャンネルリストの最上 entry として `/feed/channels` への 1 クリックエントリを公式メニュー風に追加
+    - **/feed/channels グリッド化**: 縦長 1 列を動画 feed と同様のレスポンシブグリッドに変形 + 検索ボックスで絞り込み（並び順は YouTube ネイティブの sort dropdown を使用）。各カードは viewport 進入時に lazy fetch でチャンネルページ HTML 内の Featured 動画 `videoId` を抽出して `i.ytimg.com/vi/{videoId}/maxresdefault.jpg` (16:9, 1280x720) を表示、`mqdefault.jpg` フォールバック付き、24h キャッシュ
 
 ### 📦 Amazon 定期おトク便 月別合計（オプトイン、デフォルト OFF）
 
