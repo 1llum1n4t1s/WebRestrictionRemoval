@@ -1826,9 +1826,30 @@
   function startSubsGridSortCooldownListener() {
     if (subsGridPopupClosedListener) return;
     // post-cooldown scan 共通ロジック。cooldown が更に延長されていたら何もしない。
+    // section-list 物理置換 (sort で wipe) で toolbar が detached になるケースがあるため、
+    // toolbar 在/不在を確認して欠けていれば再生成する。これを忘れると「sort したら検索 UI が
+    // 消えたまま戻らない」UX 事故になる（Codex P2 指摘）。
     const runPostCooldownScan = () => {
       if (!subsGridState) return;
       if (Date.now() < subsGridSortCooldownUntil) return;
+      const toolbarMissing = !document.getElementById(SUBS_TOOLBAR_ID);
+      if (toolbarMissing) {
+        if (subsGridState) {
+          subsGridState.toolbar = null;
+          subsGridState.search = null;
+        }
+        ensureSubsGridToolbar();
+        // section-list 置換時はネイティブが既存カードの DOM ノードを物理移動だけで並び替える
+        // ケースもあり、SUBS_CARD_MARKER_ATTR が残ったままだと新しい IntersectionObserver
+        // (subsGridState 再生成で作られる) に再 attach されない罠がある。MARKER をクリアして
+        // 全カードを fresh に observe させる。
+        document
+          .querySelectorAll(`ytd-channel-renderer[${SUBS_CARD_MARKER_ATTR}]`)
+          .forEach((c) => c.removeAttribute(SUBS_CARD_MARKER_ATTR));
+      } else {
+        // toolbar 存在するが配置が崩れている場合に正しい位置に戻す
+        placeSubsGridToolbar();
+      }
       scheduleSubsGridScan();
       applySubsGridFilter();
     };
