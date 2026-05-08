@@ -2243,8 +2243,11 @@
       "font-feature-settings", "grid-template-columns", "column-gap", "row-gap",
       "align-items", "grid-column", "grid-row",
     ];
-    ["#info-section", "#main-link", "#description", "#subscribers", "#video-count",
-     "#channel-memberships-button"].forEach((sel) => {
+    // applyGridCardInlineStyle で inline style を当てた要素はすべてここで剥がす。
+    // `#info-section > #buttons` は登録/通知ボタンを feed カード見た目に合わせて display:none したもの。
+    // ここに含め忘れると subsChannelsGrid を OFF にしてもボタンが消えたままになる（Codex P2 指摘で追加）。
+    ["#info-section", "#info-section > #buttons", "#main-link", "#description",
+     "#subscribers", "#video-count", "#channel-memberships-button"].forEach((sel) => {
       const el = card.querySelector(sel);
       if (el && el.style) {
         props.forEach((p) => el.style.removeProperty(p));
