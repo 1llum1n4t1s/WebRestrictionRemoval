@@ -17,8 +17,9 @@
  * !important は YouTube が inline style で表示を上書きしてくる箇所への対抗。
  */
 
-/* 左サイドバーの "Shorts" タブ（デスクトップ） */
-html.__cpa-yt-shorts-hide-sidebar a[title="Shorts"],
+/* 左サイドバーの "Shorts" タブ（デスクトップ）。guide / mini-guide 配下に scope する。
+ * 単独 `a[title="Shorts"]` セレクタはチャンネルページの Shorts タブ等のサイドバー外 anchor も
+ * 巻き込むため使わない（Codex P2 指摘）。タブ系は `__cpa-yt-shorts-hide-shelf` で別途扱う。 */
 html.__cpa-yt-shorts-hide-sidebar ytd-mini-guide-entry-renderer[aria-label="Shorts"],
 html.__cpa-yt-shorts-hide-sidebar ytd-guide-entry-renderer:has(a[title="Shorts"]) {
   display: none !important;
