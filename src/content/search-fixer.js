@@ -2122,17 +2122,25 @@
   function scheduleSubsGridScan() {
     if (!subsGridState) return;
     if (!subsGridState.observer) {
-      subsGridState.observer = new IntersectionObserver(
+      // observer インスタンスを **closure に capture** してから state に格納する。
+      // `subsGridState.observer` を直接 deref すると、機能 OFF or /feed/channels 離脱で
+      // `detachSubsChannelsGrid()` が `subsGridState = null` にセットした後も IO の
+      // queued callback が走った場合に TypeError を起こす (Codex P2 指摘 2026-05-08)。
+      // disconnect() しても **既に queue 入りした notification は cancel されない**ので、
+      // closure capture + 冒頭の subsGridState null guard で安全側に倒す。
+      const observer = new IntersectionObserver(
         (entries) => {
+          if (subsGridState === null) return; // detach 後の stale callback ガード
           for (const entry of entries) {
             if (entry.isIntersecting) {
-              subsGridState.observer.unobserve(entry.target);
+              observer.unobserve(entry.target); // closure capture 経由で stale な subsGridState 不要
               fetchAndInjectThumbnail(entry.target);
             }
           }
         },
         { rootMargin: "300px 0px" }
       );
+      subsGridState.observer = observer;
     }
     document.querySelectorAll("ytd-channel-renderer").forEach((card) => {
       // YouTube ネイティブ CSS が `#main-link` 等に `!important` で
