@@ -1166,24 +1166,24 @@
    * Polymer の batch update が干渉を受けて combobox label の更新が rollback される
    * (実機で「新しいアクティビティを選んだのに表示が "関連度順" のまま」というバグを観測)。
    *
-   * 2 つのイベントで cooldown を制御する:
-   *   - `yt-popup-closed` → `Date.now() + COOLDOWN_FALLBACK_MS` (long safety net)
-   *   - `yt-reload-continuation-finish` → `Date.now() + SETTLE_BUFFER_MS` (短縮: 実 DOM settle の authoritative signal)
-   * 初回 sort で cold cache / 遅いネットワーク時は popup-closed → reload-finish が 1.5s を超えて
-   * fallback setTimeout が DOM 操作中に走るため「最初の切り替えで切り替わらない」バグが起きていた。
-   * yt-reload-continuation-finish で settle 確認後、短い buffer を経て scan を走らせる方式で解決。
+   * 2 つの trigger で cooldown を制御:
+   *   - **sort dropdown 関連 click を capture phase で listen** → 即時 cooldown 設定（最も信頼できる primary trigger）
+   *   - **`yt-popup-closed`** → 長めの fallback cooldown（保険 / Polymer label 更新の真の完了 signal）
+   *
+   * yt-reload-continuation-finish は **使わない**:
+   *   Claude_in_Chrome MCP 実機検証で reload-continuation-finish (t=117101) が発火しても
+   *   yt-popup-closed (t=119641) まで 2.5 秒間 Polymer が combobox label を batch update して
+   *   いることを確認。reload-finish を「DOM settled signal」と扱って cooldown を短縮すると
+   *   その後の Polymer batch update を巻き込んで label rollback バグが起きる。
+   *   popup-closed が Polymer 更新完了の真の signal なので、これだけを後段 trigger に使う。
    */
   let subsGridSortCooldownUntil = 0;
   /** @type {((this: Document, ev: Event) => void) | null} yt-popup-closed リスナー */
   let subsGridPopupClosedListener = null;
-  /** @type {((this: Document, ev: Event) => void) | null} yt-reload-continuation-finish リスナー */
-  let subsGridReloadFinishListener = null;
   /** @type {((this: Document, ev: MouseEvent) => void) | null} sort dropdown 関連 click listener (capture) */
   let subsGridSortClickListener = null;
-  /** popup-closed から DOM 操作を skip する fallback 期間 (yt-reload-continuation-finish が来なかったとき用) */
-  const SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS = 3000;
-  /** yt-reload-continuation-finish 後の paint 待ち buffer */
-  const SUBS_GRID_SORT_SETTLE_BUFFER_MS = 200;
+  /** sort cooldown 期間 (click capture / popup-closed どちらでも同じ長さ) */
+  const SUBS_GRID_SORT_COOLDOWN_MS = 3000;
   /** @type {MutationObserver|null} leftnav の subs section #items を監視して再注入する observer */
   let leftnavInjectObserver = null;
   /** @type {Element|null} 観察中の subs section（同一 section への重複 attach 防止） */
@@ -1797,15 +1797,13 @@
       scheduleSubsGridScan();
       applySubsGridFilter();
     };
-    // sort dropdown click capture: 「yt-popup-closed が初回 sort で発火しない / タイミングがズレる」
-    // ケースに備えて、click event を capture phase で先に拾って cooldown を立てる。
-    // 旧設計は yt-popup-closed のみに依存していたが、ゆろさん実機で「初回 sort 切替が反映されない」
-    // 報告があり、cooldown trigger の取りこぼしが疑われたため click 経路を追加した。
+    // sort dropdown 関連 click capture: yt-popup-closed の発火タイミングや有無に依存せず、
+    // ユーザーが sort UI に触れた瞬間に cooldown を立てる primary trigger。
     subsGridSortClickListener = (e) => {
       if (!subsGridState) return;
       const target = e.target;
       if (!target || typeof target.closest !== "function") return;
-      // YouTube の sort dropdown 関連 (button / 選択肢 listbox / iron-dropdown 等) を広めに拾う
+      // YouTube の sort dropdown 関連 (button / chip / 選択肢 listbox / iron-dropdown 等) を広めに拾う
       if (
         target.closest("ytd-sort-filter-sub-menu-renderer") ||
         target.closest("yt-sort-filter-sub-menu-renderer") ||
@@ -1815,25 +1813,20 @@
         target.closest('[role="combobox"]') ||
         target.closest('[role="listbox"]')
       ) {
-        // capture phase で先に立てるので、yt-popup-closed より早く / 仮に発火しなくても効く
-        subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS;
-        setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS + 50);
+        subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_MS;
+        setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_MS + 50);
       }
     };
     subsGridPopupClosedListener = () => {
-      // 安全側: 長めの fallback cooldown。yt-reload-continuation-finish が来れば短縮される。
+      // popup-closed は Polymer の combobox label batch update が完了したことを示す
+      // 真の signal。実機検証で popup-closed まで Polymer は label を更新中なので、
+      // ここから更に COOLDOWN_MS の paint buffer を取って scan/filter を走らせる。
       // sort 以外の popup (例: 別 menu 閉鎖) も拾うが、scan 遅延が伸びるだけで副作用は小さい。
-      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS;
-      setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_FALLBACK_MS + 50);
-    };
-    subsGridReloadFinishListener = () => {
-      // YouTube が sort/reload を完了 → DOM が確定。短い paint buffer を置いて scan/filter を走らせる。
-      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_SETTLE_BUFFER_MS;
-      setTimeout(runPostCooldownScan, SUBS_GRID_SORT_SETTLE_BUFFER_MS + 50);
+      subsGridSortCooldownUntil = Date.now() + SUBS_GRID_SORT_COOLDOWN_MS;
+      setTimeout(runPostCooldownScan, SUBS_GRID_SORT_COOLDOWN_MS + 50);
     };
     document.addEventListener("click", subsGridSortClickListener, true); // capture phase
     document.addEventListener("yt-popup-closed", subsGridPopupClosedListener);
-    document.addEventListener("yt-reload-continuation-finish", subsGridReloadFinishListener);
   }
 
   function stopSubsGridSortCooldownListener() {
@@ -1844,10 +1837,6 @@
     if (subsGridPopupClosedListener) {
       document.removeEventListener("yt-popup-closed", subsGridPopupClosedListener);
       subsGridPopupClosedListener = null;
-    }
-    if (subsGridReloadFinishListener) {
-      document.removeEventListener("yt-reload-continuation-finish", subsGridReloadFinishListener);
-      subsGridReloadFinishListener = null;
     }
     subsGridSortCooldownUntil = 0;
   }
