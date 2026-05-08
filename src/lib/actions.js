@@ -334,7 +334,7 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({
     key: "reel",
     label: "Shorts 横棚",
-    desc: "Shorts 動画の横並び棚 (grid-shelf-view-model) を除去（ホーム / サイドバーの Shorts 棚は「Shorts 関連」カテゴリが担当）",
+    desc: "Shorts 動画の横並び棚 (grid-shelf-view-model) を除去（ホームの Shorts 棚は「動画フィルタ」の removeShortsShelf、左サイドバーは「メニュー / UI」の removeShortsSidebar が担当）",
     category: "search_only",
   }),
   Object.freeze({
