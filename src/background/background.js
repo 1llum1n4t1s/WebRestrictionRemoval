@@ -7,59 +7,45 @@ importScripts("/src/lib/actions.js");
 //   - v1.0.18: 旧 `ytShortsRemovalEnabled` トグルを `searchFixerFeatures.removeShorts` に統合
 //   - 各機能トグルが未設定なら Default OFF（オプトイン方針）で初期化
 chrome.runtime.onInstalled.addListener(async () => {
-  // v1.0.18 マイグレーション: 旧 Shorts 削除トグルを YouTube クリーナーのサブ機能に転写。
-  // 既存ユーザーがアップデートしたとき、Shorts 削除を有効にしていた状態を失わないようにする。
-  // 転写後は旧キーを削除する（remove リスト側で処理）。
+  // 過去 2 段階の Shorts 削除設定を新構造の 5 機能 (removeShortsShelf / removeShortsChip /
+  // removeShortsSidebar / redirectShortsUrl / shortsBtn) に直接転写する。
+  //
+  // - v1.0.x まで:        ytShortsRemovalEnabled (bool) 単一トグル
+  // - v1.0.18 〜 v1.0.x:  searchFixerFeatures.removeShorts (bool) サブ機能化（中間段階）
+  // - 現バージョン:        5 機能に分割
+  //
+  // どちらの旧構造から来たユーザーも、storage 生値を見て新キーが未設定 (=== undefined) のものだけを
+  // true に転写する。これでユーザーが新キーで明示的に false に設定していた場合は尊重される。
+  // 重要: SearchFixer.mergeFeatures(...) は default false で 5 機能を seed するため、merged 側を
+  // 見て undefined チェックすると seed された false を「ユーザー明示 false」と誤認する罠がある
+  // （Codex P2 指摘）。必ず existingFeatures (storage 生値) を判定基準にする。
   const legacy = await chrome.storage.local
     .get(["ytShortsRemovalEnabled", StorageKeys.SEARCH_FIXER_FEATURES, StorageKeys.SEARCH_FIXER_ENABLED])
     .catch(() => ({}));
-  if (legacy?.ytShortsRemovalEnabled === true) {
-    const mergedFeatures = SearchFixer.mergeFeatures(legacy[StorageKeys.SEARCH_FIXER_FEATURES] ?? {});
-    mergedFeatures.removeShorts = true;
+  const existingFeatures =
+    legacy?.[StorageKeys.SEARCH_FIXER_FEATURES] && typeof legacy[StorageKeys.SEARCH_FIXER_FEATURES] === "object"
+      ? legacy[StorageKeys.SEARCH_FIXER_FEATURES]
+      : {};
+  const legacyShortsActive =
+    legacy?.ytShortsRemovalEnabled === true || existingFeatures.removeShorts === true;
+  if (legacyShortsActive) {
+    const mergedFeatures = SearchFixer.mergeFeatures(existingFeatures);
+    // 5 機能とも storage 生値で未設定なら true に転写。明示 false は尊重。
+    if (existingFeatures.removeShortsShelf === undefined) mergedFeatures.removeShortsShelf = true;
+    if (existingFeatures.removeShortsChip === undefined) mergedFeatures.removeShortsChip = true;
+    if (existingFeatures.removeShortsSidebar === undefined) mergedFeatures.removeShortsSidebar = true;
+    if (existingFeatures.redirectShortsUrl === undefined) mergedFeatures.redirectShortsUrl = true;
+    if (existingFeatures.shortsBtn === undefined) mergedFeatures.shortsBtn = true;
+    // 旧キー removeShorts は新構造に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
     const migrate = {
       [StorageKeys.SEARCH_FIXER_FEATURES]: mergedFeatures,
-      // 旧 Shorts 削除を ON にしていた人は YouTube クリーナーマスターも ON にしないと
-      // サブ機能が動かない（master 必須）。マイグレーションでは「動作継続」を最優先。
-      [StorageKeys.SEARCH_FIXER_ENABLED]: true,
     };
-    await chrome.storage.local.set(migrate).catch(() => {});
-  }
-
-  // v1.0.x マイグレーション: 旧 removeShorts を 5 機能に分離。
-  // 旧 removeShorts は「Shorts 棚 / チップ / 左サイドバーメニュー削除 + URL リダイレクト
-  //  + 個別 Shorts 動画カード（ytd-video-renderer:has(a[href*="/shorts/"])）削除」を
-  // すべて含む 1 トグルだったが、Shorts を単独カテゴリで特別扱いする UI が分かりにくかったため
-  // 機能を以下に解体し、それぞれを既存カテゴリ（動画フィルタ / 検索結果 / 動画ページ /
-  // メニュー UI）に振り分けた:
-  //   - removeShortsShelf:    Shorts 棚（ホーム + 検索）
-  //   - removeShortsChip:     検索ページの Shorts フィルタチップ
-  //   - removeShortsSidebar:  左サイドバーの「ショート」メニュー
-  //   - redirectShortsUrl:    /shorts/ URL → /watch リダイレクト
-  //   - shortsBtn:            個別 Shorts 動画カード（旧 SELECTORS_REMOVE 相当 → 動画フィルタ）
-  // 旧 `removeShorts: true` ユーザーは 5 機能とも未設定のとき自動で全部 true に転写する。
-  // shortsBtn を含めないと、「Shorts 棚は隠せても /results 等で個別 Shorts カードが復活する」
-  // 退行が起きる（Codex P2 review 指摘）ため必須。
-  // （前段マイグレーションで redirectShortsUrl だけ既に転写されているケースもあるため、
-  //  各キーごとに「未設定なら埋める」方式で重複転写を避ける）
-  const featuresForShortsSplit = await chrome.storage.local
-    .get(StorageKeys.SEARCH_FIXER_FEATURES)
-    .then((s) => s[StorageKeys.SEARCH_FIXER_FEATURES])
-    .catch(() => undefined);
-  if (featuresForShortsSplit && typeof featuresForShortsSplit === "object") {
-    if (featuresForShortsSplit.removeShorts === true) {
-      const merged = SearchFixer.mergeFeatures(featuresForShortsSplit);
-      // 既に書き込まれている値（true / false）は尊重し、未設定（undefined）の場合のみ
-      // 旧 removeShorts:true の意図を引き継いで true にする。
-      if (featuresForShortsSplit.removeShortsShelf === undefined) merged.removeShortsShelf = true;
-      if (featuresForShortsSplit.removeShortsChip === undefined) merged.removeShortsChip = true;
-      if (featuresForShortsSplit.removeShortsSidebar === undefined) merged.removeShortsSidebar = true;
-      if (featuresForShortsSplit.redirectShortsUrl === undefined) merged.redirectShortsUrl = true;
-      if (featuresForShortsSplit.shortsBtn === undefined) merged.shortsBtn = true;
-      // 旧キー removeShorts は新構造に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
-      await chrome.storage.local
-        .set({ [StorageKeys.SEARCH_FIXER_FEATURES]: merged })
-        .catch(() => {});
+    // 旧 ytShortsRemovalEnabled === true の人は YouTube クリーナーマスターも ON にしないと
+    // サブ機能が動かない（master 必須）。マイグレーションでは「動作継続」を最優先で master ON。
+    if (legacy?.ytShortsRemovalEnabled === true) {
+      migrate[StorageKeys.SEARCH_FIXER_ENABLED] = true;
     }
+    await chrome.storage.local.set(migrate).catch(() => {});
   }
 
   // 廃止キーの削除（v1.0.x 系 + v1.0.17 + v1.0.18 で統合した ytShortsRemovalEnabled）
