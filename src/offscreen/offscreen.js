@@ -98,7 +98,11 @@ function tickLoudnessNormalizer(state) {
   const silenceGate = dbToGain(VolumeBooster.NORMALIZE_SILENCE_GATE_DB);
   if (!Number.isFinite(rms)) return;
   if (rms < silenceGate) {
-    scheduleNormalizerGain(state, 1);
+    // 静寂/ノイズ区間: 必ず UNITY (1.0x) に戻す。dead zone を無視するため force=true。
+    // dead zone 経由だと「直前の正規化が +1.58 dB 未満の boost で settled」のときに
+    // unity 復帰 (1.0 vs 1.2 の差 ~1.58 dB) が dead zone 内で skip されて、ノイズ区間が
+    // 古い gain で増幅されたままになる罠を回避する（Codex P2 指摘）。
+    scheduleNormalizerGain(state, 1, { force: true });
     return;
   }
 
