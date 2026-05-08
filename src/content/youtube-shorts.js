@@ -37,13 +37,12 @@
   let observer = null;
   /** @type {number|null} */
   let urlPollTimerId = null;
-  let cssClassApplied = false;
 
   // 各機能の活性状態を独立に持つ（v1.0.x で 1 機能 → 4 機能に分離）。
-  //   shelfActive    = removeShortsShelf    (Shorts 棚: SELECTORS_SHELF)
+  //   shelfActive    = removeShortsShelf    (Shorts 棚 + チャンネルタブ: SELECTORS_SHELF + tab CSS)
   //   chipActive     = removeShortsChip     (検索チップ: SELECTORS_CHIP)
-  //   sidebarActive  = removeShortsSidebar  (左サイドバーメニュー: SELECTORS_SIDEBAR)
-  //   urlRedirectActive = redirectShortsUrl (/shorts/<id> URL リダイレクト)
+  //   sidebarActive  = removeShortsSidebar  (左サイドバーメニュー + モバイル pivot: SELECTORS_SIDEBAR + CSS)
+  //   urlRedirectActive = redirectShortsUrl (/shorts/<id> URL リダイレクト + フラッシュ抑制 CSS)
   let shelfActive = false;
   let chipActive = false;
   let sidebarActive = false;
@@ -135,20 +134,20 @@
     chipActive = flags.chip;
     sidebarActive = flags.sidebar;
 
+    // CSS 用クラスは機能ごとに付け外しして、JS の DOM 削除と同じ粒度に揃える。
+    // 単一クラスに集約すると 1 サブ機能 ON でも他カテゴリの CSS まで発火する罠（旧実装の問題）。
+    // classList.toggle(name, force) は idempotent なので毎回呼んで OK。
+    const html = document.documentElement;
+    html.classList.toggle("__cpa-yt-shorts-hide-shelf", flags.shelf);
+    html.classList.toggle("__cpa-yt-shorts-hide-chip", flags.chip);
+    html.classList.toggle("__cpa-yt-shorts-hide-sidebar", flags.sidebar);
+
     if (newAnyDom !== oldAnyDom) {
       if (newAnyDom) {
-        // CSS は html 要素にクラス付与で有効化（content.css 側でセレクタ展開）。
-        // body 単位だと SPA の root 切り替えで外れるリスクがあるため html を選ぶ。
-        document.documentElement.classList.add("__cpa-yt-shorts-hidden");
-        cssClassApplied = true;
         startObserver();
         purgeShortsDom();
       } else {
         stopObserver();
-        if (cssClassApplied) {
-          document.documentElement.classList.remove("__cpa-yt-shorts-hidden");
-          cssClassApplied = false;
-        }
       }
     } else if (newAnyDom) {
       // 観察は継続中だがフラグ構成が変わった（例: shelf を OFF にして chip を ON）→ 即時 purge し直す
@@ -165,6 +164,9 @@
         stopUrlRedirectPoll();
       }
     }
+    // /shorts/ ページの overflow:hidden は redirect 機能の付随 CSS。
+    // 旧設計では shelf/chip/sidebar いずれか ON 時にしか発火しておらず redirect 単独 ON では機能していなかった。
+    html.classList.toggle("__cpa-yt-shorts-redirect-active", flags.urlRedirect);
   }
 
   // ---------- DOM 削除 ----------
