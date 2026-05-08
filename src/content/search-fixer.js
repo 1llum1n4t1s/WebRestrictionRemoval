@@ -1928,8 +1928,17 @@
         // disconnect は throw しないが念のため
       }
     }
+    // クエリは union で SUBS_CARD_MARKER_ATTR / data-cpa-subs-styled / hidden のいずれかを持つカードを拾う。
+    // SUBS_CARD_MARKER_ATTR だけだと、applyGridCardInlineStyle のデータ更新フェーズで
+    // href 変化検知時に marker だけ剥がしている経路があり、data-cpa-subs-styled が残ったカードが
+    // 取りこぼされる。再 attach 時に applyGridCardInlineStyle 構造 styling phase が
+    // data-cpa-subs-styled gate で skip されてグリッドが復元されないバグになる（Codex P2 指摘）。
     document
-      .querySelectorAll(`ytd-channel-renderer[${SUBS_CARD_MARKER_ATTR}]`)
+      .querySelectorAll(
+        `ytd-channel-renderer[${SUBS_CARD_MARKER_ATTR}],` +
+          ` ytd-channel-renderer[data-cpa-subs-styled],` +
+          ` ytd-channel-renderer[hidden]`
+      )
       .forEach((card) => {
         card.removeAttribute(SUBS_CARD_MARKER_ATTR);
         card.removeAttribute("hidden");
