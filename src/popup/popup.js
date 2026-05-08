@@ -44,7 +44,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $keepAliveHttpPingToggle = document.getElementById("keepAliveHttpPingToggle");
   const $featureCategories = document.getElementById("featureCategories");
   const $searchFixerPill = document.getElementById("searchFixerPill");
-  const $gridItemsSelect = document.getElementById("gridItemsSelect");
+  // $gridItemsSelect は buildFeatureCategories で menu_ui カテゴリ末尾に動的挿入されるため、
+  // ここでは取得せず、buildFeatureCategories の後で参照する。
   const $videoGammaToggle = document.getElementById("videoGammaToggle");
   const $videoGammaRow = document.getElementById("videoGammaRow");
   const $videoGammaSlider = document.getElementById("videoGammaSlider");
@@ -71,6 +72,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   $intervalSlider.max = String(MAX_MIN);
 
   buildFeatureCategories();
+  // menu_ui カテゴリ末尾に挿入された gridItemsSelect を以降の処理で参照する。
+  // _buildAccordionCategories が cat.id === "menu_ui" のとき _buildGridItemsRow で生成する。
+  const $gridItemsSelect = document.getElementById("gridItemsSelect");
   buildGridSelect();
   buildInstagramFeatureCategories();
 
@@ -432,18 +436,50 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ----- DOM 構築 -----
 
   /**
+   * メニュー/UI カテゴリの末尾に挿入する「ホーム列数」select 行を構築する。
+   * popup.html から static な select-row を取り除き、SearchFixer のカテゴリと整列させて
+   * 動的に menu_ui カテゴリ配下に置く。<select> の options は別途 buildGridSelect が埋める。
+   */
+  function _buildGridItemsRow(listEl) {
+    const row = document.createElement("div");
+    row.className = "select-row";
+
+    const label = document.createElement("label");
+    label.className = "select-label";
+    label.setAttribute("for", "gridItemsSelect");
+    const icon = document.createElement("span");
+    icon.className = "select-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "🔢";
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "select-name";
+    nameSpan.textContent = "ホーム列数";
+    label.append(icon, nameSpan);
+
+    const select = document.createElement("select");
+    select.id = "gridItemsSelect";
+    select.className = "select";
+
+    row.append(label, select);
+    listEl.appendChild(row);
+  }
+
+  /**
    * クリーナー詳細アコーディオンの DOM ビルダー（YouTube クリーナー / Instagram クリーナー共通）。
    *
    * 構造: `cat` > `cat-head` (アイコン + ラベル) + `cat-list` (各機能のトグル行)。
    * 各 `feature-row` は 1 行 1 トグル + 説明文の縦積みレイアウト。
    * 各 `<input type="checkbox">` には `id="${idPrefix}${item.key}"` を付与し、
    * `inputMap` (`Map<key, input>`) に登録して呼び出し側で値の収集・復元に使う。
+   *
+   * カテゴリ id が "menu_ui" のときは末尾にホーム列数 select 行を動的挿入する。
    */
   function _buildAccordionCategories(rootEl, categories, features, inputMap, idPrefix) {
     const frag = document.createDocumentFragment();
     for (const cat of categories) {
       const items = features.filter((f) => f.category === cat.id);
-      if (items.length === 0) continue;
+      // menu_ui カテゴリは features が空でもホーム列数 select を含めるため空チェックの除外対象。
+      if (items.length === 0 && cat.id !== "menu_ui") continue;
 
       const wrap = document.createElement("div");
       wrap.className = "cat";
@@ -494,6 +530,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         row.append(text, sw);
         list.appendChild(row);
         inputMap.set(item.key, input);
+      }
+
+      // menu_ui カテゴリの末尾にホーム列数 select 行を挿入。
+      // （Instagram クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
+      if (cat.id === "menu_ui") {
+        _buildGridItemsRow(list);
       }
 
       wrap.append(head, list);

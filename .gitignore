@@ -7,3 +7,4 @@ temp-build/
 *.zip
 .serena/
 .claude/
+temp/

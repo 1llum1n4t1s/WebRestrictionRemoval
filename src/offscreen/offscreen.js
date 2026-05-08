@@ -57,12 +57,25 @@ function clampNormalizerGain(gain) {
   return Math.min(maxGain, Math.max(minGain, gain));
 }
 
-function scheduleNormalizerGain(state, targetGain) {
+/**
+ * @param {object} state
+ * @param {number} targetGain 目標ゲイン倍率（clamp 前）
+ * @param {{force?: boolean}} [options] force=true で dead zone を無視して必ず更新する。
+ *   機能 OFF 時の 1.0x 強制復帰など、ユーザー操作起点の即時反映で使う。
+ */
+function scheduleNormalizerGain(state, targetGain, options) {
   const clamped = clampNormalizerGain(targetGain);
   const now = state.ctx.currentTime;
   const previousTarget = Number.isFinite(state.normalizerTargetGain)
     ? state.normalizerTargetGain
     : 1;
+  // Dead zone: 通常 tick 経由ではターゲットの差が NORMALIZE_DEAD_ZONE_DB 未満なら更新をスキップ。
+  // これで RMS の細かい揺れによる ±数 dB のポンピングを止め、BGM のうねりを耳から消す。
+  // force=true (機能 OFF 時の 1.0x 復帰など) のときは dead zone を無視して必ず適用する。
+  if (options?.force !== true && previousTarget > 0 && clamped > 0) {
+    const deltaDb = Math.abs(20 * Math.log10(clamped / previousTarget));
+    if (deltaDb < VolumeBooster.NORMALIZE_DEAD_ZONE_DB) return;
+  }
   const timeConstant = clamped < previousTarget
     ? VolumeBooster.NORMALIZE_GAIN_DOWN_TIME_CONSTANT
     : VolumeBooster.NORMALIZE_GAIN_UP_TIME_CONSTANT;
@@ -115,7 +128,9 @@ function updateLoudnessNormalizer(state, enabled) {
     startLoudnessNormalizer(state);
   } else {
     stopLoudnessNormalizer(state);
-    scheduleNormalizerGain(state, 1);
+    // 機能 OFF 時は dead zone を無視して即時 1.0x へ。dead zone が効いてしまうと
+    // OFF 後も僅かなブースト/減衰が残り、ユーザーが意図したスルー状態にならない。
+    scheduleNormalizerGain(state, 1, { force: true });
   }
 }
 
@@ -222,6 +237,15 @@ async function createAudioState(tabId, streamId) {
     }
 
     const ctx = new AudioContext();
+    // Chrome の autoplay policy で AudioContext は "suspended" 状態で起動することがある。
+    // suspended のままだと tabCapture stream は流れているのに destination から音が出ず、
+    // タブ音実体がミュート状態に陥り YouTube プレイヤー側もそれを検出してミュート UI を出す。
+    // background → offscreen の sendMessage 連鎖は user gesture を保持しているため
+    // resume() は同期的に成功するはず。失敗時は無視（後続の tickLoudnessNormalizer 等で
+    // 自然に resume されるケースもある）。
+    if (ctx.state === "suspended") {
+      try { await ctx.resume(); } catch {}
+    }
     const source = ctx.createMediaStreamSource(stream);
     const normalizerAnalyzer = ctx.createAnalyser();
     const normalizerGainNode = ctx.createGain();

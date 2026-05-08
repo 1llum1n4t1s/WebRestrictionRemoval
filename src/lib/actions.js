@@ -191,20 +191,54 @@ const KeepAlive = Object.freeze({
 });
 
 /**
- * @readonly YouTube Shorts 削除機能の定数（独自実装）。
+ * @readonly YouTube Shorts 関連の定数（独自実装）。
  *
- * v1.0.18 から YouTube クリーナーのサブ機能 `removeShorts` として統合された。
- * `searchFixerEnabled` (master) AND `searchFixerFeatures.removeShorts` の両方が
- * true のときに youtube-shorts.js が起動し、ここで定義したセレクタ・正規表現を使う。
+ * v1.0.x で「Shorts 関連」単独カテゴリを廃止し、Shorts に関する各機能を他のフィルタ機能と
+ * 同列に並べる方針に変更。実装としては以下の独立トグルが動作する:
+ *   - `removeShortsShelf`:   Shorts 棚（ホーム / 検索）削除 → 動画フィルタカテゴリ
+ *   - `removeShortsChip`:    Shorts フィルタチップ（検索ページ上部のタブ）削除 → 検索結果カテゴリ
+ *   - `removeShortsSidebar`: 左サイドバーの「ショート」メニュー削除 → メニュー/UI カテゴリ
+ *   - `redirectShortsUrl`:   `/shorts/<id>` URL を `/watch?v=<id>` にリダイレクト → 動画ページカテゴリ
+ * 個別 Shorts 動画の削除は search-fixer.js の `shortsBtn` 機能（動画フィルタ）が担当。
+ *
+ * `searchFixerEnabled` (master) AND 上記いずれかが true のときに youtube-shorts.js が起動する。
  */
 const YouTubeShorts = Object.freeze({
-  SELECTORS_REMOVE: Object.freeze([
-    'yt-chip-cloud-chip-renderer:has(#text)',
-    'ytd-video-renderer:has(a[href*="/shorts/"])',
-    'ytd-reel-shelf-renderer',
-    'ytd-rich-shelf-renderer[is-shorts]',
-    'ytm-reel-shelf-renderer',
-    'ytm-rich-section-renderer',
+  /**
+   * Shorts 棚の DOM 削除セレクタ。`removeShortsShelf` 機能用。
+   * 検索結果の横並び棚 (ytd-reel-shelf-renderer)、ホームの Shorts 棚
+   * (ytd-rich-shelf-renderer[is-shorts])、モバイル版両者を含む。
+   */
+  SELECTORS_SHELF: Object.freeze([
+    "ytd-reel-shelf-renderer",
+    "ytd-rich-shelf-renderer[is-shorts]",
+    "ytm-reel-shelf-renderer",
+    "ytm-rich-section-renderer",
+  ]),
+  /**
+   * Shorts フィルタチップの DOM 削除セレクタ。`removeShortsChip` 機能用。
+   * 検索ページ上部のフィルタチップ群（「すべて / 動画 / Shorts / プレイリスト / ...」）の中で
+   * textContent === "Shorts" のものだけを除去する（他のチップを巻き込まない判定は
+   * youtube-shorts.js の purge ループで CHIP_LABEL を使って行う）。
+   */
+  SELECTORS_CHIP: Object.freeze([
+    "yt-chip-cloud-chip-renderer:has(#text)",
+  ]),
+  /**
+   * 左サイドバーの「ショート」メニューエントリ削除セレクタ。`removeShortsSidebar` 機能用。
+   *   - ytd-guide-entry-renderer:      フル展開時のメインエントリ
+   *   - ytd-mini-guide-entry-renderer: 折りたたみ時のアイコンのみエントリ
+   *
+   * YouTube SPA の Shorts エントリは <a> に href を持たず、click handler で reelWatchEndpoint へ
+   * 遷移する設計のため、href 属性ではマッチしない（ChromeMCP 実機検証で確認済み: href=null）。
+   * 代わりに `title="ショート"` / `title="Shorts"` で識別する。日英 2 言語カバーで日本語ユーザー
+   * 主体の本拡張機能ではほぼ全数を捕捉できる。他ロケール（中文/韓国語等）は要望次第で追加する。
+   */
+  SELECTORS_SIDEBAR: Object.freeze([
+    'ytd-guide-entry-renderer:has(a[title="ショート"])',
+    'ytd-guide-entry-renderer:has(a[title="Shorts"])',
+    'ytd-mini-guide-entry-renderer:has(a[title="ショート"])',
+    'ytd-mini-guide-entry-renderer:has(a[title="Shorts"])',
   ]),
   CHIP_LABEL: "Shorts",
   SHORTS_PATH_RE: /\/shorts\/([\w-]{6,})/,
@@ -222,107 +256,122 @@ const YouTubeShorts = Object.freeze({
  * セレクタは YouTube が公開する DOM 要素タグ名（`ytd-video-renderer` 等）に依存する事実情報。
  */
 const SearchFixerFeatures = Object.freeze([
-  Object.freeze({
-    key: "removeShorts",
-    label: "Shorts 削除",
-    desc: "サイドバー / 棚 / チップから Shorts UI を物理削除し、/shorts/<ID> URL は /watch?v=<ID> へ強制リダイレクト",
-    category: "site_wide",
-  }),
-  Object.freeze({
-    key: "shelf",
-    label: "動画棚",
-    desc: "検索結果の途中に挟まる「人気の急上昇」「ニュース」などの動画グループ (ytd-shelf-renderer) を除去",
-    category: "search_remove",
-  }),
-  Object.freeze({
-    key: "cardList",
-    label: "カードリスト",
-    desc: "検索結果中の横スクロール関連トピックカード (ytd-horizontal-card-list-renderer の 2 番目以降) を除去",
-    category: "search_remove",
-  }),
+  // === カテゴリ "video_filter": 動画フィルタ（検索結果ページ + ホーム / 登録チャンネル / 急上昇等のフィードページで動作）===
+  // ChromeMCP 実機検証済みの 5 機能 + Shorts 棚削除。yt-lockup-view-model 系フィードと
+  // 検索結果 ytd-video-renderer の両方で同じ判定ロジックを適用する（検索専用 DOM の機能は
+  // category="search_only" を参照）。
   Object.freeze({
     key: "playlist",
     label: "プレイリスト",
-    desc: "検索結果中のプレイリスト項目（playlist?list= リンクや「N 本の動画」バッジ付き）を除去",
-    category: "search_remove",
+    desc: "プレイリスト項目（playlist?list= リンク / 「N 本の動画」バッジ）を除去",
+    category: "video_filter",
   }),
   Object.freeze({
     key: "mix",
     label: "ミックス",
-    desc: "YouTube が自動生成するミックス（ラジオ・&list=RD&start_radio=1）項目を除去",
-    category: "search_remove",
-  }),
-  Object.freeze({
-    key: "course",
-    label: "コース",
-    desc: "「コース」バッジ付きの学習コンテンツカード (.yt-lockup-view-model--wrapper) を除去",
-    category: "search_remove",
-  }),
-  Object.freeze({
-    key: "channel",
-    label: "チャンネル",
-    desc: "検索結果のチャンネル紹介カード (ytd-channel-renderer) を除去",
-    category: "search_remove",
-  }),
-  Object.freeze({
-    key: "reel",
-    label: "Shorts 棚",
-    desc: "検索結果に挟まる Shorts 動画の横並び棚 (ytd-reel-shelf-renderer / grid-shelf-view-model) を除去",
-    category: "search_remove",
+    desc: "YouTube 自動生成ミックス（&list=RD&start_radio=1 / 「ミックスリスト」バッジ）を除去",
+    category: "video_filter",
   }),
   Object.freeze({
     key: "shortsBtn",
-    label: "Shorts 動画",
-    desc: "検索結果のうちサムネ URL が /shorts/ になっている縦動画項目を除去",
-    category: "search_remove",
+    label: "Shorts 動画（個別）",
+    desc: "通常動画グリッドに混ざる単独の Shorts カード（サムネ URL が /shorts/ の縦動画項目）を除去",
+    category: "video_filter",
+  }),
+  Object.freeze({
+    key: "removeShortsShelf",
+    label: "Shorts 棚",
+    desc: "ホームの Shorts 棚 (ytd-rich-shelf-renderer[is-shorts]) と検索結果の Shorts 横棚 (ytd-reel-shelf-renderer) を物理削除",
+    category: "video_filter",
   }),
   Object.freeze({
     key: "live",
     label: "ライブ / プレミア",
-    desc: "「LIVE」または「PREMIERE」バッジ付きの動画を検索結果から除去",
-    category: "search_remove",
-  }),
-  Object.freeze({
-    key: "secondary",
-    label: "関連検索ブロック",
-    desc: "検索結果下部の「関連する検索キーワード」候補ブロック (ytd-secondary-search-container-renderer) を除去",
-    category: "search_remove",
-  }),
-  Object.freeze({
-    key: "verified",
-    label: "認証チャンネルの動画",
-    desc: "Verified バッジを持つチャンネル（公式アカウント・ニュース）の動画を除去",
-    category: "by_badge",
-  }),
-  Object.freeze({
-    key: "artist",
-    label: "アーティストチャンネルの動画",
-    desc: "Official Artist Channel バッジ付きの動画（ミュージック公式 MV 等）を除去",
-    category: "by_badge",
+    desc: "「LIVE」「PREMIERE」「ライブ配信中」「プレミア公開」バッジ付き動画を除去",
+    category: "video_filter",
   }),
   Object.freeze({
     key: "watched",
     label: "視聴済み動画",
     desc: "再生位置バー（resume-playback overlay）が表示されている既視聴動画を除去",
-    category: "by_badge",
+    category: "video_filter",
+  }),
+  Object.freeze({
+    key: "removeTopicsSection",
+    label: "「その他のトピック」セクション",
+    desc: "ホーム下部に表示される「その他のトピック」ジャンル別動画リコメンドセクション (ytd-rich-section-renderer) を除去（フィードページのみ）",
+    category: "video_filter",
+  }),
+  // === カテゴリ "search_only": 検索結果（検索結果ページ固有の DOM のみが対象）===
+  // shelf / cardList / course / channel / reel / secondary / chapter は検索結果ページ固有の DOM
+  // 構造（ytd-shelf-renderer / ytd-channel-renderer 等）に依存。verified / artist は現状検索のみで
+  // 動作（フィード対応は次版予定）。demoteUnmatched / highlightThumb / searchGrid は検索結果ページ
+  // のレイアウトや装飾を直接いじる機能で、フィードには対応 DOM が無い。
+  Object.freeze({
+    key: "shelf",
+    label: "動画棚",
+    desc: "「人気の急上昇」「ニュース」などの動画グループ (ytd-shelf-renderer) を除去",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "cardList",
+    label: "カードリスト",
+    desc: "横スクロール関連トピックカード (ytd-horizontal-card-list-renderer の 2 番目以降) を除去",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "course",
+    label: "コース",
+    desc: "「コース」バッジ付きの学習コンテンツカード (.yt-lockup-view-model--wrapper) を除去",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "channel",
+    label: "チャンネル紹介カード",
+    desc: "検索結果に挟まる「このチャンネル」紹介カード (ytd-channel-renderer) を除去",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "reel",
+    label: "Shorts 横棚",
+    desc: "Shorts 動画の横並び棚 (grid-shelf-view-model) を除去（ホーム / サイドバーの Shorts 棚は「Shorts 関連」カテゴリが担当）",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "secondary",
+    label: "関連検索ブロック",
+    desc: "下部の「関連する検索キーワード」候補ブロック (ytd-secondary-search-container-renderer) を除去",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "verified",
+    label: "認証チャンネルの動画",
+    desc: "Verified バッジを持つチャンネル（公式アカウント・ニュース）の動画を除去（次版でフィード対応予定）",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "artist",
+    label: "アーティストチャンネルの動画",
+    desc: "Official Artist Channel バッジ付きの動画（ミュージック公式 MV 等）を除去（次版でフィード対応予定）",
+    category: "search_only",
   }),
   Object.freeze({
     key: "chapter",
     label: "チャプター付き動画",
     desc: "チャプター情報 (expandable-metadata-renderer) が展開可能な動画を除去",
-    category: "by_badge",
+    category: "search_only",
   }),
   Object.freeze({
     key: "demoteUnmatched",
     label: "キーワード非マッチをグレー化",
     desc: "検索ワードがタイトル・説明文に含まれない動画を半透明 + グレースケール化（hover で復元）",
-    category: "highlight",
+    category: "search_only",
   }),
   Object.freeze({
     key: "highlightThumb",
     label: "サムネ枠装飾",
     desc: "各動画サムネに茜色の枠線とドロップシャドウを追加して視認性を向上（ダーク/ライト両対応）",
-    category: "highlight",
+    category: "search_only",
   }),
   Object.freeze({
     key: "centerTitle",
@@ -349,10 +398,51 @@ const SearchFixerFeatures = Object.freeze([
     category: "watch_page",
   }),
   Object.freeze({
+    key: "redirectShortsUrl",
+    label: "Shorts URL を /watch にリダイレクト",
+    desc: "`/shorts/<ID>` で開いた縦動画ページを通常の `/watch?v=<ID>` プレイヤーに強制リダイレクト",
+    category: "watch_page",
+  }),
+  Object.freeze({
     key: "searchGrid",
     label: "検索結果をグリッド表示",
     desc: "検索結果を 1 列リストから複数列グリッドに変更（ホーム列数が 4/5/6 ならその値、自動なら 3 列）",
-    category: "layout",
+    category: "search_only",
+  }),
+  Object.freeze({
+    key: "removeShortsChip",
+    label: "Shorts フィルタチップ",
+    desc: "検索ページ上部のフィルタチップ「すべて / 動画 / Shorts / プレイリスト …」のうち「Shorts」チップだけを除去",
+    category: "search_only",
+  }),
+  // === カテゴリ "menu_ui": メニュー / UI（左サイドバーやレイアウト系）===
+  Object.freeze({
+    key: "removeShortsSidebar",
+    label: "Shorts サイドバーメニュー",
+    desc: "左サイドバー（フル展開 / 折りたたみ両方）の「ショート」メニュー項目を除去",
+    category: "menu_ui",
+  }),
+  // 登録チャンネル拡張 3 機能（YouTube が上限を持つ leftnav 表示と /feed/channels の縦長一覧を補強）。
+  // /feed/channels は ytd-channel-renderer で全件 DOM に存在するためスキャンで全件取得可能。
+  // leftnav は ytd-guide-section-renderer 内に「もっと見る」展開しても件数上限あり、
+  // /feed/channels から取得した一覧を末尾に append して全件可視化する。
+  Object.freeze({
+    key: "subsLeftnavInjectAll",
+    label: "登録チャンネルを左メニューに全件展開",
+    desc: "左サイドバーの「登録チャンネル」セクションに、表示上限を超えて隠れていたチャンネルも全件追加表示（/feed/channels から同一オリジン取得、24h キャッシュ）",
+    category: "menu_ui",
+  }),
+  Object.freeze({
+    key: "subsAllShortcut",
+    label: "「すべての登録チャンネル」ショートカット",
+    desc: "左サイドバーの「登録チャンネル」見出し横に /feed/channels への 1 クリックボタンを追加",
+    category: "menu_ui",
+  }),
+  Object.freeze({
+    key: "subsChannelsGrid",
+    label: "登録チャンネル一覧をグリッド化（検索/ソート付き）",
+    desc: "/feed/channels ページを動画フィードのようなレスポンシブグリッドに変形 + 上部に検索ボックスとソート切替（名前/登録者数/登録順）。各カードは viewport 進入時に lazy fetch で最新動画サムネを表示（24h キャッシュ）",
+    category: "menu_ui",
   }),
 ]);
 
@@ -360,16 +450,29 @@ const SearchFixerDefaultFeatures = Object.freeze(
   Object.fromEntries(SearchFixerFeatures.map((feature) => [feature.key, false]))
 );
 
+/**
+ * フィードページ判定で使う pathname プレフィックス一覧。
+ * ルート "/" はホーム、`/feed/subscriptions` は登録チャンネル、`/feed/trending` は急上昇など。
+ * 検索結果 "/results" はここには含まない（呼び出し側で別途判定）。
+ *
+ * v1.0.x で「適用範囲」セレクタを廃止し、動画フィルタは常時このフィードページ + 検索結果ページで動作する。
+ */
+const SearchFixerFeedPathPrefixes = Object.freeze([
+  "/feed/subscriptions",
+  "/feed/trending",
+  "/feed/explore",
+  "/feed/history",
+  "/feed/library",
+]);
+
 const SearchFixer = Object.freeze({
   FEATURES: SearchFixerFeatures,
 
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "site_wide",     icon: "📺", label: "サイト全体" }),
-    Object.freeze({ id: "search_remove", icon: "🗑️", label: "検索結果ノイズ" }),
-    Object.freeze({ id: "by_badge",      icon: "🚫", label: "動画属性で削除" }),
-    Object.freeze({ id: "highlight",     icon: "✨", label: "ハイライト" }),
-    Object.freeze({ id: "watch_page",    icon: "🎬", label: "動画ページ" }),
-    Object.freeze({ id: "layout",        icon: "📐", label: "レイアウト" }),
+    Object.freeze({ id: "menu_ui",      icon: "🧭", label: "メニュー / UI" }),
+    Object.freeze({ id: "video_filter", icon: "🗑️", label: "動画フィルタ" }),
+    Object.freeze({ id: "watch_page",   icon: "🎬", label: "動画ページ" }),
+    Object.freeze({ id: "search_only",  icon: "🔍", label: "検索結果" }),
   ]),
 
   DEFAULT_FEATURES: SearchFixerDefaultFeatures,
@@ -380,6 +483,8 @@ const SearchFixer = Object.freeze({
     Object.freeze({ value: 5, label: "5 列" }),
     Object.freeze({ value: 6, label: "6 列" }),
   ]),
+
+  FEED_PATH_PREFIXES: SearchFixerFeedPathPrefixes,
 
   mergeFeatures(stored) {
     const out = { ...SearchFixer.DEFAULT_FEATURES };
@@ -396,6 +501,19 @@ const SearchFixer = Object.freeze({
     const n = Number(value);
     if (n === 4 || n === 5 || n === 6) return n;
     return 0;
+  },
+
+  /**
+   * pathname がフィードページ（ホーム / 登録 / 急上昇 等）に該当するか判定。
+   * 検索結果 "/results" はここには含まない（呼び出し側で別途判定）。
+   */
+  isFeedPath(pathname) {
+    if (typeof pathname !== "string") return false;
+    if (pathname === "/" || pathname === "") return true;
+    for (const prefix of SearchFixerFeedPathPrefixes) {
+      if (pathname.startsWith(prefix)) return true;
+    }
+    return false;
   },
 });
 
@@ -657,29 +775,60 @@ const VolumeBooster = Object.freeze({
   }),
   /** 自動音量正規化: 目標RMS。厳密な LUFS ではなく、リアルタイム用途の短時間ラウドネス近似。 */
   NORMALIZE_TARGET_RMS_DB: -24,
-  /** 自動音量正規化: これ未満は無音/ノイズ扱いにして増幅しない。 */
-  NORMALIZE_SILENCE_GATE_DB: -50,
-  /** 自動音量正規化: 小さい音源を持ち上げる最大量。 */
-  NORMALIZE_MAX_GAIN_DB: 9,
+  /**
+   * 自動音量正規化: これ未満は無音/ノイズ扱いにして増幅しない。
+   * BGM + 喋りの動画で「言葉と言葉の隙間に残る BGM」も無音側に倒すため、-50 → -38 に上げて
+   * gate を強めにかける。-50 だと隙間 BGM の RMS でも有効音判定 → 目標 -24dB まで持ち上げる
+   * → 喋り出した瞬間に下げる、というポンピングが発生していた。
+   */
+  NORMALIZE_SILENCE_GATE_DB: -38,
+  /**
+   * 自動音量正規化: 小さい音源を持ち上げる最大量。
+   * 過剰持ち上げ時の不自然さ（環境ノイズの増幅・喋り検出時の急減衰）を抑えるため 9 → 6 に絞る。
+   */
+  NORMALIZE_MAX_GAIN_DB: 6,
   /** 自動音量正規化: 大きい音源を下げる最大量。 */
   NORMALIZE_MIN_GAIN_DB: -12,
-  /** 自動音量正規化: 音量測定とゲイン更新の間隔。 */
-  NORMALIZE_UPDATE_MS: 250,
-  /** 自動音量正規化: 音が大きいときに下げる追従速度。 */
-  NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 0.35,
-  /** 自動音量正規化: 音が小さいときに上げる追従速度。 */
-  NORMALIZE_GAIN_UP_TIME_CONSTANT: 1.2,
   /**
-   * ナイトモード用コンプレッサー（ゲーム音のダイナミックレンジを縮める）。
-   * threshold:-18dBFS / ratio:2.5 でピークを抑えつつ可逆的な声域を残し、
-   * attack:20ms / release:400ms で自然な追従にする。
+   * 自動音量正規化: 音量測定とゲイン更新の間隔。
+   * 250ms → 400ms に伸ばし、瞬間 RMS の揺れに対する応答頻度を下げる。
+   */
+  NORMALIZE_UPDATE_MS: 400,
+  /**
+   * 自動音量正規化: 音が大きいときに下げる追従速度。
+   * 「サスペンションダンパー」イメージで上下とも遅く動かす方針。
+   * 2.0s ≒ 3τ で 6 秒で 95% 到達。瞬間ピークでは下げず、平均的に大きい音源にだけ反応する。
+   */
+  NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 2.0,
+  /**
+   * 自動音量正規化: 音が小さいときに上げる追従速度。
+   * 「サスペンションダンパー」イメージで上下とも遅く動かす方針。
+   * 8.0s ≒ 3τ で 24 秒で 95% 到達。言葉の隙間（数百 ms 〜 数秒オーダー）では実質ノーリアクションで、
+   * 数十秒〜数分スパンの「動画ごとの平均音量差」だけを丁寧に揃える挙動になる。
+   */
+  NORMALIZE_GAIN_UP_TIME_CONSTANT: 8.0,
+  /**
+   * 自動音量正規化: ヒステリシス（dead zone）。目標ゲインと現在ターゲットの差がこの dB 値
+   * 未満ならゲイン更新をスキップし、細かい RMS 揺れによるポンピングを抑える。
+   * ±3dB は「動画再生で気付かない」体感の安全領域（±2dB ≒ ラウドネス最小有意差より一段広めに取る）。
+   */
+  NORMALIZE_DEAD_ZONE_DB: 3,
+  /**
+   * ナイトモード用コンプレッサー（ダイナミックレンジを縮める）。
+   * 旧 ratio:2.5 / release:0.4 はゲーム配信で爆音抑制する用途には合うが、BGM + ナレーションの
+   * 動画では「喋りが圧縮 → やめた瞬間に release で BGM が立ち上がる」現象が起きやすい。
+   *
+   * ratio:2.0 / release:1.2s に緩和して、語間の音量変動を耳に付かない速度に落とす。
+   * 1.2s release は「喋り句末から次の喋り出しまで」(典型 200〜800ms) より十分長く、
+   * 圧縮量が文の途中で戻りきらないため BGM の立ち上がりも知覚されにくい。
+   * threshold/knee/attack は変更なし（瞬間ピーク抑制の役割は維持）。
    */
   NIGHT_MODE_PRESET: Object.freeze({
     threshold: -18,
     knee: 8,
-    ratio: 2.5,
+    ratio: 2.0,
     attack: 0.02,
-    release: 0.4,
+    release: 1.2,
   }),
   /**
    * compressor 機能 OFF 時のバイパス設定（ratio:1 で実質パススルー）。
