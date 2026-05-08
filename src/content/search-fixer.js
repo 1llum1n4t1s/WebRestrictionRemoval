@@ -2157,6 +2157,13 @@
 
   function scheduleSubsGridScan() {
     if (!subsGridState) return;
+    // cooldown 中は scan 完全 skip。applyGridCardInlineStyle のデータ更新フェーズが
+    // 毎スキャン全カード (171 件) に setAttribute("data-cpa-clean-name", newName) を発射し、
+    // 初回 sort 時は新データにより全件 setAttribute されるため Polymer の batch update に
+    // 干渉して combobox label rollback を起こしていた（実機検証で確定した根本原因）。
+    // subsGridCardsObserver callback 経由は元々 cooldown gate あるが、本関数を直接呼ぶ
+    // applySubsChannelsGrid / runPostCooldownScan 経路には gate がなかった。
+    if (Date.now() < subsGridSortCooldownUntil) return;
     if (!subsGridState.observer) {
       subsGridState.observer = new IntersectionObserver(
         (entries) => {
