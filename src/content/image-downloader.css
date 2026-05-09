@@ -1,0 +1,95 @@
+/*
+ * 画像ダウンロード機能のスタイル（Instagram / TikTok 共通）。
+ *
+ *   - .__cpa-img-dl-host             : 画像の overlay host（content script が動的付与）。
+ *                                      host 要素が `position: static` のときだけ付与され、
+ *                                      relative にしてボタンの絶対配置基準にする。
+ *   - .__cpa-img-dl-host-positioned  : host が既に positioned (relative/absolute/fixed/sticky)
+ *                                      のときに付与する代替クラス。position は触らず、子の
+ *                                      overlay button の絶対配置のみが機能する。
+ *                                      TikTok modal viewer の position:absolute 配下など、
+ *                                      既存レイアウトを壊さない経路として使う。
+ *   - .__cpa-img-dl-button           : 画像右上に注入されるダウンロードボタン。
+ *                                      hover / focus-within 時にだけ表示する。
+ *   - .__cpa-img-dl-busy             : ダウンロード fetch 中のボタン状態（cursor: wait + 透過）。
+ *
+ * `!important` は z-index と position（host が static のときのみ）に最小限で使用。
+ */
+
+.__cpa-img-dl-host {
+  /* host が static のときだけ付与される。relative を強制してボタンの absolute 配置基準にする。 */
+  position: relative !important;
+}
+
+/* HOST_POSITIONED_CLASS は position を触らない（既存 relative/absolute/fixed/sticky を尊重） */
+
+.__cpa-img-dl-button {
+  position: absolute !important;
+  /* 全 site で左上配置に統一（Instagram / TikTok の右上は公式 UI overlay が使う領域。
+     YouTube は右上空いているが UX 統一感を優先して左上に揃える）。
+     画像枠の余白は 16px（被写体に被らない + 画像枠ピッタリにならない適度な余白）。 */
+  top: 16px;
+  left: 16px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background-color: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  /* サイトの overlay や fixed バナーよりも上に出すため最大に近い z-index を当てる。
+     2147483647 は int32 max でブラウザ依存のクランプを避けるため -1 にする。 */
+  z-index: 2147483646 !important;
+
+  /* 親フォント・装飾の継承を断つ */
+  font: inherit;
+  line-height: 1;
+  text-decoration: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.__cpa-img-dl-host:hover > .__cpa-img-dl-button,
+.__cpa-img-dl-host:focus-within > .__cpa-img-dl-button,
+.__cpa-img-dl-host-positioned:hover > .__cpa-img-dl-button,
+.__cpa-img-dl-host-positioned:focus-within > .__cpa-img-dl-button {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.__cpa-img-dl-button:hover {
+  background-color: rgba(0, 0, 0, 0.78);
+}
+
+.__cpa-img-dl-button:focus-visible {
+  outline: 2px solid #C0605A;
+  outline-offset: 2px;
+}
+
+
+.__cpa-img-dl-button.__cpa-img-dl-busy {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.__cpa-img-dl-button > svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}

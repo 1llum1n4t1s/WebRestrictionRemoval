@@ -225,10 +225,10 @@ test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only 
   assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only"]);
 });
 
-test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/watched + removeShortsShelf + removeTopicsSection", () => {
+test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/membersOnly/watched + removeShortsShelf + removeTopicsSection + removeBreakingNewsSection", () => {
   const expectedVideoFilterKeys = [
-    "playlist", "mix", "shortsBtn", "live", "watched",
-    "removeShortsShelf", "removeTopicsSection",
+    "playlist", "mix", "shortsBtn", "live", "membersOnly", "watched",
+    "removeShortsShelf", "removeTopicsSection", "removeBreakingNewsSection",
   ];
   for (const key of expectedVideoFilterKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
@@ -254,7 +254,7 @@ test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only に
 
 test("SearchFixer.FEATURES: 動画ページ系 + redirectShortsUrl が watch_page に集約", () => {
   const expectedWatchPageKeys = [
-    "centerTitle", "fullWidthDesc", "hideComments", "hideLiveChat", "redirectShortsUrl",
+    "hideComments", "hideLiveChat", "redirectShortsUrl",
   ];
   for (const key of expectedWatchPageKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
@@ -322,7 +322,7 @@ test("ColorPicker.isValidFormat / normalizeFormat", () => {
 
 // ---------- PopupTabs ----------
 
-test("PopupTabs.isValid / normalize: 4 タブ識別子のみ受理、不正値は TUNE", () => {
+test("PopupTabs.isValid / normalize: 5 タブ識別子のみ受理、不正値は TUNE", () => {
   for (const id of G.PopupTabs.ALL) {
     assert.equal(G.PopupTabs.isValid(id), true, `${id} should be valid`);
   }
@@ -359,7 +359,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 14 個の定数を公開する", () => {
+test("actions.js は globalThis に 16 個の定数を公開する", () => {
   const required = [
     "Actions",
     "ExtensionPaths",
@@ -371,6 +371,8 @@ test("actions.js は globalThis に 14 個の定数を公開する", () => {
     "SearchFixer",
     "AmazonDeliveryTotal",
     "InstagramCleaner",
+    "TikTokCleaner",
+    "ImageDownloader",
     "VolumeBooster",
     "VideoGamma",
     "ColorPicker",
@@ -379,4 +381,186 @@ test("actions.js は globalThis に 14 個の定数を公開する", () => {
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);
   }
+});
+
+test("TikTokCleaner.mergeFeatures: undefined / null / 不正型は default", () => {
+  for (const value of [undefined, null, 0, "x", []]) {
+    const merged = G.TikTokCleaner.mergeFeatures(value);
+    assert.deepEqual(merged, G.TikTokCleaner.DEFAULT_FEATURES);
+  }
+});
+
+test("TikTokCleaner.mergeFeatures: partial は欠損 default 補完", () => {
+  const partial = { hideComments: true };
+  const merged = G.TikTokCleaner.mergeFeatures(partial);
+  assert.equal(merged.hideComments, true);
+  assert.equal(merged.hideSuggested, false);
+});
+
+// ---------- ImageDownloader ----------
+
+test("ImageDownloader.detectHost: instagram / tiktok のサブドメインも認識", () => {
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "instagram.com" }), "instagram");
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "www.instagram.com" }), "instagram");
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "tiktok.com" }), "tiktok");
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "www.tiktok.com" }), "tiktok");
+});
+
+test("ImageDownloader.detectHost: 大文字混じり / null / undefined / 非対応ホストは null", () => {
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "Instagram.COM" }), "instagram");
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "youtube.com" }), null);
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "example.com" }), null);
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "fake-instagram.com" }), null);
+  assert.equal(G.ImageDownloader.detectHost({ hostname: "instagram.com.evil.com" }), null);
+  assert.equal(G.ImageDownloader.detectHost(null), null);
+  assert.equal(G.ImageDownloader.detectHost(undefined), null);
+  assert.equal(G.ImageDownloader.detectHost({}), null);
+  assert.equal(G.ImageDownloader.detectHost({ hostname: 123 }), null);
+});
+
+test("ImageDownloader.buildFilename: 形式 `{host}_{YYYYMMDD_HHMMSS}.{ext}` で生成", () => {
+  const filename = G.ImageDownloader.buildFilename("instagram", "image/jpeg");
+  assert.match(filename, /^instagram_\d{8}_\d{6}\.jpg$/);
+
+  const png = G.ImageDownloader.buildFilename("instagram", "image/png");
+  assert.match(png, /^instagram_\d{8}_\d{6}\.png$/);
+
+  const webp = G.ImageDownloader.buildFilename("tiktok", "image/webp");
+  assert.match(webp, /^tiktok_\d{8}_\d{6}\.webp$/);
+});
+
+test("ImageDownloader.buildFilename: 不明な MIME は jpg にフォールバック", () => {
+  const filename = G.ImageDownloader.buildFilename("instagram", "application/octet-stream");
+  assert.match(filename, /^instagram_\d{8}_\d{6}\.jpg$/);
+
+  const empty = G.ImageDownloader.buildFilename("instagram", "");
+  assert.match(empty, /^instagram_\d{8}_\d{6}\.jpg$/);
+
+  const undef = G.ImageDownloader.buildFilename("instagram", undefined);
+  assert.match(undef, /^instagram_\d{8}_\d{6}\.jpg$/);
+});
+
+test("ImageDownloader.buildFilename: 不正 host は image にフォールバック", () => {
+  const filename = G.ImageDownloader.buildFilename("evil_site", "image/jpeg");
+  assert.match(filename, /^image_\d{8}_\d{6}\.jpg$/);
+
+  const noHost = G.ImageDownloader.buildFilename(null, "image/jpeg");
+  assert.match(noHost, /^image_\d{8}_\d{6}\.jpg$/);
+});
+
+test("ImageDownloader: 必要な定数キーが揃っている", () => {
+  assert.ok(G.ImageDownloader.HOSTS);
+  assert.equal(G.ImageDownloader.HOSTS.INSTAGRAM, "instagram");
+  assert.equal(G.ImageDownloader.HOSTS.TIKTOK, "tiktok");
+  assert.equal(typeof G.ImageDownloader.MIN_SIZE_PX, "number");
+  assert.ok(G.ImageDownloader.MIN_SIZE_PX > 0);
+  assert.equal(typeof G.ImageDownloader.BUTTON_CLASS, "string");
+  assert.equal(typeof G.ImageDownloader.HOST_CLASS, "string");
+  assert.equal(typeof G.ImageDownloader.HOST_POSITIONED_CLASS, "string");
+  assert.equal(typeof G.ImageDownloader.BUSY_CLASS, "string");
+  assert.equal(typeof G.ImageDownloader.SCANNED_SRC_DATASET_KEY, "string");
+  assert.equal(typeof G.ImageDownloader.SCANNED_SRC_ATTR_SELECTOR, "string");
+  assert.equal(typeof G.ImageDownloader.SKIP_MARKER, "string");
+  // dataset key と attribute selector の整合性: cpaImgDlSrc → data-cpa-img-dl-src
+  assert.match(
+    G.ImageDownloader.SCANNED_SRC_ATTR_SELECTOR,
+    /^img\[data-cpa-img-dl-src\]$/,
+    "SCANNED_SRC_ATTR_SELECTOR と SCANNED_SRC_DATASET_KEY の lower-kebab 変換が一致すること"
+  );
+  assert.ok(G.ImageDownloader.ALLOWED_HOSTS);
+  assert.ok(Array.isArray(G.ImageDownloader.ALLOWED_HOSTS.instagram));
+  assert.ok(Array.isArray(G.ImageDownloader.ALLOWED_HOSTS.tiktok));
+});
+
+// ---------- ImageDownloader.isAllowedFetchUrl ----------
+
+test("ImageDownloader.isAllowedFetchUrl: Instagram CDN ホストのみ許可（regex マッチ）", () => {
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-nrt1-1.cdninstagram.com/v/foo.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent.cdninstagram.com/v/foo.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-nrt1-1.fna.fbcdn.net/v/foo.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent.xx1-2.fna.fbcdn.net/v/foo.jpg"), true);
+  // 非許可
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://i.ytimg.com/foo.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://attacker.com/log"), false);
+});
+
+test("ImageDownloader.isAllowedFetchUrl: 多段サブドメインは fbcdn.net でも拒否（SSRF 緩和）", () => {
+  // ドット文字クラス除去後は 1 段サブドメインのみ許可。多段は拒否されるべき
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://evil.attacker.fbcdn.net/x.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://a.b.c.fbcdn.net/x.jpg"), false);
+  // scontent- 系の正規 fna 2 段は明示許可（合法）
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-iad3-2.fna.fbcdn.net/x.jpg"), true);
+  // scontent. 系も明示許可
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent.iad3-2.fna.fbcdn.net/x.jpg"), true);
+  // しかし scontent 以外の 2 段 fna は拒否
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://evil.fna.fbcdn.net/x.jpg"), false);
+});
+
+test("ImageDownloader.isAllowedFetchUrl: TikTok CDN ホストのみ許可（regex マッチ）", () => {
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://p16-sign-sg.tiktokcdn.com/foo.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://p19-pu-sign-useast.tiktokcdn-us.com/foo.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://p77.tiktokcdn.com/foo.jpg"), true);
+  // 非許可
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://attacker-tiktokcdn.com/foo.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://i.ytimg.com/foo.jpg"), false);
+});
+
+test("ImageDownloader.isAllowedFetchUrl: 不正 host / 不正 URL は false", () => {
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("evil_site", "https://scontent.cdninstagram.com/foo.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl(null, "https://scontent.cdninstagram.com/foo.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", null), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", ""), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "not a url"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", undefined), false);
+  // youtube context は廃止された（YouTube 画像 DL 機能削除）
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("youtube", "https://i.ytimg.com/vi/abc/maxresdefault.jpg"), false);
+});
+
+test("各クリーナー FEATURES に imageDownload エントリが含まれる（Instagram / TikTok）", () => {
+  // YouTube からは imageDownload を削除済み
+  const yt = G.SearchFixer.FEATURES.find((f) => f.key === "imageDownload");
+  assert.equal(yt, undefined, "SearchFixer.FEATURES から imageDownload は削除されている");
+  const ig = G.InstagramCleaner.FEATURES.find((f) => f.key === "imageDownload");
+  assert.ok(ig, "InstagramCleaner.FEATURES に imageDownload が存在");
+  const tt = G.TikTokCleaner.FEATURES.find((f) => f.key === "imageDownload");
+  assert.ok(tt, "TikTokCleaner.FEATURES に imageDownload が存在");
+});
+
+test("各クリーナーの DEFAULT_FEATURES に imageDownload: false が含まれる", () => {
+  // YouTube は廃止
+  assert.equal(G.SearchFixer.DEFAULT_FEATURES.imageDownload, undefined);
+  assert.equal(G.InstagramCleaner.DEFAULT_FEATURES.imageDownload, false);
+  assert.equal(G.TikTokCleaner.DEFAULT_FEATURES.imageDownload, false);
+});
+
+test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キー欠損を default false 補完", () => {
+  // InstagramCleaner
+  const ig = G.InstagramCleaner.mergeFeatures({ imageDownload: true });
+  assert.equal(ig.imageDownload, true);
+  assert.equal(ig.reels, false);
+  // TikTokCleaner
+  const tt = G.TikTokCleaner.mergeFeatures({ imageDownload: true });
+  assert.equal(tt.imageDownload, true);
+  assert.equal(tt.hideComments, false);
+});
+
+// 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
+// drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
+test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
+  assert.equal(G.SearchFixer.FEATURES.length, 29, "SearchFixer.FEATURES は 29 件");
+  assert.equal(G.InstagramCleaner.FEATURES.length, 11, "InstagramCleaner.FEATURES は 11 件");
+  assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
+});
+
+// ALLOWED_HOSTS の fbcdn.net パターンが scontent- prefix 限定であることを検証する。
+// `tracking.fbcdn.net` / `video.fbcdn.net` 等の Meta 傘下非画像 CDN への代理
+// fetch が遮断されることを保証する（/rere レビュー A1+A2 指摘修正）。
+test("ImageDownloader.isAllowedFetchUrl: fbcdn.net は scontent- prefix 限定", () => {
+  // 許可される（Instagram 投稿画像の正規 CDN）
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-iad3-1.fbcdn.net/x.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-foo-bar.fbcdn.net/x.jpg"), true);
+  // 拒否される（過剰許可だった経路）
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://tracking.fbcdn.net/pixel.png"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://video.fbcdn.net/clip.mp4"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://analytics.fbcdn.net/x.png"), false);
 });

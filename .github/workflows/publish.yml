@@ -112,6 +112,13 @@ jobs:
             --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
             --data-urlencode "grant_type=refresh_token")
           access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<< "$token_response")
+          # 動的取得した access_token は GitHub Actions の自動マスキング対象外のため、
+          # add-mask で明示的にマスク登録して以降のログ出力でも漏洩しないようにする。
+          # token_response は access_token を含む JSON 全体。`set -x` や将来の
+          # デバッグ追加で `echo "$token_response"` が混入した場合に Bearer Token
+          # が平文ログに残るのを防ぐため、access_token と並列でマスク登録する。
+          echo "::add-mask::${token_response}"
+          echo "::add-mask::${access_token}"
           curl -fsS \
             -X PUT \
             -H "Authorization: Bearer ${access_token}" \

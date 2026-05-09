@@ -26,12 +26,12 @@ const Actions = Object.freeze({
   APPLY_KEEP_ALIVE_CS: "applyKeepAliveCS",
   /** background → Instagram content script: Instagram クリーナー設定を反映 */
   APPLY_INSTAGRAM_CLEANER_CS: "applyInstagramCleanerCS",
+  /** background → TikTok content script: TikTok クリーナー設定を反映 */
+  APPLY_TIKTOK_CLEANER_CS: "applyTiktokCleanerCS",
   /** background → video-gamma content script: <video> ガンマ補正設定を反映（全タブ共通設定） */
   APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
-  /** popup → background: 音量ブースターの現在 gain を指定タブで取得 */
-  VOLUME_BOOSTER_GET_GAIN: "volumeBoosterGetGain",
   /** popup → background: 指定タブのブーストを解放（スライダー 100% 復帰時） */
   VOLUME_BOOSTER_RELEASE_TAB: "volumeBoosterReleaseTab",
 });
@@ -105,7 +105,7 @@ const StorageKeys = Object.freeze({
   KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
   /** セッション維持を許可した origin 一覧（例: https://example.com）。サイト単位で効かせる。 */
   KEEP_ALIVE_ORIGINS: "keepAliveOrigins",
-  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む全 22 サブ機能の親） */
+  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 29 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -117,6 +117,14 @@ const StorageKeys = Object.freeze({
   INSTAGRAM_CLEANER_ENABLED: "instagramCleanerEnabled",
   /** Instagram クリーナーの個別機能オン/オフ（オブジェクト） */
   INSTAGRAM_CLEANER_FEATURES: "instagramCleanerFeatures",
+  /** TikTok クリーナーマスタートグル */
+  TIKTOK_CLEANER_ENABLED: "tiktokCleanerEnabled",
+  /** TikTok クリーナーの個別機能オン/オフ（オブジェクト） */
+  TIKTOK_CLEANER_FEATURES: "tiktokCleanerFeatures",
+  /** 音量ブースター: マスタートグル（OFF 時は全タブの AudioContext を解放しパイプラインをカット。設定値は残す） */
+  VOLUME_BOOSTER_ENABLED: "volumeBoosterEnabled",
+  /** 音量ブースター: 保存されたスライダー位置 (0–300%)。マスター ON 時にタブ切替で自動適用される */
+  VOLUME_BOOSTER_LAST_GAIN: "volumeBoosterLastGain",
   /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
   /** 音量ブースター: 自動音量正規化（短時間RMSを測って自動ゲイン調整） */
@@ -186,7 +194,13 @@ const KeepAlive = Object.freeze({
   isOriginAllowed(origins, origin) {
     const normalized = KeepAlive.normalizeOrigin(origin);
     if (!normalized) return false;
-    return KeepAlive.normalizeOrigins(origins).includes(normalized);
+    if (!Array.isArray(origins)) return false;
+    // normalizeOrigins() を毎回呼んで Array→Set→Array 変換するコストを避けるため、
+    // 早期 return しつつ N 回 normalizeOrigin で比較する（hit 時に O(k), miss 時に O(N)）。
+    for (const raw of origins) {
+      if (KeepAlive.normalizeOrigin(raw) === normalized) return true;
+    }
+    return false;
   },
 });
 
@@ -286,8 +300,14 @@ const SearchFixerFeatures = Object.freeze([
   }),
   Object.freeze({
     key: "live",
-    label: "ライブ / プレミア",
-    desc: "「LIVE」「PREMIERE」「ライブ配信中」「プレミア公開」バッジ付き動画を除去",
+    label: "ライブ / プレミア / ステーション",
+    desc: "「LIVE / ライブ / PREMIERE / プレミア / ステーション」サムネバッジ付き動画を除去。ステーション = YouTube が機械生成する BGM 無限放送",
+    category: "video_filter",
+  }),
+  Object.freeze({
+    key: "membersOnly",
+    label: "メンバー限定",
+    desc: "チャンネルメンバーシップ加入者のみ視聴可能な「メンバー限定」/「Members only」サムネバッジ付き動画を除去",
     category: "video_filter",
   }),
   Object.freeze({
@@ -300,6 +320,12 @@ const SearchFixerFeatures = Object.freeze([
     key: "removeTopicsSection",
     label: "「その他のトピック」セクション",
     desc: "ホーム下部に表示される「その他のトピック」ジャンル別動画リコメンドセクション (ytd-rich-section-renderer) を除去（フィードページのみ）",
+    category: "video_filter",
+  }),
+  Object.freeze({
+    key: "removeBreakingNewsSection",
+    label: "「ニュース速報」セクション",
+    desc: "ホームに表示される「ニュース速報」/「Breaking news」ニュース記事セクション (ytd-rich-section-renderer) を除去（フィードページのみ）",
     category: "video_filter",
   }),
   // === カテゴリ "search_only": 検索結果（検索結果ページ固有の DOM のみが対象）===
@@ -372,18 +398,6 @@ const SearchFixerFeatures = Object.freeze([
     label: "サムネ枠装飾",
     desc: "各動画サムネに茜色の枠線とドロップシャドウを追加して視認性を向上（ダーク/ライト両対応）",
     category: "search_only",
-  }),
-  Object.freeze({
-    key: "centerTitle",
-    label: "タイトル中央配置",
-    desc: "動画ページのタイトル h1 を中央寄せにして雑誌風レイアウトに",
-    category: "watch_page",
-  }),
-  Object.freeze({
-    key: "fullWidthDesc",
-    label: "説明文フル幅",
-    desc: "動画ページの概要欄を画面幅いっぱいに展開して長文説明を読みやすく",
-    category: "watch_page",
   }),
   Object.freeze({
     key: "hideComments",
@@ -608,6 +622,13 @@ const InstagramCleanerFeatures = Object.freeze([
     desc: "ナビゲーション上の未読 DM 件数バッジ（赤丸の数字）を非表示にして通知圧力を軽減",
     category: "ig_extra",
   }),
+  // === 画像ダウンロード（YouTube / Instagram / TikTok 共通機能。実装は src/content/image-downloader.js）===
+  Object.freeze({
+    key: "imageDownload",
+    label: "画像にダウンロードボタンを表示",
+    desc: "投稿写真（フィード / プロフィールグリッド / 投稿詳細）にマウスを乗せたとき、右上にダウンロードボタンを overlay 表示（srcset から最大解像度を抽出）",
+    category: "ig_extra",
+  }),
 ]);
 
 const InstagramCleanerDefaultFeatures = Object.freeze(
@@ -660,6 +681,237 @@ const InstagramCleaner = Object.freeze({
       }
     }
     return out;
+  },
+});
+
+
+/**
+ * @readonly TikTok クリーナーの機能定義と定数（独自実装）。
+ *
+ * TikTok の冗長 UI（コメントパネル / コメントボタン / おすすめのアカウント等）を非表示にする。
+ * Instagram クリーナーと同じ body クラス駆動 CSS パターン。設定は `chrome.storage.local` の
+ * `tiktokCleanerEnabled` (master) + `tiktokCleanerFeatures` (object) で保持する。
+ *
+ * セレクタは TikTok が公開している `data-e2e` 属性 / `aria-label` を第一選択とし、難読化 class
+ * 名（ビルドごとに変わる）には依存しない。
+ */
+const TikTokCleanerFeatures = Object.freeze([
+  Object.freeze({
+    key: "hideComments",
+    label: "コメント欄非表示",
+    desc: "コメントパネル（動画再生時に開くコメント一覧）+ コメントアイコンボタン + コメント数表示をまとめて CSS で非表示化",
+    category: "tt_main",
+  }),
+  Object.freeze({
+    key: "hideSuggested",
+    label: "おすすめのアカウント非表示",
+    desc: "For You / フォロー中フィード / プロフィールに挿入される「おすすめのアカウント」セクションを CSS で非表示化",
+    category: "tt_main",
+  }),
+  // === 画像ダウンロード（YouTube / Instagram / TikTok 共通機能。実装は src/content/image-downloader.js）===
+  Object.freeze({
+    key: "imageDownload",
+    label: "画像にダウンロードボタンを表示",
+    desc: "フォト投稿 / 動画サムネにマウスを乗せたとき、右上にダウンロードボタンを overlay 表示",
+    category: "tt_main",
+  }),
+]);
+
+const TikTokCleanerDefaultFeatures = Object.freeze(
+  Object.fromEntries(TikTokCleanerFeatures.map((feature) => [feature.key, false]))
+);
+
+const TikTokCleaner = Object.freeze({
+  FEATURES: TikTokCleanerFeatures,
+
+  CATEGORIES: Object.freeze([
+    Object.freeze({ id: "tt_main", icon: "🚫", label: "主要機能" }),
+  ]),
+
+  DEFAULT_FEATURES: TikTokCleanerDefaultFeatures,
+
+  /** body に付与する CSS クラス名（feature key → クラス名） */
+  BODY_CLASS: Object.freeze({
+    hideComments: "__cpa-tt-comments",
+    hideSuggested: "__cpa-tt-suggested",
+  }),
+
+  mergeFeatures(stored) {
+    const out = { ...TikTokCleaner.DEFAULT_FEATURES };
+    if (stored && typeof stored === "object") {
+      for (const key of Object.keys(TikTokCleaner.DEFAULT_FEATURES)) {
+        if (stored[key] === true) out[key] = true;
+        else if (stored[key] === false) out[key] = false;
+      }
+    }
+    return out;
+  },
+});
+
+/**
+ * @readonly 画像ダウンロード機能の定数（Instagram / TikTok 共通、独自実装）。
+ *
+ * 各コンテンツ画像にホバー時のダウンロードボタンを overlay 表示し、Blob URL + `<a download>`
+ * 方式で保存する。`downloads` permission は追加しない（既存 permissions のままで動作）。
+ *
+ * 動作対象:
+ *   - Instagram: 投稿写真（フィード / プロフィールグリッド / 投稿詳細）+ リールカバー
+ *   - TikTok: フォト投稿 + 動画サムネ
+ *
+ * 機能の有効/無効は **各サイトクリーナーの features.imageDownload** が単一情報源（共通 master
+ * トグルは持たない）。サイトクリーナー master OFF 時は機能ごと無効になる設計。
+ *
+ * 設計上の不変条件:
+ *   - サイズ閾値 MIN_SIZE_PX 未満の画像（avatar / アイコン）は対象外
+ *   - クリーナーで非表示の画像にはボタンを付与しない（content script 側で computed style 確認）
+ *   - `__cpa-img-dl-` プレフィックスでサイト CSS との衝突回避
+ */
+const ImageDownloader = Object.freeze({
+  /** 対応サイトのキー（detectHost の戻り値、features の所属サイト解決に使う） */
+  HOSTS: Object.freeze({
+    INSTAGRAM: "instagram",
+    TIKTOK: "tiktok",
+  }),
+
+  /**
+   * コンテンツ画像と UI アイコンを区別するサイズ閾値（width / height のいずれかが
+   * この値以上ならコンテンツ画像と判定）。avatar (40px), アイコン (24px) は確実に除外。
+   */
+  MIN_SIZE_PX: 200,
+
+  /** 注入する DL ボタンに付ける CSS クラス名 */
+  BUTTON_CLASS: "__cpa-img-dl-button",
+  /** 画像の親要素（hover ターゲット）に付ける CSS クラス名 */
+  HOST_CLASS: "__cpa-img-dl-host",
+  /** ダウンロード処理中のボタンに付与する状態クラス（CSS で disabled 表示） */
+  BUSY_CLASS: "__cpa-img-dl-busy",
+  /** position が static でない host に付与する代替クラス（既存 position を尊重して overlay 配置） */
+  HOST_POSITIONED_CLASS: "__cpa-img-dl-host-positioned",
+  /**
+   * 処理済みの画像に最後に評価した src URL を格納する dataset キー（element.dataset[KEY]）。
+   * SPA / Polymer dom-repeat で同じ `<img>` 要素の src が別画像に差し替わったとき、
+   * 値の不一致で再評価をトリガーする（古いボタンを除去 → 新規 src で再 decorate）。
+   */
+  SCANNED_SRC_DATASET_KEY: "cpaImgDlSrc",
+  /**
+   * `SCANNED_SRC_DATASET_KEY` に対応する CSS 属性セレクタ。
+   * dataset キーは camelCase、HTML 属性は kebab-case（`cpaImgDlSrc` → `data-cpa-img-dl-src`）の
+   * 変換規則のため、両者を別々に保持して querySelector の食い違いを防ぐ。
+   * SCANNED_SRC_DATASET_KEY を変更したら必ずここも揃えること。
+   */
+  SCANNED_SRC_ATTR_SELECTOR: "img[data-cpa-img-dl-src]",
+  /** scan を skip した画像のマーカー値（コンテンツ画像でないと判定された） */
+  SKIP_MARKER: "__cpa-skip__",
+
+  /**
+   * 各サイトの fetch を許可する CDN ホスト名ホワイトリスト。
+   * `<img src>` を拡張機能が代理 fetch するため、攻撃者注入 img や任意オリジンへの
+   * 代理リクエスト経路を塞ぐ目的で URL の hostname をこの一覧と照合する。
+   * 対応していない hostname は fetch 候補から除外される（次の候補にフォールバック）。
+   *
+   * - 文字列 → 完全一致
+   * - 配列の正規表現 → サブドメインを含むパターンマッチ
+   */
+  ALLOWED_HOSTS: Object.freeze({
+    instagram: Object.freeze([
+      /^scontent(-[a-z0-9]+)?(-[a-z0-9]+)?\.cdninstagram\.com$/,
+      /^[a-z0-9-]+\.cdninstagram\.com$/,
+      // Meta の正規 fbcdn CDN は `scontent.{POP}-{NUM}.fna.fbcdn.net` または
+      // `scontent-{POP}.fna.fbcdn.net` 形式の 2 段サブドメイン。
+      // 任意の `evil.attacker.fbcdn.net` を通さないため `scontent[-.]` で開始を限定する。
+      /^scontent\.[a-z]+\d+-\d+\.fna\.fbcdn\.net$/,
+      /^scontent-[a-z0-9-]+\.fna\.fbcdn\.net$/,
+      // 1 段サブドメインの fbcdn.net も scontent- prefix 限定で許可する。
+      // `tracking.fbcdn.net` / `video.fbcdn.net` 等の非画像 CDN への代理 fetch を
+      // 防ぐため、上の 2 段パターン（fna.fbcdn.net 系）に加えてこの 1 段パターンも
+      // `scontent-` 限定にする（過剰許可で外部追跡経路化するのを遮断）。
+      /^scontent-[a-z0-9-]+\.fbcdn\.net$/,
+    ]),
+    tiktok: Object.freeze([
+      /^p\d*-sign[a-z0-9-]*\.tiktokcdn(-us)?\.com$/,
+      /^p\d*-pu[a-z0-9-]*\.tiktokcdn(-us)?\.com$/,
+      /^[a-z0-9-]+\.tiktokcdn(-us)?\.com$/,
+      /^[a-z0-9-]+\.tiktokcdn-us\.com$/,
+    ]),
+  }),
+
+  /**
+   * `location.hostname` から対応サイトを判定し、HOSTS の値（"instagram" / "tiktok"）
+   * または null を返す。`*.instagram.com` / `*.tiktok.com` のサブドメインも認識。
+   */
+  detectHost(loc) {
+    if (!loc || typeof loc.hostname !== "string") return null;
+    const host = loc.hostname.toLowerCase();
+    if (host === "instagram.com" || host.endsWith(".instagram.com")) {
+      return ImageDownloader.HOSTS.INSTAGRAM;
+    }
+    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
+      return ImageDownloader.HOSTS.TIKTOK;
+    }
+    return null;
+  },
+
+  /**
+   * `{host}_{YYYYMMDD_HHMMSS}.{ext}` 形式のファイル名を生成。
+   * ext は MIME タイプから抽出（`image/jpeg` → `jpg`、`image/webp` → `webp`、`image/png` → `png`）。
+   * 不明な MIME は `jpg` にフォールバック（Instagram / TikTok の画像はほぼ jpg/webp）。
+   */
+  buildFilename(host, mimeType) {
+    const safeHost = ImageDownloader._isValidHost(host) ? host : "image";
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mi = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+    const stamp = `${yyyy}${mm}${dd}_${hh}${mi}${ss}`;
+    const ext = ImageDownloader._mimeToExt(mimeType);
+    return `${safeHost}_${stamp}.${ext}`;
+  },
+
+  _isValidHost(host) {
+    return host === "instagram" || host === "tiktok";
+  },
+
+  /**
+   * URL が指定 host (`"instagram"` / `"tiktok"`) のホワイトリスト CDN に
+   * 該当するかを判定。`new URL()` で hostname を取り出して ALLOWED_HOSTS と照合する。
+   * 不正 URL や非 http(s) スキームは false。
+   */
+  isAllowedFetchUrl(host, url) {
+    if (!ImageDownloader._isValidHost(host)) return false;
+    if (typeof url !== "string" || !url) return false;
+    let hostname;
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+      hostname = u.hostname.toLowerCase();
+    } catch (_err) {
+      return false;
+    }
+    const allowed = ImageDownloader.ALLOWED_HOSTS[host];
+    if (!allowed) return false;
+    for (const pattern of allowed) {
+      if (typeof pattern === "string") {
+        if (hostname === pattern) return true;
+      } else if (pattern instanceof RegExp) {
+        if (pattern.test(hostname)) return true;
+      }
+    }
+    return false;
+  },
+
+  /** MIME タイプから拡張子を返す。不明な MIME は jpg にフォールバック。 */
+  _mimeToExt(mimeType) {
+    if (typeof mimeType !== "string") return "jpg";
+    const m = mimeType.toLowerCase();
+    if (m === "image/jpeg" || m === "image/jpg") return "jpg";
+    if (m === "image/png") return "png";
+    if (m === "image/webp") return "webp";
+    if (m === "image/gif") return "gif";
+    if (m === "image/heic") return "heic";
+    return "jpg";
   },
 });
 
@@ -784,9 +1036,10 @@ const VolumeBooster = Object.freeze({
   NORMALIZE_SILENCE_GATE_DB: -38,
   /**
    * 自動音量正規化: 小さい音源を持ち上げる最大量。
-   * 過剰持ち上げ時の不自然さ（環境ノイズの増幅・喋り検出時の急減衰）を抑えるため 9 → 6 に絞る。
+   * +12dB (4倍ブースト) まで持ち上げて、YouTube 側スライダーで音量を 25% に下げても元の音量に戻せるようにする。
+   * 過剰持ち上げによる環境ノイズの増幅は dead zone と silence gate (-38 dB) で抑制する設計。
    */
-  NORMALIZE_MAX_GAIN_DB: 6,
+  NORMALIZE_MAX_GAIN_DB: 12,
   /** 自動音量正規化: 大きい音源を下げる最大量。 */
   NORMALIZE_MIN_GAIN_DB: -12,
   /**
@@ -802,11 +1055,11 @@ const VolumeBooster = Object.freeze({
   NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 2.0,
   /**
    * 自動音量正規化: 音が小さいときに上げる追従速度。
-   * 「サスペンションダンパー」イメージで上下とも遅く動かす方針。
-   * 8.0s ≒ 3τ で 24 秒で 95% 到達。言葉の隙間（数百 ms 〜 数秒オーダー）では実質ノーリアクションで、
-   * 数十秒〜数分スパンの「動画ごとの平均音量差」だけを丁寧に揃える挙動になる。
+   * 4.0s ≒ 3τ で 12 秒で 95% 到達。動画ごとの音量差を 10〜15 秒で揃えつつ、
+   * 言葉の隙間（数百 ms オーダー）では実質ノーリアクションで BGM のうねりを抑える設計。
+   * DOWN (2.0s) より遅く設定することで、句末 BGM の立ち上がりよりは緩やかに上げる。
    */
-  NORMALIZE_GAIN_UP_TIME_CONSTANT: 8.0,
+  NORMALIZE_GAIN_UP_TIME_CONSTANT: 4.0,
   /**
    * 自動音量正規化: ヒステリシス（dead zone）。目標ゲインと現在ターゲットの差がこの dB 値
    * 未満ならゲイン更新をスキップし、細かい RMS 揺れによるポンピングを抑える。
@@ -815,21 +1068,30 @@ const VolumeBooster = Object.freeze({
   NORMALIZE_DEAD_ZONE_DB: 3,
   /**
    * ナイトモード用コンプレッサー（ダイナミックレンジを縮める）。
-   * 旧 ratio:2.5 / release:0.4 はゲーム配信で爆音抑制する用途には合うが、BGM + ナレーションの
-   * 動画では「喋りが圧縮 → やめた瞬間に release で BGM が立ち上がる」現象が起きやすい。
    *
-   * ratio:2.0 / release:1.0s に緩和して、語間の音量変動を耳に付かない速度に落とす。
-   * Web Audio API の DynamicsCompressorNode.release は **nominal range [0, 1]** で
-   * 1.2 を渡すと Chrome が "outside nominal range; value will be clamped" 警告を出して
-   * 1.0 に clamp する。元々 1.2s を狙っていた理由（喋り句末から次の喋り出しまでより長い
-   * release で BGM の立ち上がりを抑える）は、上限の 1.0s でもほぼ達成できる
-   * （典型句末-次句頭が 200〜800ms なので 1.0s でも文の途中では release し切らない）。
-   * threshold/knee/attack は変更なし（瞬間ピーク抑制の役割は維持）。
+   * 履歴:
+   * - 旧 ratio:2.5 / release:0.4 はゲーム配信の爆音抑制向きだが、BGM + ナレーション動画で
+   *   「喋りが圧縮 → やめた瞬間に release で BGM が立ち上がる」ポンピングが目立った。
+   * - 中間 threshold:-18 / ratio:2.0 / release:1.0s は語間ポンピングは抑えられたものの、
+   *   「圧縮が弱くて大きい音と小さい音の幅が広すぎる」という体感問題が残った。
+   *
+   * 現行 threshold:-30 / knee:12 / ratio:4.0 / release:1.0s:
+   *   - threshold を -18 → -30 dBFS まで下げ、ダイアログ帯（-22〜-28 dBFS RMS）を確実に
+   *     圧縮対象に収める。typical な action 動画の 24dB ダイナミックレンジ（softest -30dB,
+   *     loudest -6dB）が圧縮後 6dB 程度（-30 → -24dB）に縮まり、夜間視聴で大きい音が
+   *     飛び出してこなくなる。
+   *   - ratio を 2.0 → 4.0 に倍化。ratio:4 は放送向け圧縮の標準値で、aggressive すぎず
+   *     dynamic range をしっかり潰せる落としどころ。
+   *   - knee を 8 → 12 dB に広げて、threshold 越えの折れ目を滑らかにし「圧縮感」を耳に
+   *     付かなくする。dialog 中心帯が knee 内で扱われるため、自然なフェード圧縮になる。
+   *   - release は引き続き 1.0s（Chrome の nominal max）で句末ポンピング抑制を維持。
+   * threshold/knee/attack/release を強めても 1ms 未満のピークは antiClipNode (limiter)
+   * が後段で受け止めるため、瞬間ピーク抑制の二段構えは崩れない。
    */
   NIGHT_MODE_PRESET: Object.freeze({
-    threshold: -18,
-    knee: 8,
-    ratio: 2.0,
+    threshold: -30,
+    knee: 12,
+    ratio: 4.0,
     attack: 0.02,
     release: 1.0,
   }),
@@ -965,9 +1227,9 @@ const ColorPicker = Object.freeze({
  * @readonly Popup のタブ識別子。
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
- * Instagram / カラーピッカー」の 4 つに再編。アコーディオンを廃止して
- * YouTube クリーナー (22 機能) と Instagram クリーナー (10 機能) を
- * 専用タブで直接表示する設計に移行した。
+ * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
+ * YouTube クリーナー (29 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
+ * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
  */
@@ -975,10 +1237,11 @@ const PopupTabs = Object.freeze({
   TUNE: "tune",
   YOUTUBE: "youtube",
   INSTAGRAM: "instagram",
+  TIKTOK: "tiktok",
   PICKER: "picker",
-  ALL: Object.freeze(["tune", "youtube", "instagram", "picker"]),
+  ALL: Object.freeze(["tune", "youtube", "instagram", "tiktok", "picker"]),
 
-  /** 4 つのタブ識別子のいずれかなら true */
+  /** 5 つのタブ識別子のいずれかなら true */
   isValid(value) {
     return PopupTabs.ALL.includes(value);
   },
@@ -989,7 +1252,7 @@ const PopupTabs = Object.freeze({
   },
 
   /**
-   * 旧値 "assist" を "tune" に変換しつつ正規化。background の `onInstalled`
+   * 旧値 "assist" を "tune" に変換しつつ正規化する。background の `onInstalled`
    * マイグレーションと、popup 起動時のフォールバック読み出しの両方で使う。
    */
   migrate(value) {
@@ -1011,6 +1274,8 @@ const PopupTabs = Object.freeze({
   globalThis.SearchFixer = SearchFixer;
   globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
   globalThis.InstagramCleaner = InstagramCleaner;
+  globalThis.TikTokCleaner = TikTokCleaner;
+  globalThis.ImageDownloader = ImageDownloader;
   globalThis.VolumeBooster = VolumeBooster;
   globalThis.VideoGamma = VideoGamma;
   globalThis.ColorPicker = ColorPicker;

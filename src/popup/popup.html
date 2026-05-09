@@ -41,9 +41,15 @@
         <span class="tabbar-label">Instagram</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
+      <button type="button" id="tabTikTok" class="tabbar-btn"
+              role="tab" aria-selected="false" aria-controls="panelTikTok" tabindex="-1">
+        <span class="tabbar-no" aria-hidden="true">04</span>
+        <span class="tabbar-label">TikTok</span>
+        <span class="tabbar-rule" aria-hidden="true"></span>
+      </button>
       <button type="button" id="tabPicker" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelPicker" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">04</span>
+        <span class="tabbar-no" aria-hidden="true">05</span>
         <span class="tabbar-label">カラーピッカー</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
@@ -59,7 +65,18 @@
         <span class="grp-title-text">オーディオ</span>
       </h2>
 
-      <!-- 音量ブースターはマスタートグルなしの常時表示。100% でリソース解放、それ以外で増幅。 -->
+      <label class="toggle-row" id="volumeBoosterToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔊</span>
+        <span class="tr-text">
+          <span class="tr-name">音量ブースター</span>
+          <span class="tr-desc">タブの音声を増幅・補正します。設定はタブ切替で自動適用されます</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="volumeBoosterToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
       <div class="sub-block slider-center-mark" id="volumeRow">
         <div class="sub-head">
           <span class="sub-label">
@@ -221,7 +238,7 @@
           <span class="tr-icon" aria-hidden="true">🧹</span>
           <span class="tr-text">
             <span class="tr-name">YouTube クリーナー</span>
-            <span class="tr-desc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示など 22 サブ機能を一括管理</span>
+            <span class="tr-desc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 29 サブ機能を一括管理</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="searchFixerToggle" />
@@ -243,7 +260,7 @@
 
     </div><!-- /panel.youtube -->
 
-    <!-- ===== Panel: Instagram (クリーナー 10 機能) ===== -->
+    <!-- ===== Panel: Instagram (クリーナー 11 機能) ===== -->
     <div class="panel panel--instagram" id="panelInstagram"
          role="tabpanel" aria-labelledby="tabInstagram" hidden>
 
@@ -277,6 +294,41 @@
       </section>
 
     </div><!-- /panel.instagram -->
+
+    <!-- ===== Panel: TikTok (クリーナー 3 機能) ===== -->
+    <div class="panel panel--tiktok" id="panelTikTok"
+         role="tabpanel" aria-labelledby="tabTikTok" hidden>
+
+      <section class="grp" aria-label="TikTok">
+        <h2 class="grp-title">
+          <span class="grp-title-text">TikTok</span>
+          <span class="grp-pill" id="tiktokCleanerPill"></span>
+        </h2>
+
+        <label class="toggle-row" id="tiktokCleanerToggleRow">
+          <span class="tr-icon" aria-hidden="true">🎵</span>
+          <span class="tr-text">
+            <span class="tr-name">TikTok クリーナー</span>
+            <span class="tr-desc">コメント欄 / おすすめのアカウントなどの冗長 UI を一括非表示</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="tiktokCleanerToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <div class="cleaner-detail">
+          <p class="cleaner-hint">
+            マスタートグル（クリーナー）が ON のときだけ動作します。
+            個別に ON / OFF を選んでカスタマイズしてください。
+          </p>
+
+          <!-- カテゴリブロックは popup.js が TikTokCleaner.FEATURES から生成する -->
+          <div id="ttFeatureCategories"></div>
+        </div>
+      </section>
+
+    </div><!-- /panel.tiktok -->
 
     <!-- ===== Panel: Picker (顔料アトリエ) ===== -->
     <div class="panel panel--picker" id="panelPicker"

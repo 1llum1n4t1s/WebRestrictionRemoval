@@ -55,7 +55,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     .remove([
       "copyPasteSettings",
       "enabled",
-      "volumeBoosterEnabled",
       "contextMenuAllowDomains",
       "ytShortsRemovalEnabled",
       "popupCleanerAccordionOpen",
@@ -85,6 +84,10 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
+    StorageKeys.TIKTOK_CLEANER_ENABLED,
+    StorageKeys.TIKTOK_CLEANER_FEATURES,
+    StorageKeys.VOLUME_BOOSTER_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
@@ -124,6 +127,18 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.INSTAGRAM_CLEANER_FEATURES in stored)) {
     defaults[StorageKeys.INSTAGRAM_CLEANER_FEATURES] = InstagramCleaner.mergeFeatures({});
+  }
+  if (!(StorageKeys.TIKTOK_CLEANER_ENABLED in stored)) {
+    defaults[StorageKeys.TIKTOK_CLEANER_ENABLED] = false;
+  }
+  if (!(StorageKeys.TIKTOK_CLEANER_FEATURES in stored)) {
+    defaults[StorageKeys.TIKTOK_CLEANER_FEATURES] = TikTokCleaner.mergeFeatures({});
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_ENABLED] = false;
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_LAST_GAIN in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] = VolumeBooster.DEFAULT;
   }
   if (!(StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] = false;
@@ -189,12 +204,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
-  } else if (request.action === Actions.VOLUME_BOOSTER_GET_GAIN) {
-    if (!SenderCheck.isFromPopup(sender)) return;
-    getVolumeBoosterGain(request.data?.tabId)
-      .then((res) => sendResponse(res))
-      .catch(() => sendResponse({ gain: null }));
-    return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_RELEASE_TAB) {
     if (!SenderCheck.isFromPopup(sender)) return;
     releaseVolumeBoosterTab(request.data?.tabId)
@@ -219,6 +228,74 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     .catch(() => {})
     .finally(() => scheduleOffscreenClose());
 });
+
+// ---------- 音量ブースター: マスター ON 時にタブ切替で自動適用 ----------
+//
+// `tabs.onActivated` はタブ切替のたびに発火するため、毎回 storage.get を 5 キー
+// 発行すると IPC RTT がタブ切替遅延に響く。SW モジュールスコープで一度だけ取得して
+// `chrome.storage.onChanged` で invalidate する方式にする (/rere C 2-A)。
+// 注: SW 再起動でこの変数は消えるため、初回呼び出し時の null フォールバックは必須。
+let cachedVolumeSettings = null;
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  autoApplyVolumeBooster(tabId).catch(() => {});
+});
+
+async function autoApplyVolumeBooster(tabId) {
+  // getMediaStreamId は user gesture 必須なので、onActivated では新規 AudioContext を作れない。
+  // 既に boost 中のタブに対して最新の保存設定を反映する用途に限定する。
+  // 未 boost タブへの初回適用は popup 表示時の pushVolumeNow (user gesture あり) が担う。
+  if (!boostedTabIds.has(tabId)) return;
+  if (cachedVolumeSettings === null) {
+    cachedVolumeSettings = await chrome.storage.local.get([
+      StorageKeys.VOLUME_BOOSTER_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
+      StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    ]);
+  }
+  const stored = cachedVolumeSettings;
+  if (stored[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) return;
+  const gain = VolumeBooster.clampValue(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT);
+  const antiClip = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
+  const normalize = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
+  const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
+  await setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode);
+}
+
+// ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
+chrome.storage.onChanged.addListener((changes) => {
+  // 5 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
+  if (
+    StorageKeys.VOLUME_BOOSTER_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_LAST_GAIN in changes ||
+    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes
+  ) {
+    cachedVolumeSettings = null;
+  }
+  if (
+    StorageKeys.VOLUME_BOOSTER_ENABLED in changes &&
+    changes[StorageKeys.VOLUME_BOOSTER_ENABLED].newValue === false
+  ) {
+    releaseAllVolumeBoosterTabs();
+  }
+});
+
+async function releaseAllVolumeBoosterTabs() {
+  const tabIds = [...boostedTabIds];
+  if (tabIds.length > 0) {
+    await Promise.all(tabIds.map((id) => releaseVolumeBoosterTab(id).catch(() => {})));
+  } else if (offscreenState !== "CLOSED") {
+    // SW 再起動後 boostedTabIds は空だが offscreen に残存 AudioContext があるかもしれない
+    await chrome.runtime
+      .sendMessage({ target: Offscreen.TARGET, action: Offscreen.ACTION_VOLUME_RELEASE_ALL })
+      .catch(() => {});
+    scheduleOffscreenClose();
+  }
+}
 
 async function getActiveTab() {
   // SW 再起動直後やウィンドウ未検出の境界条件で chrome.tabs.query が throw することがあるため
@@ -274,6 +351,8 @@ function normalizeSettings(settings) {
     amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
     instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
+    tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
+    tiktokCleanerFeatures: TikTokCleaner.mergeFeatures(settings?.tiktokCleanerFeatures),
     videoGammaEnabled: settings?.videoGammaEnabled === true,
     videoGammaValue: VideoGamma.clampValue(settings?.videoGammaValue),
   };
@@ -292,6 +371,8 @@ function toStorageRecord(s) {
     [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
+    [StorageKeys.TIKTOK_CLEANER_ENABLED]: s.tiktokCleanerEnabled,
+    [StorageKeys.TIKTOK_CLEANER_FEATURES]: s.tiktokCleanerFeatures,
     [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
     [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
   };
@@ -380,6 +461,18 @@ async function notifyContentScripts(s) {
       }, TOP_FRAME)
       .catch(() => {});
   }
+
+  if (isTikTokUrl(url)) {
+    await chrome.tabs
+      .sendMessage(tab.id, {
+        action: Actions.APPLY_TIKTOK_CLEANER_CS,
+        data: {
+          enabled: s.tiktokCleanerEnabled,
+          features: s.tiktokCleanerFeatures,
+        },
+      }, TOP_FRAME)
+      .catch(() => {});
+  }
 }
 
 function isYouTubeUrl(url) {
@@ -410,6 +503,17 @@ function isInstagramUrl(url) {
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
     const h = u.hostname.toLowerCase();
     return h === "instagram.com" || h.endsWith(".instagram.com");
+  } catch {
+    return false;
+  }
+}
+
+function isTikTokUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    return h === "tiktok.com" || h.endsWith(".tiktok.com");
   } catch {
     return false;
   }
@@ -693,7 +797,9 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode)
         nightMode: nightModeFlag,
       });
     } catch (err) {
-      // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー
+      // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー。
+      // silent failure を防ぐため診断ログを残す（実害は fresh 経路で自己修復されるため軽微）。
+      console.warn("[WebViewingAssist] existing-path sendMessage failed, falling through:", err);
     }
     // EC-2 対策: getVolumeBoosterGain で「state あり」と判定後に audioStates が削除される
     // race（onRemoved や release 経路と同時操作）に対して、offscreen が
@@ -769,23 +875,6 @@ async function getVolumeBoosterGainDirect(tabId) {
   } catch {
     return { gain: null };
   }
-}
-
-async function getVolumeBoosterGain(tabId) {
-  if (typeof tabId !== "number") return { gain: null };
-  // popup の syncCurrentTabVolume 経路は offscreen の存在が未確定なので getContexts で
-  // 早期 return できるようにする（無駄な sendMessage を抑制）。
-  try {
-    const url = chrome.runtime.getURL(Offscreen.PATH);
-    const contexts = await chrome.runtime.getContexts({
-      contextTypes: ["OFFSCREEN_DOCUMENT"],
-      documentUrls: [url],
-    });
-    if (contexts.length === 0) return { gain: null };
-  } catch {
-    return { gain: null };
-  }
-  return await getVolumeBoosterGainDirect(tabId);
 }
 
 /**

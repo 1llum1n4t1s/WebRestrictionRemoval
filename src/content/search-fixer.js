@@ -9,7 +9,7 @@
  *
  * 役割:
  *   - 検索結果ページ（/results）で `MutationObserver` を起動し、ノイズ要素を `removeDistractions()` で除去
- *   - 動画ページ（/watch）でタイトル中央配置・説明文フル幅クラスを切り替え
+ *   - 動画ページ（/watch）でコメント欄・ライブチャット欄非表示クラスを切り替え
  *   - ホームのリッチグリッドに列数 CSS を注入（4/5/6 のみ、0 は YouTube 既定）
  *   - 検索結果ページのキーワード非マッチ動画を `yt-ext-demoted` クラスでデモート（CSS 側でグレー化）
  *
@@ -55,8 +55,91 @@
   let liveChatCollapseRetryTimer = 0;
   /** リトライ試行回数（0 始まり）。LIVE_CHAT_COLLAPSE_RETRY_DELAYS のインデックスを進める。 */
   let liveChatCollapseRetryAttempt = 0;
-  /** 指数バックオフのディレイ（ms）。close button hydration の典型タイミングをカバーする幅で設定。 */
-  const LIVE_CHAT_COLLAPSE_RETRY_DELAYS = Object.freeze([200, 600, 1500]);
+  /** 指数バックオフのディレイ（ms）。close button hydration の典型タイミングをカバーする幅で設定。
+   *  pre クラス (visibility:hidden) で見た目は即時に隠れているため、初回試行は短く取って
+   *  hydration 完了次第すぐ click → pre クラス剥がし → 公式 collapsed bar 表示、を最速化する。 */
+  const LIVE_CHAT_COLLAPSE_RETRY_DELAYS = Object.freeze([50, 200, 800]);
+
+  /** hideLiveChat の先制非表示クラス。`<html>` に付ける。
+   *  - 付与: youtube-early.js (document_start) / onNavigationStart (SPA start) /
+   *         syncLiveChatCollapse (SPA finish)
+   *  - 削除: clearLiveChatPreHide() 経由で 3 か所 (click 成功 / retry 上限 / detach)
+   *  CSS 側 (`html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame { display: none }`)
+   *  + youtube-early.js の MutationObserver による inline force-hide で frame を完全に
+   *  見えなくして体感ラグを消す。 */
+  const LIVE_CHAT_PRE_HIDE_CLASS = "__cpa-sfx-hide-live-chat-pre";
+  /** youtube-early.js が frame に当てる inline `display:none !important` のマーカー属性。
+   *  pre クラス削除時にこれが付いた frame の inline display も剥がす必要がある。 */
+  const LIVE_CHAT_FORCE_HIDE_ATTR = "data-cpa-force-hide";
+
+  /** hideLiveChat の先制非表示を全部剥がす共通 helper。
+   *  - `<html>` から pre クラスを剥がす
+   *  - youtube-early.js が frame に当てた inline `display:none !important` を剥がす
+   *  - youtube-early.js の MutationObserver は **disconnect しない** (storage.onChanged
+   *    や SPA 遷移で pre クラスが再付与されたとき、新 frame に再度 force-hide できるよう
+   *    常時維持)。observer 側で pre クラス無し guard により実質 no-op になる。 */
+  function clearLiveChatPreHide() {
+    cancelPreHideRelease();
+    document.documentElement.classList.remove(LIVE_CHAT_PRE_HIDE_CLASS);
+    document
+      .querySelectorAll(
+        'ytd-live-chat-frame[' + LIVE_CHAT_FORCE_HIDE_ATTR + '="1"]'
+      )
+      .forEach((el) => {
+        el.style.removeProperty("display");
+        el.removeAttribute(LIVE_CHAT_FORCE_HIDE_ATTR);
+      });
+  }
+
+  /** click 成功後に frame の collapsed 化を待つ rAF id (二重起動防止)。 */
+  let preHideReleaseRaf = 0;
+  /** click 成功後の collapsed 待ち最大フレーム数 (60fps なら ≈500ms)。 */
+  const PRE_HIDE_RELEASE_MAX_FRAMES = 30;
+
+  function cancelPreHideRelease() {
+    if (preHideReleaseRaf !== 0) {
+      cancelAnimationFrame(preHideReleaseRaf);
+      preHideReleaseRaf = 0;
+    }
+  }
+
+  /**
+   * click 成功直後に pre クラスを即剥がすと、YouTube が frame の collapsed transition を
+   * DOM 反映する前に display:none が解除されて frame default expand state が paint
+   * されてしまう（Edge 動画キャプチャで約 270ms expand 表示が見える現象を確認）。
+   *
+   * このため click 成功後は **frame に `collapsed` 属性が付くまで rAF で polling**
+   * して、確認できたら pre クラス + inline force-hide を剥がす。タイムアウト
+   * (PRE_HIDE_RELEASE_MAX_FRAMES) で fallback 剥がし。
+   */
+  function schedulePreHideRelease() {
+    cancelPreHideRelease();
+    let attempts = 0;
+    const tick = () => {
+      preHideReleaseRaf = 0;
+      // 機能 OFF / 別ページ遷移なら detach 経路で剥がされるためここでは何もしない
+      if (!f("hideLiveChat") || !isWatchPage()) return;
+      const frame = document.querySelector("ytd-live-chat-frame");
+      if (!frame) {
+        // frame が消えた → pre クラス意味なしなので剥がし
+        clearLiveChatPreHide();
+        return;
+      }
+      // YouTube が collapsed state に切り替えた indicator
+      // (frame の `collapsed` 属性が立てば transition 完了。通常 click 後 1〜数フレーム)
+      if (frame.hasAttribute("collapsed")) {
+        clearLiveChatPreHide();
+        return;
+      }
+      if (++attempts >= PRE_HIDE_RELEASE_MAX_FRAMES) {
+        // タイムアウト fallback (collapsed attribute が出ない場合も諦めて剥がす)
+        clearLiveChatPreHide();
+        return;
+      }
+      preHideReleaseRaf = requestAnimationFrame(tick);
+    };
+    preHideReleaseRaf = requestAnimationFrame(tick);
+  }
 
   // 注入する <style> 要素の id（CSS 文字列を更新するときの参照キー）
   const STYLE_ID_HOME_GRID = "__cpa-sfx-home-grid-style";
@@ -136,6 +219,19 @@
 
   /** SPA ナビゲーション開始時の cleanup。CLASS_PROCESSED を剥がし新クエリでの再判定を許可する。 */
   function onNavigationStart() {
+    // SPA navigate (yt-navigate-start) の段階で hideLiveChat 用の pre クラスを先制付与する。
+    // 理由: yt-navigate-finish 後の syncLiveChatCollapse まで待つと、その間に YouTube が
+    //      新ページの ytd-live-chat-frame を expand 状態に戻す瞬間が paint されて
+    //      「一瞬チャット枠が見える」現象が起きる (Edge の Performance Trace で確認)。
+    //      YouTube は SPA で frame 要素を再利用するため、新ページ遷移時に DOM 追加ではなく
+    //      既存 frame の display/state が即座に切り替わる。pre クラス (CSS で
+    //      `display: none !important`) を付けておけば切替瞬間も含めて見えない。
+    // 副作用: hideLiveChat OFF / watch 以外のページでも一瞬付くが、frame が無いページは
+    //        CSS rule マッチせず副作用ゼロ。frame があり hideLiveChat OFF のページは
+    //        yt-navigate-finish 後の syncLiveChatCollapse で OFF 判定で剥がされる。
+    if (f("hideLiveChat")) {
+      document.documentElement.classList.add(LIVE_CHAT_PRE_HIDE_CLASS);
+    }
     if (!active) return;
     document
       .querySelectorAll(`.${CLASS_PROCESSED}`)
@@ -231,6 +327,9 @@
       detachLiveChatObserver();
       return;
     }
+    // SPA 遷移経路でも先制非表示を即時 ON にする（初回直アクセスは youtube-early.js が
+    // document_start で同クラスを付与済みなので idempotent）。click 成功時に剥がす。
+    document.documentElement.classList.add(LIVE_CHAT_PRE_HIDE_CLASS);
     attachLiveChatObserver();
     scheduleLiveChatCollapse();
   }
@@ -303,8 +402,10 @@
       liveChatCollapseRaf = 0;
     }
     cancelLiveChatCollapseRetry();
-    // hideLiveChat OFF / 別ページ遷移時は force-hide クラスを剥がして元の表示状態に戻す。
-    // クラスを残したままだと、機能 OFF 後もライブチャット枠が表示されないバグになる。
+    // hideLiveChat OFF / 別ページ遷移時は先制非表示クラスも inline force-hide も
+    // 旧 force-hide クラスも剥がして元の表示状態に戻す。クラスを残したままだと、
+    // 機能 OFF 後もライブチャット枠が表示されない / 先制非表示で見えないままになる。
+    clearLiveChatPreHide();
     document
       .querySelectorAll("ytd-live-chat-frame." + LIVE_CHAT_FORCE_HIDE_CLASS)
       .forEach((el) => el.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS));
@@ -334,7 +435,16 @@
       return;
     }
     if (liveChatCollapseRetryTimer !== 0) return;
-    if (liveChatCollapseRetryAttempt >= LIVE_CHAT_COLLAPSE_RETRY_DELAYS.length) return;
+    if (liveChatCollapseRetryAttempt >= LIVE_CHAT_COLLAPSE_RETRY_DELAYS.length) {
+      // リトライ上限到達: close button が見つからない状態が続いている（live chat なし
+      // 動画 / hydration 異常など）。pre クラスで frame を永久に隠したままにすると
+      // ユーザーが「ライブチャット枠が完全に消えた」状態に陥るため、fail-safe で
+      // pre クラス + inline force-hide 両方を剥がす。別契機（iframe load / observer）で
+      // 再 trigger されたら syncLiveChatCollapse 経由で再度 pre クラスが立ち、
+      // また 0 番からバックオフ再開する。
+      clearLiveChatPreHide();
+      return;
+    }
     const delay = LIVE_CHAT_COLLAPSE_RETRY_DELAYS[liveChatCollapseRetryAttempt];
     liveChatCollapseRetryAttempt += 1;
     liveChatCollapseRetryTimer = setTimeout(() => {
@@ -379,15 +489,18 @@
     if (!iframe || iframe.__cpaLiveChatLoadAttached === true) return;
     iframe.__cpaLiveChatLoadAttached = true;
     iframe.addEventListener("load", () => {
-      // load 直後は YouTube 側の hydration が走っている最中なので、少し待ってから再評価。
-      // ChromeMCP の検証では load 後数百ms 以内に close button が ready になる挙動を確認。
+      // load 直後は YouTube 側の hydration が走っている最中だが、pre クラス
+      // (visibility:hidden) で見た目はすでに隠れているため、待ち時間を最小に絞って
+      // 早期 click → pre クラス剥がし → 公式 collapsed bar 表示、を最速化する。
+      // close button が未 hydration なら scheduleLiveChatCollapseRetry が指数バックオフ
+      // で吸収する（[50, 200, 800] ms）。
       // 新しいロード契機なのでリトライカウンタをリセットして 0 番からバックオフできるようにする。
       setTimeout(() => {
         if (f("hideLiveChat") && isWatchPage()) {
           cancelLiveChatCollapseRetry();
           collapseLiveChatIfNeeded();
         }
-      }, 300);
+      }, 50);
     });
     // 「listener 登録時には既に iframe が load 完了済み」のケース対策。
     // SPA 遷移の順序によっては、ytd-live-chat-frame 出現 → iframe 出現 → iframe load 発火
@@ -607,6 +720,13 @@
       fireUserLikeClick(closeBtn);
     }
 
+    // click 成功 *直後* に pre クラスを剥がすと、YouTube が frame の collapsed
+    // transition を DOM 反映する前に display:none が解除されて、frame default expand
+    // state が paint されてしまう（Edge 動画キャプチャで約 270ms expand 表示を確認）。
+    // 解決: frame に `collapsed` 属性が付くまで rAF polling、付いたら剥がす。
+    // タイムアウト 30 フレーム (≈500ms) で fallback 剥がし。
+    schedulePreHideRelease();
+
     // 旧バージョン残骸の force-hide クラス cleanup（過去拡張機能で frame に付与された
     // クラスが残っている場合のみ作用、新方式では二度と付与しない）。
     document
@@ -791,7 +911,22 @@
    */
   const FEED_PLAYLIST_BADGE_RE = /^\d+\s*本の動画$|^\d+\s*videos?$/i;
   const FEED_MIX_BADGE_TEXT = "ミックスリスト";
-  const FEED_LIVE_BADGE_TEXTS = new Set(["LIVE", "PREMIERE", "ライブ配信中", "プレミア公開"]);
+  // YouTube は時期によりバッジ表記を短縮する（例: "ライブ配信中" → "ライブ" / "プレミア公開" → "プレミア"）。
+  // 現行 (2026-05) は短縮表記。legacy 表記も残しておけば古い動画 retain 表示にも対応できる。
+  // "ステーション" = YouTube が機械生成する BGM 無限放送（ジャンル別ライブ風コンテンツ）。
+  // DOM 上も `ytBadgeShapeThumbnailLive` クラスが付くので Live バッジの variant 扱い。
+  const FEED_LIVE_BADGE_TEXTS = new Set([
+    "LIVE", "PREMIERE",
+    "ライブ", "ライブ配信中",
+    "プレミア", "プレミア公開",
+    "ステーション",
+  ]);
+  // メンバーシップ限定動画のサムネバッジ。日英ロケール両対応。
+  // 推測実装: 動かなかったら DOM ログから実表記に追従する。
+  const FEED_MEMBERS_ONLY_BADGE_TEXTS = new Set([
+    "メンバー限定",
+    "Members only",
+  ]);
 
   function purgeFeedDistractions() {
     if (!isFeedPage()) return;
@@ -832,12 +967,27 @@
       }
     }
 
+    // 「ニュース速報」セクションも独立 DOM (ytd-rich-section-renderer)。
+    // 内側 renderer 種別はトピックスとは異なる可能性があるため has() で限定せず、
+    // section title に出現する固有文字列「ニュース速報」/「Breaking news」のみで識別する。
+    if (f("removeBreakingNewsSection")) {
+      const sections = document.querySelectorAll("ytd-rich-section-renderer");
+      for (const section of sections) {
+        if (!section.isConnected) continue;
+        const text = section.textContent ?? "";
+        if (text.includes("ニュース速報") || text.includes("Breaking news")) {
+          section.remove();
+        }
+      }
+    }
+
     const checkShortsBtn = f("shortsBtn");
     const checkLive = f("live");
     const checkPlaylist = f("playlist");
     const checkMix = f("mix");
     const checkWatched = f("watched");
-    if (!(checkShortsBtn || checkLive || checkPlaylist || checkMix || checkWatched)) return;
+    const checkMembersOnly = f("membersOnly");
+    if (!(checkShortsBtn || checkLive || checkPlaylist || checkMix || checkWatched || checkMembersOnly)) return;
 
     const lockups = document.querySelectorAll("yt-lockup-view-model");
     for (const lockup of lockups) {
@@ -855,8 +1005,8 @@
       ) {
         shouldRemove = true;
       }
-      // 3. バッジテキスト系（ミックス → プレイリスト → ライブの順で判定）
-      else if (checkMix || checkPlaylist || checkLive) {
+      // 3. バッジテキスト系（ミックス → プレイリスト → ライブ → メンバー限定の順で判定）
+      else if (checkMix || checkPlaylist || checkLive || checkMembersOnly) {
         const badges = Array.from(lockup.querySelectorAll(".ytBadgeShapeHost"));
         const badgeTexts = badges.map((b) => (b.textContent ?? "").trim());
         // ミックス判定（特異性が最も高いので最優先）
@@ -876,7 +1026,14 @@
           shouldRemove = true;
         }
         // ライブ / プレミア判定
+        // サムネ右下バッジが "ライブ" / "ステーション" 等にマッチ → 動画自体がライブ配信
+        // (`.ytSpecAvatarShapeLiveBadge` のチャンネルアバター赤枠は判定しない。
+        //  チャンネル状態とは無関係に「動画自体がライブかどうか」だけで判定する方針)
         else if (checkLive && badgeTexts.some((t) => FEED_LIVE_BADGE_TEXTS.has(t))) {
+          shouldRemove = true;
+        }
+        // メンバー限定判定: チャンネルメンバーシップ加入者のみ視聴可能な動画
+        else if (checkMembersOnly && badgeTexts.some((t) => FEED_MEMBERS_ONLY_BADGE_TEXTS.has(t))) {
           shouldRemove = true;
         }
       }
@@ -979,12 +1136,8 @@
     });
   }
 
-  // ---------- 動画ページ（タイトル中央 / 説明文フル幅 / コメント欄・ライブチャット欄非表示） ----------
+  // ---------- 動画ページ（コメント欄・ライブチャット欄非表示） ----------
   function applyWatchPageClasses() {
-    const titleEl = document.querySelector("#title h1");
-    if (titleEl) titleEl.classList.toggle("__cpa-sfx-title-center", f("centerTitle"));
-    const descEl = document.querySelectorAll("#description")[1];
-    if (descEl) descEl.classList.toggle("__cpa-sfx-desc-full", f("fullWidthDesc"));
     // コメント欄は遅延レンダリング（スクロールで初めて DOM 出現）するため、個別要素 toggle だと
     // 初期ロード時に空振りする。`<html>` クラスで CSS 駆動にすれば後から DOM が現れても即時適用される。
     document.documentElement.classList.toggle("__cpa-sfx-hide-comments", f("hideComments"));
@@ -1166,6 +1319,17 @@
   let leftnavBodyObserver = null;
   /** @type {number} leftnav 再注入の debounce timer */
   let leftnavReinjectTimer = 0;
+  /** @type {number} body 全体監視の callback debounce timer (/rere C 3-C: 数十件/秒の mutation を 100ms 間隔に圧縮) */
+  let leftnavBodyScanTimer = 0;
+  /**
+   * @type {string|null|undefined} YouTube アカウント ID メモ化キャッシュ。
+   * undefined = 未取得 / null or string = キャッシュ済み (page reload まで再評価しない、/rere C 2-E)。
+   */
+  let _cachedYtAccountId = undefined;
+  /** @type {number} fetchSubsList の exponential backoff 上限 (ms、上限 60s) (/rere B1-S2-4) */
+  let subsListFetchBackoffMs = 0;
+  /** @type {number} fetchSubsList が直近で失敗した時刻 (Date.now() 値) */
+  let subsListFetchLastFailedAt = 0;
 
   /** 中央ディスパッチャ: onSettingsChanged から呼ばれる。各機能内で OFF 時 cleanup を実施。 */
   function applySubsFeatures() {
@@ -1195,15 +1359,22 @@
       // section 未出現: body 監視で待つ
       if (!leftnavBodyObserver) {
         leftnavBodyObserver = new MutationObserver(() => {
-          const found = findSubsSection();
-          if (found) {
-            // body 監視は不要になったので停止
-            leftnavBodyObserver?.disconnect();
-            leftnavBodyObserver = null;
-            // 注入と #items 観察 attach
-            scheduleLeftnavReinject();
-            attachItemsObserver(found);
-          }
+          // YouTube ホームでは数十件/秒の childList mutation が発火するため、
+          // findSubsSection() の DOM クエリを 100ms debounce で集約して CPU 負荷を抑制
+          // する (/rere C 3-C)。
+          if (leftnavBodyScanTimer) return;
+          leftnavBodyScanTimer = setTimeout(() => {
+            leftnavBodyScanTimer = 0;
+            const found = findSubsSection();
+            if (found) {
+              // body 監視は不要になったので停止
+              leftnavBodyObserver?.disconnect();
+              leftnavBodyObserver = null;
+              // 注入と #items 観察 attach
+              scheduleLeftnavReinject();
+              attachItemsObserver(found);
+            }
+          }, 100);
         });
         leftnavBodyObserver.observe(document.body || document.documentElement, {
           subtree: true,
@@ -1246,6 +1417,10 @@
       clearTimeout(leftnavReinjectTimer);
       leftnavReinjectTimer = 0;
     }
+    if (leftnavBodyScanTimer) {
+      clearTimeout(leftnavBodyScanTimer);
+      leftnavBodyScanTimer = 0;
+    }
   }
 
   /** 連続 mutation を 1 回の再注入に圧縮するための debounce。 */
@@ -1253,8 +1428,32 @@
     if (leftnavReinjectTimer) return;
     leftnavReinjectTimer = setTimeout(() => {
       leftnavReinjectTimer = 0;
-      applySubsLeftnavInjection();
-      applySubsAllShortcut();
+      // observer guard: 自身の DOM 書き込み (appendChild / insertBefore) が
+      // leftnavInjectObserver の childList:true で再発火するのを防ぐ。
+      // disconnect → render → takeRecords (蓄積分破棄) → observe で再接続する
+      // Amazon 月別合計と同じガードパターン（rere レビュー B1 2-D）。
+      if (leftnavInjectObserver) {
+        try { leftnavInjectObserver.disconnect(); } catch {}
+      }
+      try {
+        applySubsLeftnavInjection();
+        applySubsAllShortcut();
+      } finally {
+        // applySubsLeftnavInjection / applySubsAllShortcut の中で
+        // detachLeftnavObservers → ensureLeftnavObservers が走って leftnavInjectObserver や
+        // leftnavSectionWatched が更新される可能性がある。finally で **状態を再取得**して
+        // stale items に observe したり、新規 observer に観察対象を与え忘れる経路を塞ぐ
+        // (/rere B1-S2-3)。
+        const finalObserver = leftnavInjectObserver;
+        const finalSection = leftnavSectionWatched;
+        if (finalObserver && finalSection) {
+          const freshItems = finalSection.querySelector("#items");
+          if (freshItems) {
+            try { finalObserver.takeRecords(); } catch {}
+            try { finalObserver.observe(freshItems, { childList: true }); } catch {}
+          }
+        }
+      }
     }, 80);
   }
 
@@ -1439,16 +1638,31 @@
       return list;
     }
     if (subsListFetchInFlight) return subsListFetchInFlight;
+    // 直近の失敗から exponential backoff 期間内ならスキップする。社内プロキシ環境で
+    // /feed/channels が 401/302 を返し続ける状況で 80ms 毎の永続リトライを防ぐ
+    // (/rere B1-S2-4)。Cookie/プロキシ改善後の自然回復を妨げないよう上限 60s。
+    if (subsListFetchBackoffMs > 0 && Date.now() - subsListFetchLastFailedAt < subsListFetchBackoffMs) {
+      return null;
+    }
     subsListFetchInFlight = (async () => {
       try {
         const res = await fetch("/feed/channels", { credentials: "same-origin" });
-        if (!res.ok) return null;
+        if (!res.ok) {
+          subsListFetchLastFailedAt = Date.now();
+          subsListFetchBackoffMs = Math.min(60000, Math.max(2000, subsListFetchBackoffMs * 2));
+          return null;
+        }
         const html = await res.text();
         const doc = new DOMParser().parseFromString(html, "text/html");
         const list = parseSubsListFromDocument(doc);
-        if (list.length > 0) writeSubsListCache(list);
+        if (list.length > 0) {
+          writeSubsListCache(list);
+          subsListFetchBackoffMs = 0; // 成功で backoff リセット
+        }
         return list;
       } catch {
+        subsListFetchLastFailedAt = Date.now();
+        subsListFetchBackoffMs = Math.min(60000, Math.max(2000, subsListFetchBackoffMs * 2));
         return null;
       } finally {
         subsListFetchInFlight = null;
@@ -1690,18 +1904,29 @@
    * 取得不能なら null を返す。読み取り側はこのときキャッシュ検証をスキップする (graceful fallback)。
    */
   function getCurrentYouTubeAccountId() {
+    // YouTube のログインセッションは page reload まで変わらない (アカウント切替も
+    // navigate で content script が再起動する) ため module スコープにメモ化する。
+    // <script> タグ 20-50 個 × textContent 文字列検索のコスト削減 (/rere C 2-E)。
+    if (_cachedYtAccountId !== undefined) return _cachedYtAccountId;
     try {
       for (const s of document.querySelectorAll("script")) {
         const t = s.textContent || "";
         if (t.indexOf("DELEGATED_SESSION_ID") === -1 && t.indexOf("SESSION_INDEX") === -1) continue;
         let m = t.match(/"DELEGATED_SESSION_ID":\s*"([^"]+)"/);
-        if (m) return "ds:" + m[1];
+        if (m) {
+          _cachedYtAccountId = "ds:" + m[1];
+          return _cachedYtAccountId;
+        }
         m = t.match(/"SESSION_INDEX":\s*"([^"]*)"/);
-        if (m) return "si:" + m[1];
+        if (m) {
+          _cachedYtAccountId = "si:" + m[1];
+          return _cachedYtAccountId;
+        }
       }
     } catch {
       // 失敗時は null で安全側に倒す
     }
+    _cachedYtAccountId = null;
     return null;
   }
 
@@ -2119,6 +2344,10 @@
         if (oldThumb) oldThumb.remove();
         // SUBS_CARD_MARKER_ATTR を剥がして scheduleSubsGridScan で再 observe させる
         card.removeAttribute(SUBS_CARD_MARKER_ATTR);
+        // YouTube が card を完全再構築 (#avatar が #avatar-section に戻る等) した場合に
+        // 構造スタイリングフェーズ (avatar 移動・info-section レイアウト等) を再適用するため、
+        // styled マーカーも剥がす (/rere B1-S2-7)。
+        card.removeAttribute("data-cpa-subs-styled");
       }
     }
 
@@ -2239,6 +2468,12 @@
    */
   function clearGridCardInlineStyle(card) {
     card.removeAttribute("data-cpa-subs-styled");
+    // ON/OFF 繰り返しでの listener 蓄積防止: data-cpa-card-click を剥がして
+    // 次回 ON 時に新規 listener を 1 つだけ追加させる（古い listener は subsGridState===null guard で no-op 化）。
+    // data-cpa-card-href を剥がしておかないと Polymer dom-repeat で card が別チャンネルに再バインドされた際に
+    // 古い href のまま残って oldThumb 除去の flicker 経路を踏む（rere レビュー C3-3 指摘）。
+    card.removeAttribute("data-cpa-card-click");
+    card.removeAttribute("data-cpa-card-href");
     // applyGridCardInlineStyle が `!important` で setProperty した全 prop を網羅する。
     // `display: flex` が剥がれれば flex 系 prop は無効化されるが、`gap` は grid container でも
     // 有効で、`position: relative` も positioning context として残るため、徹底的に剥がす（Codex P2 指摘）。

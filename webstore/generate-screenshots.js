@@ -21,8 +21,8 @@ const POPUP_SHIM_DST = path.join(__dirname, 'popup-shim.js');
  * shim では:
  *   - storage は空オブジェクトを返す → 全マスタートグル OFF（install 既定状態）
  *   - tabs.query はダミー http タブを返す → 「このページでは使えません」エラーを抑制
- *   - runtime.sendMessage は VOLUME_BOOSTER_GET_GAIN に対し `{ gain: null }` を返す
- *     → 音量スライダーは DEFAULT (100%) のまま
+ *   - runtime.sendMessage は常に `{ ok: true }` を返す
+ *     → 音量スライダーは storage 空 → DEFAULT (100%) のまま
  */
 const POPUP_SHIM_CONTENT = `// ストア素材レンダリング用 chrome.* API shim（generate-screenshots.js が生成、
 // 実拡張機能では Chrome がネイティブに提供）。
@@ -37,10 +37,7 @@ window.chrome = {
     onChanged: { addListener: () => {}, removeListener: () => {} },
   },
   runtime: {
-    sendMessage: (msg) => {
-      if (msg && msg.action === "volumeBoosterGetGain") return Promise.resolve({ gain: null });
-      return Promise.resolve({ ok: true });
-    },
+    sendMessage: () => Promise.resolve({ ok: true }),
     onMessage: { addListener: () => {}, removeListener: () => {} },
     getURL: (p) => p,
     id: "mock-render-extension",

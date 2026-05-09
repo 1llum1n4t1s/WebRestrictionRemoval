@@ -31,6 +31,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $keepAliveToggle = document.getElementById("keepAliveToggle");
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
+  const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
+  const $volumeRow = document.getElementById("volumeRow");
   const $volumeSlider = document.getElementById("volumeSlider");
   const $volumeValue = document.getElementById("volumeValue");
   const $volumeResetBtn = document.getElementById("volumeResetBtn");
@@ -54,6 +56,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $instagramCleanerToggle = document.getElementById("instagramCleanerToggle");
   const $igFeatureCategories = document.getElementById("igFeatureCategories");
   const $instagramCleanerPill = document.getElementById("instagramCleanerPill");
+  const $tiktokCleanerToggle = document.getElementById("tiktokCleanerToggle");
+  const $ttFeatureCategories = document.getElementById("ttFeatureCategories");
+  const $tiktokCleanerPill = document.getElementById("tiktokCleanerPill");
   const $status = document.getElementById("statusMsg");
 
   // ----- ローカル状態 -----
@@ -63,6 +68,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const featureInputs = new Map();
   /** @type {Map<string, HTMLInputElement>} Instagram クリーナーの個別機能入力 */
   const igFeatureInputs = new Map();
+  /** @type {Map<string, HTMLInputElement>} TikTok クリーナーの個別機能入力 */
+  const ttFeatureInputs = new Map();
 
   // ----- スライダー単位は分、storage は ms -----
   const MIN_MIN = Math.round(KeepAlive.MIN_INTERVAL_MS / KeepAlive.MS_PER_MIN);
@@ -77,6 +84,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $gridItemsSelect = document.getElementById("gridItemsSelect");
   buildGridSelect();
   buildInstagramFeatureCategories();
+  buildTikTokFeatureCategories();
 
   // ----- 現在状態を復元 -----
   // 3-C4 最適化: アシスト系 + カラーピッカー系の storage key を 1 回の get で並列取得し、
@@ -93,6 +101,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
+    StorageKeys.TIKTOK_CLEANER_ENABLED,
+    StorageKeys.TIKTOK_CLEANER_FEATURES,
+    StorageKeys.VOLUME_BOOSTER_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
@@ -133,6 +145,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
+  $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
+  $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNormalizeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
@@ -147,13 +161,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateVideoGammaLabel(storedGamma);
   updateVideoGammaRowVisibility();
 
-  // 音量スライダー初期値設定（ブースト中なら active tab の現在値を反映）
+  // 音量スライダー: 保存済み gain があればそれを復元、なければ DEFAULT
   $volumeSlider.min = String(VolumeBooster.SLIDER_MIN);
   $volumeSlider.max = String(VolumeBooster.SLIDER_MAX);
   $volumeSlider.step = String(VolumeBooster.STEP);
-  $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(VolumeBooster.DEFAULT));
-  updateVolumeLabel(VolumeBooster.DEFAULT);
-  syncCurrentTabVolume().catch(() => {});
+  const savedGain = Number.isFinite(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN])
+    ? VolumeBooster.clampValue(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN])
+    : VolumeBooster.DEFAULT;
+  $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(savedGain));
+  updateVolumeLabel(savedGain);
+  updateVolumeBoosterDimState();
+  // マスター ON 時は active tab にも保存設定を即適用（タブ切替で漏れた場合の保証）
+  if ($volumeBoosterToggle.checked) {
+    pushVolumeNow(savedGain).catch(() => {});
+  }
 
   const storedIntervalMs = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
     ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
@@ -174,25 +195,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     input.checked = storedIgFeatures[key] === true;
   }
 
+  const storedTtFeatures = TikTokCleaner.mergeFeatures(stored[StorageKeys.TIKTOK_CLEANER_FEATURES]);
+  for (const [key, input] of ttFeatureInputs) {
+    input.checked = storedTtFeatures[key] === true;
+  }
+
   updateCleanerCountBadge();
   updateCleanerDimState();
   updateIgCleanerCountBadge();
   updateIgCleanerDimState();
+  updateTtCleanerCountBadge();
+  updateTtCleanerDimState();
 
   // ============================================================
   // ===== タブナビ + 顔料アトリエ（カラーピッカー） =====
   // ============================================================
 
   // ---------- DOM 参照 ----------
-  // 4 タブ構成: 調整 (tune) / YouTube / Instagram / カラーピッカー (picker)。
+  // 5 タブ構成: 調整 (tune) / YouTube / Instagram / TikTok / カラーピッカー (picker)。
   // tab/panel ペアを Map で保持し、setActiveTab / 矢印キー操作を統一的に扱う。
   const $tabTune = document.getElementById("tabTune");
   const $tabYoutube = document.getElementById("tabYoutube");
   const $tabInstagram = document.getElementById("tabInstagram");
+  const $tabTikTok = document.getElementById("tabTikTok");
   const $tabPicker = document.getElementById("tabPicker");
   const $panelTune = document.getElementById("panelTune");
   const $panelYoutube = document.getElementById("panelYoutube");
   const $panelInstagram = document.getElementById("panelInstagram");
+  const $panelTikTok = document.getElementById("panelTikTok");
   const $panelPicker = document.getElementById("panelPicker");
 
   /** タブ id → { tab, panel } の対応表。順序は UI と一致させる（矢印キー巡回用）。 */
@@ -200,6 +230,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: PopupTabs.TUNE, tab: $tabTune, panel: $panelTune },
     { id: PopupTabs.YOUTUBE, tab: $tabYoutube, panel: $panelYoutube },
     { id: PopupTabs.INSTAGRAM, tab: $tabInstagram, panel: $panelInstagram },
+    { id: PopupTabs.TIKTOK, tab: $tabTikTok, panel: $panelTikTok },
     { id: PopupTabs.PICKER, tab: $tabPicker, panel: $panelPicker },
   ];
   const $specimenCard = document.getElementById("specimenCard");
@@ -341,6 +372,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     apply();
   });
 
+  $tiktokCleanerToggle.addEventListener("change", () => {
+    updateTtCleanerDimState();
+    apply();
+  });
+
   // 動画ガンマ補正: master toggle / slider / 1.0 戻すボタン
   $videoGammaToggle.addEventListener("change", () => {
     updateVideoGammaRowVisibility();
@@ -354,6 +390,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     $videoGammaSlider.value = String(VideoGamma.SLIDER_DEFAULT);
     updateVideoGammaLabel(VideoGamma.DEFAULT);
     apply();
+  });
+
+  // 音量ブースター: マスタートグル
+  $volumeBoosterToggle.addEventListener("change", () => {
+    const on = $volumeBoosterToggle.checked;
+    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(() => {});
+    updateVolumeBoosterDimState();
+    if (on) {
+      const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+      pushVolumeNow(v).catch(() => {});
+    }
   });
 
   // 音量スライダー: input でラベル + debounced push、change（マウスアップ）で即送信
@@ -429,6 +476,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const input of igFeatureInputs.values()) {
     input.addEventListener("change", () => {
       updateIgCleanerCountBadge();
+      apply();
+    });
+  }
+
+  for (const input of ttFeatureInputs.values()) {
+    input.addEventListener("change", () => {
+      updateTtCleanerCountBadge();
       apply();
     });
   }
@@ -605,6 +659,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     $igFeatureCategories.classList.toggle("cleaner-disabled", dim);
   }
 
+  // ----- TikTok クリーナー DOM 構築（Instagram と同じ _buildAccordionCategories を再利用） -----
+  function buildTikTokFeatureCategories() {
+    _buildAccordionCategories(
+      $ttFeatureCategories,
+      TikTokCleaner.CATEGORIES,
+      TikTokCleaner.FEATURES,
+      ttFeatureInputs,
+      "tt-feature-"
+    );
+  }
+
+  function updateTtCleanerCountBadge() {
+    let on = 0;
+    for (const input of ttFeatureInputs.values()) {
+      if (input.checked) on++;
+    }
+    const total = ttFeatureInputs.size;
+    if ($tiktokCleanerPill) $tiktokCleanerPill.textContent = `${on}/${total} 機能`;
+  }
+
+  function updateTtCleanerDimState() {
+    const dim = !$tiktokCleanerToggle.checked;
+    $ttFeatureCategories.classList.toggle("cleaner-disabled", dim);
+  }
+
   // ----- 適用 -----
   async function apply() {
     const keepAliveSiteEnabled = $keepAliveToggle.checked;
@@ -622,6 +701,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
+    const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
     const videoGammaValue = currentVideoGammaValue();
     const minutes = clampMinutes(Number($intervalSlider.value));
@@ -629,6 +709,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchFixerFeatures = collectFeatureValues();
     const searchFixerGridItems = SearchFixer.clampGridItems($gridItemsSelect.value);
     const instagramCleanerFeatures = collectIgFeatureValues();
+    const tiktokCleanerFeatures = collectTtFeatureValues();
 
     const seq = ++applySeq;
     try {
@@ -645,6 +726,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           amazonDeliveryTotalEnabled,
           instagramCleanerEnabled,
           instagramCleanerFeatures,
+          tiktokCleanerEnabled,
+          tiktokCleanerFeatures,
           videoGammaEnabled,
           videoGammaValue,
         },
@@ -657,6 +740,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
             instagramCleanerEnabled,
+            tiktokCleanerEnabled,
             videoGammaEnabled
           ),
           "ok"
@@ -686,11 +770,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     return out;
   }
 
+  function collectTtFeatureValues() {
+    const out = {};
+    for (const [key, input] of ttFeatureInputs) {
+      out[key] = input.checked;
+    }
+    return out;
+  }
+
   function buildOkMessage(
     keepAliveEnabled,
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
     instagramCleanerEnabled,
+    tiktokCleanerEnabled,
     videoGammaEnabled
   ) {
     const parts = [];
@@ -698,6 +791,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (searchFixerEnabled) parts.push("YT クリーナー");
     if (amazonDeliveryTotalEnabled) parts.push("Amazon");
     if (instagramCleanerEnabled) parts.push("Instagram");
+    if (tiktokCleanerEnabled) parts.push("TikTok");
     if (videoGammaEnabled) parts.push("映像補正");
     if (parts.length === 0) return "⏹  すべて停止";
     return "✓  " + parts.join("  /  ");
@@ -764,7 +858,17 @@ document.addEventListener("DOMContentLoaded", async () => {
    * 据え置く操作も「現在 gain を再 push」だけで反映できる。
    */
   async function pushVolumeNow(value) {
+    if (!$volumeBoosterToggle.checked) return;
+    // popup → background は normalizeSettings を経由しない直接書き込み経路のため、
+    // popup 側で必ず VolumeBooster.clampValue を通す。background ハンドラ側でも clamp
+    // するが、storage に範囲外値が紛れ込むのを防ぐため二重防御 (/rere B1-S1-1)。
+    const clamped = VolumeBooster.clampValue(value);
+    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped }).catch(() => {});
     const tab = await getActiveHttpTab();
+    // popup クローズ後の orphan await から戻ったときは DOM が detached になっていることが
+    // ある。`document.body.isConnected` が false なら setVolumeHint も storage 書き込みも
+    // 副作用ゼロ路に倒して終了する (/rere B1-S2-1)。
+    if (!document.body?.isConnected) return;
     if (!tab) {
       setVolumeHint("⚠ このページでは使えません", true);
       return;
@@ -774,18 +878,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         action: Actions.VOLUME_BOOSTER_SET_GAIN,
         data: {
           tabId: tab.id,
-          gain: value,
+          gain: clamped,
           antiClip: $volumeAntiClipToggle.checked,
           normalize: $volumeNormalizeToggle.checked,
           nightMode: $volumeNightModeToggle.checked,
         },
       });
+      if (!document.body?.isConnected) return;
       if (res?.ok) {
         setVolumeHint("");
       } else {
         setVolumeHint(formatVolumeError(res?.error), true);
       }
     } catch {
+      if (!document.body?.isConnected) return;
       setVolumeHint("⚠ 通信エラー", true);
     }
   }
@@ -821,29 +927,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     return "⚠ 音量設定に失敗しました";
   }
 
-  /**
-   * Popup を開いたときに active tab の現在 gain を取得して反映する。
-   * offscreen が起動していない / 未ブーストなら DEFAULT (100%) を表示。
-   */
-  async function syncCurrentTabVolume() {
-    const tab = await getActiveHttpTab();
-    if (!tab) {
-      setVolumeHint("⚠ このページでは使えません", true);
-      return;
-    }
-    try {
-      const res = await chrome.runtime.sendMessage({
-        action: Actions.VOLUME_BOOSTER_GET_GAIN,
-        data: { tabId: tab.id },
-      });
-      const v = Number.isFinite(res?.gain) ? VolumeBooster.clampValue(res.gain) : VolumeBooster.DEFAULT;
-      $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(v));
-      updateVolumeLabel(v);
-      setVolumeHint("");
-    } catch {
-      $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(VolumeBooster.DEFAULT));
-      updateVolumeLabel(VolumeBooster.DEFAULT);
-    }
+  function updateVolumeBoosterDimState() {
+    const off = !$volumeBoosterToggle.checked;
+    $volumeRow.classList.toggle("volume-disabled", off);
+    $volumeSlider.disabled = off;
+    $volumeAntiClipToggle.disabled = off;
+    $volumeNormalizeToggle.disabled = off;
+    $volumeNightModeToggle.disabled = off;
   }
 
   /**

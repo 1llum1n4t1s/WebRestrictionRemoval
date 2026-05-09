@@ -407,6 +407,11 @@ body {
   display: none;
 }
 
+.sub-block.volume-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 /* sub-block 内に置く 2 段目のトグル行（例: keepalive HTTP ping のオプトインサブトグル）。
    sub-block の dashed border 内側に視覚的階層を作るため、フラット背景で控えめに描画。 */
 .sub-block .toggle-row--sub {

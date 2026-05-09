@@ -6,8 +6,6 @@
  *
  * クラス命名:
  *   __cpa-sfx-thumb-{dark,light}  サムネ枠装飾（ダーク/ライト両対応）
- *   __cpa-sfx-title-center        動画タイトル中央配置
- *   __cpa-sfx-desc-full           動画説明文フル幅
  *   __cpa-sfx-hide-comments       動画ページのコメント欄非表示（`<html>` 駆動）
  *   __cpa-sfx-hide-live-chat      ライブチャット公式折りたたみ状態の補助（`<html>` 駆動）
  *   cpa-sfx-demoted               キーワード非マッチ動画（デモート）— JS 側で動的注入する CSS と二段構え
@@ -25,28 +23,36 @@
   border-radius: 17px;
 }
 
-/* ---------- 動画ページ: タイトル中央配置 ---------- */
-.__cpa-sfx-title-center {
-  display: flex !important;
-  justify-content: center;
-}
-
-/* ---------- 動画ページ: 説明文フル幅 ---------- */
-.__cpa-sfx-desc-full {
-  min-width: 100% !important;
-  text-align: center !important;
-}
-
 /* ---------- 動画ページ: コメント欄非表示 ---------- */
 /* `<html>` クラス駆動 — 詳細は search-fixer.js の applyWatchPageClasses 参照 */
 html.__cpa-sfx-hide-comments ytd-comments#comments {
   display: none !important;
 }
 
-/* hideLiveChat の挙動はすべて search-fixer.js (collapseLiveChatIfNeeded) で実装。
- * CSS は frame・iframe・親コンテナに一切ルールを当てない（過去のあらゆる CSS 介入
- * 経路で「動画を処理しています」エラーや UI 副作用が起きたため）。
- * JS は engagement panel の公式 close button を user gesture 等価で click するだけ。 */
+/* hideLiveChat の挙動本体（公式 close button click）は search-fixer.js
+ * (collapseLiveChatIfNeeded) で実装。CSS は **click が完了するまでの間だけ**
+ * frame を `display: none` で先制非表示にする補助に絞る。
+ *
+ * `__cpa-sfx-hide-live-chat-pre` は以下の経路で `<html>` に立つ:
+ *   - 初回直アクセス: youtube-early.js (document_start) が無条件付与
+ *   - SPA 遷移後: search-fixer.js の syncLiveChatCollapse が付与
+ *
+ * click 成功 / リトライ上限到達 / detach (OFF・別ページ遷移) の 3 経路で必ず剥がす:
+ *   - click 成功 → YouTube 公式 collapsed bar が表示されて player 右に空白なし
+ *   - リトライ上限到達 → fail-safe で frame が見える状態に復元
+ *   - detach → 機能 OFF / 別ページ遷移時の cleanup
+ *
+ * `visibility: hidden` から `display: none` に変更した経緯:
+ *   - 旧 `visibility: hidden` は layout 領域 (402×964 px) を確保したまま約 2 秒間
+ *     空白の枠を右側に表示してしまい、ゆろさんから「一瞬コメント欄が見える」と報告された
+ *   - 「動画を処理しています」エラーは YouTube 側のタイミング bug で CSS 介入とは無関係
+ *     と判明したため `display: none` を採用
+ *   - 過去 NG だった `__cpa-sfx-live-chat-force-hide` は **永続的に** display:none を
+ *     当てる設計で「collapsed view ヘッダー (「パネルを開く」) まで消す」副作用があった
+ *     が、新方式は **数秒間のみ** の display:none で必ず剥がすため副作用は出ない */
+html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame {
+  display: none !important;
+}
 
 /* ==========================================================================
  * 登録チャンネル拡張（subsLeftnavInjectAll / subsAllShortcut / subsChannelsGrid）

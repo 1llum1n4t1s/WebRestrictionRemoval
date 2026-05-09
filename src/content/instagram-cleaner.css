@@ -158,9 +158,19 @@ html.__cpa-ig-block-videos article.__cpa-ig-article-video::after {
 /* =============================================================
    8. コメント欄非表示
    ============================================================= */
-/* JS マーカー由来（最も確実） — instagram-cleaner.js の markCommentElements() で
-   article スコープ + 厳格条件のもと動的に付与される。
-   入力フォーム / View all comments リンク / コメントリスト UL の 3 種を identifies。 */
+/* 先制非表示（flash 体感ラグ消滅）: instagram-early.js が document_start で
+   `__cpa-ig-comments-pre` を `<html>` に付与し、Instagram の安定 class `_a9ym`
+   を直系子に持つ wrapper `<div>` を即時非表示にする。`_a9ym` は per-comment UL なので
+   その親 div を `:has()` で隠せば、**post caption** (`_a9z6` に同居している) を巻き込まず
+   コメントだけを正確に消せる。instagram-cleaner.js の structural detection が間に合わない
+   極短時間の flash を消す。DIV 構造のコメントレイアウトは `_a9ym` を持たないためここで
+   は効かず、instagram-cleaner.js の triple-gate detection が fallback として動作する。 */
+html.__cpa-ig-comments-pre div:has(> ul._a9ym) {
+  display: none !important;
+}
+/* JS マーカー由来（最も確実 + DIV 構造もカバー） — instagram-cleaner.js の
+   markCommentElements() で動的に付与される。入力フォーム / View all comments リンク /
+   コメントリスト UL/DIV (article + main + dialog 全スコープ) の 3 種を identifies。 */
 html.__cpa-ig-comments .__cpa-ig-comment-input,
 html.__cpa-ig-comments .__cpa-ig-comment-view,
 html.__cpa-ig-comments .__cpa-ig-comment-list {

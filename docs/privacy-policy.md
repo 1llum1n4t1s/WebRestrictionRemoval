@@ -18,19 +18,21 @@
 - **`keepAliveIntervalMs`**（数値・ミリ秒）: セッション維持のポーリング間隔（1〜15 分の範囲）。
 - **`keepAliveHttpPingEnabled`**（真偽値）: セッション維持の「軽量 HTTP ping」サブ機能の有効/無効（オプトイン・デフォルト OFF）。
 - **`keepAliveOrigins`**（配列）: セッション維持を有効化したサイト origin（例: `https://example.com`）の一覧。現在のサイトだけに適用するために使用します。
-- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示を含む 22 サブ機能の親）の有効/無効。
-- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 22 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 10 種 / 動画属性削除 4 種 / ハイライト 2 種 / 動画ページ整形 4 種〈タイトル中央配置・説明文フル幅・コメント欄非表示・ライブチャット非表示〉/ レイアウト 1 種）の個別 ON/OFF 状態。
+- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能の親）の有効/無効。
+- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 29 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張）の個別 ON/OFF 状態。
 - **`searchFixerGridItems`**（数値）: YouTube ホームグリッドの列数指定（0=自動 / 4 / 5 / 6）。
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。
 - **`instagramCleanerEnabled`**（真偽値）: Instagram クリーナー機能の有効/無効。
-- **`instagramCleanerFeatures`**（オブジェクト）: Instagram クリーナーの 10 個のサブ機能（Reels 削除 / Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示 / いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示）の個別 ON/OFF 状態。
+- **`instagramCleanerFeatures`**（オブジェクト）: Instagram クリーナーの 11 個のサブ機能（Reels 削除 / Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示 / いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
+- **`tiktokCleanerEnabled`**（真偽値）: TikTok クリーナー機能の有効/無効。
+- **`tiktokCleanerFeatures`**（オブジェクト）: TikTok クリーナーの 3 個のサブ機能（コメント欄非表示 / おすすめのアカウント非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（高速リミッタとして動作する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNormalizeEnabled`**（真偽値）: 音量ブースターのサブトグル「自動音量正規化」（`AnalyserNode` で短時間 RMS を測定し `GainNode` のゲインを自動調整する方式。`DynamicsCompressor` は使用しません）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNightModeEnabled`**（真偽値）: 音量ブースターのサブトグル「ナイトモード」（夜間視聴向けにダイナミックレンジを圧縮する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`colorPickerHistory`**（配列・最大 20 件）: カラーピッカーで採取した色の履歴。各要素は `{ hex, ts }` の形式で、`hex` は `#RRGGBB`、`ts` は採取時刻のタイムスタンプ。
 - **`colorPickerDefaultFormat`**（文字列・`"hex"` / `"rgb"` / `"hsl"` のいずれか）: カラーピッカーで採取した色のクリップボード既定形式。
 - **`colorPickerHexHash`**（真偽値・デフォルト true）: HEX 形式でコピーする際に先頭の `#` を含めるかどうか。
-- **`popupLastTab`**（文字列・`"assist"` / `"picker"` のいずれか）: ポップアップで最後に開いていたタブ。次回起動時の表示状態復元に使用。
+- **`popupLastTab`**（文字列・`"tune"` / `"youtube"` / `"instagram"` / `"tiktok"` / `"picker"` のいずれか）: ポップアップで最後に開いていたタブ。次回起動時の表示状態復元に使用。旧値 `"assist"` は `"tune"` に自動変換されます。
 
 これらの値は端末内にのみ保存され、外部サーバーへの送信は一切行いません。
 
@@ -49,6 +51,8 @@
 本拡張機能は、第三者の外部サーバーへの通信を一切行いません。「セッション維持」機能を有効化している場合のデフォルト動作は、ユーザーが有効化したサイトの top frame で、サイト側 JS のアイドル検知をリセットするための合成イベント（`mousemove` / `pointermove` / `scroll` / `focus`）を `document` / `window` に dispatch するクライアントサイド処理のみで、ネットワーク通信は発生しません。
 
 サブ機能「サーバーへの軽量 ping を併発」（オプトイン・デフォルト OFF）を有効化した場合に限り、サーバー側のセッションタイムアウトを延長するため、ユーザーが有効化したサイト自身（同一オリジン）の top frame から軽量なエンドポイントへ `HEAD` または `GET` リクエストを発行します。例として、SharePoint（`*.sharepoint.{com,cn,de,us}`）では `/_api/web` に GET、その他の多くのサイトでは現在のページ URL または origin root に軽量 HEAD を試行します。これは現にログイン済みであるサイト自身への通信のみであり、第三者サーバーへの送信ではありません（`credentials: same-origin` で同一オリジン以外には Cookie が送信されません）。認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発する可能性があるため、副作用を理解した上で有効化することを推奨します。
+
+YouTube / Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（YouTube: `i.ytimg.com` / `yt3.googleusercontent.com` / `yt3.ggpht.com`、Instagram: `*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `*.tiktokcdn.com` / `*.tiktokcdn-us.com`）に対して画像 GET を発行します。これは現にブラウザが `<img>` タグでロードしているドメインと同一であり、`credentials: "omit"` でクッキーは送信せず、`redirect: "manual"` で 302 経由の第三者ドメイン送信を遮断し、`referrerPolicy: "no-referrer"` でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されるのみで、外部送信は一切行いません。
 
 ## 権限の使用目的
 

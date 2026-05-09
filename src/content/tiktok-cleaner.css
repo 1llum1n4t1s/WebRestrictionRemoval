@@ -1,0 +1,85 @@
+/*
+ * TikTok クリーナー専用スタイル。
+ *
+ * 設計方針 (実機 DOM 確認 2026-05-09 反映):
+ *   - すべてのルールは `html.__cpa-tt-*` body クラス driven。クラスが付いていない時は不活性化。
+ *   - photo / video ページの右側にある統合パネル `[class*="RightPanelContainer"]` は
+ *     **「コメント」「あなたにおすすめ」の 2 タブを同居** させているため、ユーザー要件「シンプル方式」に
+ *     従い hideComments OR hideSuggested **いずれか ON でパネル全体を非表示** にする。
+ *   - セレクタは TikTok の安定 hook である `[class*="RightPanelContainer"]`（`tiktok-XXX-7937d88b--RightPanelContainer`
+ *     のハッシュ部を contains マッチで吸収）と `data-e2e` 属性を併用。難読化 class への直接依存はしない。
+ *   - data-e2e が将来変更された場合の保険として `aria-label` ベースの fallback rule も併記する。
+ */
+
+/* =========================================================
+ * 共通: photo / video ページの右側統合パネル
+ * （hideComments OR hideSuggested で消える — 機能事実上の合算）
+ * ========================================================= */
+html.__cpa-tt-comments [class*="RightPanelContainer"],
+html.__cpa-tt-suggested [class*="RightPanelContainer"] {
+  display: none !important;
+}
+
+/* =========================================================
+ * TikTok modal viewer (Browser Mode) — ユーザーページからサムネクリック時に出る dialog。
+ * `DivBrowserModeContainer` 内は左 = DivVideoContainer / 右 = DivContentContainer の 2 column 構造で、
+ * 右側に DivProfileWrapper（プロフィール + キャプション）と DivCommentListContainer（コメントリスト本体）が
+ * 縦並び。コメントリスト **だけ** を非表示にして、写真/動画とキャプションは残す。
+ * ========================================================= */
+html.__cpa-tt-comments [class*="DivCommentListContainer"] {
+  display: none !important;
+}
+
+/* =========================================================
+ * hideComments: 動画 UI のコメント関連 (パネル外のサイドアイコン / 件数バッジ)
+ * ========================================================= */
+
+/* (1) 動画 UI 右サイドのコメントアイコン + フィード上の comment ボタン
+ *     modal viewer 用 `browse-comment-icon` / video ページ用 `comment-icon` を併記 */
+html.__cpa-tt-comments [data-e2e="comment-icon"],
+html.__cpa-tt-comments [data-e2e="browse-comment-icon"],
+html.__cpa-tt-comments [data-e2e="feed-comment-icon"],
+html.__cpa-tt-comments [data-e2e="video-comment-icon"] {
+  display: none !important;
+}
+
+/* (2) コメント数バッジ（ボタン横の数字）
+ *     modal viewer 用 `browse-comment-count` も併記 */
+html.__cpa-tt-comments [data-e2e="comment-count"],
+html.__cpa-tt-comments [data-e2e="browse-comment-count"],
+html.__cpa-tt-comments strong[data-e2e="comment-count"] {
+  display: none !important;
+}
+
+/* (3) aria-label fallback (data-e2e が変わった時の保険) */
+html.__cpa-tt-comments button[aria-label*="Comment" i],
+html.__cpa-tt-comments button[aria-label*="コメント"] {
+  display: none !important;
+}
+
+/* =========================================================
+ * hideSuggested: フィード / プロフィールのおすすめアカウント
+ * (右パネルに同居する「あなたにおすすめ」は前述の RightPanelContainer rule でカバー)
+ * ========================================================= */
+
+/* (1) For You / フォロー中フィードに挿入される suggestion カード */
+html.__cpa-tt-suggested [data-e2e="recommend-account-card"],
+html.__cpa-tt-suggested [data-e2e="suggested-account-card"],
+html.__cpa-tt-suggested [data-e2e="suggest-card"],
+html.__cpa-tt-suggested [data-e2e="suggested-accounts"] {
+  display: none !important;
+}
+
+/* (2) プロフィールページの「おすすめのアカウント」セクション */
+html.__cpa-tt-suggested [data-e2e="recommend-list"],
+html.__cpa-tt-suggested [data-e2e="suggested-accounts-section"],
+html.__cpa-tt-suggested [data-e2e="user-account-recommend"] {
+  display: none !important;
+}
+
+/* (3) aria-label fallback */
+html.__cpa-tt-suggested [aria-label*="Suggested account" i],
+html.__cpa-tt-suggested [aria-label*="おすすめのアカウント"],
+html.__cpa-tt-suggested [aria-label*="おすすめユーザー"] {
+  display: none !important;
+}

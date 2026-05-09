@@ -131,7 +131,10 @@
   }
 
   // background → content script の即時通知（active tab の全フレームに broadcast される）。
-  chrome.runtime.onMessage.addListener((req) => {
+  // 他 content script との設計一貫性のため SenderCheck.isFromBackground で gate する
+  // （rere レビュー A1 C1）。同一拡張内の sender 偽装は SenderCheck の三層検証で遮断される。
+  chrome.runtime.onMessage.addListener((req, sender) => {
+    if (!SenderCheck.isFromBackground(sender)) return;
     if (req?.action !== Actions.APPLY_VIDEO_GAMMA_CS) return;
     const d = req.data ?? {};
     if (typeof d.enabled === "boolean") currentEnabled = d.enabled;

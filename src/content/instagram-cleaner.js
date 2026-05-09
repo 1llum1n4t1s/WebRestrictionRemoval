@@ -191,18 +191,28 @@
   /**
    * コメント関連要素を JS で識別し、安全な範囲で隠蔽用マーカークラスを付ける。
    *
-   * 対象 (3 種):
+   * 対象 (4 種):
    *   1. **コメント入力フォーム** — `<textarea>` の aria-label/placeholder に "comment"/"コメント" を含む
    *      要素の親 `<form>`。他要素を巻き込むリスクが低いため form スコープで安全。
    *   2. **「View all N comments」/「N 件のコメントを見る」リンク** — `article` 内の `<a>` で
    *      テキストが英語/日本語の view-all パターンにマッチ。子要素 4+ のコンテナはスキップ。
-   *   3. **コメントリスト `<ul>`** — `article` 内の `<ul>` で以下を全て満たす:
+   *   3. **コメントリスト `<ul>`（ホームフィード用）** — `article` 内の `<ul>` で以下を全て満たす:
    *      - `<li>` の数が 1〜15（それ以上は別種の UL の可能性が高い）
    *      - 80% 以上の `<li>` がユーザープロフィールリンク (`/<username>/`) を含む
+   *   4. **コメントリストコンテナ（投稿詳細ページ + モーダル — UL/DIV 両対応）** —
+   *      `<article>` 不在の `/p/`, `/reel/`, `/tv/` 直接アクセス、およびフィード/プロフィールから
+   *      クリックで開く `[role="dialog"]` モーダル表示の両方をカバー。コメントは
+   *      `<ul class="_a9z6">`（直系 `<div>`）または `<div>` 直下に並ぶ。コメント入力 textarea
+   *      が存在 + `main[role="main"]` または `[role="dialog"]` 配下 + `<article>` の外、で
+   *      子 2〜50 個 / 70%+ が `/<username>/` を持つ / 70%+ が `<time>` を含む / 異なる
+   *      username が 2 種類以上 — を全部満たす container をマーク。
    *
    * 安全策（前回の「投稿本体を巻き込む」事故を防ぐ）:
-   *   - スコープを `article` に限定（`[role="dialog"]` は構造が複雑で巻き込みリスクが高いので対象外）
-   *   - `<ul>` 判定は li 数の上限 + ユーザーリンク率 80% 以上の厳格条件
+   *   - 4 はコメント入力 textarea 不在ページ（プロフィール / DM / 検索結果）に到達しないようガード
+   *   - 4 は **異なる username 2 種類以上 + `<time>` 70%+** を要件に追加し、タグ付けユーザー
+   *     パネル / liked_by 行 / プロフィールヘッダ / 単一ユーザー繰り返し UI を除外する
+   *   - 4 は article ガードを敢えて持たない（モーダル投稿は `<dialog>` 内の `<article>` で wrap
+   *     されるため）。3. と重複マーク発生時は同 class の冪等 add で CSS 効果は同一。
    *   - 既処理は `:not()` で除外して 300ms ごとの再走査コストを削減
    */
   function markCommentElements() {
@@ -240,7 +250,7 @@
           }
         });
 
-      // 3. コメントリスト UL（article スコープ・厳格条件）
+      // 3. コメントリスト UL（article スコープ・厳格条件 / ホームフィード用）
       document
         .querySelectorAll("article ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")")
         .forEach((ul) => {
@@ -264,6 +274,65 @@
             ul.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
           }
         });
+
+      // 4. コメントリストコンテナ（投稿詳細ページ /p/, /reel/, /tv/ + モーダル表示 — UL/DIV 両対応）
+      //    `<article>` が無い投稿詳細ページに加え、フィード/プロフィールから投稿クリックで
+      //    開く `[role="dialog"]` モーダル表示も対象。コメントは `<ul class="_a9z6">` (子は <div>) や
+      //    `<div>` 直下に並ぶ（投稿によって異なるレイアウト）。安全策として下記ガードで誤マッチを防ぐ:
+      //      - 同一ページにコメント入力 textarea が存在する（= コメント可能ページのみ）
+      //      - スコープを `main[role="main"]` または `[role="dialog"]` 配下に限定
+      //    （`closest("article")` ガードは入れない — モーダル投稿は `<dialog>` 内の `<article>` で
+      //     wrap されており、article ガードを入れると modal も skip されてしまうため。3. の UL
+      //     ロジックと重複マーク発生時は同じ class を 2 回 add するだけで CSS 効果は同じ。）
+      //    判定条件（structural triple-gate）:
+      //      - 直系子が 2〜50 個
+      //      - 70% 以上の子が `/<username>/` 形式のリンクを含む
+      //      - **異なる username が 2 種類以上**
+      //      - **70% 以上の子に `<time>` が含まれる**（タグ付けユーザーパネル等を除外）
+      const hasCommentInput = document.querySelector(
+        'textarea[aria-label*="comment" i], textarea[aria-label*="コメント"], textarea[placeholder*="comment" i], textarea[placeholder*="コメント"]'
+      );
+      if (hasCommentInput) {
+        const detectionRoots = [];
+        const main = document.querySelector('main[role="main"]');
+        const dialog = document.querySelector('[role="dialog"]');
+        if (main) detectionRoots.push(main);
+        // dialog が main の外側に居るときだけ別 root として追加（main 配下なら重複走査を避ける）
+        if (dialog && !main?.contains(dialog)) detectionRoots.push(dialog);
+        const candidateSelector =
+          "ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + "), div:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")";
+        for (const root of detectionRoots) {
+          root.querySelectorAll(candidateSelector).forEach((container) => {
+            const children = container.children;
+            const len = children.length;
+            if (len < 2 || len > 50) return;
+            let userLinkCount = 0;
+            let timeCount = 0;
+            const handles = new Set();
+            for (const child of children) {
+              const link = child.querySelector("a[href^='/']");
+              const href = link?.getAttribute("href") ?? "";
+              const m = href.match(/^\/([\w.]{1,30})\/?($|\?)/);
+              if (m) {
+                userLinkCount++;
+                handles.add(m[1]);
+              }
+              // コメントアイテムには必ず投稿時刻 `<time>` が含まれる。タグ付けユーザーパネル等は
+              // 含まないため、time 要素率でコメントリストを誤マッチから守る最終ゲート。
+              if (child.querySelector("time")) timeCount++;
+            }
+            // 70% 以上 user link + handle 2 種類以上 + 70% 以上 time 要素
+            // （誤マッチ防止: タグ付けユーザーパネル / liked_by 行 / 単一ユーザー繰り返し UI を除外）
+            if (
+              userLinkCount / len >= 0.7 &&
+              handles.size >= 2 &&
+              timeCount / len >= 0.7
+            ) {
+              container.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
+            }
+          });
+        }
+      }
     } catch {
       // 一部 SubFrame で querySelector が例外を投げるケースをサイレントスキップ
     }
