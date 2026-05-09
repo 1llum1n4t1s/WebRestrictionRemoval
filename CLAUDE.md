@@ -18,7 +18,7 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm test                     # Node.js 標準 test runner による純粋関数テスト
+npm test                     # Node.js 標準 test runner、49 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -146,7 +146,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 6. **`search-fixer.js` の `scheduleLiveChatCollapseRetry` 上限到達分岐**: fail-safe で pre クラス削除（live chat なし動画 / hydration 異常で永遠に click 成功しない場合に備え、frame を永久に隠したままにせず元 UI を見せる）
 7. **delay 短縮**: iframe load 後 delay は **300ms → 50ms**、リトライバックオフは **[200, 600, 1500] → [50, 200, 800]** に短縮（pre クラスで見た目はすでに隠れているため、hydration 完了次第すぐ click → 公式 collapsed bar 表示、を最速化）
 
-**復活禁止の失敗パターン（過去の CSS 介入）**: `display: none` / `height: 0` / `setAttribute("collapsed", "")` / `--ytd-watch-flexy-sidebar-width: 0` / `#chat-container:has(...) { display: none }` / 独自クラス `__cpa-sfx-live-chat-force-hide` を frame に付与は **すべて NG**。これらは frame の SPA panel state を壊して player 副作用 / 「パネルを開く」が消える / 再展開不能になる。`visibility: hidden` は layout への影響のみで frame・iframe の initialization / load や Polymer state には介入しないため、上記 NG パターンとは別レイヤ。
+**復活禁止の失敗パターン**: 詳細列挙は本ドキュメント末尾の Important Patterns「hideLiveChat（YouTube ライブチャット非表示）」を参照。要約すると `display:none` / `height:0` / `setAttribute("collapsed")` / `#chat-container:has(...){display:none}` / 独自クラスでの frame 全体非表示はすべて NG（SPA panel state を破壊して player 副作用 / 「パネルを開く」消失 / 再展開不能になる）。`visibility:hidden` は layout のみへの影響で Polymer state に介入しないため安全。
 
 **登録チャンネル拡張（v1.0.27 で完成）**: 3 機能セットで構成される。
 1. **`subsChannelsGrid`**: `/feed/channels` をレスポンシブグリッドに変形 + 検索ボックス。各カードは IntersectionObserver で viewport 進入時 lazy fetch でチャンネルページ HTML から最初の `"videoId":"..."` (Featured 動画) を抽出して `https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg` (16:9, 1280x720) を表示。404 で `mqdefault.jpg` (320x180, 16:9) フォールバック。`sessionStorage` に handle 単位 24h cache (prefix `__cpa_subs_thumb_v5::`)。**サムネ取得は YouTube が `/feeds/videos.xml` を 404 化したため HTML 内 videoId 抽出方式に切替済（v1.0.27）**。
@@ -249,6 +249,9 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt`。`generate-screenshots.js` が popup.html から `popup-render.html` + `popup-shim.js` を動的生成 → `01-popup-ui.html` が iframe で実 popup を埋め込んで撮影（drift ゼロ）。生成物 `popup-render.html` / `popup-shim.js` は .gitignore 対象 |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
 | `docs/privacy-policy.md` | プライバシーポリシー |
+| `test/actions.test.js` | 純粋関数テスト 49 件: globalThis 16 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn は scontent- prefix 限定 / TikTok / YouTube 廃止) / detectHost / buildFilename 等。件数 drift を CI で検知できる単一情報源 |
+| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで Chrome Web Store に Draft 自動アップロード。OAuth Bearer Token を curl で取得し `token_response` / `access_token` 両方を `::add-mask::` 登録してから upload。**Draft only** で自動公開しない設計（Dashboard で listing 確認後に手動公開） |
+| `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
 ## Important Patterns
 
@@ -328,3 +331,38 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 ### マイグレーション
 - **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。注: `volumeBoosterEnabled` は過去に廃止→再導入されたキー。legacy 削除リストに含めないこと。
 - **新規 storage key は `onInstalled` で必ず初期化** — `volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `searchFixerFeatures.hideComments` のような後追いキーは未設定時 `undefined` で UI 側に出るとトグルが表示されない・無効状態になるため、必ず `onInstalled` で `false` (boolean) / `VolumeBooster.DEFAULT` (数値) 初期化する。`normalizeSettings()` 側でも `=== true` 防御的判定を入れる（`!!value` だと storage の落ちた object 値で誤判定が出るため）。
+
+### 音量ブースター popup → storage 直書きの防御 (/rere v1.0.28 確立)
+**音量ブースター 5 キー** (`volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled`) のみ popup から直接 `chrome.storage.local.set` する設計で、background の `normalizeSettings` を経由しない。
+- popup の `pushVolumeNow` は **必ず `VolumeBooster.clampValue(value)` を経由**して storage / `VOLUME_BOOSTER_SET_GAIN` 両方に渡す（範囲外値が storage に紛れ込むのを防ぐ二重防御）
+- popup クローズ後の orphan await から戻ったときは `document.body.isConnected` チェックで DOM 触らない（detached DOM 操作の no-op 化）
+- 将来 `APPLY_SETTINGS` 経路に統合する場合は popup と background 両方の大規模変更が必要
+
+### SW モジュールスコープのストレージキャッシュ (/rere v1.0.28 確立)
+`chrome.tabs.onActivated` のように **高頻度発火する経路** で `chrome.storage.local.get` を毎回呼ぶと IPC RTT が累積する。
+- SW モジュールスコープ変数（例: `cachedVolumeSettings = null`）にキャッシュし、`chrome.storage.onChanged` で監視対象キーいずれかが変化したら null に invalidate するパターン
+- SW 再起動でキャッシュ消失するため、初回呼び出し時の **`if (cache === null) { cache = await chrome.storage.local.get(...) }`** フォールバック必須
+- 新しい音量関連 storage key を追加する場合は `chrome.storage.onChanged` リスナーの監視キーリストにも忘れず追加
+
+### 外部 fetch の exponential backoff (/rere v1.0.28 確立)
+社内プロキシ環境（Zscaler 等）で 401 / 302 が続く外部 fetch（YouTube `/feed/channels` 等）は **80ms cycle のリトライループで CPU を食う** リスクがある。
+- 実装: `subsListFetchBackoffMs` を 2s スタート → 倍々 → **60s 上限**。成功で 0 リセット
+- `subsListFetchLastFailedAt = Date.now()` を記録して、`Date.now() - lastFailedAt < backoffMs` の間は早期 return
+- 同類のリトライ経路（fetch 系で MutationObserver / IntersectionObserver から呼ばれる）を新規追加する場合はこのパターンを踏襲
+
+### Observer guard の 4 段防御 + finally 状態再取得 (/rere v1.0.28 強化)
+`MutationObserver(subtree: true)` 監視中の自身 DOM 書き戻しは **`disconnect → render → takeRecords → observe`** の 4 段ガード（Amazon 月別合計で確立）。さらに:
+- `applySubsLeftnavInjection` のように **内部で observer を再構築する関数を呼ぶ**ケースは、`finally` ブロックで **観察対象を再取得**する（render 後の `leftnavInjectObserver` / `leftnavSectionWatched` / `#items` の 3 つ全部）
+- entry 時点の値を closure capture して finally で使うと、render 中に observer が detach + 再 attach されたケースで stale items に observe したり、新規 observer に観察対象を与え忘れる
+
+### FEATURES 件数アサートテスト (/rere v1.0.28 確立)
+`test/actions.test.js` の **「FEATURES 件数の固定アサート」テスト** がドキュメント整合性の単一情報源。
+- 件数を増減する場合は **同時に**: (1) FEATURES 配列に追加、(2) アサート値更新、(3) CLAUDE.md / README / docs/privacy-policy.md / webstore/store-listing.txt / popup.html コメント / actions.js 内コメント の数値を全部更新
+- 1 つでも update 漏れると `npm test` で fail → CI で drift を検知できる
+- 過去に 22 / 25 / 26 / 29 が混在した状態が再発しないようにこのテストで防御
+
+### `chrome.runtime.sendMessage` の expected error (/rere v1.0.28 確立)
+マッチしないタブ（`chrome://` / `file://` / `about:` 等）への `chrome.tabs.sendMessage` は **受信側不在で必ず reject** する → これは **expected behavior**。
+- 該当箇所の `.catch(() => {})` は silent skip が正解
+- 一括 `console.debug` 化は spam ログを生むので NG（毎回のタブ切替で大量出力）
+- 将来の観測性改善は「URL pattern マッチが先に確定している経路（例: `isYouTubeUrl(tab.url) === true` のあと）でのみ詳細ログ」の **expected/unexpected 分離設計** が前提
