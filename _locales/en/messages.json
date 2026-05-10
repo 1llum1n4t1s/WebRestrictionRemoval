@@ -1,0 +1,297 @@
+{
+  "appName": {
+    "message": "Web Viewing Assist",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
+  },
+  "appDescription": {
+    "message": "Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.",
+    "description": "Short description (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "Web Viewing Assist",
+    "description": "Hover tooltip on the toolbar icon"
+  },
+
+  "headerTitle": {
+    "message": "Web Viewing Assist",
+    "description": "h1 in the popup header"
+  },
+  "headerTagline": {
+    "message": "Amplify, declutter, sustain — from one panel",
+    "description": "Tagline shown beneath the popup header"
+  },
+
+  "tabbarAriaLabel": { "message": "Popup tabs" },
+  "tabTune": { "message": "Tune" },
+  "tabYoutube": { "message": "YouTube" },
+  "tabInstagram": { "message": "Instagram" },
+  "tabTiktok": { "message": "TikTok" },
+  "tabPicker": { "message": "Color Picker" },
+
+  "groupAudio": { "message": "Audio" },
+  "groupVideo": { "message": "Video" },
+  "groupAmazon": { "message": "Amazon" },
+  "groupSession": { "message": "Session" },
+
+  "volumeBoosterMaster": { "message": "Volume Booster" },
+  "volumeBoosterMasterDesc": { "message": "Amplify and shape tab audio. Settings auto-apply on tab switch." },
+  "volumeSubLabel": { "message": "Volume Booster" },
+  "volumeSubDesc": { "message": "Set the player volume to 100% and adjust here for the best result." },
+  "volumeReset100Btn": { "message": "Reset to 100%" },
+  "volumeReset100Aria": { "message": "Reset volume to 100%" },
+  "volumeAntiClipLabel": { "message": "Auto Distortion Guard" },
+  "volumeAntiClipDesc": { "message": "Tame sudden shouts and effect peaks to prevent clipping when boosting." },
+  "volumeNormalizeLabel": { "message": "Auto Volume Normalization" },
+  "volumeNormalizeDesc": { "message": "Measure the average loudness of each video or stream and equalize it via auto-gain." },
+  "volumeNightModeLabel": { "message": "Night Mode" },
+  "volumeNightModeDesc": { "message": "Gently compress loud voices and explosions so quiet game audio is not buried." },
+
+  "videoGammaMaster": { "message": "Video Gamma" },
+  "videoGammaMasterDescHtml": {
+    "message": "Apply gamma correction to <code class=\"tr-code\">&lt;video&gt;</code> elements on the page. Brightens dark videos and softens overly bright ones.",
+    "description": "Master toggle description (HTML allowed)"
+  },
+  "videoGammaSubLabel": { "message": "Gamma value" },
+  "videoGammaSubDesc": { "message": "1.0 means no correction. Below 1.0 lifts shadows (brighter); above 1.0 boosts contrast (darker)." },
+  "videoGammaResetBtn": { "message": "Reset to 1.0" },
+  "videoGammaResetAria": { "message": "Reset gamma to 1.0" },
+
+  "amazonDeliveryMaster": { "message": "Subscribe & Save monthly total" },
+  "amazonDeliveryMasterDescHtml": {
+    "message": "Show a per-month total on the <code class=\"tr-code\">/auto-deliveries</code> page.",
+    "description": "Master toggle description (HTML allowed)"
+  },
+
+  "keepAliveMaster": { "message": "Keep session alive" },
+  "keepAliveMasterDesc": { "message": "Reset idle detection on the current site by dispatching synthetic events." },
+  "keepAliveIntervalLabel": { "message": "Polling interval" },
+  "keepAliveHttpPingLabel": { "message": "Also send a lightweight server ping" },
+  "keepAliveHttpPingDesc": { "message": "HEAD/GET only against the top frame of this site. Disable behind auth proxies." },
+
+  "searchFixerMaster": { "message": "YouTube cleaner" },
+  "searchFixerMasterDesc": { "message": "Manage 29 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
+
+  "instagramCleanerMaster": { "message": "Instagram cleaner" },
+  "instagramCleanerMasterDesc": { "message": "Hide redundant UI such as Reels, Explore, and Stories in one toggle." },
+
+  "tiktokCleanerMaster": { "message": "TikTok cleaner" },
+  "tiktokCleanerMasterDesc": { "message": "Hide redundant UI such as the comment panel and suggested-account section in one toggle." },
+
+  "cleanerHint": { "message": "Active only while the master toggle (cleaner) is on. Pick the individual sub-features you want." },
+
+  "pickerActivateJp": { "message": "Pick a color from the screen" },
+  "pickerActivateEn": { "message": "" },
+  "pickerNoteIdle": { "message": "Press the button to pick any color on screen (Esc cancels)." },
+  "specimenAriaLabel": { "message": "Picked color" },
+  "specimenTitle": { "message": "Specimen" },
+  "specimenPillEmpty": { "message": "Empty" },
+  "specimenNoEmpty": { "message": "No. — —" },
+  "specimenTimeEmpty": { "message": "Empty" },
+  "copyHexAria": { "message": "Copy HEX" },
+  "copyRgbAria": { "message": "Copy RGB" },
+  "copyHslAria": { "message": "Copy HSL" },
+  "formatTitle": { "message": "Default copy format" },
+  "formatGroupAriaLabel": { "message": "Default copy format" },
+  "formatLegend": { "message": "Default copy format" },
+  "formatRowAria": { "message": "Default copy format" },
+  "formatHashLabel": { "message": "Include # in HEX" },
+  "formatNote": { "message": "Auto-copied in this format when you pick or click a history entry." },
+  "historyTitle": { "message": "Specimen Box" },
+  "historyEmpty": { "message": "No specimens yet. Use the eyedropper to pick one." },
+  "historyClearBtn": { "message": "Clear specimen box" },
+  "extVersionAriaLabel": { "message": "Extension version" },
+
+  "eyedropperUnsupported": { "message": "EyeDropper API is not supported. Please use Chrome 95 or later." },
+  "pickerNoteActive": { "message": "Eyedropper active — click anywhere on screen (Esc cancels)" },
+  "pickerNoteRetake": { "message": "Press again to keep picking." },
+  "pickerNoteCancelled": { "message": "Pick cancelled." },
+  "pickerNoteFailed": { "message": "Color pick failed. Please try again." },
+  "pickerCopyOk": {
+    "message": "Picked — copied $FORMAT$: $TEXT$",
+    "placeholders": {
+      "format": { "content": "$1", "example": "HEX" },
+      "text": { "content": "$2", "example": "#C0605A" }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "Picked — $FORMAT$: $TEXT$ (copy failed)",
+    "placeholders": {
+      "format": { "content": "$1", "example": "HEX" },
+      "text": { "content": "$2", "example": "#C0605A" }
+    }
+  },
+  "historyClearedToast": { "message": "Specimen box cleared." },
+  "copyOkToast": {
+    "message": "Copied $FORMAT$: $TEXT$",
+    "placeholders": {
+      "format": { "content": "$1" },
+      "text": { "content": "$2" }
+    }
+  },
+  "copyFailToast": { "message": "Copy failed." },
+  "copyToast": {
+    "message": "$FORMAT$: $TEXT$",
+    "placeholders": {
+      "format": { "content": "$1" },
+      "text": { "content": "$2" }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": { "content": "$1" },
+      "time": { "content": "$2" }
+    }
+  },
+  "historyChipAria": {
+    "message": "Recall $HEX$ and copy in the default format",
+    "placeholders": {
+      "hex": { "content": "$1" }
+    }
+  },
+
+  "pillTemplate": {
+    "message": "$ON$/$TOTAL$ active",
+    "placeholders": {
+      "on": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+
+  "gridItemsLabel": { "message": "Home columns" },
+  "gridAuto": { "message": "Auto (YouTube default)" },
+  "grid4Cols": { "message": "4 cols" },
+  "grid5Cols": { "message": "5 cols" },
+  "grid6Cols": { "message": "6 cols" },
+
+  "categoryMenuUi": { "message": "Menu / UI" },
+  "categoryVideoFilter": { "message": "Video filter" },
+  "categoryWatchPage": { "message": "Watch page" },
+  "categorySearchOnly": { "message": "Search results" },
+  "categoryIgMain": { "message": "Main" },
+  "categoryIgExtra": { "message": "Extras" },
+  "categoryTtMain": { "message": "Main" },
+
+  "applyOkSession": { "message": "Keep-alive" },
+  "applyOkSearchFixer": { "message": "YT cleaner" },
+  "applyOkAmazon": { "message": "Amazon" },
+  "applyOkInstagram": { "message": "Instagram" },
+  "applyOkTiktok": { "message": "TikTok" },
+  "applyOkVideoGamma": { "message": "Video gamma" },
+  "applyOkAllStopped": { "message": "⏹  All stopped" },
+  "applyOkPrefix": { "message": "✓  " },
+  "applyOkSeparator": { "message": "  /  " },
+  "applyError": { "message": "⚠️ Cannot apply on this page" },
+
+  "intervalUnit": {
+    "message": "$N$ min",
+    "description": "Polling interval label (e.g. \"4 min\")",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+
+  "volumeErrorInvalidTab": { "message": "⚠ Cannot read tab" },
+  "volumeErrorOffscreenUnavailable": { "message": "⚠ Cannot start internal processor" },
+  "volumeErrorInvalidStream": { "message": "⚠ Cannot capture audio" },
+  "volumeErrorTabClosed": { "message": "⚠ Tab was closed" },
+  "volumeErrorUserGesture": { "message": "⚠ Only changeable while the popup is open" },
+  "volumeErrorUnsupportedPage": { "message": "⚠ Not supported on this page" },
+  "volumeErrorPermission": { "message": "⚠ Permission error" },
+  "volumeErrorUnknown": { "message": "⚠ Failed to update volume" },
+  "volumeErrorCommunication": { "message": "⚠ Communication error" },
+
+  "amazonTotalText": { "message": "Total" },
+  "amazonTotalUnit": { "message": "yen" },
+  "amazonTotalAriaLabel": { "message": "Monthly total" },
+  "subsAllShortcutLabel": { "message": "All subscriptions" },
+  "subsSearchPlaceholder": { "message": "Filter by channel name" },
+  "imageDownloadButtonLabel": { "message": "Download image" },
+
+  "feat_sf_playlist_label": { "message": "Playlists" },
+  "feat_sf_playlist_desc": { "message": "Remove playlist entries (playlist?list= links / \"N videos\" badges)." },
+  "feat_sf_mix_label": { "message": "Mix" },
+  "feat_sf_mix_desc": { "message": "Remove auto-generated YouTube mixes (&list=RD&start_radio=1 / \"Mix\" badge)." },
+  "feat_sf_shortsBtn_label": { "message": "Shorts (single)" },
+  "feat_sf_shortsBtn_desc": { "message": "Remove standalone Shorts cards mixed into video grids (vertical-video items whose thumbnail URL is /shorts/)." },
+  "feat_sf_removeShortsShelf_label": { "message": "Shorts shelf" },
+  "feat_sf_removeShortsShelf_desc": { "message": "Physically remove the Home Shorts shelf (ytd-rich-shelf-renderer[is-shorts]) and the search-result Shorts horizontal shelf (ytd-reel-shelf-renderer)." },
+  "feat_sf_live_label": { "message": "Live / Premiere / Station" },
+  "feat_sf_live_desc": { "message": "Remove videos with LIVE / Premiere / Station thumbnail badges. \"Station\" = YouTube auto-generated infinite BGM streams." },
+  "feat_sf_membersOnly_label": { "message": "Members only" },
+  "feat_sf_membersOnly_desc": { "message": "Remove videos with the \"Members only\" thumbnail badge that require channel membership to watch." },
+  "feat_sf_watched_label": { "message": "Already watched" },
+  "feat_sf_watched_desc": { "message": "Remove videos that show a resume-playback overlay (already watched)." },
+  "feat_sf_removeTopicsSection_label": { "message": "\"More topics\" section" },
+  "feat_sf_removeTopicsSection_desc": { "message": "Remove the \"More topics\" genre recommendation section (ytd-rich-section-renderer) at the bottom of Home (feed pages only)." },
+  "feat_sf_removeBreakingNewsSection_label": { "message": "\"Breaking news\" section" },
+  "feat_sf_removeBreakingNewsSection_desc": { "message": "Remove the breaking-news article section (ytd-rich-section-renderer) on Home (feed pages only)." },
+  "feat_sf_shelf_label": { "message": "Video shelf" },
+  "feat_sf_shelf_desc": { "message": "Remove video group sections (ytd-shelf-renderer) such as \"Trending\" or \"News\"." },
+  "feat_sf_cardList_label": { "message": "Card list" },
+  "feat_sf_cardList_desc": { "message": "Remove the related-topics horizontal card list (ytd-horizontal-card-list-renderer, second and later)." },
+  "feat_sf_course_label": { "message": "Courses" },
+  "feat_sf_course_desc": { "message": "Remove learning-content cards with the \"Course\" badge (.yt-lockup-view-model--wrapper)." },
+  "feat_sf_channel_label": { "message": "Channel intro card" },
+  "feat_sf_channel_desc": { "message": "Remove the \"This channel\" intro cards (ytd-channel-renderer) injected into search results." },
+  "feat_sf_reel_label": { "message": "Shorts horizontal shelf" },
+  "feat_sf_reel_desc": { "message": "Remove the horizontal Shorts shelf (grid-shelf-view-model). The Home Shorts shelf is removed by removeShortsShelf in \"Video filter\"; the left sidebar entry by removeShortsSidebar in \"Menu / UI\"." },
+  "feat_sf_secondary_label": { "message": "Related search block" },
+  "feat_sf_secondary_desc": { "message": "Remove the \"Related search keywords\" suggestion block at the bottom (ytd-secondary-search-container-renderer)." },
+  "feat_sf_verified_label": { "message": "Verified-channel videos" },
+  "feat_sf_verified_desc": { "message": "Remove videos from channels with a Verified badge (official accounts, news). Feed-page support coming." },
+  "feat_sf_artist_label": { "message": "Artist-channel videos" },
+  "feat_sf_artist_desc": { "message": "Remove videos with an Official Artist Channel badge (e.g. official MVs). Feed-page support coming." },
+  "feat_sf_chapter_label": { "message": "Videos with chapters" },
+  "feat_sf_chapter_desc": { "message": "Remove videos that expose expandable chapter info (expandable-metadata-renderer)." },
+  "feat_sf_demoteUnmatched_label": { "message": "Grey out keyword non-matches" },
+  "feat_sf_demoteUnmatched_desc": { "message": "Half-fade and grayscale videos whose title/description does not contain the search keyword (restored on hover)." },
+  "feat_sf_highlightThumb_label": { "message": "Thumbnail outline" },
+  "feat_sf_highlightThumb_desc": { "message": "Add an akane-red outline and drop shadow around each thumbnail for better scanability (works in dark and light themes)." },
+  "feat_sf_hideComments_label": { "message": "Hide comments" },
+  "feat_sf_hideComments_desc": { "message": "Hide the entire comment section (count, sort, input, threads) on the watch page. Live-stream chat is unaffected." },
+  "feat_sf_hideLiveChat_label": { "message": "Hide live chat" },
+  "feat_sf_hideLiveChat_desc": { "message": "Collapse the live-chat panel on archived live streams using YouTube's own collapse action. Regular videos are unaffected." },
+  "feat_sf_redirectShortsUrl_label": { "message": "Redirect Shorts URL to /watch" },
+  "feat_sf_redirectShortsUrl_desc": { "message": "Force a /shorts/<ID> vertical-video page to the regular /watch?v=<ID> player." },
+  "feat_sf_searchGrid_label": { "message": "Show search results as grid" },
+  "feat_sf_searchGrid_desc": { "message": "Convert search results from a single-column list to a multi-column grid (uses Home columns 4/5/6 if set; otherwise 3 columns)." },
+  "feat_sf_removeShortsChip_label": { "message": "Shorts filter chip" },
+  "feat_sf_removeShortsChip_desc": { "message": "Remove only the \"Shorts\" chip from the filter row (\"All / Videos / Shorts / Playlists …\") at the top of the search page." },
+  "feat_sf_removeShortsSidebar_label": { "message": "Shorts sidebar entry" },
+  "feat_sf_removeShortsSidebar_desc": { "message": "Remove the \"Shorts\" entry from the left sidebar (both expanded and collapsed forms)." },
+  "feat_sf_subsLeftnavInjectAll_label": { "message": "Show all subscriptions in the left menu" },
+  "feat_sf_subsLeftnavInjectAll_desc": { "message": "Inject all subscriptions hidden by YouTube's display cap into the left sidebar Subscriptions section (fetched same-origin from /feed/channels, cached 24h)." },
+  "feat_sf_subsAllShortcut_label": { "message": "\"All subscriptions\" shortcut" },
+  "feat_sf_subsAllShortcut_desc": { "message": "Add a one-click entry to /feed/channels at the top of the left sidebar Subscriptions section, styled like a native menu item." },
+  "feat_sf_subsChannelsGrid_label": { "message": "Subscriptions page as grid (with search & sort)" },
+  "feat_sf_subsChannelsGrid_desc": { "message": "Reshape /feed/channels into a responsive grid like a video feed, with a search box and sort toggle (name / subscribers / subscription order). Each card lazy-fetches the latest video thumbnail when entering the viewport (cached 24h)." },
+
+  "feat_ig_reels_label": { "message": "Remove Reels" },
+  "feat_ig_reels_desc": { "message": "Hide the Reels entry in the sidebar/navigation and force-redirect /reels/ URLs to Home." },
+  "feat_ig_explore_label": { "message": "Remove Explore" },
+  "feat_ig_explore_desc": { "message": "Hide the Explore entry in the sidebar/navigation and force-redirect /explore/ URLs to Home." },
+  "feat_ig_stories_label": { "message": "Hide Stories tray (home)" },
+  "feat_ig_stories_desc": { "message": "Hide the Stories tray (24h disappearing short videos) at the top of the Home feed via CSS." },
+  "feat_ig_storiesAll_label": { "message": "Redirect Stories URLs to home" },
+  "feat_ig_storiesAll_desc": { "message": "Redirect any /stories/ visit to Home (prevents accidental clicks on shared links)." },
+  "feat_ig_threads_label": { "message": "Hide Threads promotion" },
+  "feat_ig_threads_desc": { "message": "Hide the banner, sidebar entry, and footer link that promote the Threads app." },
+  "feat_ig_vanity_label": { "message": "Hide like and follower counts" },
+  "feat_ig_vanity_desc": { "message": "Detect numeric buttons (commas, k, M, etc.) inside <article> and hide them to reduce comparison fatigue." },
+  "feat_ig_blockVideos_label": { "message": "Block videos in posts" },
+  "feat_ig_blockVideos_desc": { "message": "Mark <video> elements inside feed <article>s and replace them with a thumbnail via CSS to prevent autoplay." },
+  "feat_ig_comments_label": { "message": "Hide comments" },
+  "feat_ig_comments_desc": { "message": "Hide the comment list, input form, and \"View N comments\" link via CSS." },
+  "feat_ig_notes_label": { "message": "Hide Notes" },
+  "feat_ig_notes_desc": { "message": "Hide the Notes row (short status messages over profile photos) at the top of the DM screen." },
+  "feat_ig_msgCounters_label": { "message": "Hide unread DM badge" },
+  "feat_ig_msgCounters_desc": { "message": "Hide the unread DM count badge (red circle with a number) on the navigation to ease notification pressure." },
+  "feat_ig_imageDownload_label": { "message": "Show download button on images" },
+  "feat_ig_imageDownload_desc": { "message": "Overlay a download button on the top-left of post photos (feed / profile grid / post detail) on hover. Picks the largest variant from srcset." },
+
+  "feat_tt_hideComments_label": { "message": "Hide comments" },
+  "feat_tt_hideComments_desc": { "message": "Hide the comment panel (the comment list shown alongside the player), the comment icon button, and the comment count via CSS." },
+  "feat_tt_hideSuggested_label": { "message": "Hide suggested accounts" },
+  "feat_tt_hideSuggested_desc": { "message": "Hide the \"Suggested accounts\" section injected into For You / Following feeds and profiles via CSS." },
+  "feat_tt_imageDownload_label": { "message": "Show download button on images" },
+  "feat_tt_imageDownload_desc": { "message": "Overlay a download button on the top-left of photo posts and video thumbnails on hover." }
+}

@@ -1,5 +1,7 @@
 # プライバシーポリシー - WEB閲覧アシスト
 
+> [English version](privacy-policy.en.md) is also available.
+
 最終更新日: 2026年5月4日
 
 ## はじめに

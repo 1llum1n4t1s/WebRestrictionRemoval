@@ -11,9 +11,95 @@
  *   - 音量ブースターはマスタートグルなしの常時表示。100% で AudioContext 解放、
  *     それ以外の値で増幅処理を起動する
  *   - カラーピッカータブは EyeDropper API で画面色を採取し、履歴 / format chips / コピー先制御を提供
+ *
+ * ローカライズ:
+ *   - 全 UI 文字列は `_locales/{en,ja}/messages.json` から `chrome.i18n.getMessage` 経由で取得する
+ *   - 静的テキストは popup.html の `data-i18n` / `data-i18n-html` / `data-i18n-attr` 属性で指定し、
+ *     applyI18nToDom() が DOMContentLoaded で一括適用する
+ *   - 動的テキスト（status / picker note / pill 等）は i18n() ヘルパー経由
+ *   - ブラウザ UI 言語が ja → 日本語、それ以外 → 英語にフォールバック
+ *     （manifest.json の `default_locale: "en"` で実現）
  */
 
+/**
+ * `chrome.i18n.getMessage(key, substitutions)` の薄いラッパ。
+ * - test 環境（Node）等で chrome global が無いケースでも throw しない
+ * - キーが messages.json に無いと空文字を返すので、呼び出し側で fallback を持っても良い
+ */
+function i18n(key, ...substitutions) {
+  if (!key) return "";
+  if (typeof chrome === "undefined" || !chrome.i18n || !chrome.i18n.getMessage) return "";
+  if (substitutions.length === 0) return chrome.i18n.getMessage(key) || "";
+  return chrome.i18n.getMessage(key, substitutions) || "";
+}
+
+/**
+ * カテゴリ id（例 "video_filter"）を category メッセージキー（例 "categoryVideoFilter"）に変換する。
+ * actions.js の CATEGORIES の id と messages.json のキー命名規則を機械的に対応付ける。
+ */
+function categoryMessageKey(categoryId) {
+  if (typeof categoryId !== "string" || !categoryId) return "";
+  const camel = categoryId
+    .split("_")
+    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join("");
+  return `category${camel}`;
+}
+
+/**
+ * `data-i18n` / `data-i18n-html` / `data-i18n-attr` 属性を持つ要素群に対して
+ * messages.json のメッセージを一括適用する。popup.html を fallback 日本語入りで配信し、
+ * DOMContentLoaded 直後にここで上書きすることで、英語環境でも違和感のない UI を出す。
+ *
+ * - data-i18n="key": textContent を上書き
+ * - data-i18n-html="key": innerHTML を上書き（messages.json は信頼できるソースのみなので XSS リスク無し）
+ * - data-i18n-attr="attr1:key1;attr2:key2": 任意属性を上書き（aria-label / placeholder / title 等）
+ */
+function applyI18nToDom(root) {
+  const scope = root || document;
+  // textContent
+  scope.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    const msg = i18n(key);
+    if (msg) el.textContent = msg;
+  });
+  // innerHTML（<code> タグ等のマークアップを含む説明文用）
+  scope.querySelectorAll("[data-i18n-html]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-html");
+    const msg = i18n(key);
+    if (msg) el.innerHTML = msg;
+  });
+  // 属性
+  scope.querySelectorAll("[data-i18n-attr]").forEach((el) => {
+    const spec = el.getAttribute("data-i18n-attr") || "";
+    spec.split(";").forEach((pair) => {
+      const idx = pair.indexOf(":");
+      if (idx < 0) return;
+      const attr = pair.slice(0, idx).trim();
+      const key = pair.slice(idx + 1).trim();
+      if (!attr || !key) return;
+      const msg = i18n(key);
+      if (msg) el.setAttribute(attr, msg);
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
+  // ----- ローカライズ: 静的テキストを最初に置換し、英語環境での FOUT を最小化 -----
+  // <html lang> も UI 言語に追従させる（フォントフォールバックや スクリーンリーダー向け）
+  try {
+    if (chrome?.i18n?.getUILanguage) {
+      const ui = chrome.i18n.getUILanguage();
+      if (typeof ui === "string" && ui.length > 0) {
+        document.documentElement.lang = ui.startsWith("ja") ? "ja" : "en";
+      }
+    }
+  } catch {
+    // 読めなくても表示には影響しない
+  }
+  applyI18nToDom();
+
   // ----- 観測性: 拡張バージョンを footer に表示 (I-7) -----
   // サポート対応時の「バージョンを教えてください」コストを削るため、popup を開けば常時見える形で提示。
   // chrome.runtime.getManifest() は同期 API なので非同期処理を待たずに即時反映できる。
@@ -285,7 +371,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof window.EyeDropper !== "function") {
     $pickBtn.disabled = true;
     $pickerNote.classList.add("is-error");
-    $pickerNote.textContent = "EyeDropper API に対応していません。Chrome 95+ をお使いください。";
+    $pickerNote.textContent = i18n("eyedropperUnsupported");
   }
 
   // ---------- タブ初期化 ----------
@@ -507,7 +593,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     icon.textContent = "🔢";
     const nameSpan = document.createElement("span");
     nameSpan.className = "select-name";
-    nameSpan.textContent = "ホーム列数";
+    nameSpan.textContent = i18n("gridItemsLabel");
     label.append(icon, nameSpan);
 
     const select = document.createElement("select");
@@ -519,7 +605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * クリーナー詳細アコーディオンの DOM ビルダー（YouTube クリーナー / Instagram クリーナー共通）。
+   * クリーナー詳細アコーディオンの DOM ビルダー（YouTube クリーナー / Instagram クリーナー / TikTok クリーナー共通）。
    *
    * 構造: `cat` > `cat-head` (アイコン + ラベル) + `cat-list` (各機能のトグル行)。
    * 各 `feature-row` は 1 行 1 トグル + 説明文の縦積みレイアウト。
@@ -527,8 +613,11 @@ document.addEventListener("DOMContentLoaded", async () => {
    * `inputMap` (`Map<key, input>`) に登録して呼び出し側で値の収集・復元に使う。
    *
    * カテゴリ id が "menu_ui" のときは末尾にホーム列数 select 行を動的挿入する。
+   *
+   * @param {string} messageKeyPrefix `feat_sf_` / `feat_ig_` / `feat_tt_` のいずれか。
+   *   これに `${item.key}_label` / `${item.key}_desc` を後置して messages.json から取得する。
    */
-  function _buildAccordionCategories(rootEl, categories, features, inputMap, idPrefix) {
+  function _buildAccordionCategories(rootEl, categories, features, inputMap, idPrefix, messageKeyPrefix) {
     const frag = document.createDocumentFragment();
     for (const cat of categories) {
       const items = features.filter((f) => f.category === cat.id);
@@ -545,7 +634,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       headIcon.textContent = cat.icon;
       headIcon.setAttribute("aria-hidden", "true");
       const headLabel = document.createElement("span");
-      headLabel.textContent = cat.label;
+      headLabel.textContent = i18n(categoryMessageKey(cat.id));
       head.append(headIcon, headLabel);
 
       const list = document.createElement("div");
@@ -560,13 +649,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const name = document.createElement("span");
         name.className = "fr-name";
-        name.textContent = item.label;
+        name.textContent = i18n(`${messageKeyPrefix}${item.key}_label`);
         text.appendChild(name);
 
-        if (item.desc) {
+        const descMessage = i18n(`${messageKeyPrefix}${item.key}_desc`);
+        if (descMessage) {
           const desc = document.createElement("span");
           desc.className = "fr-desc";
-          desc.textContent = item.desc;
+          desc.textContent = descMessage;
           text.appendChild(desc);
         }
 
@@ -587,7 +677,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       // menu_ui カテゴリの末尾にホーム列数 select 行を挿入。
-      // （Instagram クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
+      // （Instagram / TikTok クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
       if (cat.id === "menu_ui") {
         _buildGridItemsRow(list);
       }
@@ -604,7 +694,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       SearchFixer.CATEGORIES,
       SearchFixer.FEATURES,
       featureInputs,
-      "feature-"
+      "feature-",
+      "feat_sf_"
     );
   }
 
@@ -612,7 +703,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const opt of SearchFixer.GRID_OPTIONS) {
       const o = document.createElement("option");
       o.value = String(opt.value);
-      o.textContent = opt.label;
+      o.textContent = i18n(opt.messageKey);
       $gridItemsSelect.appendChild(o);
     }
   }
@@ -625,7 +716,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const total = featureInputs.size;
     // section title の grp-pill に「ON 数 / 全数 機能」を集約表示する。
     // アコーディオン廃止に伴い旧 .acc-count バッジは削除し、pill 1 つに情報を統合。
-    if ($searchFixerPill) $searchFixerPill.textContent = `${on}/${total} 機能`;
+    if ($searchFixerPill) $searchFixerPill.textContent = i18n("pillTemplate", String(on), String(total));
   }
 
   function updateCleanerDimState() {
@@ -640,7 +731,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       InstagramCleaner.CATEGORIES,
       InstagramCleaner.FEATURES,
       igFeatureInputs,
-      "ig-feature-"
+      "ig-feature-",
+      "feat_ig_"
     );
   }
 
@@ -650,8 +742,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (input.checked) on++;
     }
     const total = igFeatureInputs.size;
-    // section title の grp-pill に「ON 数 / 全数 機能」を集約表示（YouTube 側と同じ集約方針）。
-    if ($instagramCleanerPill) $instagramCleanerPill.textContent = `${on}/${total} 機能`;
+    if ($instagramCleanerPill) $instagramCleanerPill.textContent = i18n("pillTemplate", String(on), String(total));
   }
 
   function updateIgCleanerDimState() {
@@ -666,7 +757,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       TikTokCleaner.CATEGORIES,
       TikTokCleaner.FEATURES,
       ttFeatureInputs,
-      "tt-feature-"
+      "tt-feature-",
+      "feat_tt_"
     );
   }
 
@@ -676,7 +768,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (input.checked) on++;
     }
     const total = ttFeatureInputs.size;
-    if ($tiktokCleanerPill) $tiktokCleanerPill.textContent = `${on}/${total} 機能`;
+    if ($tiktokCleanerPill) $tiktokCleanerPill.textContent = i18n("pillTemplate", String(on), String(total));
   }
 
   function updateTtCleanerDimState() {
@@ -746,11 +838,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           "ok"
         );
       } else {
-        showStatus("⚠️ このページには適用できません", "error");
+        showStatus(i18n("applyError"), "error");
       }
     } catch {
       if (seq !== applySeq) return;
-      showStatus("⚠️ このページには適用できません", "error");
+      showStatus(i18n("applyError"), "error");
     }
   }
 
@@ -787,19 +879,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     videoGammaEnabled
   ) {
     const parts = [];
-    if (keepAliveEnabled) parts.push("セッション維持");
-    if (searchFixerEnabled) parts.push("YT クリーナー");
-    if (amazonDeliveryTotalEnabled) parts.push("Amazon");
-    if (instagramCleanerEnabled) parts.push("Instagram");
-    if (tiktokCleanerEnabled) parts.push("TikTok");
-    if (videoGammaEnabled) parts.push("映像補正");
-    if (parts.length === 0) return "⏹  すべて停止";
-    return "✓  " + parts.join("  /  ");
+    if (keepAliveEnabled) parts.push(i18n("applyOkSession"));
+    if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
+    if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
+    if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
+    if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
+    if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
+    if (parts.length === 0) return i18n("applyOkAllStopped");
+    return i18n("applyOkPrefix") + parts.join(i18n("applyOkSeparator"));
   }
 
   // ----- ヘルパー -----
   function updateIntervalLabel(min) {
-    $intervalValue.textContent = `${min} min`;
+    $intervalValue.textContent = i18n("intervalUnit", String(min));
   }
 
   function updateIntervalRowVisibility() {
@@ -870,7 +962,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // 副作用ゼロ路に倒して終了する (/rere B1-S2-1)。
     if (!document.body?.isConnected) return;
     if (!tab) {
-      setVolumeHint("⚠ このページでは使えません", true);
+      setVolumeHint(i18n("volumeErrorUnsupportedPage"), true);
       return;
     }
     try {
@@ -892,39 +984,39 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch {
       if (!document.body?.isConnected) return;
-      setVolumeHint("⚠ 通信エラー", true);
+      setVolumeHint(i18n("volumeErrorCommunication"), true);
     }
   }
 
   /**
-   * background が返すエラーコード文字列を、ユーザー向けの短い日本語ヒントに翻訳する。
+   * background が返すエラーコード文字列を、ユーザー向けの短いローカライズメッセージに翻訳する。
    * 不明なエラーは raw text を UI に漏らさず、汎用メッセージにフォールバックして
    * console.warn にだけ原文を出力する（開発時の調査は DevTools 経由で行う）。
    */
   function formatVolumeError(error) {
-    if (!error) return "⚠ このページでは使えません";
+    if (!error) return i18n("volumeErrorUnsupportedPage");
     const s = String(error);
-    if (s.includes("invalid-tab-id")) return "⚠ タブを取得できません";
-    if (s.includes("offscreen-unavailable")) return "⚠ 内部処理を起動できません";
-    if (s.includes("invalid-stream-id")) return "⚠ 音声を取得できません";
+    if (s.includes("invalid-tab-id")) return i18n("volumeErrorInvalidTab");
+    if (s.includes("offscreen-unavailable")) return i18n("volumeErrorOffscreenUnavailable");
+    if (s.includes("invalid-stream-id")) return i18n("volumeErrorInvalidStream");
     // B1-B2 対策: getVolumeBoosterGain の await 中にタブが閉じられた race で
     // 「No tab with id」「Cannot find tab」等が返るケースを明示的に翻訳する。
     if (/no tab|cannot find.*tab|tab.*not found|invalid.*tab/i.test(s)) {
-      return "⚠ タブが閉じられました";
+      return i18n("volumeErrorTabClosed");
     }
     if (/Tab capture not granted|user gesture/i.test(s)) {
-      return "⚠ ポップアップ操作中のみ変更可能です";
+      return i18n("volumeErrorUserGesture");
     }
     if (/cannot capture|chrome:|edge:/i.test(s)) {
-      return "⚠ このページでは使えません";
+      return i18n("volumeErrorUnsupportedPage");
     }
     if (/permission/i.test(s)) {
-      return "⚠ 権限エラー";
+      return i18n("volumeErrorPermission");
     }
     // 不明なエラー: ユーザーには汎用メッセージのみ提示し、原文は DevTools console に。
     // raw error text を UI に出すと内部実装が漏れるため意図的に隠す。
     console.warn("[VolumeBooster] Unknown error:", s);
-    return "⚠ 音量設定に失敗しました";
+    return i18n("volumeErrorUnknown");
   }
 
   function updateVolumeBoosterDimState() {
@@ -991,7 +1083,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if ($pickBtn.disabled) return;
     $pickBtn.disabled = true;
     $pickerNote.classList.remove("is-error");
-    $pickerNote.textContent = "スポイト起動中… 画面上の色をクリック（Esc でキャンセル）";
+    $pickerNote.textContent = i18n("pickerNoteActive");
 
     try {
       const dropper = new EyeDropper();
@@ -1014,19 +1106,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       const { text, label } = formatColor(hex, defaultFormat, { includeHash: hexIncludeHash });
       try {
         await navigator.clipboard.writeText(text);
-        showStatus(`採取 — ${label}: ${text} をコピーしました`, "ok");
+        showStatus(i18n("pickerCopyOk", label, text), "ok");
       } catch {
-        showStatus(`採取 — ${label}: ${text}（コピー失敗）`, "");
+        showStatus(i18n("pickerCopyFail", label, text), "");
       }
       $pickerNote.classList.remove("is-error");
-      $pickerNote.textContent = "もう一度押すと続けて採取できます。";
+      $pickerNote.textContent = i18n("pickerNoteRetake");
     } catch (err) {
       // ユーザーがキャンセル (AbortError) は静かに戻す
       if (err && err.name === "AbortError") {
-        $pickerNote.textContent = "採取をキャンセルしました。";
+        $pickerNote.textContent = i18n("pickerNoteCancelled");
       } else {
         $pickerNote.classList.add("is-error");
-        $pickerNote.textContent = "色の採取に失敗しました。再度お試しください。";
+        $pickerNote.textContent = i18n("pickerNoteFailed");
       }
     } finally {
       $pickBtn.disabled = false;
@@ -1041,7 +1133,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       .catch(() => {});
     setEmptyState();
     renderHistory();
-    showStatus("標本箱を空にしました。", "ok");
+    showStatus(i18n("historyClearedToast"), "ok");
   }
 
   async function onFormatChange(ev) {
@@ -1079,9 +1171,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           glyph.textContent = original;
         }, 1100);
       }
-      showStatus(`${label}: ${text} をコピー`, "ok");
+      showStatus(i18n("copyOkToast", label, text), "ok");
     } catch {
-      showStatus("コピーに失敗しました。", "warn");
+      showStatus(i18n("copyFailToast"), "warn");
     }
   }
 
@@ -1097,9 +1189,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const { text, label } = formatColor(hex, defaultFormat, { includeHash: hexIncludeHash });
     try {
       await navigator.clipboard.writeText(text);
-      showStatus(`${label}: ${text} をコピー`, "ok");
+      showStatus(i18n("copyOkToast", label, text), "ok");
     } catch {
-      showStatus(`${label}: ${text}`, "");
+      showStatus(i18n("copyToast", label, text), "");
     }
   }
 
@@ -1123,8 +1215,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     $rgbValue.dataset.empty = "true";
     $hslValue.dataset.empty = "true";
     $specimenNo.textContent = "No. — —";
-    $specimenTime.textContent = "未採取";
-    $specimenPill.textContent = "未採取";
+    $specimenTime.textContent = i18n("specimenTimeEmpty");
+    $specimenPill.textContent = i18n("specimenPillEmpty");
     for (const btn of $copyBtns) btn.disabled = true;
   }
 
@@ -1184,11 +1276,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       btn.style.background = entry.hex;
       btn.dataset.hex = entry.hex;
       btn.dataset.ts = String(entry.ts);
-      btn.title = `${entry.hex.toUpperCase()} — ${formatTime(entry.ts)}`;
-      btn.setAttribute(
-        "aria-label",
-        `${entry.hex.toUpperCase()} を呼び出して既定形式でコピー`
-      );
+      const hexUpper = entry.hex.toUpperCase();
+      btn.title = i18n("historyChipTitle", hexUpper, formatTime(entry.ts));
+      btn.setAttribute("aria-label", i18n("historyChipAria", hexUpper));
 
       const meta = document.createElement("span");
       meta.className = "history-meta";
@@ -1324,7 +1414,7 @@ function findHistoryIndex(list, hex) {
   return list.findIndex((it) => it.hex === norm);
 }
 
-/** タイムスタンプを popup 用にコンパクトな日本語文字列にする。当日は HH:mm のみ。 */
+/** タイムスタンプを popup 用にコンパクトな文字列にする。当日は HH:mm のみ。 */
 function formatTime(ts) {
   if (!Number.isFinite(ts)) return "—";
   const d = new Date(ts);

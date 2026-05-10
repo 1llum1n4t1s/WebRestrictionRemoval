@@ -332,8 +332,9 @@
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = ImageDownloader.BUTTON_CLASS;
-    btn.setAttribute("aria-label", "画像をダウンロード");
-    btn.title = "画像をダウンロード";
+    const dlLabel = chrome.i18n.getMessage("imageDownloadButtonLabel") || "画像をダウンロード";
+    btn.setAttribute("aria-label", dlLabel);
+    btn.title = dlLabel;
     btn.appendChild(buildDownloadIcon());
     // capture phase で stop して、下層要素の click（YouTube サムネクリック → 動画再生等）に伝播させない
     btn.addEventListener(

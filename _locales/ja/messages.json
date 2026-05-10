@@ -1,0 +1,297 @@
+{
+  "appName": {
+    "message": "WEB閲覧アシスト",
+    "description": "拡張機能名 (chrome://extensions およびストア表示)"
+  },
+  "appDescription": {
+    "message": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整える Chrome 拡張機能。",
+    "description": "拡張機能の短い説明 (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "WEB閲覧アシスト",
+    "description": "ツールバーアイコンの hover ツールチップ"
+  },
+
+  "headerTitle": {
+    "message": "WEB閲覧アシスト",
+    "description": "popup ヘッダーの h1"
+  },
+  "headerTagline": {
+    "message": "増幅 / 整理 / 維持 を 1 つのパネルから",
+    "description": "popup ヘッダーのタグライン"
+  },
+
+  "tabbarAriaLabel": { "message": "ポップアップタブ" },
+  "tabTune": { "message": "調整" },
+  "tabYoutube": { "message": "YouTube" },
+  "tabInstagram": { "message": "Instagram" },
+  "tabTiktok": { "message": "TikTok" },
+  "tabPicker": { "message": "カラーピッカー" },
+
+  "groupAudio": { "message": "オーディオ" },
+  "groupVideo": { "message": "映像" },
+  "groupAmazon": { "message": "Amazon" },
+  "groupSession": { "message": "セッション" },
+
+  "volumeBoosterMaster": { "message": "音量ブースター" },
+  "volumeBoosterMasterDesc": { "message": "タブの音声を増幅・補正します。設定はタブ切替で自動適用されます" },
+  "volumeSubLabel": { "message": "音量ブースター" },
+  "volumeSubDesc": { "message": "動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです" },
+  "volumeReset100Btn": { "message": "100% に戻す" },
+  "volumeReset100Aria": { "message": "音量を 100% に戻す" },
+  "volumeAntiClipLabel": { "message": "自動歪み防止" },
+  "volumeAntiClipDesc": { "message": "突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます" },
+  "volumeNormalizeLabel": { "message": "自動音量正規化" },
+  "volumeNormalizeDesc": { "message": "動画や配信ごとの平均音量を測り、自動ゲインで聞こえ方をそろえます" },
+  "volumeNightModeLabel": { "message": "ナイトモード" },
+  "volumeNightModeDesc": { "message": "大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます" },
+
+  "videoGammaMaster": { "message": "動画ガンマ補正" },
+  "videoGammaMasterDescHtml": {
+    "message": "ページ上の <code class=\"tr-code\">&lt;video&gt;</code> 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利",
+    "description": "動画ガンマ補正マスタートグルの説明 (HTML を含む)"
+  },
+  "videoGammaSubLabel": { "message": "ガンマ値" },
+  "videoGammaSubDesc": { "message": "1.0 で補正なし。1.0 未満で暗部を持ち上げて明るく、1.0 超でコントラストを上げて暗く" },
+  "videoGammaResetBtn": { "message": "1.0 に戻す" },
+  "videoGammaResetAria": { "message": "ガンマ値を 1.0 に戻す" },
+
+  "amazonDeliveryMaster": { "message": "定期おトク便 月別合計" },
+  "amazonDeliveryMasterDescHtml": {
+    "message": "配送月ごとの合計金額を <code class=\"tr-code\">/auto-deliveries</code> ページに表示",
+    "description": "Amazon 定期おトク便マスタートグルの説明 (HTML を含む)"
+  },
+
+  "keepAliveMaster": { "message": "セッション維持" },
+  "keepAliveMasterDesc": { "message": "現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット" },
+  "keepAliveIntervalLabel": { "message": "ポーリング間隔" },
+  "keepAliveHttpPingLabel": { "message": "サーバーへの軽量 ping を併発" },
+  "keepAliveHttpPingDesc": { "message": "このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨" },
+
+  "searchFixerMaster": { "message": "YouTube クリーナー" },
+  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 29 サブ機能を一括管理" },
+
+  "instagramCleanerMaster": { "message": "Instagram クリーナー" },
+  "instagramCleanerMasterDesc": { "message": "Reels / Explore / Stories などの冗長 UI を一括非表示" },
+
+  "tiktokCleanerMaster": { "message": "TikTok クリーナー" },
+  "tiktokCleanerMasterDesc": { "message": "コメント欄 / おすすめのアカウントなどの冗長 UI を一括非表示" },
+
+  "cleanerHint": { "message": "マスタートグル（クリーナー）が ON のときだけ動作します。個別に ON / OFF を選んでカスタマイズしてください。" },
+
+  "pickerActivateJp": { "message": "スポイトで色を採取する" },
+  "pickerActivateEn": { "message": "activate eyedropper" },
+  "pickerNoteIdle": { "message": "ボタンを押すと画面上のどこでも色を採取できます（Esc でキャンセル）。" },
+  "specimenAriaLabel": { "message": "採取した色" },
+  "specimenTitle": { "message": "標本" },
+  "specimenPillEmpty": { "message": "未採取" },
+  "specimenNoEmpty": { "message": "No. — —" },
+  "specimenTimeEmpty": { "message": "未採取" },
+  "copyHexAria": { "message": "HEX をコピー" },
+  "copyRgbAria": { "message": "RGB をコピー" },
+  "copyHslAria": { "message": "HSL をコピー" },
+  "formatTitle": { "message": "既定の保存形式" },
+  "formatGroupAriaLabel": { "message": "既定の保存形式" },
+  "formatLegend": { "message": "既定の保存形式" },
+  "formatRowAria": { "message": "既定の保存形式" },
+  "formatHashLabel": { "message": "HEX に # を含める" },
+  "formatNote": { "message": "採取・履歴クリック時にこの形式で自動コピーされます。" },
+  "historyTitle": { "message": "標本箱" },
+  "historyEmpty": { "message": "まだ標本がありません。スポイトで採取してください。" },
+  "historyClearBtn": { "message": "標本箱を空にする" },
+  "extVersionAriaLabel": { "message": "拡張機能のバージョン" },
+
+  "eyedropperUnsupported": { "message": "EyeDropper API に対応していません。Chrome 95+ をお使いください。" },
+  "pickerNoteActive": { "message": "スポイト起動中… 画面上の色をクリック（Esc でキャンセル）" },
+  "pickerNoteRetake": { "message": "もう一度押すと続けて採取できます。" },
+  "pickerNoteCancelled": { "message": "採取をキャンセルしました。" },
+  "pickerNoteFailed": { "message": "色の採取に失敗しました。再度お試しください。" },
+  "pickerCopyOk": {
+    "message": "採取 — $FORMAT$: $TEXT$ をコピーしました",
+    "placeholders": {
+      "format": { "content": "$1", "example": "HEX" },
+      "text": { "content": "$2", "example": "#C0605A" }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "採取 — $FORMAT$: $TEXT$（コピー失敗）",
+    "placeholders": {
+      "format": { "content": "$1", "example": "HEX" },
+      "text": { "content": "$2", "example": "#C0605A" }
+    }
+  },
+  "historyClearedToast": { "message": "標本箱を空にしました。" },
+  "copyOkToast": {
+    "message": "$FORMAT$: $TEXT$ をコピー",
+    "placeholders": {
+      "format": { "content": "$1" },
+      "text": { "content": "$2" }
+    }
+  },
+  "copyFailToast": { "message": "コピーに失敗しました。" },
+  "copyToast": {
+    "message": "$FORMAT$: $TEXT$",
+    "placeholders": {
+      "format": { "content": "$1" },
+      "text": { "content": "$2" }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": { "content": "$1" },
+      "time": { "content": "$2" }
+    }
+  },
+  "historyChipAria": {
+    "message": "$HEX$ を呼び出して既定形式でコピー",
+    "placeholders": {
+      "hex": { "content": "$1" }
+    }
+  },
+
+  "pillTemplate": {
+    "message": "$ON$/$TOTAL$ 機能",
+    "placeholders": {
+      "on": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+
+  "gridItemsLabel": { "message": "ホーム列数" },
+  "gridAuto": { "message": "自動（YouTube 既定）" },
+  "grid4Cols": { "message": "4 列" },
+  "grid5Cols": { "message": "5 列" },
+  "grid6Cols": { "message": "6 列" },
+
+  "categoryMenuUi": { "message": "メニュー / UI" },
+  "categoryVideoFilter": { "message": "動画フィルタ" },
+  "categoryWatchPage": { "message": "動画ページ" },
+  "categorySearchOnly": { "message": "検索結果" },
+  "categoryIgMain": { "message": "主要機能" },
+  "categoryIgExtra": { "message": "追加機能" },
+  "categoryTtMain": { "message": "主要機能" },
+
+  "applyOkSession": { "message": "セッション維持" },
+  "applyOkSearchFixer": { "message": "YT クリーナー" },
+  "applyOkAmazon": { "message": "Amazon" },
+  "applyOkInstagram": { "message": "Instagram" },
+  "applyOkTiktok": { "message": "TikTok" },
+  "applyOkVideoGamma": { "message": "映像補正" },
+  "applyOkAllStopped": { "message": "⏹  すべて停止" },
+  "applyOkPrefix": { "message": "✓  " },
+  "applyOkSeparator": { "message": "  /  " },
+  "applyError": { "message": "⚠️ このページには適用できません" },
+
+  "intervalUnit": {
+    "message": "$N$ min",
+    "description": "セッション維持のポーリング間隔表示 (例: 4 min)。「分」単位は短縮の min を使用",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+
+  "volumeErrorInvalidTab": { "message": "⚠ タブを取得できません" },
+  "volumeErrorOffscreenUnavailable": { "message": "⚠ 内部処理を起動できません" },
+  "volumeErrorInvalidStream": { "message": "⚠ 音声を取得できません" },
+  "volumeErrorTabClosed": { "message": "⚠ タブが閉じられました" },
+  "volumeErrorUserGesture": { "message": "⚠ ポップアップ操作中のみ変更可能です" },
+  "volumeErrorUnsupportedPage": { "message": "⚠ このページでは使えません" },
+  "volumeErrorPermission": { "message": "⚠ 権限エラー" },
+  "volumeErrorUnknown": { "message": "⚠ 音量設定に失敗しました" },
+  "volumeErrorCommunication": { "message": "⚠ 通信エラー" },
+
+  "amazonTotalText": { "message": "合計金額" },
+  "amazonTotalUnit": { "message": "円" },
+  "amazonTotalAriaLabel": { "message": "この月の合計金額" },
+  "subsAllShortcutLabel": { "message": "すべての登録チャンネル" },
+  "subsSearchPlaceholder": { "message": "チャンネル名で絞り込み" },
+  "imageDownloadButtonLabel": { "message": "画像をダウンロード" },
+
+  "feat_sf_playlist_label": { "message": "プレイリスト" },
+  "feat_sf_playlist_desc": { "message": "プレイリスト項目（playlist?list= リンク / 「N 本の動画」バッジ）を除去" },
+  "feat_sf_mix_label": { "message": "ミックス" },
+  "feat_sf_mix_desc": { "message": "YouTube 自動生成ミックス（&list=RD&start_radio=1 / 「ミックスリスト」バッジ）を除去" },
+  "feat_sf_shortsBtn_label": { "message": "Shorts 動画（個別）" },
+  "feat_sf_shortsBtn_desc": { "message": "通常動画グリッドに混ざる単独の Shorts カード（サムネ URL が /shorts/ の縦動画項目）を除去" },
+  "feat_sf_removeShortsShelf_label": { "message": "Shorts 棚" },
+  "feat_sf_removeShortsShelf_desc": { "message": "ホームの Shorts 棚 (ytd-rich-shelf-renderer[is-shorts]) と検索結果の Shorts 横棚 (ytd-reel-shelf-renderer) を物理削除" },
+  "feat_sf_live_label": { "message": "ライブ / プレミア / ステーション" },
+  "feat_sf_live_desc": { "message": "「LIVE / ライブ / PREMIERE / プレミア / ステーション」サムネバッジ付き動画を除去。ステーション = YouTube が機械生成する BGM 無限放送" },
+  "feat_sf_membersOnly_label": { "message": "メンバー限定" },
+  "feat_sf_membersOnly_desc": { "message": "チャンネルメンバーシップ加入者のみ視聴可能な「メンバー限定」/「Members only」サムネバッジ付き動画を除去" },
+  "feat_sf_watched_label": { "message": "視聴済み動画" },
+  "feat_sf_watched_desc": { "message": "再生位置バー（resume-playback overlay）が表示されている既視聴動画を除去" },
+  "feat_sf_removeTopicsSection_label": { "message": "「その他のトピック」セクション" },
+  "feat_sf_removeTopicsSection_desc": { "message": "ホーム下部に表示される「その他のトピック」ジャンル別動画リコメンドセクション (ytd-rich-section-renderer) を除去（フィードページのみ）" },
+  "feat_sf_removeBreakingNewsSection_label": { "message": "「ニュース速報」セクション" },
+  "feat_sf_removeBreakingNewsSection_desc": { "message": "ホームに表示される「ニュース速報」/「Breaking news」ニュース記事セクション (ytd-rich-section-renderer) を除去（フィードページのみ）" },
+  "feat_sf_shelf_label": { "message": "動画棚" },
+  "feat_sf_shelf_desc": { "message": "「人気の急上昇」「ニュース」などの動画グループ (ytd-shelf-renderer) を除去" },
+  "feat_sf_cardList_label": { "message": "カードリスト" },
+  "feat_sf_cardList_desc": { "message": "横スクロール関連トピックカード (ytd-horizontal-card-list-renderer の 2 番目以降) を除去" },
+  "feat_sf_course_label": { "message": "コース" },
+  "feat_sf_course_desc": { "message": "「コース」バッジ付きの学習コンテンツカード (.yt-lockup-view-model--wrapper) を除去" },
+  "feat_sf_channel_label": { "message": "チャンネル紹介カード" },
+  "feat_sf_channel_desc": { "message": "検索結果に挟まる「このチャンネル」紹介カード (ytd-channel-renderer) を除去" },
+  "feat_sf_reel_label": { "message": "Shorts 横棚" },
+  "feat_sf_reel_desc": { "message": "Shorts 動画の横並び棚 (grid-shelf-view-model) を除去（ホームの Shorts 棚は「動画フィルタ」の removeShortsShelf、左サイドバーは「メニュー / UI」の removeShortsSidebar が担当）" },
+  "feat_sf_secondary_label": { "message": "関連検索ブロック" },
+  "feat_sf_secondary_desc": { "message": "下部の「関連する検索キーワード」候補ブロック (ytd-secondary-search-container-renderer) を除去" },
+  "feat_sf_verified_label": { "message": "認証チャンネルの動画" },
+  "feat_sf_verified_desc": { "message": "Verified バッジを持つチャンネル（公式アカウント・ニュース）の動画を除去（次版でフィード対応予定）" },
+  "feat_sf_artist_label": { "message": "アーティストチャンネルの動画" },
+  "feat_sf_artist_desc": { "message": "Official Artist Channel バッジ付きの動画（ミュージック公式 MV 等）を除去（次版でフィード対応予定）" },
+  "feat_sf_chapter_label": { "message": "チャプター付き動画" },
+  "feat_sf_chapter_desc": { "message": "チャプター情報 (expandable-metadata-renderer) が展開可能な動画を除去" },
+  "feat_sf_demoteUnmatched_label": { "message": "キーワード非マッチをグレー化" },
+  "feat_sf_demoteUnmatched_desc": { "message": "検索ワードがタイトル・説明文に含まれない動画を半透明 + グレースケール化（hover で復元）" },
+  "feat_sf_highlightThumb_label": { "message": "サムネ枠装飾" },
+  "feat_sf_highlightThumb_desc": { "message": "各動画サムネに茜色の枠線とドロップシャドウを追加して視認性を向上（ダーク/ライト両対応）" },
+  "feat_sf_hideComments_label": { "message": "コメント欄非表示" },
+  "feat_sf_hideComments_desc": { "message": "動画ページ下部のコメントセクション（件数・並び替え・入力欄・スレッド一覧）を一括で非表示化。ライブ配信のチャット欄は対象外" },
+  "feat_sf_hideLiveChat_label": { "message": "ライブチャット欄非表示" },
+  "feat_sf_hideLiveChat_desc": { "message": "ライブ配信アーカイブの右側に表示されるライブコメント欄を、YouTube 公式操作と同じ折りたたみで非表示化。通常動画には影響なし" },
+  "feat_sf_redirectShortsUrl_label": { "message": "Shorts URL を /watch にリダイレクト" },
+  "feat_sf_redirectShortsUrl_desc": { "message": "/shorts/<ID> で開いた縦動画ページを通常の /watch?v=<ID> プレイヤーに強制リダイレクト" },
+  "feat_sf_searchGrid_label": { "message": "検索結果をグリッド表示" },
+  "feat_sf_searchGrid_desc": { "message": "検索結果を 1 列リストから複数列グリッドに変更（ホーム列数が 4/5/6 ならその値、自動なら 3 列）" },
+  "feat_sf_removeShortsChip_label": { "message": "Shorts フィルタチップ" },
+  "feat_sf_removeShortsChip_desc": { "message": "検索ページ上部のフィルタチップ「すべて / 動画 / Shorts / プレイリスト …」のうち「Shorts」チップだけを除去" },
+  "feat_sf_removeShortsSidebar_label": { "message": "Shorts サイドバーメニュー" },
+  "feat_sf_removeShortsSidebar_desc": { "message": "左サイドバー（フル展開 / 折りたたみ両方）の「ショート」メニュー項目を除去" },
+  "feat_sf_subsLeftnavInjectAll_label": { "message": "登録チャンネルを左メニューに全件展開" },
+  "feat_sf_subsLeftnavInjectAll_desc": { "message": "左サイドバーの「登録チャンネル」セクションに、表示上限を超えて隠れていたチャンネルも全件追加表示（/feed/channels から同一オリジン取得、24h キャッシュ）" },
+  "feat_sf_subsAllShortcut_label": { "message": "「すべての登録チャンネル」ショートカット" },
+  "feat_sf_subsAllShortcut_desc": { "message": "左サイドバーの「登録チャンネル」セクションの最上に /feed/channels への 1 クリックエントリを公式メニュー風に追加" },
+  "feat_sf_subsChannelsGrid_label": { "message": "登録チャンネル一覧をグリッド化（検索/ソート付き）" },
+  "feat_sf_subsChannelsGrid_desc": { "message": "/feed/channels ページを動画フィードのようなレスポンシブグリッドに変形 + 上部に検索ボックスとソート切替（名前/登録者数/登録順）。各カードは viewport 進入時に lazy fetch で最新動画サムネを表示（24h キャッシュ）" },
+
+  "feat_ig_reels_label": { "message": "Reels 削除" },
+  "feat_ig_reels_desc": { "message": "サイドバー / ナビの Reels 項目を非表示 + /reels/ URL アクセス時にホーム / へ強制リダイレクト" },
+  "feat_ig_explore_label": { "message": "Explore 削除" },
+  "feat_ig_explore_desc": { "message": "サイドバー / ナビの Explore 項目を非表示 + /explore/ URL アクセス時にホーム / へ強制リダイレクト" },
+  "feat_ig_stories_label": { "message": "ストーリー段非表示（ホーム）" },
+  "feat_ig_stories_desc": { "message": "ホームフィード上部のストーリーズ・トレイ（24h で消える短編動画群）を CSS で非表示化" },
+  "feat_ig_storiesAll_label": { "message": "Stories URL をホームに戻す" },
+  "feat_ig_storiesAll_desc": { "message": "/stories/ パスに直接アクセスした瞬間にホーム / へリダイレクト（リンク踏み防止）" },
+  "feat_ig_threads_label": { "message": "Threads 誘導非表示" },
+  "feat_ig_threads_desc": { "message": "Threads アプリへの誘導バナー / サイドバー項目 / フッターリンクを非表示化" },
+  "feat_ig_vanity_label": { "message": "いいね数・フォロワー数非表示" },
+  "feat_ig_vanity_desc": { "message": "<article> 内の数値表記ボタン（カンマ・k・M・万など）を検出して非表示にし、比較疲れを軽減" },
+  "feat_ig_blockVideos_label": { "message": "投稿内の動画ブロック" },
+  "feat_ig_blockVideos_desc": { "message": "フィード <article> 内の <video> 要素にマーカーを付け、CSS でサムネ画像に差し替えて自動再生を防止" },
+  "feat_ig_comments_label": { "message": "コメント欄非表示" },
+  "feat_ig_comments_desc": { "message": "コメント一覧 / 入力フォーム / 「N 件のコメントを見る」リンクをまとめて CSS で非表示化" },
+  "feat_ig_notes_label": { "message": "Notes 非表示" },
+  "feat_ig_notes_desc": { "message": "DM 画面上部の Notes（プロフィール写真の上に乗る短文ステータス）行を非表示" },
+  "feat_ig_msgCounters_label": { "message": "新規メッセージカウンター非表示" },
+  "feat_ig_msgCounters_desc": { "message": "ナビゲーション上の未読 DM 件数バッジ（赤丸の数字）を非表示にして通知圧力を軽減" },
+  "feat_ig_imageDownload_label": { "message": "画像にダウンロードボタンを表示" },
+  "feat_ig_imageDownload_desc": { "message": "投稿写真（フィード / プロフィールグリッド / 投稿詳細）にマウスを乗せたとき、右上にダウンロードボタンを overlay 表示（srcset から最大解像度を抽出）" },
+
+  "feat_tt_hideComments_label": { "message": "コメント欄非表示" },
+  "feat_tt_hideComments_desc": { "message": "コメントパネル（動画再生時に開くコメント一覧）+ コメントアイコンボタン + コメント数表示をまとめて CSS で非表示化" },
+  "feat_tt_hideSuggested_label": { "message": "おすすめのアカウント非表示" },
+  "feat_tt_hideSuggested_desc": { "message": "For You / フォロー中フィード / プロフィールに挿入される「おすすめのアカウント」セクションを CSS で非表示化" },
+  "feat_tt_imageDownload_label": { "message": "画像にダウンロードボタンを表示" },
+  "feat_tt_imageDownload_desc": { "message": "フォト投稿 / 動画サムネにマウスを乗せたとき、右上にダウンロードボタンを overlay 表示" }
+}

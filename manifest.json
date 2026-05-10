@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "WEB閲覧アシスト",
-  "description": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整える Chrome 拡張機能。",
+  "name": "__MSG_appName__",
+  "description": "__MSG_appDescription__",
+  "default_locale": "en",
   "version": "1.0.28",
   "action": {
     "default_icon": {
@@ -9,7 +10,7 @@
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "WEB閲覧アシスト",
+    "default_title": "__MSG_defaultTitle__",
     "default_popup": "src/popup/popup.html"
   },
   "icons": {

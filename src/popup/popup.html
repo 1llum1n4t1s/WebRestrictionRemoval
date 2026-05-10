@@ -12,8 +12,8 @@
     <header class="hdr">
       <div class="hdr-mark" aria-hidden="true">📖</div>
       <div class="hdr-text">
-        <h1 class="hdr-title">WEB閲覧アシスト</h1>
-        <p class="hdr-tag">増幅 / 整理 / 維持 を 1 つのパネルから</p>
+        <h1 class="hdr-title" data-i18n="headerTitle">WEB閲覧アシスト</h1>
+        <p class="hdr-tag" data-i18n="headerTagline">増幅 / 整理 / 維持 を 1 つのパネルから</p>
       </div>
     </header>
 
@@ -22,35 +22,35 @@
          flex-grow を transition することで横スペース問題を解決しつつ、active の存在感を強調。
          label は max-width 0 → 200px の transition で滑らかに展開する（CSS-only）。
     -->
-    <nav class="tabbar" role="tablist" aria-label="ポップアップタブ">
+    <nav class="tabbar" role="tablist" data-i18n-attr="aria-label:tabbarAriaLabel" aria-label="ポップアップタブ">
       <button type="button" id="tabTune" class="tabbar-btn is-active"
               role="tab" aria-selected="true" aria-controls="panelTune" tabindex="0">
         <span class="tabbar-no" aria-hidden="true">01</span>
-        <span class="tabbar-label">調整</span>
+        <span class="tabbar-label" data-i18n="tabTune">調整</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabYoutube" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelYoutube" tabindex="-1">
         <span class="tabbar-no" aria-hidden="true">02</span>
-        <span class="tabbar-label">YouTube</span>
+        <span class="tabbar-label" data-i18n="tabYoutube">YouTube</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabInstagram" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelInstagram" tabindex="-1">
         <span class="tabbar-no" aria-hidden="true">03</span>
-        <span class="tabbar-label">Instagram</span>
+        <span class="tabbar-label" data-i18n="tabInstagram">Instagram</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabTikTok" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelTikTok" tabindex="-1">
         <span class="tabbar-no" aria-hidden="true">04</span>
-        <span class="tabbar-label">TikTok</span>
+        <span class="tabbar-label" data-i18n="tabTiktok">TikTok</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabPicker" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelPicker" tabindex="-1">
         <span class="tabbar-no" aria-hidden="true">05</span>
-        <span class="tabbar-label">カラーピッカー</span>
+        <span class="tabbar-label" data-i18n="tabPicker">カラーピッカー</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
     </nav>
@@ -60,16 +60,16 @@
          role="tabpanel" aria-labelledby="tabTune">
 
     <!-- ===== Audio Group ===== -->
-    <section class="grp" aria-label="オーディオ">
+    <section class="grp" data-i18n-attr="aria-label:groupAudio" aria-label="オーディオ">
       <h2 class="grp-title">
-        <span class="grp-title-text">オーディオ</span>
+        <span class="grp-title-text" data-i18n="groupAudio">オーディオ</span>
       </h2>
 
       <label class="toggle-row" id="volumeBoosterToggleRow">
         <span class="tr-icon" aria-hidden="true">🔊</span>
         <span class="tr-text">
-          <span class="tr-name">音量ブースター</span>
-          <span class="tr-desc">タブの音声を増幅・補正します。設定はタブ切替で自動適用されます</span>
+          <span class="tr-name" data-i18n="volumeBoosterMaster">音量ブースター</span>
+          <span class="tr-desc" data-i18n="volumeBoosterMasterDesc">タブの音声を増幅・補正します。設定はタブ切替で自動適用されます</span>
         </span>
         <span class="switch">
           <input type="checkbox" id="volumeBoosterToggle" />
@@ -80,14 +80,17 @@
       <div class="sub-block slider-center-mark" id="volumeRow">
         <div class="sub-head">
           <span class="sub-label">
-            <span aria-hidden="true">🔊</span>&nbsp;音量ブースター
+            <span aria-hidden="true">🔊</span>&nbsp;<span data-i18n="volumeSubLabel">音量ブースター</span>
           </span>
           <span class="sub-value" id="volumeValue">100%</span>
         </div>
-        <div class="tr-desc">動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです</div>
+        <div class="tr-desc" data-i18n="volumeSubDesc">動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです</div>
         <input type="range" id="volumeSlider" class="range" />
         <div class="volume-actions">
-          <button type="button" id="volumeResetBtn" class="ghost-btn" aria-label="音量を 100% に戻す">100% に戻す</button>
+          <button type="button" id="volumeResetBtn" class="ghost-btn"
+                  data-i18n="volumeReset100Btn"
+                  data-i18n-attr="aria-label:volumeReset100Aria"
+                  aria-label="音量を 100% に戻す">100% に戻す</button>
           <span class="volume-hint" id="volumeHint"></span>
         </div>
 
@@ -95,8 +98,8 @@
         <label class="toggle-row toggle-row--sub" id="volumeAntiClipToggleRow">
           <span class="tr-icon" aria-hidden="true">🛡️</span>
           <span class="tr-text">
-            <span class="tr-name">自動歪み防止</span>
-            <span class="tr-desc">突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます</span>
+            <span class="tr-name" data-i18n="volumeAntiClipLabel">自動歪み防止</span>
+            <span class="tr-desc" data-i18n="volumeAntiClipDesc">突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="volumeAntiClipToggle" />
@@ -107,8 +110,8 @@
         <label class="toggle-row toggle-row--sub" id="volumeNormalizeToggleRow">
           <span class="tr-icon" aria-hidden="true">📊</span>
           <span class="tr-text">
-            <span class="tr-name">自動音量正規化</span>
-            <span class="tr-desc">動画や配信ごとの平均音量を測り、自動ゲインで聞こえ方をそろえます</span>
+            <span class="tr-name" data-i18n="volumeNormalizeLabel">自動音量正規化</span>
+            <span class="tr-desc" data-i18n="volumeNormalizeDesc">動画や配信ごとの平均音量を測り、自動ゲインで聞こえ方をそろえます</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="volumeNormalizeToggle" />
@@ -119,8 +122,8 @@
         <label class="toggle-row toggle-row--sub" id="volumeNightModeToggleRow">
           <span class="tr-icon" aria-hidden="true">🌙</span>
           <span class="tr-text">
-            <span class="tr-name">ナイトモード</span>
-            <span class="tr-desc">大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます</span>
+            <span class="tr-name" data-i18n="volumeNightModeLabel">ナイトモード</span>
+            <span class="tr-desc" data-i18n="volumeNightModeDesc">大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="volumeNightModeToggle" />
@@ -131,16 +134,16 @@
     </section>
 
     <!-- ===== Video Group ===== -->
-    <section class="grp" aria-label="映像">
+    <section class="grp" data-i18n-attr="aria-label:groupVideo" aria-label="映像">
       <h2 class="grp-title">
-        <span class="grp-title-text">映像</span>
+        <span class="grp-title-text" data-i18n="groupVideo">映像</span>
       </h2>
 
       <label class="toggle-row" id="videoGammaToggleRow">
         <span class="tr-icon" aria-hidden="true">🎞️</span>
         <span class="tr-text">
-          <span class="tr-name">動画ガンマ補正</span>
-          <span class="tr-desc">ページ上の <code class="tr-code">&lt;video&gt;</code> 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利</span>
+          <span class="tr-name" data-i18n="videoGammaMaster">動画ガンマ補正</span>
+          <span class="tr-desc" data-i18n-html="videoGammaMasterDescHtml">ページ上の <code class="tr-code">&lt;video&gt;</code> 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利</span>
         </span>
         <span class="switch">
           <input type="checkbox" id="videoGammaToggle" />
@@ -152,29 +155,32 @@
       <div class="sub-block slider-center-mark hidden" id="videoGammaRow">
         <div class="sub-head">
           <span class="sub-label">
-            <span aria-hidden="true">γ</span>&nbsp;ガンマ値
+            <span aria-hidden="true">γ</span>&nbsp;<span data-i18n="videoGammaSubLabel">ガンマ値</span>
           </span>
           <span class="sub-value" id="videoGammaValueLabel">1.00</span>
         </div>
-        <div class="tr-desc">1.0 で補正なし。1.0 未満で暗部を持ち上げて明るく、1.0 超でコントラストを上げて暗く</div>
+        <div class="tr-desc" data-i18n="videoGammaSubDesc">1.0 で補正なし。1.0 未満で暗部を持ち上げて明るく、1.0 超でコントラストを上げて暗く</div>
         <input type="range" id="videoGammaSlider" class="range" />
         <div class="volume-actions">
-          <button type="button" id="videoGammaResetBtn" class="ghost-btn" aria-label="ガンマ値を 1.0 に戻す">1.0 に戻す</button>
+          <button type="button" id="videoGammaResetBtn" class="ghost-btn"
+                  data-i18n="videoGammaResetBtn"
+                  data-i18n-attr="aria-label:videoGammaResetAria"
+                  aria-label="ガンマ値を 1.0 に戻す">1.0 に戻す</button>
         </div>
       </div>
     </section>
 
     <!-- ===== Amazon Group ===== -->
-    <section class="grp" aria-label="Amazon">
+    <section class="grp" data-i18n-attr="aria-label:groupAmazon" aria-label="Amazon">
       <h2 class="grp-title">
-        <span class="grp-title-text">Amazon</span>
+        <span class="grp-title-text" data-i18n="groupAmazon">Amazon</span>
       </h2>
 
       <label class="toggle-row" id="amazonDeliveryToggleRow">
         <span class="tr-icon" aria-hidden="true">📦</span>
         <span class="tr-text">
-          <span class="tr-name">定期おトク便 月別合計</span>
-          <span class="tr-desc">配送月ごとの合計金額を <code class="tr-code">/auto-deliveries</code> ページに表示</span>
+          <span class="tr-name" data-i18n="amazonDeliveryMaster">定期おトク便 月別合計</span>
+          <span class="tr-desc" data-i18n-html="amazonDeliveryMasterDescHtml">配送月ごとの合計金額を <code class="tr-code">/auto-deliveries</code> ページに表示</span>
         </span>
         <span class="switch">
           <input type="checkbox" id="amazonDeliveryToggle" />
@@ -184,14 +190,14 @@
     </section>
 
     <!-- ===== Session ===== -->
-    <section class="grp" aria-label="セッション">
-      <h2 class="grp-title"><span class="grp-title-text">セッション</span></h2>
+    <section class="grp" data-i18n-attr="aria-label:groupSession" aria-label="セッション">
+      <h2 class="grp-title"><span class="grp-title-text" data-i18n="groupSession">セッション</span></h2>
 
       <label class="toggle-row" id="keepAliveToggleRow">
           <span class="tr-icon" aria-hidden="true">🔄</span>
           <span class="tr-text">
-            <span class="tr-name">セッション維持</span>
-            <span class="tr-desc">現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット</span>
+            <span class="tr-name" data-i18n="keepAliveMaster">セッション維持</span>
+            <span class="tr-desc" data-i18n="keepAliveMasterDesc">現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット</span>
           </span>
         <span class="switch">
           <input type="checkbox" id="keepAliveToggle" />
@@ -202,7 +208,7 @@
       <!-- セッション維持 ON 時のみ表示するサブ設定群 -->
       <div class="sub-block hidden" id="intervalRow">
         <div class="sub-head">
-          <span class="sub-label">ポーリング間隔</span>
+          <span class="sub-label" data-i18n="keepAliveIntervalLabel">ポーリング間隔</span>
           <span class="sub-value" id="intervalValue"></span>
         </div>
         <input type="range" id="intervalSlider" class="range" step="1" />
@@ -211,8 +217,8 @@
         <label class="toggle-row toggle-row--sub" id="keepAliveHttpPingToggleRow">
           <span class="tr-icon" aria-hidden="true">🌐</span>
           <span class="tr-text">
-            <span class="tr-name">サーバーへの軽量 ping を併発</span>
-            <span class="tr-desc">このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨</span>
+            <span class="tr-name" data-i18n="keepAliveHttpPingLabel">サーバーへの軽量 ping を併発</span>
+            <span class="tr-desc" data-i18n="keepAliveHttpPingDesc">このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="keepAliveHttpPingToggle" />
@@ -224,21 +230,21 @@
 
     </div><!-- /panel.tune -->
 
-    <!-- ===== Panel: YouTube (クリーナー 22 機能 + ホーム列数) ===== -->
+    <!-- ===== Panel: YouTube (クリーナー 29 機能 + ホーム列数) ===== -->
     <div class="panel panel--youtube" id="panelYoutube"
          role="tabpanel" aria-labelledby="tabYoutube" hidden>
 
-      <section class="grp" aria-label="YouTube">
+      <section class="grp" data-i18n-attr="aria-label:tabYoutube" aria-label="YouTube">
         <h2 class="grp-title">
-          <span class="grp-title-text">YouTube</span>
+          <span class="grp-title-text" data-i18n="tabYoutube">YouTube</span>
           <span class="grp-pill" id="searchFixerPill"></span>
         </h2>
 
         <label class="toggle-row" id="searchFixerToggleRow">
           <span class="tr-icon" aria-hidden="true">🧹</span>
           <span class="tr-text">
-            <span class="tr-name">YouTube クリーナー</span>
-            <span class="tr-desc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 29 サブ機能を一括管理</span>
+            <span class="tr-name" data-i18n="searchFixerMaster">YouTube クリーナー</span>
+            <span class="tr-desc" data-i18n="searchFixerMasterDesc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 29 サブ機能を一括管理</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="searchFixerToggle" />
@@ -247,7 +253,7 @@
         </label>
 
         <div class="cleaner-detail">
-          <p class="cleaner-hint">
+          <p class="cleaner-hint" data-i18n="cleanerHint">
             マスタートグル（クリーナー）が ON のときだけ動作します。
             個別に ON / OFF を選んでカスタマイズしてください。
           </p>
@@ -264,17 +270,17 @@
     <div class="panel panel--instagram" id="panelInstagram"
          role="tabpanel" aria-labelledby="tabInstagram" hidden>
 
-      <section class="grp" aria-label="Instagram">
+      <section class="grp" data-i18n-attr="aria-label:tabInstagram" aria-label="Instagram">
         <h2 class="grp-title">
-          <span class="grp-title-text">Instagram</span>
+          <span class="grp-title-text" data-i18n="tabInstagram">Instagram</span>
           <span class="grp-pill" id="instagramCleanerPill"></span>
         </h2>
 
         <label class="toggle-row" id="instagramCleanerToggleRow">
           <span class="tr-icon" aria-hidden="true">📷</span>
           <span class="tr-text">
-            <span class="tr-name">Instagram クリーナー</span>
-            <span class="tr-desc">Reels / Explore / Stories などの冗長 UI を一括非表示</span>
+            <span class="tr-name" data-i18n="instagramCleanerMaster">Instagram クリーナー</span>
+            <span class="tr-desc" data-i18n="instagramCleanerMasterDesc">Reels / Explore / Stories などの冗長 UI を一括非表示</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="instagramCleanerToggle" />
@@ -283,7 +289,7 @@
         </label>
 
         <div class="cleaner-detail">
-          <p class="cleaner-hint">
+          <p class="cleaner-hint" data-i18n="cleanerHint">
             マスタートグル（クリーナー）が ON のときだけ動作します。
             個別に ON / OFF を選んでカスタマイズしてください。
           </p>
@@ -299,17 +305,17 @@
     <div class="panel panel--tiktok" id="panelTikTok"
          role="tabpanel" aria-labelledby="tabTikTok" hidden>
 
-      <section class="grp" aria-label="TikTok">
+      <section class="grp" data-i18n-attr="aria-label:tabTiktok" aria-label="TikTok">
         <h2 class="grp-title">
-          <span class="grp-title-text">TikTok</span>
+          <span class="grp-title-text" data-i18n="tabTiktok">TikTok</span>
           <span class="grp-pill" id="tiktokCleanerPill"></span>
         </h2>
 
         <label class="toggle-row" id="tiktokCleanerToggleRow">
           <span class="tr-icon" aria-hidden="true">🎵</span>
           <span class="tr-text">
-            <span class="tr-name">TikTok クリーナー</span>
-            <span class="tr-desc">コメント欄 / おすすめのアカウントなどの冗長 UI を一括非表示</span>
+            <span class="tr-name" data-i18n="tiktokCleanerMaster">TikTok クリーナー</span>
+            <span class="tr-desc" data-i18n="tiktokCleanerMasterDesc">コメント欄 / おすすめのアカウントなどの冗長 UI を一括非表示</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="tiktokCleanerToggle" />
@@ -318,7 +324,7 @@
         </label>
 
         <div class="cleaner-detail">
-          <p class="cleaner-hint">
+          <p class="cleaner-hint" data-i18n="cleanerHint">
             マスタートグル（クリーナー）が ON のときだけ動作します。
             個別に ON / OFF を選んでカスタマイズしてください。
           </p>
@@ -341,20 +347,20 @@
             <span class="pick-btn-icon-dot"></span>
           </span>
           <span class="pick-btn-text">
-            <span class="pick-btn-jp">スポイトで色を採取する</span>
-            <span class="pick-btn-en"><em>activate eyedropper</em></span>
+            <span class="pick-btn-jp" data-i18n="pickerActivateJp">スポイトで色を採取する</span>
+            <span class="pick-btn-en"><em data-i18n="pickerActivateEn">activate eyedropper</em></span>
           </span>
         </button>
-        <p class="picker-note" id="pickerNote">
+        <p class="picker-note" id="pickerNote" data-i18n="pickerNoteIdle">
           ボタンを押すと画面上のどこでも色を採取できます（Esc でキャンセル）。
         </p>
       </div>
 
       <!-- ===== Specimen 標本カード ===== -->
-      <section class="grp grp--specimen" aria-label="採取した色">
+      <section class="grp grp--specimen" data-i18n-attr="aria-label:specimenAriaLabel" aria-label="採取した色">
         <h2 class="grp-title">
-          <span class="grp-title-text">標本</span>
-          <span class="grp-pill" id="specimenPill">未採取</span>
+          <span class="grp-title-text" data-i18n="specimenTitle">標本</span>
+          <span class="grp-pill" id="specimenPill" data-i18n="specimenPillEmpty">未採取</span>
         </h2>
 
         <article class="specimen-card is-empty" id="specimenCard">
@@ -362,7 +368,7 @@
           <div class="specimen-meta">
             <div class="specimen-meta-row">
               <span class="specimen-no" id="specimenNo">No. — —</span>
-              <span class="specimen-time" id="specimenTime">未採取</span>
+              <span class="specimen-time" id="specimenTime" data-i18n="specimenTimeEmpty">未採取</span>
             </div>
 
             <dl class="value-list" id="valueList">
@@ -373,6 +379,7 @@
                 <dd class="value-output">
                   <code class="value-text" id="hexValue" data-empty="true">—</code>
                   <button type="button" class="copy-btn" data-copy="hex"
+                          data-i18n-attr="aria-label:copyHexAria"
                           aria-label="HEX をコピー" disabled>
                     <span class="copy-btn-glyph" aria-hidden="true">写</span>
                   </button>
@@ -385,6 +392,7 @@
                 <dd class="value-output">
                   <code class="value-text" id="rgbValue" data-empty="true">—</code>
                   <button type="button" class="copy-btn" data-copy="rgb"
+                          data-i18n-attr="aria-label:copyRgbAria"
                           aria-label="RGB をコピー" disabled>
                     <span class="copy-btn-glyph" aria-hidden="true">写</span>
                   </button>
@@ -397,6 +405,7 @@
                 <dd class="value-output">
                   <code class="value-text" id="hslValue" data-empty="true">—</code>
                   <button type="button" class="copy-btn" data-copy="hsl"
+                          data-i18n-attr="aria-label:copyHslAria"
                           aria-label="HSL をコピー" disabled>
                     <span class="copy-btn-glyph" aria-hidden="true">写</span>
                   </button>
@@ -408,14 +417,14 @@
       </section>
 
       <!-- ===== Format Selector ===== -->
-      <section class="grp grp--format" aria-label="既定の保存形式">
+      <section class="grp grp--format" data-i18n-attr="aria-label:formatTitle" aria-label="既定の保存形式">
         <h2 class="grp-title">
-          <span class="grp-title-text">既定の保存形式</span>
+          <span class="grp-title-text" data-i18n="formatTitle">既定の保存形式</span>
         </h2>
 
         <fieldset class="fmt-fieldset">
-          <legend class="visually-hidden">既定の保存形式</legend>
-          <div class="fmt-row" role="radiogroup" aria-label="既定の保存形式">
+          <legend class="visually-hidden" data-i18n="formatLegend">既定の保存形式</legend>
+          <div class="fmt-row" role="radiogroup" data-i18n-attr="aria-label:formatRowAria" aria-label="既定の保存形式">
             <label class="fmt-chip">
               <input type="radio" name="defaultFormat" value="hex" />
               <span class="fmt-chip-text">
@@ -440,28 +449,28 @@
           </div>
           <label class="fmt-hash-toggle" id="fmtHashToggle">
             <input type="checkbox" id="hexHashCheck" checked />
-            <span class="fmt-hash-label">HEX に # を含める</span>
+            <span class="fmt-hash-label" data-i18n="formatHashLabel">HEX に # を含める</span>
           </label>
-          <p class="fmt-note">
+          <p class="fmt-note" data-i18n="formatNote">
             採取・履歴クリック時にこの形式で自動コピーされます。
           </p>
         </fieldset>
       </section>
 
       <!-- ===== History 標本箱 ===== -->
-      <section class="grp grp--history" aria-label="標本箱">
+      <section class="grp grp--history" data-i18n-attr="aria-label:historyTitle" aria-label="標本箱">
         <h2 class="grp-title">
-          <span class="grp-title-text">標本箱</span>
+          <span class="grp-title-text" data-i18n="historyTitle">標本箱</span>
           <span class="grp-pill" id="historyCount">0 / 20</span>
         </h2>
 
         <ol class="history-grid" id="historyGrid"></ol>
-        <p class="history-empty" id="historyEmpty">
+        <p class="history-empty" id="historyEmpty" data-i18n="historyEmpty">
           まだ標本がありません。スポイトで採取してください。
         </p>
 
         <div class="history-actions">
-          <button type="button" id="clearHistoryBtn" class="ghost-btn" disabled>
+          <button type="button" id="clearHistoryBtn" class="ghost-btn" data-i18n="historyClearBtn" disabled>
             標本箱を空にする
           </button>
         </div>
@@ -475,7 +484,9 @@
     <!-- ===== Version footer ===== -->
     <!-- popup.js が DOMContentLoaded で chrome.runtime.getManifest().version を流し込む。
          サポート対応時に「拡張のバージョンを教えて」確認コストを削るための観測性改善 (I-7)。 -->
-    <p class="footer-version" id="extVersion" aria-label="拡張機能のバージョン"></p>
+    <p class="footer-version" id="extVersion"
+       data-i18n-attr="aria-label:extVersionAriaLabel"
+       aria-label="拡張機能のバージョン"></p>
   </div>
 
   <script src="../lib/actions.js"></script>

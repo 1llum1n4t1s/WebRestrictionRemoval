@@ -910,16 +910,21 @@
    * 親が無い場合は lockup 自身を remove。
    */
   const FEED_PLAYLIST_BADGE_RE = /^\d+\s*本の動画$|^\d+\s*videos?$/i;
-  const FEED_MIX_BADGE_TEXT = "ミックスリスト";
+  // ミックスバッジは日本語環境では「ミックスリスト」、英語環境では「Mix」(YouTube 公式表記)。
+  // ロケール切替ではなく両表記を同じ Set に入れて判定するハイブリッド方式（cf. FEED_LIVE_BADGE_TEXTS）。
+  const FEED_MIX_BADGE_TEXTS = new Set([
+    "ミックスリスト",
+    "Mix",
+  ]);
   // YouTube は時期によりバッジ表記を短縮する（例: "ライブ配信中" → "ライブ" / "プレミア公開" → "プレミア"）。
   // 現行 (2026-05) は短縮表記。legacy 表記も残しておけば古い動画 retain 表示にも対応できる。
-  // "ステーション" = YouTube が機械生成する BGM 無限放送（ジャンル別ライブ風コンテンツ）。
+  // "ステーション" / "STATION" = YouTube が機械生成する BGM 無限放送（ジャンル別ライブ風コンテンツ）。
   // DOM 上も `ytBadgeShapeThumbnailLive` クラスが付くので Live バッジの variant 扱い。
   const FEED_LIVE_BADGE_TEXTS = new Set([
     "LIVE", "PREMIERE",
     "ライブ", "ライブ配信中",
     "プレミア", "プレミア公開",
-    "ステーション",
+    "ステーション", "STATION",
   ]);
   // メンバーシップ限定動画のサムネバッジ。日英ロケール両対応。
   // 推測実装: 動かなかったら DOM ログから実表記に追従する。
@@ -1012,7 +1017,7 @@
         // ミックス判定（特異性が最も高いので最優先）
         if (
           checkMix &&
-          (badgeTexts.includes(FEED_MIX_BADGE_TEXT) ||
+          (badgeTexts.some((t) => FEED_MIX_BADGE_TEXTS.has(t)) ||
             !!lockup.querySelector('a[href*="&list=RD"]'))
         ) {
           shouldRemove = true;
@@ -1951,8 +1956,9 @@
     const entry = document.createElement("a");
     entry.className = SUBS_SHORTCUT_MARKER;
     entry.href = "/feed/channels";
-    entry.title = "すべての登録チャンネル";
-    entry.setAttribute("aria-label", "すべての登録チャンネル");
+    const allSubsLabel = chrome.i18n.getMessage("subsAllShortcutLabel") || "すべての登録チャンネル";
+    entry.title = allSubsLabel;
+    entry.setAttribute("aria-label", allSubsLabel);
     // YouTube の Trusted Types policy で innerHTML 文字列代入は弾かれうるので createElement で構築。
     const iconSpan = document.createElement("span");
     iconSpan.className = `${SUBS_SHORTCUT_MARKER}-icon`;
@@ -1971,7 +1977,7 @@
     iconSpan.appendChild(svg);
     const labelSpan = document.createElement("span");
     labelSpan.className = `${SUBS_SHORTCUT_MARKER}-label`;
-    labelSpan.textContent = "すべての登録チャンネル";
+    labelSpan.textContent = allSubsLabel;
     entry.appendChild(iconSpan);
     entry.appendChild(labelSpan);
     const firstChannel = itemsDiv.querySelector(
@@ -2145,7 +2151,7 @@
 
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = "チャンネル名で絞り込み";
+    search.placeholder = chrome.i18n.getMessage("subsSearchPlaceholder") || "チャンネル名で絞り込み";
     search.autocomplete = "off";
     search.spellcheck = false;
     search.addEventListener("input", () => applySubsGridFilter());

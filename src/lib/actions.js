@@ -274,190 +274,46 @@ const SearchFixerFeatures = Object.freeze([
   // ChromeMCP 実機検証済みの 5 機能 + Shorts 棚削除。yt-lockup-view-model 系フィードと
   // 検索結果 ytd-video-renderer の両方で同じ判定ロジックを適用する（検索専用 DOM の機能は
   // category="search_only" を参照）。
-  Object.freeze({
-    key: "playlist",
-    label: "プレイリスト",
-    desc: "プレイリスト項目（playlist?list= リンク / 「N 本の動画」バッジ）を除去",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "mix",
-    label: "ミックス",
-    desc: "YouTube 自動生成ミックス（&list=RD&start_radio=1 / 「ミックスリスト」バッジ）を除去",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "shortsBtn",
-    label: "Shorts 動画（個別）",
-    desc: "通常動画グリッドに混ざる単独の Shorts カード（サムネ URL が /shorts/ の縦動画項目）を除去",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "removeShortsShelf",
-    label: "Shorts 棚",
-    desc: "ホームの Shorts 棚 (ytd-rich-shelf-renderer[is-shorts]) と検索結果の Shorts 横棚 (ytd-reel-shelf-renderer) を物理削除",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "live",
-    label: "ライブ / プレミア / ステーション",
-    desc: "「LIVE / ライブ / PREMIERE / プレミア / ステーション」サムネバッジ付き動画を除去。ステーション = YouTube が機械生成する BGM 無限放送",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "membersOnly",
-    label: "メンバー限定",
-    desc: "チャンネルメンバーシップ加入者のみ視聴可能な「メンバー限定」/「Members only」サムネバッジ付き動画を除去",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "watched",
-    label: "視聴済み動画",
-    desc: "再生位置バー（resume-playback overlay）が表示されている既視聴動画を除去",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "removeTopicsSection",
-    label: "「その他のトピック」セクション",
-    desc: "ホーム下部に表示される「その他のトピック」ジャンル別動画リコメンドセクション (ytd-rich-section-renderer) を除去（フィードページのみ）",
-    category: "video_filter",
-  }),
-  Object.freeze({
-    key: "removeBreakingNewsSection",
-    label: "「ニュース速報」セクション",
-    desc: "ホームに表示される「ニュース速報」/「Breaking news」ニュース記事セクション (ytd-rich-section-renderer) を除去（フィードページのみ）",
-    category: "video_filter",
-  }),
+  // ラベル / 説明文は _locales/{en,ja}/messages.json の `feat_sf_<key>_{label,desc}` を参照。
+  Object.freeze({ key: "playlist", category: "video_filter" }),
+  Object.freeze({ key: "mix", category: "video_filter" }),
+  Object.freeze({ key: "shortsBtn", category: "video_filter" }),
+  Object.freeze({ key: "removeShortsShelf", category: "video_filter" }),
+  Object.freeze({ key: "live", category: "video_filter" }),
+  Object.freeze({ key: "membersOnly", category: "video_filter" }),
+  Object.freeze({ key: "watched", category: "video_filter" }),
+  Object.freeze({ key: "removeTopicsSection", category: "video_filter" }),
+  Object.freeze({ key: "removeBreakingNewsSection", category: "video_filter" }),
   // === カテゴリ "search_only": 検索結果（検索結果ページ固有の DOM のみが対象）===
   // shelf / cardList / course / channel / reel / secondary / chapter は検索結果ページ固有の DOM
   // 構造（ytd-shelf-renderer / ytd-channel-renderer 等）に依存。verified / artist は現状検索のみで
   // 動作（フィード対応は次版予定）。demoteUnmatched / highlightThumb / searchGrid は検索結果ページ
   // のレイアウトや装飾を直接いじる機能で、フィードには対応 DOM が無い。
-  Object.freeze({
-    key: "shelf",
-    label: "動画棚",
-    desc: "「人気の急上昇」「ニュース」などの動画グループ (ytd-shelf-renderer) を除去",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "cardList",
-    label: "カードリスト",
-    desc: "横スクロール関連トピックカード (ytd-horizontal-card-list-renderer の 2 番目以降) を除去",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "course",
-    label: "コース",
-    desc: "「コース」バッジ付きの学習コンテンツカード (.yt-lockup-view-model--wrapper) を除去",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "channel",
-    label: "チャンネル紹介カード",
-    desc: "検索結果に挟まる「このチャンネル」紹介カード (ytd-channel-renderer) を除去",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "reel",
-    label: "Shorts 横棚",
-    desc: "Shorts 動画の横並び棚 (grid-shelf-view-model) を除去（ホームの Shorts 棚は「動画フィルタ」の removeShortsShelf、左サイドバーは「メニュー / UI」の removeShortsSidebar が担当）",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "secondary",
-    label: "関連検索ブロック",
-    desc: "下部の「関連する検索キーワード」候補ブロック (ytd-secondary-search-container-renderer) を除去",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "verified",
-    label: "認証チャンネルの動画",
-    desc: "Verified バッジを持つチャンネル（公式アカウント・ニュース）の動画を除去（次版でフィード対応予定）",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "artist",
-    label: "アーティストチャンネルの動画",
-    desc: "Official Artist Channel バッジ付きの動画（ミュージック公式 MV 等）を除去（次版でフィード対応予定）",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "chapter",
-    label: "チャプター付き動画",
-    desc: "チャプター情報 (expandable-metadata-renderer) が展開可能な動画を除去",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "demoteUnmatched",
-    label: "キーワード非マッチをグレー化",
-    desc: "検索ワードがタイトル・説明文に含まれない動画を半透明 + グレースケール化（hover で復元）",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "highlightThumb",
-    label: "サムネ枠装飾",
-    desc: "各動画サムネに茜色の枠線とドロップシャドウを追加して視認性を向上（ダーク/ライト両対応）",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "hideComments",
-    label: "コメント欄非表示",
-    desc: "動画ページ下部のコメントセクション（件数・並び替え・入力欄・スレッド一覧）を一括で非表示化。ライブ配信のチャット欄は対象外",
-    category: "watch_page",
-  }),
-  Object.freeze({
-    key: "hideLiveChat",
-    label: "ライブチャット欄非表示",
-    desc: "ライブ配信アーカイブの右側に表示されるライブコメント欄を、YouTube 公式操作と同じ折りたたみで非表示化。通常動画には影響なし",
-    category: "watch_page",
-  }),
-  Object.freeze({
-    key: "redirectShortsUrl",
-    label: "Shorts URL を /watch にリダイレクト",
-    desc: "`/shorts/<ID>` で開いた縦動画ページを通常の `/watch?v=<ID>` プレイヤーに強制リダイレクト",
-    category: "watch_page",
-  }),
-  Object.freeze({
-    key: "searchGrid",
-    label: "検索結果をグリッド表示",
-    desc: "検索結果を 1 列リストから複数列グリッドに変更（ホーム列数が 4/5/6 ならその値、自動なら 3 列）",
-    category: "search_only",
-  }),
-  Object.freeze({
-    key: "removeShortsChip",
-    label: "Shorts フィルタチップ",
-    desc: "検索ページ上部のフィルタチップ「すべて / 動画 / Shorts / プレイリスト …」のうち「Shorts」チップだけを除去",
-    category: "search_only",
-  }),
+  Object.freeze({ key: "shelf", category: "search_only" }),
+  Object.freeze({ key: "cardList", category: "search_only" }),
+  Object.freeze({ key: "course", category: "search_only" }),
+  Object.freeze({ key: "channel", category: "search_only" }),
+  Object.freeze({ key: "reel", category: "search_only" }),
+  Object.freeze({ key: "secondary", category: "search_only" }),
+  Object.freeze({ key: "verified", category: "search_only" }),
+  Object.freeze({ key: "artist", category: "search_only" }),
+  Object.freeze({ key: "chapter", category: "search_only" }),
+  Object.freeze({ key: "demoteUnmatched", category: "search_only" }),
+  Object.freeze({ key: "highlightThumb", category: "search_only" }),
+  Object.freeze({ key: "hideComments", category: "watch_page" }),
+  Object.freeze({ key: "hideLiveChat", category: "watch_page" }),
+  Object.freeze({ key: "redirectShortsUrl", category: "watch_page" }),
+  Object.freeze({ key: "searchGrid", category: "search_only" }),
+  Object.freeze({ key: "removeShortsChip", category: "search_only" }),
   // === カテゴリ "menu_ui": メニュー / UI（左サイドバーやレイアウト系）===
-  Object.freeze({
-    key: "removeShortsSidebar",
-    label: "Shorts サイドバーメニュー",
-    desc: "左サイドバー（フル展開 / 折りたたみ両方）の「ショート」メニュー項目を除去",
-    category: "menu_ui",
-  }),
+  Object.freeze({ key: "removeShortsSidebar", category: "menu_ui" }),
   // 登録チャンネル拡張 3 機能（YouTube が上限を持つ leftnav 表示と /feed/channels の縦長一覧を補強）。
   // /feed/channels は ytd-channel-renderer で全件 DOM に存在するためスキャンで全件取得可能。
   // leftnav は ytd-guide-section-renderer 内に「もっと見る」展開しても件数上限あり、
   // /feed/channels から取得した一覧を末尾に append して全件可視化する。
-  Object.freeze({
-    key: "subsLeftnavInjectAll",
-    label: "登録チャンネルを左メニューに全件展開",
-    desc: "左サイドバーの「登録チャンネル」セクションに、表示上限を超えて隠れていたチャンネルも全件追加表示（/feed/channels から同一オリジン取得、24h キャッシュ）",
-    category: "menu_ui",
-  }),
-  Object.freeze({
-    key: "subsAllShortcut",
-    label: "「すべての登録チャンネル」ショートカット",
-    desc: "左サイドバーの「登録チャンネル」セクションの最上に /feed/channels への 1 クリックエントリを公式メニュー風に追加",
-    category: "menu_ui",
-  }),
-  Object.freeze({
-    key: "subsChannelsGrid",
-    label: "登録チャンネル一覧をグリッド化（検索/ソート付き）",
-    desc: "/feed/channels ページを動画フィードのようなレスポンシブグリッドに変形 + 上部に検索ボックスとソート切替（名前/登録者数/登録順）。各カードは viewport 進入時に lazy fetch で最新動画サムネを表示（24h キャッシュ）",
-    category: "menu_ui",
-  }),
+  Object.freeze({ key: "subsLeftnavInjectAll", category: "menu_ui" }),
+  Object.freeze({ key: "subsAllShortcut", category: "menu_ui" }),
+  Object.freeze({ key: "subsChannelsGrid", category: "menu_ui" }),
 ]);
 
 const SearchFixerDefaultFeatures = Object.freeze(
@@ -482,20 +338,22 @@ const SearchFixerFeedPathPrefixes = Object.freeze([
 const SearchFixer = Object.freeze({
   FEATURES: SearchFixerFeatures,
 
+  // category.label は _locales/.../messages.json の `category<CamelId>` (例: categoryMenuUi)。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "menu_ui",      icon: "🧭", label: "メニュー / UI" }),
-    Object.freeze({ id: "video_filter", icon: "🗑️", label: "動画フィルタ" }),
-    Object.freeze({ id: "watch_page",   icon: "🎬", label: "動画ページ" }),
-    Object.freeze({ id: "search_only",  icon: "🔍", label: "検索結果" }),
+    Object.freeze({ id: "menu_ui",      icon: "🧭" }),
+    Object.freeze({ id: "video_filter", icon: "🗑️" }),
+    Object.freeze({ id: "watch_page",   icon: "🎬" }),
+    Object.freeze({ id: "search_only",  icon: "🔍" }),
   ]),
 
   DEFAULT_FEATURES: SearchFixerDefaultFeatures,
 
+  // option.label は _locales/.../messages.json の `gridAuto` / `grid4Cols` / `grid5Cols` / `grid6Cols`。
   GRID_OPTIONS: Object.freeze([
-    Object.freeze({ value: 0, label: "自動（YouTube 既定）" }),
-    Object.freeze({ value: 4, label: "4 列" }),
-    Object.freeze({ value: 5, label: "5 列" }),
-    Object.freeze({ value: 6, label: "6 列" }),
+    Object.freeze({ value: 0, messageKey: "gridAuto" }),
+    Object.freeze({ value: 4, messageKey: "grid4Cols" }),
+    Object.freeze({ value: 5, messageKey: "grid5Cols" }),
+    Object.freeze({ value: 6, messageKey: "grid6Cols" }),
   ]),
 
   FEED_PATH_PREFIXES: SearchFixerFeedPathPrefixes,
@@ -562,73 +420,19 @@ const AmazonDeliveryTotal = Object.freeze({
  * 公開する意味論的属性に依存（難読化 class への依存は避けて安定性とライセンス安全性を確保）。
  */
 const InstagramCleanerFeatures = Object.freeze([
-  Object.freeze({
-    key: "reels",
-    label: "Reels 削除",
-    desc: "サイドバー / ナビの Reels 項目を非表示 + /reels/ URL アクセス時にホーム / へ強制リダイレクト",
-    category: "ig_main",
-  }),
-  Object.freeze({
-    key: "explore",
-    label: "Explore 削除",
-    desc: "サイドバー / ナビの Explore 項目を非表示 + /explore/ URL アクセス時にホーム / へ強制リダイレクト",
-    category: "ig_main",
-  }),
-  Object.freeze({
-    key: "stories",
-    label: "ストーリー段非表示（ホーム）",
-    desc: "ホームフィード上部のストーリーズ・トレイ（24h で消える短編動画群）を CSS で非表示化",
-    category: "ig_main",
-  }),
-  Object.freeze({
-    key: "storiesAll",
-    label: "Stories URL をホームに戻す",
-    desc: "/stories/ パスに直接アクセスした瞬間にホーム / へリダイレクト（リンク踏み防止）",
-    category: "ig_main",
-  }),
-  Object.freeze({
-    key: "threads",
-    label: "Threads 誘導非表示",
-    desc: "Threads アプリへの誘導バナー / サイドバー項目 / フッターリンクを非表示化",
-    category: "ig_main",
-  }),
-  Object.freeze({
-    key: "vanity",
-    label: "いいね数・フォロワー数非表示",
-    desc: "<article> 内の数値表記ボタン（カンマ・k・M・万など）を検出して非表示にし、比較疲れを軽減",
-    category: "ig_extra",
-  }),
-  Object.freeze({
-    key: "blockVideos",
-    label: "投稿内の動画ブロック",
-    desc: "フィード <article> 内の <video> 要素にマーカーを付け、CSS でサムネ画像に差し替えて自動再生を防止",
-    category: "ig_extra",
-  }),
-  Object.freeze({
-    key: "comments",
-    label: "コメント欄非表示",
-    desc: "コメント一覧 / 入力フォーム / 「N 件のコメントを見る」リンクをまとめて CSS で非表示化",
-    category: "ig_extra",
-  }),
-  Object.freeze({
-    key: "notes",
-    label: "Notes 非表示",
-    desc: "DM 画面上部の Notes（プロフィール写真の上に乗る短文ステータス）行を非表示",
-    category: "ig_extra",
-  }),
-  Object.freeze({
-    key: "msgCounters",
-    label: "新規メッセージカウンター非表示",
-    desc: "ナビゲーション上の未読 DM 件数バッジ（赤丸の数字）を非表示にして通知圧力を軽減",
-    category: "ig_extra",
-  }),
+  // ラベル / 説明文は _locales/{en,ja}/messages.json の `feat_ig_<key>_{label,desc}` を参照。
+  Object.freeze({ key: "reels", category: "ig_main" }),
+  Object.freeze({ key: "explore", category: "ig_main" }),
+  Object.freeze({ key: "stories", category: "ig_main" }),
+  Object.freeze({ key: "storiesAll", category: "ig_main" }),
+  Object.freeze({ key: "threads", category: "ig_main" }),
+  Object.freeze({ key: "vanity", category: "ig_extra" }),
+  Object.freeze({ key: "blockVideos", category: "ig_extra" }),
+  Object.freeze({ key: "comments", category: "ig_extra" }),
+  Object.freeze({ key: "notes", category: "ig_extra" }),
+  Object.freeze({ key: "msgCounters", category: "ig_extra" }),
   // === 画像ダウンロード（YouTube / Instagram / TikTok 共通機能。実装は src/content/image-downloader.js）===
-  Object.freeze({
-    key: "imageDownload",
-    label: "画像にダウンロードボタンを表示",
-    desc: "投稿写真（フィード / プロフィールグリッド / 投稿詳細）にマウスを乗せたとき、右上にダウンロードボタンを overlay 表示（srcset から最大解像度を抽出）",
-    category: "ig_extra",
-  }),
+  Object.freeze({ key: "imageDownload", category: "ig_extra" }),
 ]);
 
 const InstagramCleanerDefaultFeatures = Object.freeze(
@@ -638,9 +442,10 @@ const InstagramCleanerDefaultFeatures = Object.freeze(
 const InstagramCleaner = Object.freeze({
   FEATURES: InstagramCleanerFeatures,
 
+  // category.label は _locales/.../messages.json の `categoryIgMain` / `categoryIgExtra`。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "ig_main",  icon: "🚫", label: "主要機能" }),
-    Object.freeze({ id: "ig_extra", icon: "✂️", label: "追加機能" }),
+    Object.freeze({ id: "ig_main",  icon: "🚫" }),
+    Object.freeze({ id: "ig_extra", icon: "✂️" }),
   ]),
 
   DEFAULT_FEATURES: InstagramCleanerDefaultFeatures,
@@ -696,25 +501,11 @@ const InstagramCleaner = Object.freeze({
  * 名（ビルドごとに変わる）には依存しない。
  */
 const TikTokCleanerFeatures = Object.freeze([
-  Object.freeze({
-    key: "hideComments",
-    label: "コメント欄非表示",
-    desc: "コメントパネル（動画再生時に開くコメント一覧）+ コメントアイコンボタン + コメント数表示をまとめて CSS で非表示化",
-    category: "tt_main",
-  }),
-  Object.freeze({
-    key: "hideSuggested",
-    label: "おすすめのアカウント非表示",
-    desc: "For You / フォロー中フィード / プロフィールに挿入される「おすすめのアカウント」セクションを CSS で非表示化",
-    category: "tt_main",
-  }),
+  // ラベル / 説明文は _locales/{en,ja}/messages.json の `feat_tt_<key>_{label,desc}` を参照。
+  Object.freeze({ key: "hideComments", category: "tt_main" }),
+  Object.freeze({ key: "hideSuggested", category: "tt_main" }),
   // === 画像ダウンロード（YouTube / Instagram / TikTok 共通機能。実装は src/content/image-downloader.js）===
-  Object.freeze({
-    key: "imageDownload",
-    label: "画像にダウンロードボタンを表示",
-    desc: "フォト投稿 / 動画サムネにマウスを乗せたとき、右上にダウンロードボタンを overlay 表示",
-    category: "tt_main",
-  }),
+  Object.freeze({ key: "imageDownload", category: "tt_main" }),
 ]);
 
 const TikTokCleanerDefaultFeatures = Object.freeze(
@@ -724,8 +515,9 @@ const TikTokCleanerDefaultFeatures = Object.freeze(
 const TikTokCleaner = Object.freeze({
   FEATURES: TikTokCleanerFeatures,
 
+  // category.label は _locales/.../messages.json の `categoryTtMain`。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "tt_main", icon: "🚫", label: "主要機能" }),
+    Object.freeze({ id: "tt_main", icon: "🚫" }),
   ]),
 
   DEFAULT_FEATURES: TikTokCleanerDefaultFeatures,

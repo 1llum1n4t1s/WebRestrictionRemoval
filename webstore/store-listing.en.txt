@@ -1,0 +1,172 @@
+============================================================
+Chrome Web Store listing copy (English)
+============================================================
+
+[Store Listing] tab
+------------------------------------------------------------
+
+■ Name (under 30 chars)
+Web Viewing Assist
+
+■ Summary (under 132 chars)
+A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
+
+■ Description (under 16,000 chars)
+An extension that consolidates 8 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
+(In v1.0.18 the former "restriction removal" features were retired; the Extension is now focused exclusively on web viewing assistance.)
+
+■ Main features
+
+· 🔄 Keep session alive (opt-in, default OFF)
+  Mitigates idle-based session timeouts on sites such as SharePoint / Box.
+  On the current site you enabled, the top frame periodically dispatches synthetic mousemove / pointermove / scroll / focus events to reset the site's JS idle detection.
+  Additionally, on SharePoint (*.sharepoint.{com,cn,de,us}) it tries a dedicated GET, and on other sites it tries a lightweight HEAD against the current URL / origin root from the top frame to help extend the server-side session.
+  The popup slider lets you adjust the interval from 1 to 15 minutes (default 4 minutes).
+  ※ Sites that reject HEAD or auth-proxy idle timeouts may not be helped by this feature.
+
+· 📺 YouTube cleanup (opt-in, default OFF)
+  Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
+  In addition, the YouTube cleaner offers 29 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements).
+
+· 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
+  Shows a per-month total on https://www.amazon.co.jp/auto-deliveries.
+
+· 📷 Instagram cleaner (opt-in, default OFF)
+  Hides Instagram's redundant UI through 11 sub-features.
+  Main: Remove Reels (with URL redirect) / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion
+  Extras: Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Image download button
+  ※ Client-side DOM and CSS only; nothing is transmitted externally.
+
+· 🎵 TikTok cleaner (opt-in, default OFF)
+  Hides TikTok's redundant UI through 3 sub-features.
+  Main: Hide comments / Hide suggested accounts / Image download button
+  ※ For direct photo / video URL access, the entire right panel is hidden; in the modal viewer (Browser Mode) only the comment list is hidden, preserving the profile.
+  ※ Client-side DOM and CSS only; nothing is transmitted externally.
+
+· 🔊 Volume Booster (opt-in, default OFF)
+  Amplifies the active tab's volume from 0% to 300%. Turn the master toggle ON to enable the slider; the settings (gain value, sub-toggles) are persisted globally. The Extension obtains tab audio via chrome.tabCapture and processes it in the offscreen document's AudioContext through a 6-node chain — "Auto Volume Normalization (short-window RMS via AnalyserNode + auto GainNode) → Night-Mode compression (DynamicsCompressor) → manual GainNode for amplification → Auto Distortion Guard / limiter (DynamicsCompressor)" — which is the standard mastering layout (loudness correction → compression → make-up gain → limiter). The three sub-toggles (Auto Distortion Guard / Auto Volume Normalization / Night Mode) all default to OFF.
+  The slider uses a logarithmic mapping over the 100..300% range so equal distance equals equal dB; gain changes are smoothed with a 45 ms ramp to suppress clicks. Even at 100%, if any of Auto Volume Normalization / Auto Distortion Guard / Night Mode is ON, the AudioContext is preserved so use cases like "leave the volume alone but tame sudden peaks", "even out podcast voice levels", or "tame loud night-time scenes" still work. On tab switch, only tabs already being boosted are auto-reapplied; new tabs are applied once you open the popup and operate it.
+  ※ Master OFF / slider 100% with all sub-toggles OFF / tab closed / Extension disabled — any of these instantly releases the AudioContext and frees resources.
+  ※ No recording, storage, or external transmission whatsoever.
+
+· 🎞️ Video Gamma (opt-in, default OFF)
+  Applies gamma correction to <video> elements on the page using SVG <feComponentTransfer type="gamma">. Master toggle + slider; the slider center (1.0) means no correction, left is darker (max 3.0), right is brighter (min 0.3). The setting is shared across tabs, and <video> elements inside iframes (e.g. YouTube embeds) also receive the same correction via all_frames: true.
+  ※ Video data is not read, recorded, or transmitted; the feature only attaches an SVG filter, fully client-side.
+
+· 🎨 Color Picker (always available)
+  The "Color Picker" tab in the popup uses the EyeDropper API to pick a color from anywhere on screen and copy it to the clipboard in HEX / RGB / HSL. Whether to include "#" in HEX is individually toggleable. Picked colors are kept on the device only as a specimen box (history) of up to 20 entries.
+  ※ Nothing is recorded, stored, or transmitted; everything happens inside the popup.
+
+■ How to use
+
+1. Click the toolbar icon to open the popup.
+2. Pick the feature you want via the popup's tab bar (Tune / YouTube / Instagram / TikTok / Color Picker).
+3. Toggle on/off and tweak values via toggles and sliders inside each tab (auto-saved).
+4. For Volume Booster and Video Gamma, drag the sliders directly.
+5. On the "Color Picker" tab, trigger EyeDropper to pick a color from the screen.
+
+Settings are auto-saved and restored on next launch.
+
+■ Privacy
+
+· No personal information or user data is collected.
+· Settings are stored only on your device (chrome.storage.local).
+· No communication with any third-party external servers.
+  (When keep-session-alive's lightweight ping is ON, same-origin HEAD / GET requests may be issued against the user's enabled site itself.)
+  (When the Instagram / TikTok image download button is ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
+· While Volume Booster is in use, tab audio data is only amplified and re-output through an AudioContext; no recording, storage, or external transmission is performed.
+
+■ Category
+Productivity → Tools
+
+■ Languages
+English, Japanese
+
+------------------------------------------------------------
+
+[Assets] tab
+------------------------------------------------------------
+
+■ Store icon (128x128)
+→ images/icon-128.png
+
+■ Screenshots (1280x800), up to 5, at least 1
+  1: webstore/images/01-popup-ui-1280x800.png
+  2: webstore/images/02-features-1280x800.png
+  3: webstore/images/03-hero-promo-1280x800.png
+
+■ Promo tile (small, 440x280), optional
+→ webstore/images/promo-small-440x280.png
+
+■ Marquee promo tile (1400x560), optional
+→ webstore/images/promo-marquee-1400x560.png
+
+------------------------------------------------------------
+
+[Privacy practices] tab
+------------------------------------------------------------
+
+■ Does this item have a single purpose?
+Yes
+
+■ Single-purpose description
+To tune the readability, audio, and continuity of the page you are viewing, using only local settings the user chose.
+
+■ Data-use disclosure
+
+  · Do you collect personally identifiable information?
+    No
+
+  · How do you handle user data?
+    - Sale of user data: No
+    - Using or transferring user data for purposes unrelated to the original purpose: No
+    - Using or transferring user data for creditworthiness assessment or lending: No
+
+■ Permission justifications (concise, ~40–60 chars)
+
+  activeTab:
+  Used to apply settings to the current tab from the popup, and to determine the target tab for the Volume Booster.
+
+  storage:
+  Used to persist feature toggles, slider settings, and color-picker history on the device (chrome.storage.local).
+
+  offscreen:
+  Used to maintain the Volume Booster's AudioContext / GainNode / DynamicsCompressor chain outside the Service Worker.
+
+  tabCapture:
+  Used by the Volume Booster to capture tab audio and apply 0–300% normalization, compression, and amplification via AudioContext.
+
+■ Host-permission justifications
+
+  http://*/* and https://*/*:
+  Required so that the keep-session-alive and Video Gamma content scripts can be injected on all http(s) sites.
+  (1) Keep session alive: the injected content script only starts the poller for origins the user explicitly enabled in the popup (keepAliveOrigins allowlist), and dispatches synthetic mousemove / pointermove / scroll / focus events. The HTTP ping is a separate sub-toggle (default OFF) and only fires same-origin HEAD / GET when ON.
+  (2) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
+  Neither feature reads, modifies, or transmits the page DOM (Video Gamma only attaches a filter to <video>; it does not read or save video data).
+
+  *://*.youtube.com/*:
+  Required for the YouTube cleaner (29 sub-features including Shorts removal and subscriptions enhancements). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
+
+  *://www.amazon.co.jp/auto-deliveries*:
+  Required to show a per-month total on the Amazon recurring-delivery page. The script reads `subscription-price` per month and inserts the computed total into the same page. Scoped to /auto-deliveries (not the whole amazon.co.jp). Nothing read is transmitted off-device.
+
+  *://*.instagram.com/*:
+  Required for the Instagram cleaner (11 sub-features). Hides / adds Reels / Explore / Stories tray / Threads promotion / vanity counts / video playback / comment list / Notes / message counters / image download button using semantic selectors based on aria-label / href / role / data-pagelet / SVG path data. URL redirects (e.g. /reels/, /explore/) are also opt-in. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.cdninstagram.com / scontent-*.fna.fbcdn.net), with credentials:omit + redirect:manual blocking third-party transmission. Nothing read is transmitted off-device.
+
+  *://*.tiktok.com/*:
+  Required for the TikTok cleaner (3 sub-features). Comment list / suggested accounts / image download button are implemented via semantic selectors based on data-e2e and [class*="..."]. For direct photo / video URL access the entire right panel is hidden; in the modal viewer (Browser Mode) only the comment list is hidden. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.tiktokcdn.com / *.tiktokcdn-us.com). Nothing read is transmitted off-device.
+
+■ Do you use remote code?
+No
+(All code is contained in the extension package; no code is loaded from external sources.)
+
+------------------------------------------------------------
+
+[Distribution] tab
+------------------------------------------------------------
+
+■ Visibility
+Public (or unlisted / private as preferred)
+
+■ Target regions
+All regions
