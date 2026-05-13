@@ -71,17 +71,23 @@ npm test
 Popup (src/popup/popup.{html,js,css})
   ──APPLY_SETTINGS──▶ Background (src/background/background.js)
                         │ storage 更新 +
-                        ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS / APPLY_INSTAGRAM_CLEANER_CS──▶
-                          各 Content Script
+                        ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS
+                          / APPLY_INSTAGRAM_CLEANER_CS / APPLY_TIKTOK_CLEANER_CS / APPLY_VIDEO_GAMMA_CS
+                          / APPLY_LOUPE_CS / APPLY_IMAGE_DOWNLOADER_CS──▶ 各 Content Script
 
 [音量ブースター]
-  Popup ──VOLUME_BOOSTER_SET_GAIN (gain, antiClip, normalize, nightMode)──▶ Background
+  Popup ──VOLUME_BOOSTER_SET_GAIN (gain, antiClip, normalize, nightMode, muted)──▶ Background
                                     │ chrome.tabCapture.getMediaStreamId
                                     ──ACTION_VOLUME_SET_GAIN──▶ Offscreen Document
                                                                   │ getUserMedia + AudioContext
                                                                   │ source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination
                                                                   │ (短時間RMS正規化 → ナイトモード圧縮 → 手動ゲイン → リミッタ)
                                                                   └ 自動ゲイン補正 + 圧縮 + 増幅して再出力
+
+[ルーペ]
+  Content Script ──LOUPE_REQUEST_CAPTURE──▶ Background
+                                              │ chrome.tabs.captureVisibleTab(windowId, {jpeg, quality:70})
+                                              └ JPEG DataURL を sendResponse で返却 → content script が Blob URL 化して lens に貼付
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
@@ -173,15 +179,17 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 6. 再キャプチャ: scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize で `scheduleRecapture()` → `requestCaptureAndUpdate()` 再実行
 7. 左クリック / master OFF / visibilitychange / storage.onChanged(loupeEnabled:false) で `deactivate()` → DOM 撤去 + リスナー解除 + `URL.revokeObjectURL` で Blob URL 解放
 
-**設計上の不変条件** (Important Patterns 「ルーペ」セクション参照):
+**設計上の不変条件**:
 - `captureInFlight` + `pendingRecapture` フラグで重複リクエスト防止 (同時 capture は 1 つまで、進行中の trigger は後追い実行)
 - Blob URL は cleanup 時に必ず revoke (DataURL は revoke 不可なので Blob URL に変換する設計)
 - top frame 限定 (`window === window.top` ガード + manifest `all_frames: false`)
 - MutationObserver は `subtree: false` で body 直下のみ監視 (SPA top-level navigation 検知に十分、深い tree の頻発変化を避ける)
 - 左クリック OFF は `capture: true` で document level listener、サイト側 click より先に stopPropagation して副作用を防ぐ
 - 倍率 / サイズ変更は popup → storage 直書き → content script の `storage.onChanged` で同期 (background の `normalizeSettings` を経由しない、音量ブースター直書きパターンと同型)
-- タブ切替時 (`visibilitychange` で hidden 検知) は cleanup する (古い画面が新タブで残らないようにする、音量ブースターの「既存 boost 中タブのみ自動適用」とは意図的に異なる UX)
+- タブ切替時 (`visibilitychange` で hidden 検知) は cleanup、**フォアグラウンド復帰時は `readSettingsAndApply()` で自動 reactivate** する (storage の `loupeEnabled === true` のままなら lens 復帰、音量ブースターと UX 統一 / /rere D-1 で確立)
+- `readSettingsAndApply` は `applyInFlight` / `applyQueued` で並列実行を直列化 (storage.onChanged / runtime.onMessage / visibilitychange 復帰の重複呼出で activate と deactivate が race するのを防ぐ / /rere B1-E3)
 - 再キャプチャ debounce 500ms は `chrome.tabs.captureVisibleTab` の Chrome 公式レート上限 (2fps = 500ms 周期) と一致させる安全値
+- background の `LOUPE_REQUEST_CAPTURE` ハンドラは **`tabId === activeTabId` を assert** してから撮影 (`chrome.tabs.query({ active: true, windowId })` で確認、バックグラウンドタブからの別タブピクセル取得を遮断 / /rere A1-I1)
 
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
 `*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
@@ -271,7 +279,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得 / URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
-| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは 4 トグル + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3 + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
+| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは **8 マスタートグル** + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3 + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
 | `src/offscreen/offscreen.{html,js}` | 音量ブースター専用 offscreen document: AudioContext + AnalyserNode + 自動 GainNode + 手動 GainNode + DynamicsCompressor × 2 (night mode / anti-clip) で正規化 + 増幅 + 圧縮 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt`。`generate-screenshots.js` が popup.html から `popup-render.html` + `popup-shim.js` を動的生成 → `01-popup-ui.html` が iframe で実 popup を埋め込んで撮影（drift ゼロ）。生成物 `popup-render.html` / `popup-shim.js` は .gitignore 対象 |
@@ -292,8 +300,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
-- **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。
-- **`document_start` 専用エントリは actions.js を読み込まない** — youtube-early.js のように `document_start` で走るエントリは、actions.js 依存（`StorageKeys` 等）を持たず生 storage key 文字列で書く。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になる。最小スクリプト + actions.js 非読込で衝突を防ぐ。
+- **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
 - **early script は共通フレームワーク経由** — `src/content/early-framework.js` が `<style>` 注入・pre クラス同期付与・`chrome.storage.local.get`・`storage.onChanged` 購読のボイラープレートを集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、各 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) が config を渡して setup を呼ぶ。新サイトの early script を追加する場合もこのパターンに乗せる。サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す (差異が大きすぎて framework に押し込むと config 肥大化する)。
 - **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaLoupeRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` のみ `__cpa` プレフィックスなしの歴史的命名 (互換性のため変更しない)。
 - **iframe 多重対策** — keepalive は `shouldFireHttpPing()` でトップフレーム or クロスオリジン iframe のみ ping を発射。同一オリジン iframe はトップに任せる。
@@ -302,14 +309,31 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 - **DOM 書き戻しは observer guard 必須** — `subtree: true` 監視中に自身が DOM を書き戻すと再帰発火 → 無限ループでフリーズ。Amazon 月別合計の修正で確立した **`disconnect → render → takeRecords → observe` ガード + `requestAnimationFrame` coalesce** の二重防御を新規 DOM 書き込みロジックでも踏襲する。
 - **cross-document な iframe 内 DOM 変化は MutationObserver で観察できない** — `subtree: true` でも iframe の中身は別ドキュメント扱いで届かない。iframe 内要素を相手にする場合は `iframe.addEventListener("load", ...)` で再評価タイミングを別経路で確保する（hideLiveChat の close button click はこのパターンに該当）。
 
-### hideLiveChat（YouTube ライブチャット非表示）
-hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を集約した最小設計に到達している。新機能を足すときに **絶対に復活させてはいけない過去の失敗経路** が複数あるため、ここで明文化しておく。
+### Extension context invalidation guard PATTERN SYNC (/rere v1.0.28+ 確立)
+拡張機能リロード / 自動更新後、既存タブの content script は **orphan 化** する。`chrome.runtime.id` が `undefined` になり、`chrome.i18n.getMessage` / `chrome.runtime.sendMessage` 等が "Extension context invalidated" で throw する。MutationObserver / setInterval は orphan でも止まらないため、自前で停止する必要がある。
 
-採用パターン:
+**実装済みファイル (9 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` / `keepalive.js` / `video-gamma.js` / `loupe.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
+
+**実装パターン** (PATTERN SYNC):
+- 主要 timer / observer callback / 高頻度発火関数の入口で `if (!chrome.runtime?.id)` チェック
+- 検知時に: ① 該当 timer の `clearInterval` / `clearTimeout` ② MutationObserver の `disconnect` ③ 必要なら body class / DOM marker / Blob URL の cleanup
+- chrome API 非依存の cleanup 関数 (`removeAllOverlays` / `removeAllTotals` / `deactivate` / `cleanup` 等) は orphan 後でも安全に呼べる
+- 1 回検知したらフラグで「以後検知しない」状態に固定して CPU 浪費ゼロ化
+
+**新規 content script を書く場合**:
+- timer / observer がある場合は **必ず** この PATTERN を踏襲
+- 入口ガードは「主要発火経路 (300ms ポーリングなど)」に置き、保険的に複数箇所に置いてもよい
+- 「実害は限定的」(observer callback の早期 return) でも CPU を持続的に食う経路があるので、無条件で `disconnect` する設計が望ましい
+
+### hideLiveChat（YouTube ライブチャット非表示）
+hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を集約した最小設計に到達している (詳細フローは Architecture 章「YouTube クリーナー」の `hideLiveChat 体感ラグ消滅の先制非表示パターン」7 ステップ参照)。新機能を足すときに **絶対に復活させてはいけない過去の失敗経路** が複数あるため、ここで明文化しておく。
+
+採用パターン (要約):
 - `findLiveChatPanelCloseButton` → `iframe.contentDocument` 経由で `yt-live-chat-header-renderer #close-button button` を取得
 - `fireUserLikeClick` で iframe の window から取った `PointerEvent`/`MouseEvent` で full sequence 発火
 - `iframe.addEventListener("load", ...)` の idempotent hook で load 後 50ms に再評価
-- **CSS 先制非表示で体感ラグ消滅** — `youtube-early.js` (document_start) が `<html>` に `__cpa-sfx-hide-live-chat-pre` を付与 → CSS で `ytd-live-chat-frame { visibility: hidden !important }` → click 成功時に search-fixer.js が pre クラスを剥がす → YouTube 公式 collapsed bar 表示。`visibility: hidden` は frame の Polymer state / iframe load を壊さないため安全（`display: none` の NG パターンとは別レイヤ）。リトライ上限到達時は fail-safe で pre クラス剥がし（永久に隠れたままを防ぐ）。詳細は本ドキュメントの「`hideLiveChat` 体感ラグ消滅の先制非表示パターン」を参照
+- **CSS 先制非表示で体感ラグ消滅** — `youtube-early.js` (document_start) が `<html>` に `__cpa-sfx-hide-live-chat-pre` を付与 → CSS で `ytd-live-chat-frame { display: none !important }` → click 成功で frame に `collapsed` 属性が付くまで rAF polling してから pre クラス剥がし → YouTube 公式 collapsed bar 表示。リトライ上限到達 / detach / OFF 切替の 3 経路で fail-safe に pre クラス剥がし（永久に隠れたままを防ぐ）
+- **`visibility: hidden` ではなく `display: none` を採用** している (旧 visibility:hidden 案では layout 領域 402×964 px が空白枠として 2 秒残る実機問題があり置換済み)。pre クラスは click 成功で必ず剥がれる設計なので、過去 NG だった `__cpa-sfx-live-chat-force-hide` の「永続 display:none」とは別物
 
 復活禁止の失敗パターン:
 - 独自クラス `__cpa-sfx-live-chat-force-hide` を frame に付与 → frame ごと `display: none` で collapsed view ヘッダー（「パネルを開く」）まで消し、SPA 副作用も誘発
@@ -317,6 +341,7 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - CSS `iframe.ytd-live-chat-frame { height: 0 }` (collapsed 条件付き or 無条件いずれも) → SPA panel state が不整合で player 副作用
 - CSS `#chat-container:has(...) { display: none }` / `--ytd-watch-flexy-sidebar-width: 0` → 同上 + ユーザーが「パネルを開く」を再表示できなくなる
 - frame 内の `#close-button` を top frame から `document.querySelector` で探す → そもそも iframe の中なので届かない（`iframe.contentDocument` 必須）
+- pre クラス剥がしを click 成功 *直後* に行う → YouTube が collapsed transition を DOM 反映する前に display:none が解除され、frame default expand state が paint されてしまう (Edge 動画キャプチャで約 270ms expand 表示を確認)。必ず `collapsed` 属性付与を rAF polling で待つ
 
 ### 音量ブースター・Offscreen Document
 
@@ -347,6 +372,27 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - **subs section の DOM 構造**: `#header-entry` は別の `#header` div、`#items.firstElementChild` は collapsible (見出しっぽい expander)。`querySelector("ytd-guide-entry-renderer:not(#header-entry)")` で最初のチャンネル entry を取得して直前に挿入するのが正解。
 - **Trusted Types policy 対応**: YouTube は Trusted Types を有効化しているため、`innerHTML` 文字列代入は MAIN world で弾かれる。content script の isolated world では制約緩いが、安全側で **`createElement` ベース**で構築。SVG は `createElementNS` を使う。
 - **handle は ASCII 限定じゃない、URL エンコード必須**（2026-05-13 修正） — YouTube ハンドルには日本語 / 韓国語 / 中国語 / アクセント記号など Unicode が含まれるケースが多数（`@むめいの有名になりたい` / `@あゆむさんぽ` / `@Ailas足脚の世界` 等）。DOM の `getAttribute("href")` は **URL エンコード形式** (`/@%E3%82%80...`) で返すため、`href.match(/(@[\w.-]{1,60})/)` のような ASCII 専用正規表現では完全に失敗する。`SearchFixer.extractHandleFromHref` (`src/lib/actions.js`) で **`decodeURIComponent` → Unicode property escapes `\p{L}\p{N}` マッチ** で実装している。subsChannelsGrid のサムネ取得が日本語ハンドルで永遠にスキップされる重大バグの原因だった。新規に handle を扱うコードを書くときは必ず `SearchFixer.extractHandleFromHref` を使うこと。
+
+### 外部 fetch allowlist 設計 (`ImageDownloader.ALLOWED_HOSTS`)
+画像ダウンロード機能が許可する CDN ホストは `actions.js` の `ImageDownloader.ALLOWED_HOSTS` で regex 配列として宣言する。**任意サブドメインを通す広いパターンは禁止** (`evil.{cdn}.com` を allowlist 通過させて代理 fetch 攻撃面を作る)。
+
+**採用パターン**:
+- **Instagram fbcdn** は `scontent-` prefix 限定 (`/^scontent-[a-z0-9-]+\.fna\.fbcdn\.net$/` 等) — `evil.fbcdn.net` 等を通さない設計
+- **TikTok** は `p\d+` プレフィックス必須 (`/^p\d+(-[a-z0-9-]+)?\.tiktokcdn(-us)?\.com$/`) — `evil.tiktokcdn.com` / `tracking.tiktokcdn-us.com` / `static.tiktokcdn.com` を全部拒否 (/rere レビュー A2-SC-1 で確立)
+- 新サブドメインを追加する場合は **prefix 必須化** を守ること (実 prefix が「p<数字>」「scontent-」のような構造プレフィックスを持っている場合のみ許可)
+
+**fetch セキュリティ 4 原則** (image-downloader.js / search-fixer.js / keepalive.js 共通):
+1. `credentials: "omit"` — クロスオリジン Cookie 送信を回避
+2. `redirect: "manual"` — 302 経由の第三者ドメインへの認証情報送信を遮断 (opaqueredirect は `r.ok === false` 扱いで自動スキップ)
+3. `referrerPolicy: "no-referrer"` — リファラ送信ゼロ
+4. `hostname` を `ALLOWED_HOSTS` で検証 — 攻撃者注入 `<img>` 経由の代理 fetch を防ぐ
+
+### image-downloader 並列化のセマンティクス維持
+`fetchFirstAvailable` は srcset の最大解像度から順に並んだ候補配列を受け取り、**「最初に 200 OK を返した最大解像度」** を採用する。
+- 旧逐次実装: `for...of` で順次 fetch、最悪 N × RTT (体感 1-3 秒遅延)
+- 新並列実装 (/rere C-#4 で確立): `Promise.allSettled` で全候補同時発射 → 全結果待ってから **配列順 (=解像度降順) で先頭 fulfilled を採用**
+- `Promise.any` だと「最速応答」になり CDN のキャッシュヒット状況で低解像度が混入する罠 → **採用してはいけない**
+- `signal.aborted` (ユーザー OFF) の検知は全 fetch 完了後の最終チェックで AbortError を throw する設計
 
 ### Observer / async の罠
 - **MutationObserver / IntersectionObserver の callback は stale の前提で書く** — `disconnect()` を呼んでも **既に queue 入りした notification は cancel されない** (IO/MO 共通仕様)。observer インスタンスは **closure に capture** + callback 冒頭で **state null guard** を入れる。
