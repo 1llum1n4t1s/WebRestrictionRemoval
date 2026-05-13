@@ -60,7 +60,11 @@ jobs:
 
       - name: zip パッケージを作成
         run: |
-          zip -r web-viewing-assist.zip manifest.json icons src \
+          # _locales/ は manifest.json の default_locale 参照先 (en/ja の messages.json)。
+          # 含めないと CWS の Submit for review で `PKG_DEFAULT_LOCALE_MISSING` エラー。
+          # 2026-05-13: Draft only 時代はフル validation が走らず通過していたが、auto-publish
+          # 化で発覚した bug。zip.ps1 / zip.sh は最初から _locales を含めている。
+          zip -r web-viewing-assist.zip manifest.json icons src _locales \
             -x "*.DS_Store" "*.swp" "*~"
           ls -lh web-viewing-assist.zip
 
