@@ -30,7 +30,7 @@
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/content/youtube-early.js"],
+      "js": ["src/content/early-framework.js", "src/content/youtube-early.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -50,7 +50,7 @@
     },
     {
       "matches": ["*://*.instagram.com/*"],
-      "js": ["src/content/instagram-early.js"],
+      "js": ["src/content/early-framework.js", "src/content/instagram-early.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -63,7 +63,7 @@
     },
     {
       "matches": ["*://*.tiktok.com/*"],
-      "js": ["src/content/tiktok-early.js"],
+      "js": ["src/content/early-framework.js", "src/content/tiktok-early.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -79,6 +79,13 @@
       "js": ["src/lib/actions.js", "src/content/video-gamma.js"],
       "run_at": "document_idle",
       "all_frames": true
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/lib/actions.js", "src/content/loupe.js"],
+      "css": ["src/content/loupe.css"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "permissions": [

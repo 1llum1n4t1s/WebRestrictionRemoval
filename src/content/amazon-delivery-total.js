@@ -35,6 +35,44 @@
   let rafHandle = 0;
   /** observer の observe 引数（再接続時に使う） */
   const OBSERVE_OPTIONS = { childList: true, subtree: true };
+  /** 拡張機能 reload 後の orphan content script 検出フラグ */
+  let contextInvalidated = false;
+
+  /**
+   * 拡張機能リロード後、古い content script は DOM に残るが `chrome.runtime.id` が
+   * undefined になる。この状態で `chrome.i18n.getMessage` (buildTotalNode 内) を呼ぶと
+   * "Extension context invalidated" で throw する。
+   *
+   * MutationObserver → scheduleRender → renderAllTotals → buildTotalNode の経路で
+   * 過去にこのエラーを実機 (TikTok image-downloader) で確認したため、ここでも同じガード
+   * パターンを適用する。判定 true 時は observer disconnect + rAF cancel + DOM 撤去を
+   * 1 度だけ実行し、以後の呼び出しを no-op 化する。`removeAllTotals` は chrome API
+   * 非依存なので invalidation 後も安全に呼べる。
+   */
+  function checkContextInvalidated() {
+    if (contextInvalidated) return true;
+    try {
+      if (!chrome.runtime || !chrome.runtime.id) {
+        contextInvalidated = true;
+      }
+    } catch (_) {
+      contextInvalidated = true;
+    }
+    if (contextInvalidated) {
+      if (observer) {
+        try { observer.disconnect(); } catch (_) {}
+        observer = null;
+      }
+      if (rafHandle) {
+        try { cancelAnimationFrame(rafHandle); } catch (_) {}
+        rafHandle = 0;
+      }
+      scanScheduled = false;
+      active = false;
+      try { removeAllTotals(); } catch (_) {}
+    }
+    return contextInvalidated;
+  }
 
   // ---------- 状態購読 ----------
   chrome.storage.local
@@ -96,11 +134,13 @@
    */
   function scheduleRender() {
     if (scanScheduled) return;
+    if (checkContextInvalidated()) return;
     scanScheduled = true;
     rafHandle = requestAnimationFrame(() => {
       scanScheduled = false;
       rafHandle = 0;
       if (!active) return;
+      if (checkContextInvalidated()) return;
       runRenderInsideObserverGuard();
     });
   }

@@ -221,6 +221,14 @@
    *   通常の mutation は immediate=false で 150ms debounce する。
    */
   function scheduleScan(immediate) {
+    // zombie guard (/rere レビュー B1-D3 / D-4 横展開 PATTERN SYNC):
+    // orphan content script で MutationObserver は disconnect されないと永久発火し続ける。
+    // chrome API は呼ばないため例外は出ないが、purgeShortsDom が走り続けて CPU を浪費する。
+    if (!chrome.runtime?.id) {
+      stopObserver();
+      stopUrlRedirectPoll();
+      return;
+    }
     if (immediate) {
       if (scanTimerId) {
         clearTimeout(scanTimerId);
@@ -301,6 +309,11 @@
   }
 
   function maybeRedirectShortsUrl() {
+    // zombie guard (PATTERN SYNC): setInterval は orphan でも止まらないので 1 回検知で停止
+    if (!chrome.runtime?.id) {
+      stopUrlRedirectPoll();
+      return;
+    }
     try {
       const match = location.pathname.match(YouTubeShorts.SHORTS_PATH_RE);
       if (!match) return;

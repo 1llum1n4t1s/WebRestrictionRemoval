@@ -1,6 +1,6 @@
 # 📖 Web Viewing Assist
 
-A Chrome extension that consolidates 8 features for comfortable browsing into a single popup: **Keep session alive** / **YouTube cleaner (29 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster** / **Video Gamma** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
+A Chrome extension that consolidates 9 features for comfortable browsing into a single popup: **Keep session alive** / **YouTube cleaner (29 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster** / **Video Gamma** / **Loupe** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
 
 > **Notable changes through v1.0.18**: The "restriction removal" features (right-click / selection / force paste & copy) have been fully removed; the Extension is now focused exclusively on web viewing assistance. The Extension was also renamed from "Web Restriction Removal Helper" to "Web Viewing Assist". Version numbers are finalized via the `/vava` skill at release time.
 
@@ -64,17 +64,32 @@ Fetches are limited to each site's official CDN (`*.cdninstagram.com` / `sconten
 
 ### 🔊 Volume Booster (opt-in, default OFF)
 
-Amplifies the active tab's volume from **0% to 300%**. With the **master toggle ON**, the slider is enabled and your settings (gain value, sub-toggles) are persisted globally. At 100% the AudioContext is released to free resources; other values start the amplification pipeline. The "Auto Distortion Guard", "Auto Volume Normalization", and "Night Mode" sub-toggles (all default OFF) enable individual audio nodes. Auto normalization is implemented with short-window RMS measurement via `AnalyserNode` plus an automatic `GainNode`; the distortion guard and Night Mode are implemented with `DynamicsCompressor`.
+Amplifies the active tab's volume from **0% to 300%**. With the **master toggle ON**, the slider is enabled and your settings (gain value, sub-toggles, mute) are persisted globally. At 100% with all sub-toggles and mute OFF the AudioContext is released to free resources; otherwise the amplification pipeline is started. The "Auto Distortion Guard", "Auto Volume Normalization", and "Night Mode" sub-toggles (all default OFF) enable individual audio nodes. A **mute 🔊/🔇 button** sits at the left edge of the slider — clicking it ramps the gain to 0 while preserving the slider value and sub-toggle settings, and clicking again restores the original volume instantly (this is an independent layer from Chrome's native tab mute). Auto normalization is implemented with short-window RMS measurement via `AnalyserNode` plus an automatic `GainNode`; the distortion guard and Night Mode are implemented with `DynamicsCompressor`.
 
 | Behavior | Description |
 |---|---|
 | Acquire | `chrome.tabCapture.getMediaStreamId` obtains the active tab's audio stream. |
 | Process | The offscreen document's `AudioContext` builds a 6-node chain: `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination`, applying loudness correction → compression → user gain → limiter in order before re-output. |
-| Release | Master toggle OFF / slider back to 100% with all sub-toggles OFF / tab closed / Extension disabled — any of these immediately releases the stream. |
+| Mute | `gainNode.gain` is ramped to 0 while `lastSetPercent` is preserved. The AudioContext is kept alive so unmute can restore the volume instantly. |
+| Release | Master toggle OFF / slider back to 100% with all sub-toggles and mute OFF / tab closed / Extension disabled — any of these immediately releases the stream. |
 
 ### 🎞️ Video Gamma (opt-in, default OFF)
 
 Applies gamma correction to `<video>` elements on the page (custom implementation based on SVG `<feComponentTransfer type="gamma">`). Master toggle + slider; the slider center (1.0) means no correction, moving left makes the video darker (max 3.0), moving right makes it brighter (min 0.3). The setting is shared across all tabs, and `<video>` elements inside iframes (e.g. YouTube embeds) also receive the same correction via `all_frames: true`.
+
+### 🔍 Loupe (opt-in, default OFF)
+
+A circular magnifier that follows the cursor. When the master toggle is ON, the Extension captures the active tab as a JPEG snapshot via `chrome.tabs.captureVisibleTab` and displays it as a `background-image` inside a circular `position: fixed` lens. `mousemove` updates `background-position` at 60 fps using `requestAnimationFrame` coalescing to show the area under the cursor magnified. Because the captured pixels include video / iframe / canvas content, this is ideal for **pausing a video and inspecting fine details**.
+
+| Behavior | Description |
+|---|---|
+| Zoom | 1.5× / 2.5× / 4× — pick one via the popup segment control. |
+| Lens size | Adjustable 150 – 1000 px (default 220 px) via the popup slider. |
+| Off | Left-click anywhere on the page while the lens is showing — the lens is removed instantly and the popup toggle flips OFF. |
+| Re-capture | Triggered automatically on initial activation, on scroll (500 ms debounced), on large DOM changes (`MutationObserver`), and on window resize. |
+| Memory | The captured JPEG is converted to a Blob URL and `URL.revokeObjectURL` is called on cleanup so it is released reliably. |
+
+Note: Chrome's `captureVisibleTab` is rate-limited to 2 fps, so re-capture after scrolling or DOM changes is delayed by up to 500 ms by design. This is unnoticeable for the "pause → inspect → resume" workflow.
 
 ### 🎨 Color Picker (always available)
 
@@ -159,7 +174,7 @@ Popup (src/popup/popup.{html,js,css})
 ### How Volume Booster works
 
 - Chrome allows only one offscreen document per extension, so `tabCapture` (USER_MEDIA) and AudioContext output (AUDIO_PLAYBACK) coexist in the same document.
-- When the slider is at UNITY (100%) AND all sub-toggles (Auto Distortion Guard / Auto Volume Normalization / Night Mode) are OFF, `getMediaStreamId` is not called and the AudioContext is released. At 100% with any sub-toggle ON, the AudioContext is preserved so auto correction can still apply.
+- When the slider is at UNITY (100%) AND all sub-toggles (Auto Distortion Guard / Auto Volume Normalization / Night Mode) and the mute toggle are OFF, `getMediaStreamId` is not called and the AudioContext is released. At 100% with any sub-toggle or mute ON, the AudioContext is preserved so auto correction or muting can still apply.
 - When a tab is closed, `chrome.tabs.onRemoved` releases immediately (this API fires durably and is not affected by Service Worker restarts).
 - While a boost is active, the offscreen document's idle close is suppressed and the AudioContext is preserved.
 

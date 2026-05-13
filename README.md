@@ -2,7 +2,7 @@
 
 > [English version](README.en.md) is also available.
 
-Web ブラウジングを快適にする 8 機能（**セッション維持** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Instagram クリーナー（11 サブ機能）** / **TikTok クリーナー（3 サブ機能）** / **音量ブースター** / **動画ガンマ補正** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。**画像ダウンロードボタン（Instagram / TikTok 共通）** も各クリーナーのサブ機能として利用できます。
+Web ブラウジングを快適にする 9 機能（**セッション維持** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Instagram クリーナー（11 サブ機能）** / **TikTok クリーナー（3 サブ機能）** / **音量ブースター** / **動画ガンマ補正** / **ルーペ** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。**画像ダウンロードボタン（Instagram / TikTok 共通）** も各クリーナーのサブ機能として利用できます。
 
 > **v1.0.18 までの主な変更点**: 「制限解除（右クリック / 選択 / 強制ペースト・コピー）」機能を全面廃止し、Web 閲覧支援機能のみに特化しました。あわせて拡張機能名を「**WEB制限解除サポート**」から「**WEB閲覧アシスト**」に変更しています。バージョン番号は `/vava` スキル経由でリリース時に確定します。
 
@@ -66,17 +66,32 @@ Instagram / TikTok クリーナーに含まれる `imageDownload` サブ機能�
 
 ### 🔊 音量ブースター（オプトイン、デフォルト OFF）
 
-アクティブタブの音量を **0〜300%** で増幅します。**マスタートグル付き**で、ON のときに 0〜300% スライダーが有効化され、設定（gain 値・サブトグル）はグローバル永続化されます。スライダーが 100% のときは AudioContext を解放してリソースを返却し、それ以外の値で増幅処理を起動します。サブトグル「自動歪み防止」「自動音量正規化」「ナイトモード」（いずれもデフォルト OFF）で各音響ノードが個別に有効化されます。自動音量正規化は `AnalyserNode` による短時間 RMS 測定 + 自動 `GainNode` で実装し、自動歪み防止とナイトモードは `DynamicsCompressor` で実装します。
+アクティブタブの音量を **0〜300%** で増幅します。**マスタートグル付き**で、ON のときに 0〜300% スライダーが有効化され、設定（gain 値・サブトグル・ミュート）はグローバル永続化されます。スライダーが 100% かつ全サブトグル OFF かつミュート OFF のときは AudioContext を解放してリソースを返却し、それ以外の値で増幅処理を起動します。サブトグル「自動歪み防止」「自動音量正規化」「ナイトモード」（いずれもデフォルト OFF）で各音響ノードが個別に有効化されます。スライダーの左端の **ミュート 🔊/🔇 ボタン** はスライダー値・サブトグル設定を保持したまま gain だけ 0 にランプし、再クリックで元の音量に復帰します（Chrome 標準のタブミュートとは独立レイヤとして動作）。自動音量正規化は `AnalyserNode` による短時間 RMS 測定 + 自動 `GainNode` で実装し、自動歪み防止とナイトモードは `DynamicsCompressor` で実装します。
 
 | 動作 | 説明 |
 |------|------|
 | 取得 | `chrome.tabCapture.getMediaStreamId` で active tab の音声 stream を取得 |
 | 処理 | offscreen ドキュメント内の `AudioContext` で `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` の 6 ノードチェーンを構築し、ラウドネス補正・圧縮・ユーザー gain・リミッタを順に適用して `destination` に再出力 |
-| 解放 | マスタートグル OFF / スライダーを 100% に戻し全サブトグル OFF / タブを閉じる / 拡張機能を無効化 で即時 release |
+| ミュート | `gainNode.gain` を 0 にランプ（`lastSetPercent` は保持）。AudioContext は維持されたままで再クリック時に高速復帰 |
+| 解放 | マスタートグル OFF / スライダー 100% かつ全サブトグル OFF かつミュート OFF / タブを閉じる / 拡張機能を無効化 で即時 release |
 
 ### 🎞️ 動画ガンマ補正（オプトイン、デフォルト OFF）
 
 ページ上の `<video>` 要素にガンマ補正を適用します（SVG `<feComponentTransfer type="gamma">` ベースの独自実装）。マスタートグル + スライダー構成で、スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。全タブ共通設定で、iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たります。
+
+### 🔍 ルーペ（オプトイン、デフォルト OFF）
+
+マウスカーソルに追従する円形拡大鏡。ポップアップでマスタートグルを ON にすると、現在のタブの静止画 (JPEG) を `chrome.tabs.captureVisibleTab` で取得し、円形レンズの背景画像として表示します。`mousemove` で `background-position` をリアルタイム計算 (60fps、`requestAnimationFrame` コアレス) してカーソル下の領域を拡大します。動画 / iframe / canvas を含む描画ピクセルがそのまま映るため、**動画を一時停止して細部を確認** する用途に最適です。
+
+| 動作 | 説明 |
+|------|------|
+| 倍率 | 1.5× / 2.5× / 4× の 3 段階。ポップアップのセグメントコントロールで選択 |
+| レンズサイズ | 150〜1000px の範囲でスライダー可変（デフォルト 220px） |
+| OFF 操作 | レンズ表示中に画面上で **左クリック** → 即座にレンズ撤去 + ポップアップのトグルも OFF 状態に書き戻し |
+| 再キャプチャ | 初回 / スクロール (500ms debounced) / DOM 大幅変化 (`MutationObserver`) / ウィンドウリサイズで自動 |
+| メモリ | 取得した JPEG は Blob URL に変換し、OFF 時に `URL.revokeObjectURL` で確実に解放 |
+
+※ Chrome の `captureVisibleTab` は 2fps 上限があるため、スクロール / DOM 変化後の再キャプチャは最大 500ms 遅延します。これは仕様で、動画停止 → 確認 → 動かす、というワークフローでは違和感ありません。
 
 ### 🎨 カラーピッカー（常時利用可）
 
@@ -161,7 +176,7 @@ Popup (src/popup/popup.{html,js,css})
 ### 音量ブースターの仕組み
 
 - Chrome は 1 拡張あたり 1 つの offscreen document しか開けないため、`tabCapture` (USER_MEDIA) と AudioContext 出力 (AUDIO_PLAYBACK) を同居させる
-- スライダーが UNITY (100%) かつ全サブトグル (自動歪み防止 / 自動音量正規化 / ナイトモード) が OFF の場合のみ、`getMediaStreamId` を呼ばず AudioContext を release してリソース返却。100% でもサブトグル ON なら AudioContext を維持して自動補正を効かせる
+- スライダーが UNITY (100%) かつ全サブトグル (自動歪み防止 / 自動音量正規化 / ナイトモード) が OFF かつミュート OFF の場合のみ、`getMediaStreamId` を呼ばず AudioContext を release してリソース返却。100% でもサブトグルまたはミュートが ON なら AudioContext を維持して自動補正・消音を効かせる
 - タブを閉じると `chrome.tabs.onRemoved` で即座に release（永続的に発火する API のため Service Worker 再起動の影響を受けない）
 - 音量ブースト中は offscreen のアイドル close を抑止し、AudioContext を保持し続ける
 

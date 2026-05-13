@@ -85,7 +85,16 @@
           <span class="sub-value" id="volumeValue">100%</span>
         </div>
         <div class="tr-desc" data-i18n="volumeSubDesc">動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです</div>
-        <input type="range" id="volumeSlider" class="range" />
+        <div class="volume-slider-row">
+          <button type="button" id="volumeMuteBtn" class="volume-mute-btn"
+                  aria-pressed="false"
+                  data-i18n-attr="aria-label:volumeMuteAriaOff;title:volumeMuteTitleOff"
+                  aria-label="ミュート"
+                  title="ミュート（音量は保持）">
+            <span class="volume-mute-icon" aria-hidden="true">🔊</span>
+          </button>
+          <input type="range" id="volumeSlider" class="range" />
+        </div>
         <div class="volume-actions">
           <button type="button" id="volumeResetBtn" class="ghost-btn"
                   data-i18n="volumeReset100Btn"
@@ -167,6 +176,45 @@
                   data-i18n-attr="aria-label:videoGammaResetAria"
                   aria-label="ガンマ値を 1.0 に戻す">1.0 に戻す</button>
         </div>
+      </div>
+
+      <!-- ルーペ機能マスタートグル -->
+      <label class="toggle-row" id="loupeToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔍</span>
+        <span class="tr-text">
+          <span class="tr-name" data-i18n="loupeMaster">ルーペ</span>
+          <span class="tr-desc" data-i18n="loupeMasterDesc">現在の画面を円形レンズで拡大。動画は一時停止してから使うのがおすすめ。左クリックで OFF</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="loupeToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- マスタートグル ON 時のみ表示する倍率セグメント + サイズスライダー -->
+      <div class="sub-block hidden" id="loupeRow">
+        <div class="sub-head">
+          <span class="sub-label">
+            <span aria-hidden="true">🔎</span>&nbsp;<span data-i18n="loupeZoomLabel">倍率</span>
+          </span>
+          <span class="sub-value" id="loupeZoomValue">2.5×</span>
+        </div>
+        <div class="loupe-zoom-segment" id="loupeZoomSegment" role="group"
+             data-i18n-attr="aria-label:loupeZoomAriaLabel"
+             aria-label="倍率を選択">
+          <button type="button" class="seg-btn" data-zoom="1.5">1.5×</button>
+          <button type="button" class="seg-btn is-active" data-zoom="2.5">2.5×</button>
+          <button type="button" class="seg-btn" data-zoom="4">4×</button>
+        </div>
+
+        <div class="sub-head sub-head--gap">
+          <span class="sub-label">
+            <span aria-hidden="true">🔲</span>&nbsp;<span data-i18n="loupeSizeLabel">レンズサイズ</span>
+          </span>
+          <span class="sub-value" id="loupeSizeValue">220px</span>
+        </div>
+        <div class="tr-desc" data-i18n="loupeSizeDesc">レンズの直径を 150〜1000px の範囲で調整できます</div>
+        <input type="range" id="loupeSizeSlider" class="range" />
       </div>
     </section>
 

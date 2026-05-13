@@ -105,13 +105,19 @@ jobs:
           # CLI が OAuth Bearer Token をエラーメッセージに混ぜてくると平文でログ残存しうる。
           # 直接ストリームすれば Actions ランナー側のマスキングが各シークレットを `***` に置換できる。
           set -euo pipefail
+          # ⚠️ このブロックでは `set -x` を絶対に有効化しない。set -x がトークン取得行を
+          # 展開すると CWS_REFRESH_TOKEN / token_response / access_token のいずれかが
+          # add-mask 登録前に平文ログに出る可能性がある (/rere レビュー A2-S-1 防御)。
           token_response=$(curl -fsS \
             -X POST "https://oauth2.googleapis.com/token" \
             --data-urlencode "client_id=${CWS_CLIENT_ID}" \
             --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
             --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
             --data-urlencode "grant_type=refresh_token")
-          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<< "$token_response")
+          # Python 例外メッセージは標準で token 本体を含まないが、防御深層として stderr を抑制し、
+          # KeyError / JSONDecodeError 時のスタックトレースから付帯情報の漏洩可能性をゼロ化する。
+          # パース失敗時は `set -euo pipefail` により非ゼロ終了で job が即 abort する。
+          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response")
           # 動的取得した access_token は GitHub Actions の自動マスキング対象外のため、
           # add-mask で明示的にマスク登録して以降のログ出力でも漏洩しないようにする。
           # token_response は access_token を含む JSON 全体。`set -x` や将来の

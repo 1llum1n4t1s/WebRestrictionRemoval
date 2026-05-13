@@ -59,21 +59,54 @@
   const STYLE_ID = "__cpa-ig-early-hide-comments";
   const FORCE_HIDE_ATTR = "data-cpa-ig-force-hide";
 
-  // (1) <html> 直下に <style> を同期 prepend する。manifest css 経由の rule に依存せず、
-  //     instagram-early.js 実行時点で CSS rule を確実に effective 化する。
-  if (!document.getElementById(STYLE_ID)) {
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent =
-      "html." + PRE_CLASS + " div:has(> ul._a9ym) { display: none !important; }";
-    document.documentElement.appendChild(style);
+  // -----------------------------------------------------------------
+  // (0) URL リダイレクトの document_start 先制実行
+  //
+  // 通常 reels/explore/stories の URL リダイレクトは instagram-cleaner.js が document_idle で
+  // 行うが、Reels ページは Instagram 自身の React bundle が CPU を独占して document_idle が
+  // 到達しないケースがある (実機 Edge で確認、Trace で Instagram 本体が 41 秒占有 / 我々の
+  // content script は 0.14ms のみ)。その結果、ユーザーが reels リダイレクトを ON にしていても
+  // ホームに飛ばされず、タブがフリーズする。
+  //
+  // document_start で先制 redirect することで、Instagram の重い JS bundle が実行を始める前に
+  // location.replace でページを離脱できる。`chrome.storage.local.get` の async 応答 (数 ms) を
+  // 待つ必要があるが、document_idle までの待ち (数百 ms 〜 freeze) より遥かに早い。
+  //
+  // 設計判断:
+  //   - `location.replace` を使用 (history に残さない: ユーザーが「戻る」で再度 freeze 経路に
+  //     入らないようにする)
+  //   - storage 未設定 / catch は何もしない (= 後段の instagram-cleaner.js に任せる)
+  //   - actions.js はロードしないので生の storage key string と path 正規表現を直書きする
+  //     (instagram-cleaner.js の checkUrlRedirect と同じ regex に揃える)
+  // -----------------------------------------------------------------
+  const path = location.pathname;
+  // ⚠️ MUST SYNC with `src/content/instagram-cleaner.js` checkUrlRedirect (line ~441-443):
+  // 同じ regex を使って document_start と document_idle の両経路で同じ URL を判定する。
+  // 片方だけ書き換えると「early では redirect されたが cleaner では戻る」など整合性が崩れる。
+  const REELS_RE = /^\/reels?(\/|$)/i;
+  const EXPLORE_RE = /^\/explore(\/|$)/i;
+  const STORIES_RE = /^\/stories(\/|$)/i;
+  if (REELS_RE.test(path) || EXPLORE_RE.test(path) || STORIES_RE.test(path)) {
+    chrome.storage.local
+      .get(["instagramCleanerEnabled", "instagramCleanerFeatures"])
+      .then((stored) => {
+        if (stored.instagramCleanerEnabled !== true) return;
+        const feats = stored.instagramCleanerFeatures;
+        if (!feats || typeof feats !== "object") return;
+        const shouldRedirect =
+          (REELS_RE.test(path) && feats.reels === true) ||
+          (EXPLORE_RE.test(path) && feats.explore === true) ||
+          (STORIES_RE.test(path) && feats.storiesAll === true);
+        if (shouldRedirect) {
+          try { location.replace("/"); }
+          catch { location.href = "/"; }
+        }
+      })
+      .catch(() => {});
   }
 
-  // (2) <html> 同期で先制付与
-  document.documentElement.classList.add(PRE_CLASS);
-
-  // (3) MutationObserver で `_a9ym` UL 出現を監視 → その **親 div** に inline 強制 hide。
-  //     `_a9z6` (外側 UL) には post caption が含まれるため触らない（caption 巻き込み防止）。
+  // サイト固有: MutationObserver で `_a9ym` UL 出現を監視 → その **親 div** に inline 強制 hide。
+  // `_a9z6` (外側 UL) には post caption が含まれるため触らない（caption 巻き込み防止）。
   const forceHideParent = (ymUl) => {
     const wrapper = ymUl?.parentElement;
     if (!wrapper || wrapper.getAttribute(FORCE_HIDE_ATTR) === "1") return;
@@ -84,18 +117,28 @@
   // 既に _a9ym があれば即適用（document_start 時点では普通は無いが念のため）
   document.querySelectorAll("ul._a9ym").forEach(forceHideParent);
 
+  // observer 制御: 旧実装は常時稼働で OFF 時もコールバック先頭で早期 return する設計だったが、
+  // Instagram は React で document subtree に対して秒間数十〜数百件の mutation を発火するため、
+  // OFF ユーザーでも MO callback が高頻度起動し CPU を浪費する問題があった (/rere レビュー C-#3)。
+  // ON/OFF で observe/disconnect を切り替えて、OFF 中はコールバックを完全停止する。
+  let observerActive = false;
+  const ensureObserverActive = () => {
+    if (observerActive) return;
+    observer.observe(document, { childList: true, subtree: true });
+    observerActive = true;
+  };
+  const disconnectObserver = () => {
+    if (!observerActive) return;
+    try { observer.disconnect(); } catch {}
+    observerActive = false;
+  };
+
   const observer = new MutationObserver((mutations) => {
-    // zombie guard: 拡張機能が更新・無効化された後も古い content script の observer は
-    // 残り続けて mutation を受信する。chrome.runtime?.id が undefined になったら
-    // 即 disconnect して以降のコールバック呼び出しコストをゼロにする（rere レビュー D-6）。
+    // zombie guard (PATTERN SYNC): orphan content script で observer が永久発火するのを停止
     if (!chrome.runtime?.id) {
-      try { observer.disconnect(); } catch {}
+      disconnectObserver();
       return;
     }
-    // pre クラスがない (= 機能 OFF) なら何もしない。
-    // observer 自体は disconnect せず常時動かして、storage.onChanged で hideComments
-    // が再 ON になったタイミングからすぐ機能できるようにする。
-    if (!document.documentElement.classList.contains(PRE_CLASS)) return;
     for (const m of mutations) {
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
@@ -107,9 +150,10 @@
       }
     }
   });
-  observer.observe(document, { childList: true, subtree: true });
+  // framework が pre クラスを同期付与した後の初期状態 (storage 確認前) は observer 稼働。
+  // OFF 確定で offRevert が disconnect する。
+  ensureObserverActive();
 
-  // (4)(5) storage 確認 + onChanged で再評価
   const offRevert = () => {
     document.documentElement.classList.remove(PRE_CLASS);
     document
@@ -118,40 +162,31 @@
         el.style.removeProperty("display");
         el.removeAttribute(FORCE_HIDE_ATTR);
       });
+    disconnectObserver();
   };
 
   const onApply = () => {
     document.documentElement.classList.add(PRE_CLASS);
+    ensureObserverActive();
     // 再 ON 時に既存 _a9ym があれば即 force-hide
     document.querySelectorAll("ul._a9ym").forEach(forceHideParent);
   };
 
-  const evalSettings = (stored) => {
-    const enabled = stored.instagramCleanerEnabled === true;
-    const commentsOn = !!(
-      stored.instagramCleanerFeatures &&
-      stored.instagramCleanerFeatures.comments === true
-    );
-    if (enabled && commentsOn) onApply();
-    else offRevert();
-  };
-
-  chrome.storage.local
-    .get(["instagramCleanerEnabled", "instagramCleanerFeatures"])
-    .then(evalSettings)
-    .catch(offRevert);
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    if (
-      !("instagramCleanerEnabled" in changes) &&
-      !("instagramCleanerFeatures" in changes)
-    ) {
-      return;
-    }
-    chrome.storage.local
-      .get(["instagramCleanerEnabled", "instagramCleanerFeatures"])
-      .then(evalSettings)
-      .catch(offRevert);
+  // 共通フレームワーク経由で style 注入 + pre クラス同期付与 + storage 取得 + onChanged 購読
+  __cpaEarlyFramework.setup({
+    styleId: STYLE_ID,
+    cssText:
+      "html." + PRE_CLASS + " div:has(> ul._a9ym) { display: none !important; }",
+    preClasses: [PRE_CLASS],
+    storageKeys: ["instagramCleanerEnabled", "instagramCleanerFeatures"],
+    onEvaluate(stored) {
+      const enabled = stored.instagramCleanerEnabled === true;
+      const commentsOn = !!(
+        stored.instagramCleanerFeatures &&
+        stored.instagramCleanerFeatures.comments === true
+      );
+      if (enabled && commentsOn) onApply();
+      else offRevert();
+    },
   });
 })();

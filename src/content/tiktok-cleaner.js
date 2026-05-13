@@ -72,6 +72,12 @@
 
   /** 各機能フラグに応じて document.documentElement にクラスを付け外し。 */
   function applyBodyClasses() {
+    // zombie guard (/rere レビュー B1-D3 / D-4 横展開 PATTERN SYNC):
+    // orphan content script では chrome listener が発火停止するが、何らかの理由で遅延発火した
+    // 場合に body class を確実に剥がして UI 状態を素に戻す保険。
+    if (!chrome.runtime?.id) {
+      active = false;
+    }
     const root = document.documentElement;
     if (!root) return;
     for (const [key, className] of Object.entries(TikTokCleaner.BODY_CLASS)) {

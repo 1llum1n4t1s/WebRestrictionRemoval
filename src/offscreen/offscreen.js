@@ -153,9 +153,10 @@ function updateLoudnessNormalizer(state, enabled) {
  * @param {boolean} antiClip 自動歪み防止 ON/OFF
  * @param {boolean} normalize 自動音量正規化 ON/OFF
  * @param {boolean} nightMode ナイトモード圧縮 ON/OFF
+ * @param {boolean} muted ミュート ON/OFF（true なら gainPercent によらず 0 にランプ、lastSetPercent は保持）
  * @returns {Promise<{ok: boolean, gain?: number, error?: string}>}
  */
-async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize, nightMode) {
+async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize, nightMode, muted) {
   try {
     if (!Number.isInteger(tabId) || tabId <= 0) {
       return { ok: false, error: "invalid-tab-id" };
@@ -201,13 +202,16 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize, 
     // 対数マッピングで実 gain を算出 → setTargetAtTime で 45ms ramp。
     // 直接 `.value =` 代入だとプチノイズが乗るため必ず ramp 経由にする。
     // cancelScheduledValues で古いランプ予約を破棄してから現在値を anchor し新しいランプを開始。
+    // ミュート ON のときは percentToGain を無視して 0 へランプする。`lastSetPercent` には
+    // ユーザーが意図したスライダー値を残し、ミュート解除時に同じランプ経路で復帰できるようにする。
     const clamped = VolumeBooster.clampValue(gainPercent);
-    const targetGain = VolumeBooster.percentToGain(clamped);
+    const mutedFlag = muted === true;
+    const targetGain = mutedFlag ? 0 : VolumeBooster.percentToGain(clamped);
     const now = state.ctx.currentTime;
     state.gainNode.gain.cancelScheduledValues(now);
     state.gainNode.gain.setValueAtTime(state.gainNode.gain.value, now);
     state.gainNode.gain.setTargetAtTime(targetGain, now, VolumeBooster.RAMP_TIME_CONSTANT);
-    // ユーザーが意図したスライダー位置を保持（gain.value はランプ中で別値）。
+    // ユーザーが意図したスライダー位置を保持（gain.value はランプ中で別値、ミュート中も保持）。
     state.lastSetPercent = clamped;
     // 既存ノードのプロパティを書き換えるだけなので AudioContext 再構築は不要。トグル切替時も音切れなし。
     updateLoudnessNormalizer(state, normalize === true);
@@ -263,7 +267,12 @@ async function createAudioState(tabId, streamId) {
     // ノード順序: ラウドネス正規化（測定 + 自動 gain）→ ナイトモード（コンプ）
     // → ブースト（gain）→ 自動歪み防止（リミッタ）の直列接続。
     // 正規化は「音源全体の平均的な音量」を先に整え、ナイトモードはその後で瞬間的な大小差を狭める。
-    normalizerAnalyzer.fftSize = 2048;
+    //
+    // fftSize は周波数解析用パラメータだが、`getFloatTimeDomainData` でも測定窓サイズとして使われる。
+    // 旧値 2048 (約 46ms @ 44.1kHz) は RMS 測定として過大で、NORMALIZE_UPDATE_MS ごとの
+    // RMS 計算ループが offscreen の CPU を持続的に消費していた (/rere レビュー C-#16)。
+    // 512 (約 11ms @ 44.1kHz) でラウドネス正規化に十分な精度を保ちつつ計算量を 1/4 に圧縮する。
+    normalizerAnalyzer.fftSize = 512;
     normalizerGainNode.gain.value = 1;
     const nightModeNode = ctx.createDynamicsCompressor();
     const antiClipNode = ctx.createDynamicsCompressor();
@@ -385,7 +394,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       msg.gain,
       msg.antiClip,
       msg.normalize,
-      msg.nightMode
+      msg.nightMode,
+      msg.muted
     ).then(sendResponse);
     return true;
   }

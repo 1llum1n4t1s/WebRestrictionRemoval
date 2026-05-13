@@ -979,8 +979,15 @@
       const sections = document.querySelectorAll("ytd-rich-section-renderer");
       for (const section of sections) {
         if (!section.isConnected) continue;
-        const text = section.textContent ?? "";
-        if (text.includes("ニュース速報") || text.includes("Breaking news")) {
+        // 旧実装は section.textContent (サブツリー全体の連結文字列、数百〜数千文字) を毎回計算して
+        // includes 検索していたが、見出し要素 (`#title` / `yt-formatted-string`) の限定走査で
+        // 十分かつ大幅に軽量 (/rere レビュー C-#13)。YouTube の rich section の見出しは
+        // `#title` (id 属性) または `yt-formatted-string` 要素に入る。
+        const title = section.querySelector(
+          "#title, yt-formatted-string"
+        );
+        const titleText = title?.textContent ?? "";
+        if (titleText.includes("ニュース速報") || titleText.includes("Breaking news")) {
           section.remove();
         }
       }
@@ -1288,8 +1295,11 @@
   // leftnav 注入時にアイコンが欠落するバグがあった。v3 では ytInitialData JSON から
   // thumbnail URL を取り出すため空 URL は出ない。旧 v2 cache は schema bump で破棄する。
   const SUBS_CACHE_LIST_KEY = "__cpa_subs_list_v3";
-  // v5: maxresdefault.jpg (16:9) URL を保存するため、hqdefault (4:3) を保存していた v4 を invalidate。
-  const SUBS_CACHE_THUMB_PREFIX = "__cpa_subs_thumb_v5::";
+  // v6 (2026-05-13): HTML 内の最初の `"videoId":"..."` を採用する旧ロジックは「削除済み / 非公開動画」
+  // を引いて灰色 + 三点リーダーのプレースホルダーが表示される問題があった。v6 では複数 videoId 候補を
+  // 並列 HEAD で篩い分け、`maxresdefault.jpg` が **200** を返すものだけ採用する。全部 404 なら null
+  // を cache 保存（プレースホルダー画像は表示しない）。旧 v5 cache は強制 invalidate。
+  const SUBS_CACHE_THUMB_PREFIX = "__cpa_subs_thumb_v6::";
   const SUBS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
   /** @type {Promise<Array<{handle:string,name:string,href:string,avatarUrl:string}>>|null} */
@@ -1477,10 +1487,30 @@
     return null;
   }
 
-  /** "/@handle" 形式の href から @handle 部分を抽出。 */
+  /**
+   * `/@handle` 形式の href から @handle 部分を抽出する。
+   *
+   * actions.js の `SearchFixer.extractHandleFromHref` と同等の実装をローカルにも持つ。
+   * テスト容易性のため pure function は actions.js 側に move したが、IntersectionObserver の
+   * 高頻度コールバックパスでは `SearchFixer` namespace の解決失敗 (load 順 / cache) に起因する
+   * silent TypeError でサムネ inject 全体が止まる障害が観測されたため、防御的にローカルにも
+   * 同じロジックを残す（2026-05-13 subsChannelsGrid サムネ取得失敗バグ修正）。
+   *
+   * Unicode 対応:
+   *   - YouTube のハンドルは ASCII (`@nagumorui`) だけでなく日本語 / 韓国語 / 中国語 /
+   *     アクセント記号を含むケースが多数ある (`@むめいの有名になりたい` 等)。
+   *   - DOM の `href` は URL エンコード形式 (`/@%E3%82%80...`) で保持されるため、
+   *     `decodeURIComponent` でデコードしてから Unicode property escapes でマッチする。
+   */
   function extractHandleFromHref(href) {
     if (!href) return null;
-    const m = href.match(/\/(@[\w.-]{1,60})(?:\/|$|\?)/);
+    let decoded;
+    try {
+      decoded = decodeURIComponent(href);
+    } catch {
+      decoded = href;
+    }
+    const m = decoded.match(/(@[\p{L}\p{N}._-]{1,60})(?:\/|$|\?|#)/u);
     return m ? m[1] : null;
   }
 
@@ -1588,7 +1618,12 @@
   function buildSubsLeftnavEntry(ch) {
     const link = document.createElement("a");
     link.className = SUBS_INJECT_MARKER;
-    link.href = ch.href;
+    // ch.href は ytInitialData の navigationEndpoint.commandMetadata.webCommandMetadata.url から
+    // 来るパス相対 (`/@handle`) のはず。`javascript:` / `data:` 等が紛れ込んだ場合に <a> クリックで
+    // page world でスクリプト実行される経路を遮断する (/rere レビュー A2-I-2)。
+    // 通常の YouTube ハンドル URL は `/` または `https://` 始まりなのでこの 2 形式のみ allowlist。
+    link.href =
+      ch.href.startsWith("/") || ch.href.startsWith("https://") ? ch.href : "/";
     link.title = ch.name;
     link.setAttribute("data-handle", ch.handle);
     const avatarUrl = normalizeAvatarUrl(ch.avatarUrl);
@@ -1625,6 +1660,11 @@
   function normalizeAvatarUrl(url) {
     if (!url || typeof url !== "string") return "";
     if (url.startsWith("//")) return "https:" + url;
+    // ytInitialData の thumbnail.url は通常 https:// または // のプロトコル相対形式だが、
+    // CDN 設定ミス / 中間者 / 将来の改ざんで `javascript:` / `data:` 等が紛れ込んだ場合に
+    // `<img src>` 経由で onerror ハンドラが isolated world で発火する経路を遮断する
+    // (/rere レビュー A2-I-1)。http(s) 以外のスキームは空文字で拒否。
+    if (!url.startsWith("https://") && !url.startsWith("http://")) return "";
     return url;
   }
 
@@ -1938,6 +1978,11 @@
   // ----- A2: ショートカットボタン -----
 
   function applySubsAllShortcut() {
+    // 拡張機能 reload 後の orphan content script では `chrome.runtime.id` が undefined になり、
+    // この関数内の `chrome.i18n.getMessage` で "Extension context invalidated" が throw する。
+    // MutationObserver / SPA navigation 起点でこの関数が呼ばれ続けるため、入口でガードする。
+    // observer 群の disconnect は不要 (invalidation 後は callback が呼ばれても空処理で済むため)。
+    if (!chrome.runtime || !chrome.runtime.id) return;
     const existing = document.querySelector(`.${SUBS_SHORTCUT_MARKER}`);
     if (!f("subsAllShortcut")) {
       if (existing) existing.remove();
@@ -1993,6 +2038,10 @@
   // ----- C: /feed/channels グリッド化 + 検索 + ソート + lazy fetch -----
 
   function applySubsChannelsGrid() {
+    // 同上: orphan content script で `chrome.i18n.getMessage` (ensureSubsGridToolbar 内 placeholder)
+    // が throw するのを防ぐ。MutationObserver / SPA navigation 起点で頻繁に呼ばれる経路なので
+    // 入口でガードする。
+    if (!chrome.runtime || !chrome.runtime.id) return;
     const enabled = f("subsChannelsGrid") && location.pathname === "/feed/channels";
     if (!enabled) {
       detachSubsChannelsGrid();
@@ -2529,10 +2578,15 @@
 
   /**
    * カードがビューポートに入ったタイミングで、対応するチャンネルの Featured 動画サムネを取得。
-   * `/${handle}` HTML 内の最初の `"videoId":"..."` を抽出して
-   * `https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg` を組み立てる (16:9, 1280x720)。
+   * `/${handle}` HTML 内の `"videoId":"..."` 出現順上位 10 件を候補に、**2 段階で並列 HEAD 篩い分け** (v6 仕様):
+   *
+   *   1. maxresdefault.jpg HEAD 200 を探す → 採用 (`https://i.ytimg.com/vi/{vid}/maxresdefault.jpg`, 1280x720)
+   *   2. 全 404 なら hqdefault.jpg のサイズ > 30KB を探す → 採用 (480x360, Shorts / HD なし動画救済)
+   *   3. それも見つからなければ thumbUrl=null (空白カード、灰色プレースホルダー画像は絶対表示しない)
+   *
+   * 旧 v5 ロジックは「HTML 内最初の `videoId`」を盲信して削除済み動画の灰色プレースホルダー画像
+   * (maxres 404 / 1097B、hq < 16KB) を表示してしまう問題があった (2026-05-13 ユロさん指摘で発覚)。
    * 旧 Stage2 (`/feeds/videos.xml?channel_id=...`) は YouTube が 2026-05 までに 404 化したため撤去。
-   * 失敗時は thumbUrl=null でも cache に保存して同じハンドルへの再 fetch を抑止。
    */
   async function fetchAndInjectThumbnail(card) {
     if (!f("subsChannelsGrid")) return;
@@ -2556,9 +2610,76 @@
         const html = await res.text();
         const channelIdMatch = html.match(/"externalId":"(UC[\w-]{20,30})"/);
         channelId = channelIdMatch?.[1] || null;
-        const videoIdMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
-        const videoId = videoIdMatch?.[1] || null;
-        thumbUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : null;
+        // 旧 v5 ロジックは HTML 内最初の `"videoId":"..."` を採用していたが、これは Featured 動画
+        // とは限らず「削除済み / 非公開動画」を引くことがあった。削除済み動画の maxresdefault.jpg は
+        // 404 + 1097B の灰色 + 三点リーダープレースホルダーが返り、視覚的に「サムネ取れてない」状態
+        // を引き起こす (2026-05-13 ユロさん指摘で発覚)。
+        //
+        // v6 の 2 段階篩い分け:
+        //   1. top 10 候補で maxresdefault.jpg HEAD 200 を並列検索 → 通常 HD 動画ヒットなら採用
+        //   2. それでも見つからない場合は hqdefault.jpg のサイズが 30KB 超を並列検索 → Shorts 等
+        //      maxres なしだが「灰色プレースホルダー (8-16KB)」よりは明らかに valid な動画を救う
+        //   3. それでもダメなら null (空白カード、灰色プレースホルダー画像は絶対表示しない)
+        //
+        // 実測データ (2026-05-13 検証):
+        //   - 削除済み動画 maxres: 404 / 1097B (灰色 + ... プレースホルダー)
+        //   - 削除済み動画 hqdefault: 200 / 8000-16000B (同プレースホルダー)
+        //   - 通常 HD 動画 maxres: 200 / 50000-200000B+
+        //   - 通常 Shorts 動画 hqdefault: 200 / 30000-50000B (縦長サムネ)
+        //   - 30000B 閾値で削除済みプレースホルダーと valid Shorts を確実に分離できる
+        const candidateIds = [...new Set(
+          [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)].map((m) => m[1])
+        )].slice(0, 10);
+        // Stage 1: maxresdefault HEAD で 200 を探す (HD 動画優先)
+        const maxresChecks = await Promise.allSettled(
+          candidateIds.map((vid) =>
+            // `redirect: "manual"` で 3xx を opaqueredirect として捕捉する。CDN 設定変更や中間者による
+            // 認証ドメインへの 302 を `r.ok === false` 扱いにして候補スキップする防御
+            // (/rere レビュー A2-I-4)。`credentials: "omit"` + redirect:manual の組み合わせは
+            // image-downloader.js / keepalive.js と同じパターン。
+            fetch(`https://i.ytimg.com/vi/${vid}/maxresdefault.jpg`, {
+              method: "HEAD",
+              credentials: "omit",
+              redirect: "manual",
+            }).then((r) => ({ vid, ok: r.ok }))
+          )
+        );
+        let validVideoId = null;
+        let thumbVariant = "maxresdefault";
+        for (let i = 0; i < candidateIds.length; i++) {
+          const c = maxresChecks[i];
+          if (c.status === "fulfilled" && c.value?.ok) {
+            validVideoId = candidateIds[i];
+            break;
+          }
+        }
+        // Stage 2: maxres 全 404 のとき hqdefault のサイズで Shorts / HD なし動画を救済
+        if (!validVideoId) {
+          const hqChecks = await Promise.allSettled(
+            candidateIds.map((vid) =>
+              // 同上 (A2-I-4): redirect:manual で 3xx を opaqueredirect 化、credentials:omit と併用
+              fetch(`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`, {
+                method: "HEAD",
+                credentials: "omit",
+                redirect: "manual",
+              }).then((r) => ({
+                vid,
+                len: parseInt(r.headers.get("content-length") || "0", 10),
+              }))
+            )
+          );
+          for (let i = 0; i < candidateIds.length; i++) {
+            const c = hqChecks[i];
+            if (c.status === "fulfilled" && c.value.len > 30000) {
+              validVideoId = candidateIds[i];
+              thumbVariant = "hqdefault";
+              break;
+            }
+          }
+        }
+        thumbUrl = validVideoId
+          ? `https://i.ytimg.com/vi/${validVideoId}/${thumbVariant}.jpg`
+          : null;
         writeSubsThumbCache(handle, { thumbUrl, channelId, ts: Date.now() });
       } catch {
         return;
@@ -2583,11 +2704,14 @@
     img.src = normalizeAvatarUrl(thumbUrl);
     img.loading = "lazy";
     img.alt = "";
-    // maxresdefault.jpg は HD upload のみ存在し古い動画では 404。失敗時は mqdefault.jpg
-    // (320x180, 16:9 で全動画必須) に切替。`onerror = null` で fallback 失敗時の無限ループを防ぐ。
+    // v6: 採用時点で HEAD 200 確認済みのため通常は onerror に来ない。
+    // 念のため maxres → mqdefault、hq → mqdefault の保守的 fallback を残す
+    // (HEAD 後に短時間でサムネが消えた等の極端なレースに備える)。
     img.onerror = () => {
       img.onerror = null;
-      const fallback = img.src.replace(/\/maxresdefault\.jpg([?#].*)?$/, "/mqdefault.jpg$1");
+      const fallback = img.src
+        .replace(/\/maxresdefault\.jpg([?#].*)?$/, "/mqdefault.jpg$1")
+        .replace(/\/hqdefault\.jpg([?#].*)?$/, "/mqdefault.jpg$1");
       if (fallback !== img.src) img.src = fallback;
     };
     // #avatar-section 直下に置く。`#avatar` 内に置くとアバター 36px 円の上に乗ってしまう。

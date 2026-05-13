@@ -57,36 +57,23 @@
   if (!location.pathname.startsWith("/watch")) return;
 
   const PRE_CLASS = "__cpa-sfx-hide-live-chat-pre";
-  const STYLE_ID = "__cpa-sfx-early-hide-live-chat";
   const FORCE_HIDE_ATTR = "data-cpa-force-hide";
 
-  // (1) <html> 直下に <style> を同期 prepend する。manifest css 経由の rule に依存せず、
-  //     youtube-early.js 実行時点で CSS rule を確実に effective 化する。
-  if (!document.getElementById(STYLE_ID)) {
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent =
-      "html." + PRE_CLASS + " ytd-live-chat-frame { display: none !important; }";
-    document.documentElement.appendChild(style);
-  }
-
-  // (2) <html> 同期で先制付与
-  document.documentElement.classList.add(PRE_CLASS);
-
-  // (3) MutationObserver で frame DOM 追加を監視し、即時 inline !important で強制 hide
+  // サイト固有: MutationObserver で frame DOM 追加を監視し、inline !important で強制 hide。
+  // **inline `setProperty('display', 'none', 'important')` の理由**: CSS rule (`!important` 付き) でも
+  // YouTube が `style="display: flex"` を inline で当てた瞬間に specificity で負ける可能性がある。
+  // inline style with !important なら author origin の最高 specificity を確保し、競合 style に勝つ。
   const forceHide = (frame) => {
     if (!frame || frame.getAttribute(FORCE_HIDE_ATTR) === "1") return;
     frame.style.setProperty("display", "none", "important");
     frame.setAttribute(FORCE_HIDE_ATTR, "1");
   };
 
-  // 既に frame があれば即適用（document_start 時点では普通は無いが念のため）
+  // 既に frame があれば即適用
   document.querySelectorAll("ytd-live-chat-frame").forEach(forceHide);
 
+  // observer は常時維持し、pre クラスの有無で動作 guard。
   const frameObserver = new MutationObserver((mutations) => {
-    // pre クラスがない (= 機能 OFF or click 成功後) なら何もしない。
-    // observer 自体は disconnect せず常時動かして、SPA 遷移や storage.onChanged で
-    // pre クラスが再付与されたタイミングからすぐ機能できるようにする。
     if (!document.documentElement.classList.contains(PRE_CLASS)) return;
     for (const m of mutations) {
       for (const node of m.addedNodes) {
@@ -102,7 +89,6 @@
   });
   frameObserver.observe(document, { childList: true, subtree: true });
 
-  // (4)(5) storage 確認 → OFF なら pre クラス + inline force-hide 剥がし (observer は維持)
   function offRevert() {
     document.documentElement.classList.remove(PRE_CLASS);
     document
@@ -113,36 +99,21 @@
       });
   }
 
-  function evalSettings(stored) {
-    const enabled = stored.searchFixerEnabled === true;
-    const hideLiveChat = !!(
-      stored.searchFixerFeatures &&
-      stored.searchFixerFeatures.hideLiveChat === true
-    );
-    if (enabled && hideLiveChat) return;
-    offRevert();
-  }
-
-  chrome.storage.local
-    .get(["searchFixerEnabled", "searchFixerFeatures"])
-    .then(evalSettings)
-    .catch(offRevert);
-
-  // (6) storage.onChanged 追従。OFF→ON / ON→OFF どちらの再評価にも対応する。
-  // instagram-early.js / tiktok-early.js と同じパターン。同一 isolated world で
-  // search-fixer.js も storage.onChanged を購読しているが、early 側は
-  // pre クラスと inline force-hide を即座に同期する責務に閉じている。
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    if (
-      !("searchFixerEnabled" in changes) &&
-      !("searchFixerFeatures" in changes)
-    ) {
-      return;
-    }
-    chrome.storage.local
-      .get(["searchFixerEnabled", "searchFixerFeatures"])
-      .then(evalSettings)
-      .catch(offRevert);
+  // 共通フレームワーク経由で style 注入 + pre クラス同期付与 + storage 取得 + onChanged 購読
+  __cpaEarlyFramework.setup({
+    styleId: "__cpa-sfx-early-hide-live-chat",
+    cssText:
+      "html." + PRE_CLASS + " ytd-live-chat-frame { display: none !important; }",
+    preClasses: [PRE_CLASS],
+    storageKeys: ["searchFixerEnabled", "searchFixerFeatures"],
+    onEvaluate(stored) {
+      const enabled = stored.searchFixerEnabled === true;
+      const hideLiveChat = !!(
+        stored.searchFixerFeatures &&
+        stored.searchFixerFeatures.hideLiveChat === true
+      );
+      if (enabled && hideLiveChat) return;
+      offRevert();
+    },
   });
 })();

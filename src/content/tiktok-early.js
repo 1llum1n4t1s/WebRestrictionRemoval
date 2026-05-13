@@ -29,80 +29,52 @@
 
   const PRE_HIDE_COMMENTS = "__cpa-tt-comments";
   const PRE_HIDE_SUGGESTED = "__cpa-tt-suggested";
-  const STYLE_ID = "__cpa-tt-early-style";
 
-  // (1) <style> 同期注入 — manifest css の effective 化保険として中核セレクタを焼き込む。
-  //     photo / video ページの右側統合パネル（コメント + あなたにおすすめタブ同居）を最優先で
-  //     消し、加えて動画 UI 上のコメントアイコンや件数バッジ等を補助的に消す。
-  if (!document.getElementById(STYLE_ID)) {
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent =
-      'html.' + PRE_HIDE_COMMENTS + ' [class*="RightPanelContainer"],' +
-      'html.' + PRE_HIDE_SUGGESTED + ' [class*="RightPanelContainer"]' +
-      '{display:none!important;}' +
-      'html.' + PRE_HIDE_COMMENTS + ' [class*="DivCommentListContainer"]' +
-      '{display:none!important;}' +
-      'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="comment-icon"],' +
-      'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="browse-comment-icon"],' +
-      'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="feed-comment-icon"],' +
-      'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="comment-count"],' +
-      'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="browse-comment-count"]' +
-      '{display:none!important;}' +
-      'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="recommend-account-card"],' +
-      'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="suggested-account-card"],' +
-      'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="suggest-card"],' +
-      'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="recommend-list"]' +
-      '{display:none!important;}';
-    document.documentElement.appendChild(style);
-  }
-
-  // (2) 同期で pre クラス付与（オプトアウト方式: storage 読み出し前に付けて async 待ちの flash 防止）
-  document.documentElement.classList.add(PRE_HIDE_COMMENTS);
-  document.documentElement.classList.add(PRE_HIDE_SUGGESTED);
-
-  // (3) storage 確認 + onChanged 監視
   const FEATURE_TO_CLASS = {
     hideComments: PRE_HIDE_COMMENTS,
     hideSuggested: PRE_HIDE_SUGGESTED,
   };
 
-  const evalSettings = (stored) => {
-    const enabled = stored.tiktokCleanerEnabled === true;
-    const features = (stored.tiktokCleanerFeatures && typeof stored.tiktokCleanerFeatures === "object")
-      ? stored.tiktokCleanerFeatures
-      : {};
-    for (const [key, cls] of Object.entries(FEATURE_TO_CLASS)) {
-      if (enabled && features[key] === true) {
-        document.documentElement.classList.add(cls);
-      } else {
-        document.documentElement.classList.remove(cls);
+  // CSS rule: manifest css の effective 化保険として中核セレクタを焼き込む。
+  // photo / video ページの右側統合パネル（コメント + あなたにおすすめタブ同居）を最優先で
+  // 消し、加えて動画 UI 上のコメントアイコンや件数バッジ等を補助的に消す。
+  const CSS_TEXT =
+    'html.' + PRE_HIDE_COMMENTS + ' [class*="RightPanelContainer"],' +
+    'html.' + PRE_HIDE_SUGGESTED + ' [class*="RightPanelContainer"]' +
+    '{display:none!important;}' +
+    'html.' + PRE_HIDE_COMMENTS + ' [class*="DivCommentListContainer"]' +
+    '{display:none!important;}' +
+    'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="comment-icon"],' +
+    'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="browse-comment-icon"],' +
+    'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="feed-comment-icon"],' +
+    'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="comment-count"],' +
+    'html.' + PRE_HIDE_COMMENTS + ' [data-e2e="browse-comment-count"]' +
+    '{display:none!important;}' +
+    'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="recommend-account-card"],' +
+    'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="suggested-account-card"],' +
+    'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="suggest-card"],' +
+    'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="recommend-list"]' +
+    '{display:none!important;}';
+
+  // 共通フレームワーク経由で style 注入 + pre クラス同期付与 + storage 取得 + onChanged 購読
+  __cpaEarlyFramework.setup({
+    styleId: "__cpa-tt-early-style",
+    cssText: CSS_TEXT,
+    preClasses: [PRE_HIDE_COMMENTS, PRE_HIDE_SUGGESTED],
+    storageKeys: ["tiktokCleanerEnabled", "tiktokCleanerFeatures"],
+    onEvaluate(stored) {
+      const enabled = stored.tiktokCleanerEnabled === true;
+      const features =
+        stored.tiktokCleanerFeatures && typeof stored.tiktokCleanerFeatures === "object"
+          ? stored.tiktokCleanerFeatures
+          : {};
+      for (const [key, cls] of Object.entries(FEATURE_TO_CLASS)) {
+        if (enabled && features[key] === true) {
+          document.documentElement.classList.add(cls);
+        } else {
+          document.documentElement.classList.remove(cls);
+        }
       }
-    }
-  };
-
-  const stripAll = () => {
-    for (const cls of Object.values(FEATURE_TO_CLASS)) {
-      document.documentElement.classList.remove(cls);
-    }
-  };
-
-  chrome.storage.local
-    .get(["tiktokCleanerEnabled", "tiktokCleanerFeatures"])
-    .then(evalSettings)
-    .catch(stripAll);
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    if (
-      !("tiktokCleanerEnabled" in changes) &&
-      !("tiktokCleanerFeatures" in changes)
-    ) {
-      return;
-    }
-    chrome.storage.local
-      .get(["tiktokCleanerEnabled", "tiktokCleanerFeatures"])
-      .then(evalSettings)
-      .catch(stripAll);
+    },
   });
 })();

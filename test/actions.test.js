@@ -10,7 +10,8 @@
  *   - KeepAlive: clampIntervalMs / normalizeOrigins / isOriginAllowed
  *   - SearchFixer: clampGridItems / mergeFeatures
  *   - InstagramCleaner: mergeFeatures
- *   - ColorPicker: isValidFormat / normalizeFormat / isValidTab / normalizeTab
+ *   - ColorPicker: isValidFormat / normalizeFormat
+ *   - PopupTabs: isValid / normalize / migrate
  *
  * これらは外部依存ゼロの pure function なのでテスト容易性が高く、ドリフト検知に費用対効果が大きい。
  */
@@ -69,6 +70,24 @@ test("VolumeBooster.sliderPositionToPercent: SLIDER_UNITY で UNITY", () => {
   );
 });
 
+// ---------- StorageKeys: 音量ブースター系の鍵が揃っているか ----------
+
+test("StorageKeys.VOLUME_BOOSTER_* が 6 キー揃っている（master + lastGain + 3 サブトグル + muted）", () => {
+  // 6 キーいずれかを追加・削除する場合は次を必ず同時更新:
+  //   - background.js の cachedVolumeSettings 監視リストと onInstalled 初期化
+  //   - popup.js の storage.local.get / event handler
+  //   - _locales/{en,ja}/messages.json (UI 露出する場合)
+  //   - CLAUDE.md "5 storage key" / "6 storage key" の数値整合
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_LAST_GAIN, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED, "string");
+  // 旧仕様の混入チェック (snake_case や大文字小文字違いの誤キー混入を防ぐ)
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED, "volumeBoosterMutedEnabled");
+});
+
 // ---------- VideoGamma ----------
 
 test("VideoGamma.clampValue: 範囲内の値はそのまま、範囲外は clamp、不正値は DEFAULT", () => {
@@ -110,6 +129,111 @@ test("VideoGamma.isUnity: DEFAULT 近傍で true、それ以外で false", () =>
   assert.equal(G.VideoGamma.isUnity(1.01), false);
   assert.equal(G.VideoGamma.isUnity(0.5), false);
   assert.equal(G.VideoGamma.isUnity(2.0), false);
+});
+
+// ---------- Loupe ----------
+
+test("Loupe.validateZoom: ZOOM_LEVELS 内はそのまま、それ以外は DEFAULT_ZOOM", () => {
+  // 有効値: ZOOM_LEVELS の全要素
+  for (const z of G.Loupe.ZOOM_LEVELS) {
+    assert.equal(G.Loupe.validateZoom(z), z, `valid zoom ${z}`);
+  }
+  // 無効値: DEFAULT_ZOOM にフォールバック
+  assert.equal(G.Loupe.validateZoom(3.0), G.Loupe.DEFAULT_ZOOM);
+  assert.equal(G.Loupe.validateZoom(0), G.Loupe.DEFAULT_ZOOM);
+  assert.equal(G.Loupe.validateZoom(-1), G.Loupe.DEFAULT_ZOOM);
+  assert.equal(G.Loupe.validateZoom(NaN), G.Loupe.DEFAULT_ZOOM);
+  assert.equal(G.Loupe.validateZoom("abc"), G.Loupe.DEFAULT_ZOOM);
+  assert.equal(G.Loupe.validateZoom(undefined), G.Loupe.DEFAULT_ZOOM);
+  assert.equal(G.Loupe.validateZoom(null), G.Loupe.DEFAULT_ZOOM);
+});
+
+test("Loupe.clampSize: 範囲内は STEP 丸め、範囲外は clamp、不正値は DEFAULT", () => {
+  // 境界値
+  assert.equal(G.Loupe.clampSize(G.Loupe.SIZE_MIN), G.Loupe.SIZE_MIN);
+  assert.equal(G.Loupe.clampSize(G.Loupe.SIZE_MAX), G.Loupe.SIZE_MAX);
+  assert.equal(G.Loupe.clampSize(G.Loupe.SIZE_DEFAULT), G.Loupe.SIZE_DEFAULT);
+  // 範囲外 clamp（下限・上限とも）
+  assert.equal(G.Loupe.clampSize(100), G.Loupe.SIZE_MIN);
+  assert.equal(G.Loupe.clampSize(0), G.Loupe.SIZE_MIN);
+  // SIZE_MAX を超える値は SIZE_MAX に clamp（SIZE_MAX+1 以上で確実に clamp 経路に入る値で検証）
+  assert.equal(G.Loupe.clampSize(G.Loupe.SIZE_MAX + 100), G.Loupe.SIZE_MAX);
+  assert.equal(G.Loupe.clampSize(9999), G.Loupe.SIZE_MAX);
+  // 範囲内の中間値は STEP 丸めで返る（500 は範囲内になったので clamp ではなく round パス）
+  assert.equal(G.Loupe.clampSize(500), 500);
+  // STEP 丸め（SIZE_STEP=10: 155→160, 154→150）
+  assert.equal(G.Loupe.clampSize(155), 160);
+  assert.equal(G.Loupe.clampSize(154), 150);
+  assert.equal(G.Loupe.clampSize(225), 230);
+  // 不正値
+  assert.equal(G.Loupe.clampSize(NaN), G.Loupe.SIZE_DEFAULT);
+  assert.equal(G.Loupe.clampSize(undefined), G.Loupe.SIZE_DEFAULT);
+  assert.equal(G.Loupe.clampSize("abc"), G.Loupe.SIZE_DEFAULT);
+  assert.equal(G.Loupe.clampSize(null), G.Loupe.SIZE_DEFAULT);
+});
+
+test("Loupe.ZOOM_LEVELS は DEFAULT_ZOOM を含む（不変条件）", () => {
+  assert.ok(
+    G.Loupe.ZOOM_LEVELS.includes(G.Loupe.DEFAULT_ZOOM),
+    "DEFAULT_ZOOM が ZOOM_LEVELS に含まれていないと validateZoom(DEFAULT_ZOOM) が再帰的に DEFAULT を返す矛盾"
+  );
+});
+
+test("Loupe.SIZE_DEFAULT は [SIZE_MIN, SIZE_MAX] の範囲内（不変条件）", () => {
+  assert.ok(G.Loupe.SIZE_DEFAULT >= G.Loupe.SIZE_MIN);
+  assert.ok(G.Loupe.SIZE_DEFAULT <= G.Loupe.SIZE_MAX);
+});
+
+test("Loupe.computeLensPosition: カーソルがレンズ中央に来る座標を返す", () => {
+  // mouseX=500, mouseY=300, lensSize=200 → left=400, top=200
+  const p = G.Loupe.computeLensPosition(500, 300, 200);
+  assert.equal(p.left, 400);
+  assert.equal(p.top, 200);
+  // 端点: mouseX=0 で left=-lensSize/2 (画面外への食み出し許容)
+  const p2 = G.Loupe.computeLensPosition(0, 0, 220);
+  assert.equal(p2.left, -110);
+  assert.equal(p2.top, -110);
+});
+
+test("Loupe.computeBackgroundPosition: zoom=2.5 でマウス位置の領域が中央に来る", () => {
+  // mouseX=100, mouseY=100, zoom=2.5, lensRadius=110
+  // bgX = 110 - 100*2.5 = 110 - 250 = -140
+  // bgY = 110 - 100*2.5 = -140
+  const bp = G.Loupe.computeBackgroundPosition(100, 100, 2.5, 110);
+  assert.equal(bp.bgX, -140);
+  assert.equal(bp.bgY, -140);
+  // zoom=1.5 / mouseX=400, mouseY=300, lensRadius=110
+  // bgX = 110 - 400*1.5 = 110 - 600 = -490
+  // bgY = 110 - 300*1.5 = 110 - 450 = -340
+  const bp2 = G.Loupe.computeBackgroundPosition(400, 300, 1.5, 110);
+  assert.equal(bp2.bgX, -490);
+  assert.equal(bp2.bgY, -340);
+});
+
+test("Loupe.formatLoupeError: 想定 code は対応キー、想定外は loupeErrorUnknown", () => {
+  assert.equal(G.Loupe.formatLoupeError("no tab"), "loupeErrorInvalidTab");
+  assert.equal(G.Loupe.formatLoupeError("invalid-tab-id"), "loupeErrorInvalidTab");
+  assert.equal(
+    G.Loupe.formatLoupeError("Cannot access contents of url chrome://newtab"),
+    "loupeErrorUnsupportedPage"
+  );
+  assert.equal(G.Loupe.formatLoupeError("Cannot capture this page"), "loupeErrorUnsupportedPage");
+  assert.equal(G.Loupe.formatLoupeError("permission denied"), "loupeErrorPermission");
+  assert.equal(
+    G.Loupe.formatLoupeError("MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND exceeded"),
+    "loupeErrorQuota"
+  );
+  // 未知の code
+  assert.equal(G.Loupe.formatLoupeError(""), "loupeErrorUnknown");
+  assert.equal(G.Loupe.formatLoupeError(null), "loupeErrorUnknown");
+  assert.equal(G.Loupe.formatLoupeError(undefined), "loupeErrorUnknown");
+  assert.equal(G.Loupe.formatLoupeError("something random"), "loupeErrorUnknown");
+});
+
+test("StorageKeys.LOUPE_* が 3 キー揃っている", () => {
+  assert.equal(G.StorageKeys.LOUPE_ENABLED, "loupeEnabled");
+  assert.equal(G.StorageKeys.LOUPE_ZOOM, "loupeZoom");
+  assert.equal(G.StorageKeys.LOUPE_SIZE, "loupeSize");
 });
 
 // ---------- KeepAlive ----------
@@ -197,6 +321,51 @@ test("SearchFixer.isFeedPath: ホーム / 登録 / 急上昇 等は true、そ�
   assert.equal(G.SearchFixer.isFeedPath(undefined), false);
   assert.equal(G.SearchFixer.isFeedPath(null), false);
   assert.equal(G.SearchFixer.isFeedPath(123), false);
+});
+
+test("SearchFixer.extractHandleFromHref: ASCII / Unicode / URL encoded / 不正値", () => {
+  // ASCII handle (既存動作の維持)
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@shachikuolrisa"), "@shachikuolrisa");
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@nagumorui/featured"), "@nagumorui");
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@Im10cm?si=xxx"), "@Im10cm");
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@HoriKChannel#anchor"), "@HoriKChannel");
+
+  // 日本語ハンドル (生 Unicode、テスト用に href にそのまま入るケース)
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@むめいの有名になりたい"), "@むめいの有名になりたい");
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@あゆむさんぽ"), "@あゆむさんぽ");
+
+  // URL エンコード形式 (DOM の getAttribute("href") が実機で返す形)
+  assert.equal(
+    G.SearchFixer.extractHandleFromHref(
+      "/@%E3%82%80%E3%82%81%E3%81%84%E3%81%AE%E6%9C%89%E5%90%8D%E3%81%AB%E3%81%AA%E3%82%8A%E3%81%9F%E3%81%84"
+    ),
+    "@むめいの有名になりたい"
+  );
+  assert.equal(
+    G.SearchFixer.extractHandleFromHref("/@%E3%81%82%E3%82%86%E3%82%80%E3%81%95%E3%82%93%E3%81%BD"),
+    "@あゆむさんぽ"
+  );
+
+  // ASCII + Unicode 混在 (Aila's 足脚の世界 = `@Ailas` + 日本語、旧実装で完全失敗していたケース)
+  assert.equal(
+    G.SearchFixer.extractHandleFromHref("/@Ailas%E8%B6%B3%E8%84%9A%E3%81%AE%E4%B8%96%E7%95%8C"),
+    "@Ailas足脚の世界"
+  );
+
+  // 韓国語 / 中国語 (将来の登録ケース)
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@한국어"), "@한국어");
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@中文ch"), "@中文ch");
+
+  // 不正値・非 @ 形式
+  assert.equal(G.SearchFixer.extractHandleFromHref(null), null);
+  assert.equal(G.SearchFixer.extractHandleFromHref(undefined), null);
+  assert.equal(G.SearchFixer.extractHandleFromHref(""), null);
+  assert.equal(G.SearchFixer.extractHandleFromHref("/channel/UCxxxxx"), null);
+  assert.equal(G.SearchFixer.extractHandleFromHref("/watch?v=abc"), null);
+
+  // 不正な % シーケンス（decodeURIComponent が throw）→ 素の href にフォールバック
+  // `@bad` までは ASCII でマッチ可能だが、直後が `%` なので終端マッチに失敗 → null
+  assert.equal(G.SearchFixer.extractHandleFromHref("/@bad%ZZ%fail"), null);
 });
 
 test("SearchFixer.FEATURES: 旧 removeShorts は 4 機能に解体され Shorts カテゴリは廃止", () => {
@@ -359,7 +528,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 16 個の定数を公開する", () => {
+test("actions.js は globalThis に 17 個の定数を公開する", () => {
   const required = [
     "Actions",
     "ExtensionPaths",
@@ -375,6 +544,7 @@ test("actions.js は globalThis に 16 個の定数を公開する", () => {
     "ImageDownloader",
     "VolumeBooster",
     "VideoGamma",
+    "Loupe",
     "ColorPicker",
     "PopupTabs",
   ];
@@ -503,6 +673,11 @@ test("ImageDownloader.isAllowedFetchUrl: TikTok CDN ホストのみ許可（rege
   // 非許可
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://attacker-tiktokcdn.com/foo.jpg"), false);
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://i.ytimg.com/foo.jpg"), false);
+  // /rere レビュー A2-SC-1 防御: 旧パターン `[a-z0-9-]+\.tiktokcdn\.com$` で通過していた
+  // 任意サブドメインを `p<数字>` プレフィックス必須化で拒否することを保証する。
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://evil.tiktokcdn.com/foo.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://tracking.tiktokcdn-us.com/foo.jpg"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("tiktok", "https://static.tiktokcdn.com/foo.jpg"), false);
 });
 
 test("ImageDownloader.isAllowedFetchUrl: 不正 host / 不正 URL は false", () => {

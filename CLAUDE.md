@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 8 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 8 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカーは popup タブとして常時利用可（履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 9 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 9 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカーは popup タブとして常時利用可（履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 popup は **5 タブ構成** (`調整 / YouTube / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
 
@@ -18,7 +18,7 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm test                     # Node.js 標準 test runner、49 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix を含む）
+npm test                     # Node.js 標準 test runner、59 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -37,6 +37,7 @@ Lint は未導入。コード変更後は最低限以下を実行:
 node --check src/lib/actions.js \
   && node --check src/popup/popup.js \
   && node --check src/background/background.js \
+  && node --check src/content/early-framework.js \
   && node --check src/content/youtube-early.js \
   && node --check src/content/instagram-early.js \
   && node --check src/content/tiktok-early.js \
@@ -47,6 +48,7 @@ node --check src/lib/actions.js \
   && node --check src/content/instagram-cleaner.js \
   && node --check src/content/tiktok-cleaner.js \
   && node --check src/content/video-gamma.js \
+  && node --check src/content/loupe.js \
   && node --check src/content/image-downloader.js \
   && node --check src/offscreen/offscreen.js
 ```
@@ -83,7 +85,7 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**7 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 音量ブースター）+ 音量ブースタースライダー + 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ 各クリーナー専用パネル × 3（YouTube クリーナー 29 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグルを `.volume-disabled` で dim 化。
+5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**8 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 29 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
 
 **クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
@@ -97,11 +99,12 @@ Popup (src/popup/popup.{html,js,css})
 Service worker。役割:
 1. **設定の集約と各 content script への配布**: `APPLY_SETTINGS` を popup から受信し、storage 保存と active tab 通知を行う。YouTube タブ / Amazon `auto-deliveries` タブ判定は URL パターンで行う。非マッチタブには receiver 不在で例外になるため `try/catch` でガード。
 2. **Offscreen Document ライフサイクル管理**: `ensureOffscreenDocument()` で並行作成ガード、`scheduleOffscreenClose()` で 30 秒アイドル後に自動クローズ。**音量ブースト中タブが残っている間は close を再延期**（`isVolumeBoosterActive` で確認、SW 再起動直後は安全側に倒す）。`reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。
-3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode)` がエントリ。UNITY release 条件・既存 AudioContext 経路・自動ゲイン / compressor preset の詳細は Important Patterns 参照。
+3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode, muted)` がエントリ。UNITY release 条件・既存 AudioContext 経路・自動ゲイン / compressor preset・ミュート時の gain ramp to 0 の詳細は Important Patterns 参照。
 4. **音量ブースター自動適用**: `chrome.tabs.onActivated` で `autoApplyVolumeBooster(tabId)` を呼び出し。**既に boost 中のタブのみ**（`boostedTabIds.has(tabId)` ガード）が対象。新規タブは `tabCapture.getMediaStreamId` の user gesture 要件によりpopup open が必要。`chrome.storage.onChanged` で `volumeBoosterEnabled` が `false` になったら `releaseAllVolumeBoosterTabs()` で全 AudioContext を即座に解放（SW 再起動後 `boostedTabIds` が空の場合は offscreen に `ACTION_VOLUME_RELEASE_ALL` を直接送信するフォールバック経路あり）。
 5. **Message Handler の sender 検証**: `SenderCheck.isFromPopup` / `isFromContentScript` ヘルパーで由来を検証。`APPLY_SETTINGS` / `VOLUME_BOOSTER_*` は popup 由来のみ受け付ける。
 6. **タブクローズで自動 release**: `chrome.tabs.onRemoved` で `ACTION_VOLUME_RELEASE_TAB` を offscreen に送信(permission 不要、SW 再起動でも永続的に発火する)。
 7. **設定マイグレーション**: `onInstalled` で旧キー削除 + 未設定キーの初期化（詳細は Important Patterns の「マイグレーション」を参照）。
+8. **ルーペ用 captureVisibleTab**: content script からの `LOUPE_REQUEST_CAPTURE` を受け、`chrome.tabs.captureVisibleTab(windowId, { format: "jpeg", quality: 70 })` を実行して JPEG DataURL を `sendResponse` で返す。`SenderCheck.isFromContentScript` で由来検証、sender.tab から targetTab を解決。Chrome 公式 2fps quota は content script の 500ms debounce で対応。
 
 `chrome://`, `edge://`, `about:`, `file://` などの非 HTTP(S) ページにはメッセージ送信をスキップ（`content_scripts.matches` が `http(s)://*/*` のみのため）。
 
@@ -135,7 +138,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 **`hideLiveChat` 実装上の注意**: hideLiveChat の close 操作の本体はすべて JS 経由で行う。実装は `ytd-live-chat-frame` 配下の iframe (`youtube.com/live_chat_replay`) 内の `yt-live-chat-header-renderer #close-button button[aria-label="閉じる"]` を **`iframe.contentDocument` 経由で取得し**、`fireUserLikeClick` で **full pointer/mouse event sequence** (`pointerdown → mousedown → pointerup → mouseup → click`) を発火する。youtube.com same-origin かつ sandbox 制約なしなので contentDocument にアクセス可能。**frame・iframe・親 `#chat-container`・theater 用 `--ytd-watch-flexy-sidebar-width` には一切触らない**（過去にこれらを CSS や独自属性で操作するたびに player 再初期化 / レイアウト崩れ / 「動画を処理しています」エラー / 再展開不能などの副作用を起こした経緯。なお「動画を処理しています」自体は YouTube 側のタイミング bug だが、保守的に介入は避ける方針）。close button が見つからない場合は何もしない。MutationObserver は cross-document な iframe 内 DOM 変化を観察できないため、`iframe.addEventListener("load", ...)` を `__cpaLiveChatLoadAttached` marker で idempotent に hook し、load 後 50ms で `collapseLiveChatIfNeeded` を再実行することで close button が ready になったタイミングを取りこぼさない。fireUserLikeClick は `btn.ownerDocument.defaultView` 経由で iframe の window から `PointerEvent`/`MouseEvent` constructor を取得する（別 realm の event 扱いを避けるため）。
 
-**hideLiveChat 体感ラグ消滅の先制非表示パターン**: 上記 click ベース実装は「公式 close button の hydration 待ち + click 発火」までの数百 ms、ライブチャット枠が完全展開状態で見えてしまう体感ラグがある。これを消すため、**`document_start` で `<html>` に `__cpa-sfx-hide-live-chat-pre` クラスを付け、CSS で `ytd-live-chat-frame { visibility: hidden !important }` を当てる先制非表示**を入れる:
+**hideLiveChat 体感ラグ消滅の先制非表示パターン**: 上記 click ベース実装は「公式 close button の hydration 待ち + click 発火」までの数百 ms、ライブチャット枠が完全展開状態で見えてしまう体感ラグがある。これを消すため、**`document_start` で `<html>` に `__cpa-sfx-hide-live-chat-pre` クラスを付け、CSS で `ytd-live-chat-frame { display: none !important }` を当てる先制非表示**を入れる (※当初 `visibility: hidden` で実装したが layout 領域 402×964 px が空白枠として 2 秒残る実機問題があり `display: none` に変更済み、詳細は手順 2 参照):
 
 1. **`src/content/youtube-early.js`**: 新規 content_scripts エントリ（`*://*.youtube.com/*` / `run_at: document_start` / 単独エントリ）。actions.js は読み込まず生 storage key 文字列で書く最小スクリプト。**オプトアウト方式 + `<style>` inline 注入**: (a) `<style id="__cpa-sfx-early-hide-live-chat">` を `<html>` 直下に同期 prepend して CSS rule を即時 effective 化、(b) `<html>` に `__cpa-sfx-hide-live-chat-pre` を **同期で無条件付与**、(c) `chrome.storage.local` から `searchFixerEnabled` / `searchFixerFeatures` を非同期取得、(d) master OFF または hideLiveChat OFF or `/watch` 以外なら剥がす。**`<style>` inline 注入の理由**: search-fixer.css は manifest css 経由で挿入されるが、SPA navigation や frame DOM 追加タイミングによっては CSS rule の effective 化が paint cycle に間に合わないケースが Edge Trace で確認されたため、youtube-early.js 自身で CSS rule を確保する保険。**オプトアウト方式の理由**: オプトイン方式（storage 確認後に付与）だと `chrome.storage.local.get` の async 待ち（数十 ms）の間に frame が DOM 出現してチャット枠が一瞬見えてしまう実機問題があったため。OFF ユーザーには frame hydration 完了前 (数百 ms) に剥がし完了するので実質見えない
 2. **`search-fixer.css`**: `html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame { display: none !important; }` のみ。**当初 `visibility: hidden` を採用したが layout 領域 (402×964 px) が約 2 秒間空白枠として右側に残り「一瞬コメント欄が見える」と認識される実機問題があったため `display: none` に変更**。pre クラスは click 成功 / リトライ上限到達 / detach の 3 経路で必ず剥がされる設計なので、過去 NG だった `__cpa-sfx-live-chat-force-hide` の「永続 display:none」とは違い、数秒間だけ display:none → click 成功で剥がし → YouTube 公式 collapsed bar 表示、というフローになる。「動画を処理しています」エラーは YouTube 側のタイミング bug で CSS 介入とは無関係
@@ -157,6 +160,28 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 ### 動画ガンマ補正 (`src/content/video-gamma.js`)
 全 http(s) ページに `all_frames: true` で注入される content script。`videoGammaEnabled` (master) + `videoGammaValue` (数値 0.3〜3.0、初期 1.0) で管理。SVG `<feComponentTransfer type="gamma">` ベースの独自実装で、CSS `filter: url(#__cpa-video-gamma)` を `<video>` 要素に当てて全タブ共通のガンマ補正を適用する。スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たる。動画データの読み取りや保存は行わない（filter 適用のみ）。
+
+### ルーペ (`src/content/loupe.js` + `src/content/loupe.css`)
+全 http(s) サイトの top frame に注入される独立機能。`loupeEnabled` (master) + `loupeZoom` (1.5/2.5/4.0、初期 2.5) + `loupeSize` (150〜1000px、step 10、初期 220) の **3 storage key** で管理。`chrome.tabs.captureVisibleTab({ format: "jpeg", quality: 70 })` で active tab の静止画を取得し、`position: fixed; clip-path: circle()` の円形レンズ DOM に `background-image` として貼り付け、`mousemove` から `background-position` を rAF コアレス 60fps で更新する。倍率は popup のセグメントコントロールから 3 段階で選択、レンズサイズは popup のスライダーで可変。動画 / iframe / canvas を含む描画ピクセルを captureVisibleTab で取得するため「動画を一時停止してから細部を確認」する用途に最適。**popup で master トグルを ON にすると popup が自動クローズする** (ON 状態だと popup 自体がレンズで拡大したい領域を隠す UX 問題を回避、`setTimeout(50)` で APPLY_SETTINGS message dispatch を完了させてから close)。
+
+**処理フロー**:
+1. popup でマスタートグル ON → `APPLY_SETTINGS` → background → `notifyContentScripts` → `APPLY_LOUPE_CS` を top frame に送信
+2. content script: `activate()` → DOM 構築 + リスナー登録 → `requestCaptureAndUpdate()` で background に `LOUPE_REQUEST_CAPTURE` 送信
+3. background: `chrome.tabs.captureVisibleTab(windowId, { format: "jpeg", quality: Loupe.CAPTURE_QUALITY })` → JPEG DataURL を `sendResponse`
+4. content script: DataURL を `fetch` 経由で Blob URL 化 → `lensEl.style.backgroundImage = url(blobURL)` で表示
+5. mousemove: `Loupe.computeLensPosition` + `Loupe.computeBackgroundPosition` で座標計算 → rAF コアレスで描画
+6. 再キャプチャ: scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize で `scheduleRecapture()` → `requestCaptureAndUpdate()` 再実行
+7. 左クリック / master OFF / visibilitychange / storage.onChanged(loupeEnabled:false) で `deactivate()` → DOM 撤去 + リスナー解除 + `URL.revokeObjectURL` で Blob URL 解放
+
+**設計上の不変条件** (Important Patterns 「ルーペ」セクション参照):
+- `captureInFlight` + `pendingRecapture` フラグで重複リクエスト防止 (同時 capture は 1 つまで、進行中の trigger は後追い実行)
+- Blob URL は cleanup 時に必ず revoke (DataURL は revoke 不可なので Blob URL に変換する設計)
+- top frame 限定 (`window === window.top` ガード + manifest `all_frames: false`)
+- MutationObserver は `subtree: false` で body 直下のみ監視 (SPA top-level navigation 検知に十分、深い tree の頻発変化を避ける)
+- 左クリック OFF は `capture: true` で document level listener、サイト側 click より先に stopPropagation して副作用を防ぐ
+- 倍率 / サイズ変更は popup → storage 直書き → content script の `storage.onChanged` で同期 (background の `normalizeSettings` を経由しない、音量ブースター直書きパターンと同型)
+- タブ切替時 (`visibilitychange` で hidden 検知) は cleanup する (古い画面が新タブで残らないようにする、音量ブースターの「既存 boost 中タブのみ自動適用」とは意図的に異なる UX)
+- 再キャプチャ debounce 500ms は `chrome.tabs.captureVisibleTab` の Chrome 公式レート上限 (2fps = 500ms 周期) と一致させる安全値
 
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
 `*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
@@ -214,14 +239,15 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 - modal viewer で `DivCommentContainer` 全体非表示 → プロフィール + キャプション巻き込み
 
 ### 音量ブースター (`src/offscreen/offscreen.js` の Volume Booster 部分)
-Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext + AnalyserNode + GainNode + DynamicsCompressorNode × 2）のみを使ったタブ音声補正 + 増幅の独自実装。Equalizer や音質変更は持たず、自動音量正規化は短時間RMS測定 + 自動 GainNode、ナイトモード / 自動歪み防止は DynamicsCompressorNode で実装する。`volumeBoosterEnabled` (master) + `volumeBoosterLastGain` (数値 0〜300、初期 100) + `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` の 5 storage key で管理。全設定はグローバル永続化（タブ間共通）。マスター OFF は AudioContext 解放のみで設定値は保持。
+Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext + AnalyserNode + GainNode + DynamicsCompressorNode × 2）のみを使ったタブ音声補正 + 増幅の独自実装。Equalizer や音質変更は持たず、自動音量正規化は短時間RMS測定 + 自動 GainNode、ナイトモード / 自動歪み防止は DynamicsCompressorNode で実装する。`volumeBoosterEnabled` (master) + `volumeBoosterLastGain` (数値 0〜300、初期 100) + `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterMutedEnabled` の **6 storage key** で管理。全設定はグローバル永続化（タブ間共通）。マスター OFF は AudioContext 解放のみで設定値は保持。**ミュートは boost パイプライン経由の独立レイヤ**で Chrome 標準のタブミュートとは共存（両方 ON なら二重消音、片方解除でも他方が残っていれば無音継続）。
 
 **処理フロー**:
-1. popup でスライダー / サブトグル操作 → 120ms debounce → `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`, `antiClip`, `normalize`, `nightMode`）。**マスター OFF 時は `pushVolumeNow` が早期 return**（background に送信しない）
-2. background: gain が UNITY かつ全サブトグル OFF なら `releaseVolumeBoosterTab` で AudioContext 解放して終了。それ以外は `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext があれば streamId なしで gain / 自動ゲイン / preset だけ更新）
-3. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`, `antiClip`, `normalize`, `nightMode`）
-4. offscreen: 未登録タブなら `getUserMedia` → `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` の 6 ノード接続。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp、正規化 timer の開始/停止、各 DynamicsCompressor のパラメータ切替
+1. popup でスライダー / サブトグル / ミュート操作 → 120ms debounce（ミュートは即時）→ `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`, `antiClip`, `normalize`, `nightMode`, `muted`）。**マスター OFF 時は `pushVolumeNow` が早期 return**（background に送信しない）
+2. background: gain が UNITY かつ全サブトグル OFF かつミュート OFF なら `releaseVolumeBoosterTab` で AudioContext 解放して終了。それ以外は `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext があれば streamId なしで gain / 自動ゲイン / preset / mute だけ更新）
+3. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`, `antiClip`, `normalize`, `nightMode`, `muted`）
+4. offscreen: 未登録タブなら `getUserMedia` → `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` の 6 ノード接続。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp（`muted=true` のときは percentToGain を無視して 0 にランプ、`lastSetPercent` はユーザーが意図したスライダー値を保持）、正規化 timer の開始/停止、各 DynamicsCompressor のパラメータ切替
 5. **タブ切替で自動適用**: `tabs.onActivated` → `autoApplyVolumeBooster(tabId)` → **`boostedTabIds` に既登録のタブのみ**が対象（既存 AudioContext があるので `getMediaStreamId` 不要で user gesture 制約に引っかからない）。新規タブへの初回適用は popup open が必要（popup open 自体が user gesture）
+6. **ミュート UI**: popup の音量スライダー左にトグルボタン（🔊/🔇、`aria-pressed` ベース）。ミュート ON 中もスライダー値は last gain 位置のまま表示・操作可能で、ユーザーは「ミュート維持のままスライダー値を変更 → ミュート解除で意図した音量に復帰」できる
 
 ノード順序・対数マッピング・gain ramp・compressor preset・UNITY release 条件などの**設計上の不変条件は Important Patterns「音量ブースター・Offscreen Document」に集約**。数値の単一情報源は [`src/lib/actions.js`](src/lib/actions.js) の `VolumeBooster` 定数 — ドキュメントとコードに齟齬が出たら必ずコードを正とすること。
 
@@ -230,10 +256,11 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` |
-| `src/lib/actions.js` | `Object.freeze` された 16 個の定数を IIFE wrap + globalThis 公開: Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / ColorPicker / PopupTabs |
+| `src/lib/actions.js` | `Object.freeze` された 17 個の定数を IIFE wrap + globalThis 公開: Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / Loupe / ColorPicker / PopupTabs |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
-| `src/content/youtube-early.js` | YouTube watch ページ向け `document_start` 注入の最小スクリプト。hideLiveChat ON 時に `<html>` へ `__cpa-sfx-hide-live-chat-pre` クラスを最速付与し、ライブチャット枠の体感ラグを消す（actions.js は読み込まない） |
+| `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
+| `src/content/youtube-early.js` | YouTube watch ページ向け `document_start` 注入の最小スクリプト。hideLiveChat ON 時に `<html>` へ `__cpa-sfx-hide-live-chat-pre` クラスを最速付与し、ライブチャット枠の体感ラグを消す。early-framework.js 経由でボイラープレート共通化、サイト固有の MutationObserver / force-hide のみ独自実装 |
 | `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの Shorts 5 サブ機能（Shelf / Chip / Sidebar / Redirect / Btn、top frame のみ）: MutationObserver + URL リダイレクト + 機能ごとの `__cpa-yt-shorts-hide-{shelf,chip,sidebar}` / `__cpa-yt-shorts-redirect-active` クラスで `display: none` |
 | `src/content/search-fixer.{js,css}` | YouTube クリーナー（29 機能 = 検索結果ノイズ除去・Shorts 5 サブ機能・動画ページ整形・グリッド列数・登録チャンネル拡張 3 機能を含む）: master + features + gridItems で駆動、`/feed/channels` グリッド化 / leftnav 全件展開 / すべての登録チャンネルショートカットを含む |
 | `src/content/amazon-delivery-total.{js,css}` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 + `__cpa-amzn-delivery-total` 配色 |
@@ -242,14 +269,15 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/content/tiktok-early.js` | TikTok 用 `document_start` 注入の最小スクリプト。`tiktokCleanerEnabled` + `tiktokCleanerFeatures` を読んで `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` 同期付与 + inline `<style>` で主要セレクタ焼き込み（FOUC 防止、actions.js 非依存） |
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
+| `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得 / URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
-| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは 4 トグル + 音量スライダー + 音量サブトグル × 3 + 動画ガンマスライダー、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
+| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは 4 トグル + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3 + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
 | `src/offscreen/offscreen.{html,js}` | 音量ブースター専用 offscreen document: AudioContext + AnalyserNode + 自動 GainNode + 手動 GainNode + DynamicsCompressor × 2 (night mode / anti-clip) で正規化 + 増幅 + 圧縮 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt`。`generate-screenshots.js` が popup.html から `popup-render.html` + `popup-shim.js` を動的生成 → `01-popup-ui.html` が iframe で実 popup を埋め込んで撮影（drift ゼロ）。生成物 `popup-render.html` / `popup-shim.js` は .gitignore 対象 |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト 49 件: globalThis 16 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn は scontent- prefix 限定 / TikTok / YouTube 廃止) / detectHost / buildFilename 等。件数 drift を CI で検知できる単一情報源 |
+| `test/actions.test.js` | 純粋関数テスト 59 件: globalThis 17 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn は scontent- prefix 限定 / TikTok / YouTube 廃止) / detectHost / buildFilename / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** 等。件数 drift を CI で検知できる単一情報源 |
 | `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで Chrome Web Store に Draft 自動アップロード。OAuth Bearer Token を curl で取得し `token_response` / `access_token` 両方を `::add-mask::` 登録してから upload。**Draft only** で自動公開しない設計（Dashboard で listing 確認後に手動公開） |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
@@ -260,13 +288,14 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 ### 設計の起点
 - **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する。FEATURES に追加すれば popup UI は自動生成される。actions.js は古典的グローバル定数方式（ES modules ではない）で 4 経路で共有: ① background の `importScripts()`、② manifest content_scripts の最初のエントリで全 http(s) フレームに自動注入、③ popup.html の `<script>` タグ、④ offscreen.html の `<script>` タグ。
 - **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` / `package-lock.json` の `version` フィールドおよびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
-- **デフォルト OFF 方針徹底** — 7 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 音量ブースター）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。
+- **デフォルト OFF 方針徹底** — 8 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / 音量ブースター）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF かつミュート OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。ルーペもマスター OFF で content script 内の DOM / リスナーがすべて撤去される（Blob URL も revoke）。
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
-- **content_scripts の二重ロード回避** — `actions.js` は最初のエントリ（`http(s)://*/*`）でのみロード。2 番目以降の YouTube / Amazon / Instagram エントリは `js` 配列に含めない（同一 isolated world で script scope 共有）。**`run_at` も最初のエントリと揃える（`document_idle`）**。先行ロード前に走ると `InstagramCleaner is not defined` 等で即死する。
-- **`document_start` 専用エントリは actions.js を読み込まない** — youtube-early.js のように `document_start` で走るエントリは、actions.js 依存（`StorageKeys` 等）を持たず生 storage key 文字列で書く。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になる。最小スクリプト + 単独エントリ + actions.js 非読込で衝突を防ぐ。
-- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。
+- **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。
+- **`document_start` 専用エントリは actions.js を読み込まない** — youtube-early.js のように `document_start` で走るエントリは、actions.js 依存（`StorageKeys` 等）を持たず生 storage key 文字列で書く。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になる。最小スクリプト + actions.js 非読込で衝突を防ぐ。
+- **early script は共通フレームワーク経由** — `src/content/early-framework.js` が `<style>` 注入・pre クラス同期付与・`chrome.storage.local.get`・`storage.onChanged` 購読のボイラープレートを集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、各 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) が config を渡して setup を呼ぶ。新サイトの early script を追加する場合もこのパターンに乗せる。サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す (差異が大きすぎて framework に押し込むと config 肥大化する)。
+- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaLoupeRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` のみ `__cpa` プレフィックスなしの歴史的命名 (互換性のため変更しない)。
 - **iframe 多重対策** — keepalive は `shouldFireHttpPing()` でトップフレーム or クロスオリジン iframe のみ ping を発射。同一オリジン iframe はトップに任せる。
 
 ### MutationObserver 取り扱い
@@ -300,7 +329,7 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 
 **ライフサイクルの不変条件**:
 - **マスター OFF = パイプライン解放、設定は保持** — `volumeBoosterEnabled` が `false` になったら `releaseAllVolumeBoosterTabs()` で全 AudioContext を解放するが、`volumeBoosterLastGain` / サブトグルの storage 値は一切触らない。次回 ON 時に保存済み値を復元する。
-- **UNITY release 条件は「100% かつ全サブトグル OFF」** — `setVolumeBoosterGain` で UNITY 早期 return するのは `clamped === UNITY && !antiClipFlag && !normalizeFlag && !nightModeFlag` のときだけ。100% でもサブトグル ON なら AudioContext 維持で自動ゲイン / compressor を効かせる。「音量は変えずに正規化だけ」「突発音だけ抑える」「ナイトモードだけ使う」ユースケースを維持する。
+- **UNITY release 条件は「100% かつ全サブトグル OFF かつミュート OFF」** — `setVolumeBoosterGain` で UNITY 早期 return するのは `clamped === UNITY && !antiClipFlag && !normalizeFlag && !nightModeFlag && !mutedFlag` のときだけ。100% でもサブトグル ON なら AudioContext 維持で自動ゲイン / compressor を効かせる。「音量は変えずに正規化だけ」「突発音だけ抑える」「ナイトモードだけ使う」「100% で完全消音」ユースケースを維持する。
 - **`releaseAllVolumeBoosterTabs` の SW 再起動フォールバック** — SW 再起動後は `boostedTabIds` が空だが offscreen に生きた AudioContext がある可能性あり。`boostedTabIds` が空かつ `offscreenState !== "CLOSED"` のとき `ACTION_VOLUME_RELEASE_ALL` を offscreen に直接送信する。
 - **`autoApplyVolumeBooster` は既 boost タブ限定** — `boostedTabIds.has(tabId)` ガードにより、`tabs.onActivated` では既存 AudioContext の gain ramp だけが走る。新規タブへの初回適用は popup open（= user gesture）が必要（`tabCapture.getMediaStreamId` の user gesture 要件）。
 - **アイドル close 抑止** — `isVolumeBoosterActive` で boost 中タブを query。先頭で `offscreenState === "CLOSED"` を見て早期 false return すること（query 不要 + receiver 不在経路の誤判定回避）。SW 再起動直後など sendMessage が一時失敗した場合のみ安全側（active 扱い）に倒す。
@@ -317,6 +346,7 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - **Polymer dom-repeat 配下に `<a>` を sibling 挿入してはいけない** — `ytd-guide-section-renderer` 等の Polymer 管理下に外部から sibling として `<a>` を挿入すると、Polymer が「list 構造が変わった」と検知して内部 reorder を発動し、想定外の section 移動が起こる。代わりに **`#items` の中**に `<a>` を inject する（`subsLeftnavInjectAll` / `subsAllShortcut` のパターン）。
 - **subs section の DOM 構造**: `#header-entry` は別の `#header` div、`#items.firstElementChild` は collapsible (見出しっぽい expander)。`querySelector("ytd-guide-entry-renderer:not(#header-entry)")` で最初のチャンネル entry を取得して直前に挿入するのが正解。
 - **Trusted Types policy 対応**: YouTube は Trusted Types を有効化しているため、`innerHTML` 文字列代入は MAIN world で弾かれる。content script の isolated world では制約緩いが、安全側で **`createElement` ベース**で構築。SVG は `createElementNS` を使う。
+- **handle は ASCII 限定じゃない、URL エンコード必須**（2026-05-13 修正） — YouTube ハンドルには日本語 / 韓国語 / 中国語 / アクセント記号など Unicode が含まれるケースが多数（`@むめいの有名になりたい` / `@あゆむさんぽ` / `@Ailas足脚の世界` 等）。DOM の `getAttribute("href")` は **URL エンコード形式** (`/@%E3%82%80...`) で返すため、`href.match(/(@[\w.-]{1,60})/)` のような ASCII 専用正規表現では完全に失敗する。`SearchFixer.extractHandleFromHref` (`src/lib/actions.js`) で **`decodeURIComponent` → Unicode property escapes `\p{L}\p{N}` マッチ** で実装している。subsChannelsGrid のサムネ取得が日本語ハンドルで永遠にスキップされる重大バグの原因だった。新規に handle を扱うコードを書くときは必ず `SearchFixer.extractHandleFromHref` を使うこと。
 
 ### Observer / async の罠
 - **MutationObserver / IntersectionObserver の callback は stale の前提で書く** — `disconnect()` を呼んでも **既に queue 入りした notification は cancel されない** (IO/MO 共通仕様)。observer インスタンスは **closure に capture** + callback 冒頭で **state null guard** を入れる。
@@ -333,7 +363,7 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - **新規 storage key は `onInstalled` で必ず初期化** — `volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `searchFixerFeatures.hideComments` のような後追いキーは未設定時 `undefined` で UI 側に出るとトグルが表示されない・無効状態になるため、必ず `onInstalled` で `false` (boolean) / `VolumeBooster.DEFAULT` (数値) 初期化する。`normalizeSettings()` 側でも `=== true` 防御的判定を入れる（`!!value` だと storage の落ちた object 値で誤判定が出るため）。
 
 ### 音量ブースター popup → storage 直書きの防御 (/rere v1.0.28 確立)
-**音量ブースター 5 キー** (`volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled`) のみ popup から直接 `chrome.storage.local.set` する設計で、background の `normalizeSettings` を経由しない。
+**音量ブースター 6 キー** (`volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterMutedEnabled`) のみ popup から直接 `chrome.storage.local.set` する設計で、background の `normalizeSettings` を経由しない。
 - popup の `pushVolumeNow` は **必ず `VolumeBooster.clampValue(value)` を経由**して storage / `VOLUME_BOOSTER_SET_GAIN` 両方に渡す（範囲外値が storage に紛れ込むのを防ぐ二重防御）
 - popup クローズ後の orphan await から戻ったときは `document.body.isConnected` チェックで DOM 触らない（detached DOM 操作の no-op 化）
 - 将来 `APPLY_SETTINGS` 経路に統合する場合は popup と background 両方の大規模変更が必要

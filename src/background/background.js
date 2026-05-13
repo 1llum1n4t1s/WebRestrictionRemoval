@@ -91,8 +91,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VIDEO_GAMMA_ENABLED,
     StorageKeys.VIDEO_GAMMA_VALUE,
+    StorageKeys.LOUPE_ENABLED,
+    StorageKeys.LOUPE_ZOOM,
+    StorageKeys.LOUPE_SIZE,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
@@ -149,12 +153,26 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] = false;
   }
+  if (!(StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] = false;
+  }
   // 動画ガンマ補正: master OFF / 値 1.0 で初期化（インストール直後は完全に無処理）
   if (!(StorageKeys.VIDEO_GAMMA_ENABLED in stored)) {
     defaults[StorageKeys.VIDEO_GAMMA_ENABLED] = false;
   }
   if (!(StorageKeys.VIDEO_GAMMA_VALUE in stored)) {
     defaults[StorageKeys.VIDEO_GAMMA_VALUE] = VideoGamma.DEFAULT;
+  }
+  // ルーペ: master OFF / 倍率 DEFAULT_ZOOM (2.5) / サイズ SIZE_DEFAULT (220) で初期化。
+  // インストール直後は完全に無処理（content script ロードはされるが activate しない）。
+  if (!(StorageKeys.LOUPE_ENABLED in stored)) {
+    defaults[StorageKeys.LOUPE_ENABLED] = false;
+  }
+  if (!(StorageKeys.LOUPE_ZOOM in stored)) {
+    defaults[StorageKeys.LOUPE_ZOOM] = Loupe.DEFAULT_ZOOM;
+  }
+  if (!(StorageKeys.LOUPE_SIZE in stored)) {
+    defaults[StorageKeys.LOUPE_SIZE] = Loupe.SIZE_DEFAULT;
   }
   // 顔料アトリエ（カラーピッカー）の新規キー: 履歴は空配列、既定形式は HEX、
   // 最終タブは「アシスト」で初期化。後追いキーが undefined のまま UI に出ないよう
@@ -199,7 +217,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       request.data?.gain,
       request.data?.antiClip,
       request.data?.normalize,
-      request.data?.nightMode
+      request.data?.nightMode,
+      request.data?.muted
     )
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
@@ -209,6 +228,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     releaseVolumeBoosterTab(request.data?.tabId)
       .then((res) => sendResponse(res))
       .catch(() => sendResponse({ ok: false }));
+    return true;
+  } else if (request.action === Actions.LOUPE_REQUEST_CAPTURE) {
+    // ルーペ content script からの captureVisibleTab 要求。
+    // sender 検証: content script 由来のみ受け付け（popup からは来ない設計）。
+    if (!SenderCheck.isFromContentScript(sender)) return;
+    const tabId = sender.tab?.id;
+    const windowId = sender.tab?.windowId;
+    if (!Number.isInteger(tabId) || !Number.isInteger(windowId)) {
+      sendResponse({ ok: false, error: "invalid-tab-id" });
+      return true;
+    }
+    // タブ一致確認 (/rere レビュー A1-I1 防御): `chrome.tabs.captureVisibleTab(windowId, ...)` は
+    // 指定ウィンドウの **現在アクティブなタブ** のスクリーンショットを撮る。loupe.js の
+    // visibilitychange cleanup が将来何らかの理由で失敗した場合、バックグラウンドタブの
+    // content script が別タブ (アクティブ) のピクセルを取得できる理論的経路がある。
+    // sender.tab.id が windowId のアクティブタブと一致することを assert してから撮影する。
+    chrome.tabs
+      .query({ active: true, windowId })
+      .then((tabs) => {
+        const activeTabId = tabs[0]?.id;
+        if (activeTabId !== tabId) {
+          sendResponse({ ok: false, error: "tab-not-active" });
+          return null;
+        }
+        // captureVisibleTab は背景 SW から activeTab 権限で動作する。
+        // JPEG quality:70 で payload を約 300-600KB に抑え、PNG (数 MB) より高速転送。
+        // 500ms debounce が content 側にあるため Chrome 公式 2fps quota 内に収まる。
+        return chrome.tabs.captureVisibleTab(windowId, {
+          format: "jpeg",
+          quality: Loupe.CAPTURE_QUALITY,
+        });
+      })
+      .then((dataUrl) => {
+        if (dataUrl != null) sendResponse({ ok: true, dataUrl });
+      })
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
   }
 });
@@ -253,6 +308,7 @@ async function autoApplyVolumeBooster(tabId) {
       StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
       StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
       StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     ]);
   }
   const stored = cachedVolumeSettings;
@@ -261,18 +317,20 @@ async function autoApplyVolumeBooster(tabId) {
   const antiClip = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   const normalize = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
   const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
-  await setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode);
+  const muted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
+  await setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode, muted);
 }
 
 // ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
 chrome.storage.onChanged.addListener((changes) => {
-  // 5 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
+  // 6 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN in changes ||
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes
+    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes
   ) {
     cachedVolumeSettings = null;
   }
@@ -333,11 +391,16 @@ async function handleApplySettings(settings) {
  * `!!` だと truthy 判定されて誤って ON 化されうる。デフォルト OFF 方針を堅持するため、
  * 明示的な `true` のときだけ有効化する。
  *
- * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / Normalize / NightMode) は
+ * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / Normalize / NightMode / Muted) は
  * APPLY_SETTINGS の対象外**: popup が VOLUME_BOOSTER_SET_GAIN メッセージで gain と一緒に
  * 渡してくるため、storage.set は popup 側で直接行う。content script への配信も不要なので
  * normalizeSettings / toStorageRecord には含めない。新しい音量関連 storage key を増やすときは
  * この方針を維持するか、APPLY_SETTINGS 経路に統合するかを先に判断すること。
+ *
+ * **ルーペの zoom / size (loupeZoom / loupeSize) も APPLY_SETTINGS の対象外**: 同じく popup が
+ * `chrome.storage.local.set` で直接保存し、content script は `storage.onChanged` で同期する。
+ * loupeEnabled だけ APPLY_SETTINGS 経路に乗せて active tab への即時通知 (APPLY_LOUPE_CS) を担保する。
+ * これは音量ブースター 6 キー直書きパターン (CLAUDE.md「Important Patterns」#23) と同型。
  */
 function normalizeSettings(settings) {
   return {
@@ -355,6 +418,7 @@ function normalizeSettings(settings) {
     tiktokCleanerFeatures: TikTokCleaner.mergeFeatures(settings?.tiktokCleanerFeatures),
     videoGammaEnabled: settings?.videoGammaEnabled === true,
     videoGammaValue: VideoGamma.clampValue(settings?.videoGammaValue),
+    loupeEnabled: settings?.loupeEnabled === true,
   };
 }
 
@@ -375,6 +439,7 @@ function toStorageRecord(s) {
     [StorageKeys.TIKTOK_CLEANER_FEATURES]: s.tiktokCleanerFeatures,
     [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
     [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
+    [StorageKeys.LOUPE_ENABLED]: s.loupeEnabled,
   };
 }
 
@@ -415,6 +480,17 @@ async function notifyContentScripts(s) {
         value: s.videoGammaValue,
       },
     })
+    .catch(() => {});
+
+  // ルーペ content script も全 http(s) ページに注入済みなので常に通知。
+  // all_frames: false で top frame のみに注入されるため、TOP_FRAME 指定で
+  // 無駄なメッセージブロードキャストを避ける（zoom/size は content 側が storage から直接読むので
+  // ここでは enabled フラグのみ送る）。
+  await chrome.tabs
+    .sendMessage(tab.id, {
+      action: Actions.APPLY_LOUPE_CS,
+      data: { enabled: s.loupeEnabled },
+    }, { frameId: 0 })
     .catch(() => {});
 
   // A1-2 / #11 対策: youtube-shorts / search-fixer / amazon-delivery-total / instagram-cleaner は
@@ -753,7 +829,7 @@ async function isVolumeBoosterActive() {
  * offscreen 側で各 compressor のパラメータを切り替える。両 OFF 時もチェーンには残し
  * ratio:1 のバイパス設定にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode, muted) {
   // P2-#13: tabId は popup origin（SenderCheck.isFromPopup で検証済み）から渡されるが、
   // popup の中では `getActiveHttpTab()` 経由で active tab の id を入れて送ってくる。
   // popup CSP (`script-src 'self'`) で外部スクリプトが popup 内で動くことは事実上不可能なため、
@@ -767,11 +843,19 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode)
   const antiClipFlag = antiClip === true;
   const normalizeFlag = normalize === true;
   const nightModeFlag = nightMode === true;
+  const mutedFlag = muted === true;
 
-  // スライダーが等倍位置 (100%) かつ全サブトグル OFF のときだけ release → リソース返却。
-  // 100% でも自動歪み防止 / 自動音量正規化のいずれかが ON なら compressor を効かせる必要があるため
-  // AudioContext を維持して通常経路に進む（gain は 1.0x にランプ、compressor は preset 通り適用）。
-  if (clamped === VolumeBooster.UNITY && !antiClipFlag && !normalizeFlag && !nightModeFlag) {
+  // スライダーが等倍位置 (100%) かつ全サブトグル OFF かつミュート OFF のときだけ release → リソース返却。
+  // 100% でも自動歪み防止 / 自動音量正規化 / ナイトモードのいずれかが ON なら compressor を効かせる必要があり、
+  // ミュート ON なら gain を 0 にランプし続ける必要があるため、いずれの場合も AudioContext を維持して通常経路に進む
+  // （gain は 1.0x または 0 にランプ、compressor は preset 通り適用）。
+  if (
+    clamped === VolumeBooster.UNITY &&
+    !antiClipFlag &&
+    !normalizeFlag &&
+    !nightModeFlag &&
+    !mutedFlag
+  ) {
     await releaseVolumeBoosterTab(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
   }
@@ -795,6 +879,7 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode)
         antiClip: antiClipFlag,
         normalize: normalizeFlag,
         nightMode: nightModeFlag,
+        muted: mutedFlag,
       });
     } catch (err) {
       // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー。
@@ -846,6 +931,7 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode)
       antiClip: antiClipFlag,
       normalize: normalizeFlag,
       nightMode: nightModeFlag,
+      muted: mutedFlag,
     });
     // P2-#19: 成功時のみローカルキャッシュに登録。失敗（offscreen エラー / no-response）の場合は
     // ブースト中状態にならないため Set には追加しない。

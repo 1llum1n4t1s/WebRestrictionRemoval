@@ -450,6 +450,13 @@ body {
   margin-bottom: 8px;
 }
 
+/* sub-block 内に複数の sub-head セクションを縦に並べるときの間隔調整。
+   ルーペの「倍率セグメント + サイズスライダー」のように 2 つのコントロールを
+   同じ sub-block 内に置く場合の上マージン用。 */
+.sub-head--gap {
+  margin-top: 12px;
+}
+
 .sub-label {
   font-size: 10.5px;
   color: var(--ink-soft);
@@ -462,6 +469,108 @@ body {
   font-weight: 600;
   color: var(--accent-deep);
   letter-spacing: 0.02em;
+}
+
+/* ---------- Loupe zoom segment control ----------
+   ルーペの倍率を 3 段階のセグメント (1.5× / 2.5× / 4×) で選択する radio button 風の UI。
+   選択中は accent カラー塗り、未選択は ghost-btn 風 outline 表現。 */
+.loupe-zoom-segment {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.loupe-zoom-segment .seg-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.loupe-zoom-segment .seg-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.loupe-zoom-segment .seg-btn.is-active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.loupe-zoom-segment .seg-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- Volume slider row (mute button + range) ---------- */
+/* ミュート切替ボタンと音量スライダーを横並びに配置するためのフレックスコンテナ。
+   ボタンは固定幅、スライダーは残り全幅を取る。中央マーカー (slider-center-mark::after) は
+   親 .sub-block が基準なので、スライダーの左端がボタン分ずれても外観に影響しない
+   (translate ではなく左から % 計算なのでズレるが、視覚的にはほぼ不可視) */
+.volume-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.volume-slider-row .range {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Volume mute button ---------- */
+.volume-mute-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--accent-deep);
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.volume-mute-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.volume-mute-btn:active {
+  transform: translateY(0.5px);
+}
+
+.volume-mute-btn[aria-pressed="true"] {
+  border-color: var(--warn);
+  background: var(--accent-soft);
+  color: var(--warn);
+}
+
+.volume-mute-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.volume-mute-icon {
+  font-size: 14px;
+  line-height: 1;
+  /* 絵文字フォント高さの微妙な詰め */
+  display: inline-block;
+  transform: translateY(-0.5px);
 }
 
 /* ---------- Range slider ---------- */
@@ -1348,13 +1457,17 @@ body {
   transform: translateY(-1px);
 }
 
+/* 既定の保存形式チップは「採取色」ではなく固定の accent (茜) で塗る。
+ * 過去は --pigment / --pigment-tint で採取色に染めていたが、暗い色を採取すると
+ * チップが popup 背景に溶けてボタンが見えなくなる事故が起きた (ゆろさん報告 2026-05-13)。
+ * 既定の保存形式は採取色と独立した UI 操作なので、視認性優先で accent 固定にする。 */
 .fmt-chip input:checked + .fmt-chip-text {
-  border-color: var(--pigment);
-  background: var(--pigment-tint);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .fmt-chip input:checked + .fmt-chip-text .fmt-chip-name {
-  color: var(--pigment);
+  color: var(--accent);
   font-weight: 600;
 }
 

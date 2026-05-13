@@ -299,6 +299,16 @@
         if (main) detectionRoots.push(main);
         // dialog が main の外側に居るときだけ別 root として追加（main 配下なら重複走査を避ける）
         if (dialog && !main?.contains(dialog)) detectionRoots.push(dialog);
+        // 早期 return ガード (/rere レビュー C-#12):
+        // 既にマーク済みコンテナが detection root 内に存在する場合、SPA top-level 遷移までは
+        // 同じコメントリストが対象 = 再走査不要。10,000+ DOM ノードに対する 300ms 周期の
+        // querySelectorAll を完全スキップして累積 CPU 負荷を圧縮する。SPA 遷移時に
+        // <main> / <dialog> の子要素が差し替わるとマーク済み要素も消えるので、その瞬間から
+        // 自動的に再走査が再開される (= マーク済み要素が無いので早期 return を抜ける)。
+        const alreadyMarked = detectionRoots.some((root) =>
+          root.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
+        );
+        if (alreadyMarked) return;
         const candidateSelector =
           "ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + "), div:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")";
         for (const root of detectionRoots) {
@@ -431,6 +441,15 @@
   }
 
   function checkUrlRedirect() {
+    // zombie guard (/rere レビュー B1-D3 / D-4 横展開 PATTERN SYNC):
+    // 通常は sweepOnce (300ms) が先に zombie 検知して stopUrlGuard を呼ぶが、
+    // urlGuardTimer 単独経路で発火する race を塞ぐ保険として独立ガードを置く。
+    if (!chrome.runtime?.id) {
+      active = false;
+      stopUrlGuard();
+      stopDomSweep();
+      return;
+    }
     if (!active) return;
     // P2-#18: タブが非表示のときはリダイレクトをスキップ。Battery Saver / Background Throttling で
     // setInterval 間隔が伸びる環境でもバックグラウンドの不要な location.assign を抑える。
@@ -438,12 +457,17 @@
     if (document.hidden) return;
     const path = location.pathname;
     let shouldRedirect = false;
+    // ⚠️ MUST SYNC with `src/content/instagram-early.js` の REELS_RE / EXPLORE_RE / STORIES_RE:
+    // document_start と document_idle の両経路で同じ URL 判定をする必要がある。
     if (f("reels") && /^\/reels?(\/|$)/i.test(path)) shouldRedirect = true;
     else if (f("explore") && /^\/explore(\/|$)/i.test(path)) shouldRedirect = true;
     else if (f("storiesAll") && /^\/stories(\/|$)/i.test(path)) shouldRedirect = true;
     if (!shouldRedirect) return;
+    // instagram-early.js (document_start redirect) と同じく `replace` を使う。
+    // `assign` だと history に残り、ユーザーが「戻る」ボタンで Reels に戻った瞬間に
+    // Instagram の重い React bundle が再 freeze する経路がある (/rere レビュー B1-D2 指摘)。
     try {
-      window.location.assign("/");
+      window.location.replace("/");
     } catch {
       window.location.href = "/";
     }

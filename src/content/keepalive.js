@@ -191,6 +191,18 @@ function createKeepAlive({ intervalMs, httpPingEnabled = false }) {
   }
 
   function tick() {
+    // zombie guard (/rere レビュー B1-D3 / D-4 横展開 PATTERN SYNC):
+    // 拡張機能リロード後の orphan content script では `chrome.runtime.id` が undefined。
+    // setInterval は extension context が死んでも止まらないため、自前で stop する必要がある。
+    // 合成イベント dispatch は chrome API 非依存なので動き続けるが、setInterval を放置すると
+    // CPU を浪費し続けるので 1 回検知したら即停止 + timerId クリアで以後の tick を完全停止する。
+    if (!chrome.runtime?.id) {
+      if (timerId !== null) {
+        try { clearInterval(timerId); } catch {}
+        timerId = null;
+      }
+      return;
+    }
     // A) 合成アクティビティ束 — 各フレームのサイト側アイドル検知
     //    （SessionTimeoutManager / pointer 系 / focus 系）を幅広くリセットする。副作用ゼロで常時実行。
     dispatchSyntheticActivity();

@@ -120,6 +120,15 @@
   }
 
   function readSettingsAndApply() {
+    // zombie guard (/rere レビュー B1-D3 / D-4 横展開 PATTERN SYNC):
+    // 拡張機能リロード後の orphan content script では `chrome.runtime.id` が undefined。
+    // listener 自体は orphan 化で発火停止するため重大な暴走経路はないが、SVG filter 要素が
+    // 残置されると「拡張 OFF したのに動画が暗いまま」のユーザー体感に繋がるので、
+    // 万一 listener が遅延発火した経路に備えて cleanup を実行する保険。
+    if (!chrome.runtime?.id) {
+      cleanup();
+      return;
+    }
     chrome.storage.local
       .get([StorageKeys.VIDEO_GAMMA_ENABLED, StorageKeys.VIDEO_GAMMA_VALUE])
       .then((s) => {

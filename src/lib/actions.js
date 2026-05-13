@@ -30,10 +30,14 @@ const Actions = Object.freeze({
   APPLY_TIKTOK_CLEANER_CS: "applyTiktokCleanerCS",
   /** background → video-gamma content script: <video> ガンマ補正設定を反映（全タブ共通設定） */
   APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
+  /** background → loupe content script: ルーペ機能の有効/無効を反映 */
+  APPLY_LOUPE_CS: "applyLoupeCS",
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
   /** popup → background: 指定タブのブーストを解放（スライダー 100% 復帰時） */
   VOLUME_BOOSTER_RELEASE_TAB: "volumeBoosterReleaseTab",
+  /** loupe content script → background: 現在タブのスクリーンキャプチャを要求し、JPEG DataURL を取得する */
+  LOUPE_REQUEST_CAPTURE: "loupeRequestCapture",
 });
 
 /**
@@ -131,10 +135,19 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_NORMALIZE_ENABLED: "volumeBoosterNormalizeEnabled",
   /** 音量ブースター: ナイトモード（ゲーム配信用途） */
   VOLUME_BOOSTER_NIGHT_MODE_ENABLED: "volumeBoosterNightModeEnabled",
+  /** 音量ブースター: ミュート（スライダー値・サブトグル設定は保持したまま gain を 0 にランプ）。
+   *  グローバル設定で、ON 中は UNITY release 条件をブロックして AudioContext を維持する。 */
+  VOLUME_BOOSTER_MUTED_ENABLED: "volumeBoosterMutedEnabled",
   /** 動画ガンマ補正: マスタートグル（OFF 時は SVG filter 一切注入せず completely no-op） */
   VIDEO_GAMMA_ENABLED: "videoGammaEnabled",
   /** 動画ガンマ補正: ガンマ値（VideoGamma.MIN..MAX、デフォルト 1.0 = 補正なし） */
   VIDEO_GAMMA_VALUE: "videoGammaValue",
+  /** ルーペ: マスタートグル（OFF 時は content script のレンズ DOM を即座に撤去し、リスナも全て解除） */
+  LOUPE_ENABLED: "loupeEnabled",
+  /** ルーペ: 倍率（Loupe.ZOOM_LEVELS のいずれか、デフォルト 2.5）。popup の倍率セグメントで選択 */
+  LOUPE_ZOOM: "loupeZoom",
+  /** ルーペ: レンズ直径 px（Loupe.SIZE_MIN..MAX、デフォルト 220）。popup のスライダーで可変 */
+  LOUPE_SIZE: "loupeSize",
   /** カラーピッカー: 採取した色の履歴（最新が先頭。各要素 {hex, ts} の最大 20 件） */
   COLOR_PICKER_HISTORY: "colorPickerHistory",
   /** カラーピッカー: 既定の保存形式 ("hex" | "rgb" | "hsl") */
@@ -387,6 +400,41 @@ const SearchFixer = Object.freeze({
     }
     return false;
   },
+
+  /**
+   * `/@handle` 形式の href から handle 文字列 (`@xxx`) を抽出する pure function。
+   *
+   * 設計上の注意:
+   *   - YouTube のハンドルは ASCII (`@nagumorui`) だけでなく Unicode 文字 (日本語 / 韓国語 /
+   *     中国語 / アクセント記号) を含むケースが多数ある (`@むめいの有名になりたい` 等)。
+   *   - DOM 上の `href` 属性は URL エンコード形式 (`/@%E3%82%80...`) で保持されているため、
+   *     先に `decodeURIComponent` でデコードしてから正規表現マッチする。
+   *   - Unicode property escapes `\p{L}\p{N}` で Letter + Number を許可
+   *     (ES2018+、Chrome 64+ で対応、minimum_chrome_version: 140 では完全サポート)。
+   *
+   * 失敗パターンとフォールバック:
+   *   - href が null / 空文字 → null
+   *   - `@` 形式じゃない URL (`/channel/UCxxx` 等) → null
+   *   - 不正な % シーケンス (decodeURIComponent が throw) → 素の href にフォールバックして再試行
+   *
+   * 過去の罠: 旧実装は `(@[\w.-]{1,60})(?:\/|$|\?)` で ASCII 限定だったため、日本語ハンドルの
+   * カードでサムネ取得が永遠にスキップされる重大バグがあった (subsChannelsGrid 経由で発覚)。
+   *
+   * @param {string|null|undefined} href "/@xxx" 形式の URL
+   * @returns {string|null} "@xxx" または null
+   */
+  extractHandleFromHref(href) {
+    if (!href) return null;
+    let decoded;
+    try {
+      decoded = decodeURIComponent(href);
+    } catch {
+      // 不正な % シーケンス（壊れた encoding）の場合は素の href にフォールバック
+      decoded = href;
+    }
+    const m = decoded.match(/(@[\p{L}\p{N}._-]{1,60})(?:\/|$|\?|#)/u);
+    return m ? m[1] : null;
+  },
 });
 
 /**
@@ -622,8 +670,12 @@ const ImageDownloader = Object.freeze({
     tiktok: Object.freeze([
       /^p\d*-sign[a-z0-9-]*\.tiktokcdn(-us)?\.com$/,
       /^p\d*-pu[a-z0-9-]*\.tiktokcdn(-us)?\.com$/,
-      /^[a-z0-9-]+\.tiktokcdn(-us)?\.com$/,
-      /^[a-z0-9-]+\.tiktokcdn-us\.com$/,
+      // TikTok の正規 CDN サブドメインは `p<数字>` または `p<数字>-<region>` 形式。
+      // 旧 `[a-z0-9-]+\.tiktokcdn\.com$` パターンは `evil.tiktokcdn.com` や
+      // `tracking.tiktokcdn.com` 等の任意サブドメインを通過させて代理 fetch 攻撃面を広げる
+      // 設計欠陥があった (/rere レビュー A2-SC-1 指摘)。`p\d+` プレフィックス必須化で
+      // 攻撃面を絞り込む。Instagram 側が `scontent-` prefix 限定なのと対称的な設計。
+      /^p\d+(-[a-z0-9-]+)?\.tiktokcdn(-us)?\.com$/,
     ]),
   }),
 
@@ -984,6 +1036,158 @@ const VideoGamma = Object.freeze({
 });
 
 /**
+ * @readonly ルーペ機能（独自実装）の定数。
+ *
+ * `chrome.tabs.captureVisibleTab` で active tab の静止画を JPEG quality:70 で取得し、
+ * content script の `position: fixed` 円形レンズに `background-image` として貼り付ける。
+ * マウス座標 (clientX/clientY) から `background-position` をリアルタイム計算 (60fps、rAF コアレス)
+ * してレンズに「カーソル下を拡大した内容」を表示する仕組み。
+ *
+ * iframe / canvas / video の現在フレームも captureVisibleTab で「描画ピクセル」として取得できるため、
+ * 動画を一時停止して細部を確認する用途に最適。テキストはビットマップ拡大で多少ぼやけるが、
+ * 動画 / iframe を含む汎用拡大鏡として機能する。DOM clone 方式と異なり Trusted Types の影響を受けない。
+ *
+ * 設計上の不変条件:
+ *   - 全 http(s) サイトの top frame に注入（all_frames: false）
+ *   - 左クリックで OFF（master トグル OFF と同じ挙動 + storage の loupeEnabled も false に書き戻し）
+ *   - 再キャプチャ trigger: 初回 / scroll 500ms debounced / MutationObserver(childList, subtree:false) / resize
+ *   - メモリ管理: DataURL を Blob URL に変換して <img>/background-image で参照、cleanup 時に必ず revoke
+ *   - z-index: 2147483646 (image-downloader と同値で前面確保)
+ *   - tabs.onActivated での自動適用はしない（visibilitychange で旧タブ cleanup、新タブは OFF 開始）
+ *
+ * 関連 storage key:
+ *   - LOUPE_ENABLED (boolean, default false): マスタートグル
+ *   - LOUPE_ZOOM (number, default 2.5): 倍率（ZOOM_LEVELS のいずれか）
+ *   - LOUPE_SIZE (number, default 220): レンズ直径 px（SIZE_MIN..MAX）
+ */
+const Loupe = Object.freeze({
+  /** 選択可能な倍率の列挙（popup のセグメントコントロールの 3 ボタンに対応） */
+  ZOOM_LEVELS: Object.freeze([1.5, 2.5, 4.0]),
+  /** デフォルト倍率（必ず ZOOM_LEVELS に含まれる値であること） */
+  DEFAULT_ZOOM: 2.5,
+  /** レンズ直径の最小値 (px)。これより小さいと中央のクロスヘアと倍率バッジが視認困難 */
+  SIZE_MIN: 150,
+  /** レンズ直径の最大値 (px)。1000 までは「画面の大部分を覆う巨大ルーペ」用途（小さい表 / 細字法律文書を
+   *  ほぼ全画面で読みたい等）を想定。一般的な viewport (1920×1080 / 1440×900) でも画面に収まり、
+   *  4× 倍率なら 250×250 ピクセル分を 1000×1000 で見られる */
+  SIZE_MAX: 1000,
+  /** デフォルトレンズ直径 (px)。SIZE_MIN..SIZE_MAX の中央値より小さめで、初期表示で邪魔にならない位置 */
+  SIZE_DEFAULT: 220,
+  /** スライダーの step (px)。10px 単位で十分滑らかな調整感、storage の値が無駄に細かくなるのを防ぐ */
+  SIZE_STEP: 10,
+  /** captureVisibleTab の JPEG 品質 (0-100)。70 で payload 約 300-600KB、視認性とのバランス最適 */
+  CAPTURE_QUALITY: 70,
+  /**
+   * スクロール / DOM 変化 / resize 後の再キャプチャ debounce (ms)。
+   * captureVisibleTab の Chrome 公式レート上限は 2fps = 500ms ごと 1 回までなので、
+   * これより短い debounce 値にすると quota エラーが発生する。500ms は最小安全値。
+   */
+  RECAPTURE_DEBOUNCE_MS: 500,
+  /** レンズ DOM の z-index。image-downloader と同値で「拡張機能 UI として最前面」を統一 */
+  LENS_Z_INDEX: 2147483646,
+  /** 注入する DOM 要素の id 名 / class 名 */
+  LENS_ID: "__cpa-loupe-lens",
+  CLASS_LENS: "__cpa-loupe-lens",
+  CLASS_CROSSHAIR: "__cpa-loupe-crosshair",
+  CLASS_BADGE: "__cpa-loupe-badge",
+
+  /**
+   * 倍率値の正規化。ZOOM_LEVELS に含まれない値（不正な storage 値、古いバージョンからの移行値等）は
+   * DEFAULT_ZOOM にフォールバック。文字列 / NaN / null / undefined も同様に DEFAULT_ZOOM。
+   *
+   * @param {unknown} v 検証する倍率値
+   * @returns {number} ZOOM_LEVELS のいずれかの値
+   */
+  validateZoom(v) {
+    const n = Number(v);
+    if (Loupe.ZOOM_LEVELS.includes(n)) return n;
+    return Loupe.DEFAULT_ZOOM;
+  },
+
+  /**
+   * レンズ直径の正規化。SIZE_MIN..SIZE_MAX に clamp し、SIZE_STEP 単位に丸める。
+   * 不正値（NaN / 文字列 / undefined）は SIZE_DEFAULT にフォールバック。
+   *
+   * @param {unknown} v 検証するサイズ値
+   * @returns {number} SIZE_MIN..SIZE_MAX の整数（SIZE_STEP の倍数）
+   */
+  clampSize(v) {
+    // null は Number(null) === 0 になるため、明示的に DEFAULT へ倒す。
+    // storage 未設定時の `undefined` も DEFAULT 扱い（uninitialized 値を MIN に倒さない）。
+    if (v === null || v === undefined) return Loupe.SIZE_DEFAULT;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return Loupe.SIZE_DEFAULT;
+    const clamped = Math.min(Loupe.SIZE_MAX, Math.max(Loupe.SIZE_MIN, n));
+    return Math.round(clamped / Loupe.SIZE_STEP) * Loupe.SIZE_STEP;
+  },
+
+  /**
+   * マウス座標からレンズ DOM の screen 上の left/top 座標を計算する pure function。
+   * カーソルがレンズの中央に来るように配置する。viewport 端を超えても clamp はしない
+   * (典型的なルーペ UX に合わせて、レンズの一部が画面外にはみ出すのを許容)。
+   *
+   * @param {number} mouseX clientX
+   * @param {number} mouseY clientY
+   * @param {number} lensSize レンズ直径 px
+   * @returns {{left: number, top: number}}
+   */
+  computeLensPosition(mouseX, mouseY, lensSize) {
+    const r = lensSize / 2;
+    return {
+      left: mouseX - r,
+      top: mouseY - r,
+    };
+  },
+
+  /**
+   * マウス座標からレンズの `background-position` 値を計算する pure function。
+   *
+   * 設計:
+   *   - background-size = viewport * zoom（キャプチャ画像を倍率で拡大した内部仮想サイズ）
+   *   - background-position はその拡大画像を「レンズ div の左上を起点に」どこにオフセットするか
+   *   - カーソル位置 (mouseX, mouseY) に対応する画像ピクセル (mouseX*zoom, mouseY*zoom) を
+   *     レンズの中心 (r, r) に重ねるための shift = (r - mouseX*zoom, r - mouseY*zoom)
+   *
+   * @param {number} mouseX clientX
+   * @param {number} mouseY clientY
+   * @param {number} zoom 倍率（ZOOM_LEVELS のいずれか）
+   * @param {number} lensRadius レンズ半径 px（lensSize / 2）
+   * @returns {{bgX: number, bgY: number}}
+   */
+  computeBackgroundPosition(mouseX, mouseY, zoom, lensRadius) {
+    return {
+      bgX: lensRadius - mouseX * zoom,
+      bgY: lensRadius - mouseY * zoom,
+    };
+  },
+
+  /**
+   * background から返ってくる error code を i18n キー文字列に変換する pure function。
+   * 想定: 将来 popup に「ルーペが起動できなかった理由」を表示する hint 領域を追加する際の橋渡し
+   * （音量ブースターの `formatVolumeError` と同型の設計）。
+   *
+   * **現状はまだ呼び出し元なし**: content script は console.warn でエラー詳細を残し、ユーザーへの
+   * 通知は「レンズが表示されない」という暗黙的フィードバックに留めている。popup の hint 領域を
+   * 整備するときに `chrome.i18n.getMessage(formatLoupeError(res.error))` として呼び出す予定。
+   * テスト (test/actions.test.js) は事前に書いてあるので、将来導入時に追加検証は不要。
+   *
+   * @param {string|undefined|null} code background エラー code
+   * @returns {string} i18n キー
+   */
+  formatLoupeError(code) {
+    if (!code) return "loupeErrorUnknown";
+    const s = String(code);
+    if (/no tab|invalid-tab-id|tab not found|cannot find tab/i.test(s)) return "loupeErrorInvalidTab";
+    if (/not allowed|cannot capture|chrome:|edge:|file:|about:/i.test(s)) {
+      return "loupeErrorUnsupportedPage";
+    }
+    if (/permission/i.test(s)) return "loupeErrorPermission";
+    if (/MAX_CAPTURE|quota/i.test(s)) return "loupeErrorQuota";
+    return "loupeErrorUnknown";
+  },
+});
+
+/**
  * @readonly カラーピッカー（独自実装）の定数。
  *
  * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
@@ -1070,6 +1274,7 @@ const PopupTabs = Object.freeze({
   globalThis.ImageDownloader = ImageDownloader;
   globalThis.VolumeBooster = VolumeBooster;
   globalThis.VideoGamma = VideoGamma;
+  globalThis.Loupe = Loupe;
   globalThis.ColorPicker = ColorPicker;
   globalThis.PopupTabs = PopupTabs;
 })();

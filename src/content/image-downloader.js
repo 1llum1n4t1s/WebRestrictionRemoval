@@ -62,6 +62,43 @@
   let scanScheduled = false;
   /** active な fetch 群を一括キャンセルするための AbortController（OFF 時に abort） */
   let abortController = null;
+  /** 拡張機能リロード後の orphan content script 検出フラグ。一度 true になったら以後の処理は全て早期 return。 */
+  let contextInvalidated = false;
+
+  /**
+   * 拡張機能がリロードされた直後、古い content script は DOM 上に残り続けるが
+   * `chrome.runtime.id` が undefined になる。この状態で `chrome.i18n.getMessage`
+   * 等を呼ぶと "Extension context invalidated" で throw する。
+   *
+   * MutationObserver から `buildButton` → `chrome.i18n.getMessage` が呼ばれる経路で
+   * 過去にこのエラーを実機 (TikTok) で確認したため、scheduleScan / scanAllImages の
+   * 入口でガードする。判定 true 時は 1 度だけ cleanup を行い、以後の MO callback を
+   * no-op 化する。`removeAllOverlays` は chrome API 非依存なので invalidation 後も
+   * 安全に呼べる。
+   */
+  function checkContextInvalidated() {
+    if (contextInvalidated) return true;
+    try {
+      if (!chrome.runtime || !chrome.runtime.id) {
+        contextInvalidated = true;
+      }
+    } catch (_) {
+      contextInvalidated = true;
+    }
+    if (contextInvalidated) {
+      if (mutationObserver) {
+        try { mutationObserver.disconnect(); } catch (_) {}
+        mutationObserver = null;
+      }
+      if (abortController) {
+        try { abortController.abort(); } catch (_) {}
+        abortController = null;
+      }
+      active = false;
+      try { removeAllOverlays(); } catch (_) {}
+    }
+    return contextInvalidated;
+  }
 
   // === Site adapters: コンテンツ画像判定 + 最大解像度 URL 候補列挙 ===
 
@@ -397,33 +434,46 @@
    *   - `referrerPolicy: "no-referrer"` でリファラ送信ゼロ
    *   - hostname を ImageDownloader.ALLOWED_HOSTS で検証 → 各サイトの正規 CDN 以外は弾く
    *     （攻撃者注入 `<img>` 経由の代理 fetch 防止）
+   *
+   * 並列化 (/rere レビュー C-#4):
+   *   - 旧実装は for 逐次 fetch で最悪 N × RTT 直列。srcset が 3〜5 解像度のとき体感 1〜3 秒遅延。
+   *   - 新実装は全候補を `Promise.allSettled` で同時発射し、最遅 RTT 1 つだけ待つ。
+   *   - **「最大解像度優先」セマンティクスは維持**: 並列発射後、配列順 (= 解像度降順) で先頭の
+   *     fulfilled を採用する。`Promise.any` だと「最速応答」になり低解像度が混入しうるので NG。
    */
   async function fetchFirstAvailable(urls, signal) {
-    for (const url of urls) {
-      if (!url) continue;
-      if (!ImageDownloader.isAllowedFetchUrl(host, url)) continue;
-      // ユーザーが OFF にしたときの abort signal と、個別 fetch の timeout を AbortSignal.any で合成。
-      // どちらが先に発火しても fetch がキャンセルされる。signal が null のときは timeout のみ。
-      const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-      const combinedSignal = signal
-        ? AbortSignal.any([signal, timeoutSignal])
-        : timeoutSignal;
-      try {
+    const allowed = urls.filter((u) => u && ImageDownloader.isAllowedFetchUrl(host, u));
+    if (!allowed.length) return null;
+    const results = await Promise.allSettled(
+      allowed.map(async (url) => {
+        // ユーザー OFF abort signal と個別 timeout を AbortSignal.any で合成。
+        const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+        const combinedSignal = signal
+          ? AbortSignal.any([signal, timeoutSignal])
+          : timeoutSignal;
         const res = await fetch(url, {
           credentials: "omit",
           referrerPolicy: "no-referrer",
           redirect: "manual",
           signal: combinedSignal,
         });
-        if (res.type === "opaqueredirect") continue;
-        if (!res.ok) continue;
+        if (res.type === "opaqueredirect") throw new Error("opaqueredirect");
+        if (!res.ok) throw new Error("not ok: " + res.status);
         const blob = await res.blob();
-        if (blob && blob.size > 0) return { url, blob };
-      } catch (err) {
-        // ユーザー abort（OFF 切替）は throw で上位に伝播。timeout / TimeoutError / その他は次候補へ。
-        if (err && err.name === "AbortError" && signal && signal.aborted) throw err;
-        // TimeoutError は AbortError サブタイプだが signal.aborted が false なので次候補に行く。
-      }
+        if (!blob || blob.size === 0) throw new Error("empty blob");
+        return { url, blob };
+      })
+    );
+    // 全 fetch 完了後にユーザー abort が立っていれば throw して上位に伝播
+    // (onDownloadClick の signal.aborted ガードと整合)。
+    if (signal && signal.aborted) {
+      const err = new Error("aborted");
+      err.name = "AbortError";
+      throw err;
+    }
+    // 配列順 = 解像度降順なので、先頭の fulfilled を採用 = 最大解像度優先を維持
+    for (const r of results) {
+      if (r.status === "fulfilled") return r.value;
     }
     return null;
   }
@@ -527,6 +577,7 @@
 
   function scanAllImages() {
     if (!active) return;
+    if (checkContextInvalidated()) return;
     const imgs = document.querySelectorAll("img");
     for (const img of imgs) {
       decorateImage(img);
@@ -535,6 +586,7 @@
 
   function scheduleScan() {
     if (scanScheduled) return;
+    if (checkContextInvalidated()) return;
     scanScheduled = true;
     setTimeout(() => {
       scanScheduled = false;

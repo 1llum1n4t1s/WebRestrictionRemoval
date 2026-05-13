@@ -29,6 +29,10 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` acting as a fast limiter) is enabled. Default OFF.
 - **`volumeBoosterNormalizeEnabled`** (boolean): whether the Volume Booster's "Auto Volume Normalization" sub-toggle is enabled. Implemented with `AnalyserNode` short-window RMS measurement plus an auto `GainNode` (no `DynamicsCompressor` is used). Default OFF.
 - **`volumeBoosterNightModeEnabled`** (boolean): whether the Volume Booster's "Night Mode" sub-toggle (a `DynamicsCompressor` that compresses dynamic range for night listening) is enabled. Default OFF.
+- **`volumeBoosterMutedEnabled`** (boolean): the Volume Booster mute toggle. When ON, the `GainNode` is ramped to 0 while the slider value and sub-toggle settings are preserved (the AudioContext is kept alive so unmute can restore the volume instantly). Default OFF.
+- **`loupeEnabled`** (boolean): Loupe master toggle. Default OFF.
+- **`loupeZoom`** (number): Loupe magnification. One of 1.5 / 2.5 / 4.0. Default 2.5.
+- **`loupeSize`** (number, 150 – 1000 / 10 px step): Loupe lens diameter in px. Default 220.
 - **`colorPickerHistory`** (array, up to 20 items): history of colors picked with the color picker. Each entry is `{ hex, ts }` where `hex` is `#RRGGBB` and `ts` is the pick timestamp.
 - **`colorPickerDefaultFormat`** (string, one of `"hex"` / `"rgb"` / `"hsl"`): default clipboard format for picked colors.
 - **`colorPickerHexHash`** (boolean, default true): whether to include the leading `#` when copying in HEX format.
@@ -36,11 +40,15 @@ The Extension stores the following settings only on the user's device (`chrome.s
 
 These values are stored only on the device and are never transmitted to any external server.
 
-The Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles OFF, or when the Extension is disabled.
+The Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled.
 
 ## Tab audio access
 
 When the Volume Booster slider is set to a value other than 100%, or when one of Auto Distortion Guard / Auto Volume Normalization / Night Mode is enabled (even at 100%), the Extension uses the `chrome.tabCapture` API to obtain the active tab's audio stream and processes it through an `AudioContext` in the offscreen document for normalization, compression, and amplification before re-output. Audio data is never sent externally and is never recorded or stored. The stream is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles OFF, or when the Extension is disabled.
+
+## Tab screen (screenshot) access
+
+While the Loupe master toggle is ON, the Extension uses the `chrome.tabs.captureVisibleTab` API to obtain the **visible area of the active tab** as a JPEG snapshot and displays it as a magnifying lens in the content script DOM. The captured image is converted to a Blob URL and referenced only by the current tab's content script. It is never transmitted or stored outside the Extension's memory (no external server / no local file / no clipboard, etc.). When the master toggle is turned OFF, when the page is left-clicked, when the tab moves to the background, or when the Extension is disabled, the held Blob URL is released immediately via `URL.revokeObjectURL`. Re-capture is triggered automatically on user scroll, on large DOM changes, and on window resize, with a 500 ms debounce that fits within Chrome's official 2 fps rate limit.
 
 ## Data sharing
 
@@ -59,7 +67,7 @@ When the YouTube / Instagram / TikTok cleaner's "Show download button on images"
 - **activeTab**: used to access information about the current tab (e.g. determining the target tab for the Volume Booster) when the user changes settings via the popup.
 - **storage**: used to save and restore the keys listed in "Data stored locally" on the device.
 - **offscreen**: used to host an offscreen document (extension context) so the Volume Booster's `AudioContext` can be maintained outside the Service Worker lifecycle.
-- **tabCapture**: used to capture the active tab's audio stream for amplification, normalization, and compression in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle is enabled at 100%. No recording, storage, or external transmission is performed.
+- **tabCapture**: used to capture the active tab's audio stream for amplification, normalization, compression, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute is enabled at 100%. No recording, storage, or external transmission is performed.
 
 ## Notable changes through v1.0.18 (already applied)
 

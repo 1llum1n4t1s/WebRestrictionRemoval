@@ -126,6 +126,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeAntiClipToggle = document.getElementById("volumeAntiClipToggle");
   const $volumeNormalizeToggle = document.getElementById("volumeNormalizeToggle");
   const $volumeNightModeToggle = document.getElementById("volumeNightModeToggle");
+  const $volumeMuteBtn = document.getElementById("volumeMuteBtn");
+  const $volumeMuteIcon = $volumeMuteBtn?.querySelector(".volume-mute-icon");
   const $intervalRow = document.getElementById("intervalRow");
   const $intervalSlider = document.getElementById("intervalSlider");
   const $intervalValue = document.getElementById("intervalValue");
@@ -139,6 +141,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $videoGammaSlider = document.getElementById("videoGammaSlider");
   const $videoGammaValueLabel = document.getElementById("videoGammaValueLabel");
   const $videoGammaResetBtn = document.getElementById("videoGammaResetBtn");
+  const $loupeToggle = document.getElementById("loupeToggle");
+  const $loupeRow = document.getElementById("loupeRow");
+  const $loupeZoomSegment = document.getElementById("loupeZoomSegment");
+  const $loupeZoomValue = document.getElementById("loupeZoomValue");
+  const $loupeSizeSlider = document.getElementById("loupeSizeSlider");
+  const $loupeSizeValue = document.getElementById("loupeSizeValue");
   const $instagramCleanerToggle = document.getElementById("instagramCleanerToggle");
   const $igFeatureCategories = document.getElementById("igFeatureCategories");
   const $instagramCleanerPill = document.getElementById("instagramCleanerPill");
@@ -194,8 +202,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VIDEO_GAMMA_ENABLED,
     StorageKeys.VIDEO_GAMMA_VALUE,
+    StorageKeys.LOUPE_ENABLED,
+    StorageKeys.LOUPE_ZOOM,
+    StorageKeys.LOUPE_SIZE,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
@@ -236,6 +248,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNormalizeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
+  // ミュート状態の復元 + ボタン視覚状態の同期。
+  // ミュート ON でもスライダー値は last gain 位置のまま表示する（pushVolumeNow 側で muted=true を渡すと
+  // background → offscreen が gainNode を 0 にランプし、ユーザーが意図したスライダー値は state.lastSetPercent に保持される）。
+  let volumeMuted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
+  updateMuteBtnVisual();
 
   // 動画ガンマ補正の初期値設定
   $videoGammaToggle.checked = stored[StorageKeys.VIDEO_GAMMA_ENABLED] === true;
@@ -246,6 +263,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   $videoGammaSlider.value = String(VideoGamma.valueToSlider(storedGamma));
   updateVideoGammaLabel(storedGamma);
   updateVideoGammaRowVisibility();
+
+  // ルーペの初期値設定
+  $loupeToggle.checked = stored[StorageKeys.LOUPE_ENABLED] === true;
+  $loupeSizeSlider.min = String(Loupe.SIZE_MIN);
+  $loupeSizeSlider.max = String(Loupe.SIZE_MAX);
+  $loupeSizeSlider.step = String(Loupe.SIZE_STEP);
+  const storedLoupeZoom = Loupe.validateZoom(stored[StorageKeys.LOUPE_ZOOM]);
+  const storedLoupeSize = Loupe.clampSize(stored[StorageKeys.LOUPE_SIZE]);
+  $loupeSizeSlider.value = String(storedLoupeSize);
+  updateLoupeZoomSegment(storedLoupeZoom);
+  updateLoupeSizeLabel(storedLoupeSize);
+  updateLoupeRowVisibility();
 
   // 音量スライダー: 保存済み gain があればそれを復元、なければ DEFAULT
   $volumeSlider.min = String(VolumeBooster.SLIDER_MIN);
@@ -478,6 +507,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     apply();
   });
 
+  // ルーペ: マスタートグル
+  $loupeToggle.addEventListener("change", () => {
+    updateLoupeRowVisibility();
+    // loupeEnabled は APPLY_SETTINGS 経路 (background → notifyContentScripts) で伝達。
+    // zoom / size は popup の直接 storage.set + content script の storage.onChanged で同期する。
+    apply();
+    // ルーペ ON 時は popup を自動クローズする (ON 状態だと popup がレンズで拡大したい領域を
+    // 隠してしまうため、ゆろさん指摘 2026-05-13)。OFF 時は閉じない (連続で他の操作をする可能性)。
+    // `apply()` 内の `sendMessage` は同期で dispatch されるため、close 前に message は送信済み。
+    // 念のため一拍 (50ms) 待ってから close して、Chrome MV3 で稀に発生する message dispatch
+    // 遅延を吸収する。
+    if ($loupeToggle.checked) {
+      setTimeout(() => window.close(), 50);
+    }
+  });
+
+  // ルーペ: 倍率セグメントコントロール（ボタンの委譲クリックハンドラ）
+  $loupeZoomSegment.addEventListener("click", (e) => {
+    const btn = e.target.closest(".seg-btn");
+    if (!btn || !$loupeZoomSegment.contains(btn)) return;
+    const zoom = Loupe.validateZoom(btn.dataset.zoom);
+    updateLoupeZoomSegment(zoom);
+    chrome.storage.local.set({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(() => {});
+    // zoom 変更は storage.onChanged 経由で content script に届くので apply() は不要。
+  });
+
+  // ルーペ: サイズスライダー
+  $loupeSizeSlider.addEventListener("input", () => {
+    updateLoupeSizeLabel(Loupe.clampSize(Number($loupeSizeSlider.value)));
+  });
+  $loupeSizeSlider.addEventListener("change", () => {
+    const size = Loupe.clampSize(Number($loupeSizeSlider.value));
+    $loupeSizeSlider.value = String(size);
+    updateLoupeSizeLabel(size);
+    chrome.storage.local.set({ [StorageKeys.LOUPE_SIZE]: size }).catch(() => {});
+  });
+
   // 音量ブースター: マスタートグル
   $volumeBoosterToggle.addEventListener("change", () => {
     const on = $volumeBoosterToggle.checked;
@@ -533,6 +599,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
     }).catch(() => {});
     applyCompressorTogglePush();
+  });
+
+  // ミュートボタン: クリックで volumeMuted を toggle、storage 保存、現在 gain を再 push して即時反映。
+  // ミュート ON でもスライダー値 / サブトグル設定は保持され、UNITY release 条件で AudioContext を解放しない。
+  // 5 storage key の他のキーと同様、popup 直書き経路（normalizeSettings を経由しない）。
+  $volumeMuteBtn.addEventListener("click", () => {
+    if (!$volumeBoosterToggle.checked) return;
+    cancelVolumePush();
+    volumeMuted = !volumeMuted;
+    updateMuteBtnVisual();
+    chrome.storage.local.set({
+      [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
+    }).catch(() => {});
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+    pushVolumeNow(v).catch(() => {});
   });
 
   /**
@@ -796,6 +877,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
     const videoGammaValue = currentVideoGammaValue();
+    const loupeEnabled = $loupeToggle.checked;
     const minutes = clampMinutes(Number($intervalSlider.value));
     const keepAliveIntervalMs = minutes * KeepAlive.MS_PER_MIN;
     const searchFixerFeatures = collectFeatureValues();
@@ -822,6 +904,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           tiktokCleanerFeatures,
           videoGammaEnabled,
           videoGammaValue,
+          loupeEnabled,
         },
       });
       if (seq !== applySeq) return;
@@ -833,7 +916,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             amazonDeliveryTotalEnabled,
             instagramCleanerEnabled,
             tiktokCleanerEnabled,
-            videoGammaEnabled
+            videoGammaEnabled,
+            loupeEnabled
           ),
           "ok"
         );
@@ -876,7 +960,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     amazonDeliveryTotalEnabled,
     instagramCleanerEnabled,
     tiktokCleanerEnabled,
-    videoGammaEnabled
+    videoGammaEnabled,
+    loupeEnabled
   ) {
     const parts = [];
     if (keepAliveEnabled) parts.push(i18n("applyOkSession"));
@@ -885,6 +970,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
     if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
     if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
+    if (loupeEnabled) parts.push(i18n("applyOkLoupe"));
     if (parts.length === 0) return i18n("applyOkAllStopped");
     return i18n("applyOkPrefix") + parts.join(i18n("applyOkSeparator"));
   }
@@ -910,6 +996,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function updateVideoGammaRowVisibility() {
     $videoGammaRow.classList.toggle("hidden", !$videoGammaToggle.checked);
+  }
+
+  // ----- ルーペ ヘルパー -----
+  function updateLoupeRowVisibility() {
+    $loupeRow.classList.toggle("hidden", !$loupeToggle.checked);
+  }
+
+  /**
+   * 倍率セグメントコントロールの選択状態を zoom 値に同期する。
+   * 倍率バッジ風の sub-value 表示も同時に更新（"2.5×" 形式、ロケール非依存）。
+   */
+  function updateLoupeZoomSegment(zoom) {
+    const z = Loupe.validateZoom(zoom);
+    $loupeZoomSegment.querySelectorAll(".seg-btn").forEach((btn) => {
+      const isMatch = Number(btn.dataset.zoom) === z;
+      btn.classList.toggle("is-active", isMatch);
+      btn.setAttribute("aria-pressed", String(isMatch));
+    });
+    $loupeZoomValue.textContent = `${z}×`;
+  }
+
+  function updateLoupeSizeLabel(size) {
+    $loupeSizeValue.textContent = `${size}px`;
   }
 
   // ----- 音量ブースター ヘルパー -----
@@ -974,6 +1083,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           antiClip: $volumeAntiClipToggle.checked,
           normalize: $volumeNormalizeToggle.checked,
           nightMode: $volumeNightModeToggle.checked,
+          muted: volumeMuted,
         },
       });
       if (!document.body?.isConnected) return;
@@ -1026,6 +1136,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeAntiClipToggle.disabled = off;
     $volumeNormalizeToggle.disabled = off;
     $volumeNightModeToggle.disabled = off;
+    if ($volumeMuteBtn) $volumeMuteBtn.disabled = off;
+  }
+
+  /**
+   * ミュートボタンの視覚状態を volumeMuted に同期する。
+   * - aria-pressed: スクリーンリーダ向けトグル状態（クリック挙動と一致させる）
+   * - aria-label / title: ON/OFF で意味を切替（i18n キーは ja/en で両方提供）
+   * - icon: 🔊 ⇄ 🔇 で見た目を反転
+   * - クラス: CSS の [aria-pressed="true"] セレクタで warn 色に切替
+   */
+  function updateMuteBtnVisual() {
+    if (!$volumeMuteBtn) return;
+    $volumeMuteBtn.setAttribute("aria-pressed", volumeMuted ? "true" : "false");
+    const ariaKey = volumeMuted ? "volumeMuteAriaOn" : "volumeMuteAriaOff";
+    const titleKey = volumeMuted ? "volumeMuteTitleOn" : "volumeMuteTitleOff";
+    const ariaLabel = i18n(ariaKey);
+    const title = i18n(titleKey);
+    if (ariaLabel) $volumeMuteBtn.setAttribute("aria-label", ariaLabel);
+    if (title) $volumeMuteBtn.setAttribute("title", title);
+    if ($volumeMuteIcon) $volumeMuteIcon.textContent = volumeMuted ? "🔇" : "🔊";
   }
 
   /**
