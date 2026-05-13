@@ -286,7 +286,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
 | `docs/privacy-policy.md` | プライバシーポリシー |
 | `test/actions.test.js` | 純粋関数テスト 59 件: globalThis 17 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn は scontent- prefix 限定 / TikTok / YouTube 廃止) / detectHost / buildFilename / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** 等。件数 drift を CI で検知できる単一情報源 |
-| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで Chrome Web Store に Draft 自動アップロード。OAuth Bearer Token を curl で取得し `token_response` / `access_token` 両方を `::add-mask::` 登録してから upload。**Draft only** で自動公開しない設計（Dashboard で listing 確認後に手動公開） |
+| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで Chrome Web Store に **アップロード + Submit for review まで自動化**。OAuth Bearer Token を curl で取得し `token_response` / `access_token` 両方を `::add-mask::` 登録してから 2 ステップ実行: (1) ZIP を PUT で Draft 化 → uploadState=SUCCESS 確認、(2) Publish API (`publishTarget=default`) で全ユーザー公開キュー投入。レビュー結果はメール通知。**listing (説明文 / スクリーンショット / カテゴリ) 変更時は CWS API に更新エンドポイントが存在しないため Dashboard で先行手動更新が必要**。 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
 ## Important Patterns

@@ -72,7 +72,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Chrome Web Store Draft アップロード
+    name: Chrome Web Store にアップロード + Submit for review
     runs-on: ubuntu-latest
     needs: package
     environment: chrome-web-store
@@ -83,19 +83,24 @@ jobs:
           name: web-viewing-assist-zip
           path: .
 
-      - name: Chrome Web Store に Draft アップロード
+      - name: Chrome Web Store にアップロード + Publish API で Submit for review
         env:
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
-          # **意図的に --auto-publish を使わない**: 即審査キューに入れると Chrome Web Store の listing
-          # （説明文 / スクリーンショット / カテゴリ）が編集ロックされ、ストア掲載文を更新したい場合に
-          # 一度キャンセル → 再提出が必要になる。Draft only にしておけば Dashboard で listing を整えてから
-          # 手動で「公開」ボタンを押す運用ができ、ZIP と説明文を整合させたまま審査に出せる。
-          # CWS API には listing 更新エンドポイントが存在しない (v2 API の discovery document で確認済み)
-          # ため、Dashboard 経由のレビューが必須な以上、auto-publish は罠にしかならない。
+          # フルオート申請フロー (2026-05-13 から auto-publish 化、ゆろさん指示):
+          # 1) ZIP を Draft としてアップロード
+          # 2) Publish API (publishTarget=default) で Submit for review まで自動化
+          # release/x.y.z push で push → CI → Submit for review まで一気通貫。
+          #
+          # **listing 変更時の運用注意**: 説明文 / スクリーンショット / カテゴリ / 権限の正当性などの
+          # listing 項目は CWS API に更新エンドポイントが存在しない (v2 API discovery で確認済み)。
+          # listing を変更したいリリースでは、push 前 or push 後すぐに Dashboard で listing を整え、
+          # **その後 release ブランチを push** することで listing 更新を反映させる運用にする
+          # (Submit for review は Draft の最新コミット + 最新 listing で行われるため、listing 変更が
+          # 先行していれば追従する)。
           #
           # upload job は npm ci / npx / checkout を行わず、Secrets を第三者 npm lifecycle の後段に置かない。
           # package job が作った ZIP artifact だけを fresh runner で受け取り、CWS API へ直接アップロードする。
@@ -125,13 +130,47 @@ jobs:
           # が平文ログに残るのを防ぐため、access_token と並列でマスク登録する。
           echo "::add-mask::${token_response}"
           echo "::add-mask::${access_token}"
-          curl -fsS \
+
+          # ----- ステップ 1: ZIP を Draft としてアップロード -----
+          echo "📤 Step 1/2: Chrome Web Store に ZIP をアップロード中..."
+          upload_response=$(curl -fsS \
             -X PUT \
             -H "Authorization: Bearer ${access_token}" \
             -H "x-goog-api-version: 2" \
             -H "Content-Type: application/zip" \
             --data-binary @web-viewing-assist.zip \
-            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}"
-          echo "🎉 Chrome Web Store に Draft としてアップロード完了！"
-          echo "📝 次のステップ: Developer Dashboard で listing（説明文 / スクリーンショット / 権限の正当性）を確認・更新してから「公開」ボタンを押してね"
-          echo "🔗 https://chrome.google.com/webstore/devconsole"
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}")
+          echo "✅ アップロード完了"
+          # uploadState を確認 (SUCCESS / IN_PROGRESS / FAILURE)。FAILURE なら publish step に進まない。
+          upload_state=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("uploadState","UNKNOWN"))' 2>/dev/null <<< "$upload_response")
+          echo "📊 uploadState: ${upload_state}"
+          if [ "$upload_state" != "SUCCESS" ]; then
+            echo "::error::アップロードが SUCCESS ではないため publish を中止します (state=${upload_state})"
+            echo "Response: $upload_response"
+            exit 1
+          fi
+
+          # ----- ステップ 2: Publish API で Submit for review -----
+          # publishTarget=default で全ユーザー公開 (trustedTesters 限定公開も可能だが本番採用)。
+          # response の status 配列で OK / ITEM_PENDING_REVIEW / 各種エラーを判定。
+          echo "📨 Step 2/2: Publish API で Submit for review..."
+          publish_response=$(curl -fsS \
+            -X POST \
+            -H "Authorization: Bearer ${access_token}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}/publish?publishTarget=default")
+          publish_status=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(",".join(d.get("status",[])))' 2>/dev/null <<< "$publish_response")
+          echo "📊 Publish status: ${publish_status}"
+          case "$publish_status" in
+            *OK*|*ITEM_PENDING_REVIEW*)
+              echo "🎉 Submit for review 完了！Chrome Web Store のレビューキューに入りました"
+              echo "🔗 Dashboard: https://chrome.google.com/webstore/devconsole"
+              echo "⏰ レビュー結果は通常 1〜数日でメール通知"
+              ;;
+            *)
+              echo "::error::予期しない publish status: ${publish_status}"
+              echo "Response: $publish_response"
+              exit 1
+              ;;
+          esac
