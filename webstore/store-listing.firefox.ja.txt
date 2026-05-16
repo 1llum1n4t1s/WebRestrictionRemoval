@@ -1,0 +1,54 @@
+============================================================
+Firefox AMO 掲載情報（日本語版）
+※ Chrome Web Store 用は webstore/store-listing.txt を参照
+※ 英語版は webstore/store-listing.firefox.en.txt を参照
+※ Firefox 版は音量ブースター機能を除外 (offscreen / tabCapture が Firefox MV3 未対応)
+============================================================
+
+■ 名前
+WEB閲覧アシスト (Firefox 版)
+
+■ 概要 (250 文字以内)
+閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Firefox 拡張機能。9 カテゴリの補助機能（セッション維持・YouTube クリーナー・Amazon 定期おトク便合計・Instagram/TikTok クリーナー・動画ガンマ補正・ルーペ・RTX 動画強化・カラーピッカー）を 1 つのポップアップに統合。すべてデフォルト OFF のオプトイン方針、外部送信ゼロ。
+
+■ 説明 (16,000 文字以内)
+日々の Web 閲覧を快適にする 9 カテゴリの補助機能を統合した拡張機能です。
+
+■ Firefox 版で利用できる機能
+
+🔹 セッション維持
+合成イベント dispatch + 同一オリジン HTTP ping で、社内ポータルや管理画面の自動ログアウトを抑止します。
+HTTP ping はデフォルト OFF（オプトイン）。AbortSignal で 5 秒タイムアウト、同一オリジン only、redirect: manual で第三者ドメインへの認証情報送信ゼロ。
+
+🔹 YouTube クリーナー (29 サブ機能)
+検索結果のノイズ除去 / Shorts 削除 (5 サブ機能) / 動画ページ整形 / コメント欄非表示 / ライブチャット非表示 / グリッド列数調整 / 登録チャンネル拡張 (subs feed をグリッド化 + lazy thumbnail) など、YouTube の冗長 UI を細かく制御。
+
+🔹 Amazon 定期おトク便 月別合計
+amazon.co.jp/auto-deliveries で配送月ごとの合計金額を自動算出して表示。
+
+🔹 Instagram クリーナー (11 サブ機能)
+Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Notes / メッセージカウンター 等の冗長 UI を非表示。意味論的セレクタ (aria-label / role / data-pagelet) のみ使用、難読化 class には依存しません。
+
+🔹 TikTok クリーナー (3 サブ機能)
+コメント欄非表示 / 「あなたにおすすめ」非表示 / 画像ダウンロードボタン。
+
+🔹 動画ガンマ補正
+全タブ共通のスライダーで `<video>` 要素にガンマ補正を適用 (SVG `<feComponentTransfer type="gamma">` 独自実装)。
+
+🔹 ルーペ
+マウス追従の円形拡大鏡。倍率 3 段階 / レンズサイズ可変。`tabs.captureVisibleTab` で取得した静止画を貼り付けるため、動画 / iframe / canvas の細部も拡大可能。
+
+🔹 RTX 動画強化
+`<video>` 要素のあるページに 1×1 px の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution / AMD FidelityFX 等) の動画ページ検知を補助。ドライバ機能の有効化自体は GPU 側設定 (NVIDIA Control Panel 等) に依存。外部送信ゼロ。
+
+🔹 カラーピッカー (popup タブ)
+EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`browser.storage.local` のみで外部送信ゼロ。
+
+■ Chrome 版との差分
+このリポジトリには Chrome 版もあり、Chrome 版には追加で「音量ブースター」機能（タブ音声を増幅・自動ゲイン補正・ナイトモード等）があります。音量ブースターは `chrome.offscreen` および `chrome.tabCapture` API に依存しており、これらが Firefox MV3 で未対応のため、Firefox 版では除外されています。Firefox 側で API が実装され次第、移植予定です。
+
+■ プライバシー
+すべてローカル実行・外部送信ゼロ。`browser.storage.local` のみ使用 (sync なし、クラウド同期なし)。プライバシーポリシーは docs/privacy-policy.md を参照。
+
+■ 動作要件
+Firefox 140 以降。

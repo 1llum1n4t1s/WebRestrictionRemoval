@@ -60,7 +60,8 @@
          role="tabpanel" aria-labelledby="tabTune">
 
     <!-- ===== Audio Group ===== -->
-    <section class="grp" data-i18n-attr="aria-label:groupAudio" aria-label="オーディオ">
+    <!-- id="audioGroupSection": Firefox 版では音量ブースターが利用不可 (offscreen / tabCapture 未対応) のため popup.js でこのセクション全体を非表示にする -->
+    <section class="grp" id="audioGroupSection" data-i18n-attr="aria-label:groupAudio" aria-label="オーディオ">
       <h2 class="grp-title">
         <span class="grp-title-text" data-i18n="groupAudio">オーディオ</span>
       </h2>
@@ -274,6 +275,21 @@
           </span>
         </label>
       </div>
+
+      <!-- RTX 動画強化 master トグル: <video> 要素のあるページに極小の透明 hint 要素を inject して、
+           NVIDIA RTX Super Resolution / AMD FidelityFX などの GPU ドライバ側映像補正の検知を補助する。
+           ドライバ機能の有効化自体は GPU 側設定 (NVIDIA Control Panel 等) に依存。オプトイン・デフォルト OFF -->
+      <label class="toggle-row" id="rtxEnhancerToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔆</span>
+        <span class="tr-text">
+          <span class="tr-name" data-i18n="rtxEnhancerMaster">RTX 動画強化</span>
+          <span class="tr-desc" data-i18n="rtxEnhancerMasterDesc">video 要素のあるページに hint を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正を認識しやすくします（GPU 側で NVIDIA Control Panel 等の有効化が必要）</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="rtxEnhancerToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
     </section>
 
     </div><!-- /panel.tune -->

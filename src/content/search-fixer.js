@@ -290,6 +290,8 @@
   function attachResultsObserver() {
     if (observerAttached) return;
     resultsObserver = new MutationObserver((mutations) => {
+      // /rere B2-012: extension reload で orphan 化したら全 observer / timer を停止
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
       if (!active) return;
       // 大量 mutation の coalesce: 個別ノードを舐めるのではなく、まとめて再スキャンする。
       // 元の実装は addedNode 種別ごとに分岐していたが、selector ヒット率が低いケースでも
@@ -381,6 +383,8 @@
   }
 
   function handleLiveChatMutations(mutations) {
+    // /rere B2-012: extension reload で orphan 化したら全 observer / timer を停止
+    if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
     if (!f("hideLiveChat") || !isWatchPage()) return;
     // 関連する mutation があれば次フレームで collapse 試行 + observer 再アタッチ判定。
     // frame 出現 / 内部 UI 出現 / collapsed 属性変化のいずれもトリガーとして扱う。
@@ -1072,9 +1076,20 @@
         el.classList.add(isDark ? "__cpa-sfx-thumb-dark" : "__cpa-sfx-thumb-light");
       }
     });
+    // 装飾済みマーカー: SPA で検索結果ページから離れた後の clearThumbnailHighlight が
+    // querySelectorAll を走らせるかどうかをこのフラグで判定 (空走査回避)
+    if (enabled && items.length > 0) {
+      document.documentElement.classList.add("__cpa-sfx-thumb-applied");
+    } else {
+      document.documentElement.classList.remove("__cpa-sfx-thumb-applied");
+    }
   }
 
   function clearThumbnailHighlight() {
+    // 装飾済みマーカーが無いなら querySelectorAll は不要 (subs/channels 等の非結果ページで空走査になるのを回避)。
+    // /rere v1.0.30+ 計測で SIGNIF シナリオの hot path に出てきたので追加 (cxcx Self 0ms / Total 1.1ms の元凶)。
+    if (!document.documentElement.classList.contains("__cpa-sfx-thumb-applied")) return;
+    document.documentElement.classList.remove("__cpa-sfx-thumb-applied");
     document
       .querySelectorAll(".__cpa-sfx-thumb-dark, .__cpa-sfx-thumb-light")
       .forEach((el) => el.classList.remove("__cpa-sfx-thumb-dark", "__cpa-sfx-thumb-light"));
@@ -1085,8 +1100,10 @@
     const enabled = f("demoteUnmatched");
     const existing = document.getElementById(STYLE_ID_DEMOTE);
     if (!enabled) {
-      // 機能 OFF: 注入 CSS と既存クラスを片付ける
-      if (existing) existing.remove();
+      // 機能 OFF 経路: existing が無い = 過去に style を一度も注入してない = 装飾要素も無い (前提条件)。
+      // この場合 querySelectorAll(.demoted) は確実に 0 件なので走査を skip する (cxcx 計測で空走査が SIGNIF 経路に出た)。
+      if (!existing) return;
+      existing.remove();
       document
         .querySelectorAll(`.${CLASS_DEMOTED}`)
         .forEach((el) => el.classList.remove(CLASS_DEMOTED));
@@ -1374,6 +1391,8 @@
       // section 未出現: body 監視で待つ
       if (!leftnavBodyObserver) {
         leftnavBodyObserver = new MutationObserver(() => {
+          // /rere B2-012/B2-018: extension reload で orphan 化したら全 observer / timer を停止
+          if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
           // YouTube ホームでは数十件/秒の childList mutation が発火するため、
           // findSubsSection() の DOM クエリを 100ms debounce で集約して CPU 負荷を抑制
           // する (/rere C 3-C)。
@@ -1411,6 +1430,8 @@
     const items = section.querySelector("#items");
     if (!items) return;
     leftnavInjectObserver = new MutationObserver(() => {
+      // /rere B2-012/B2-018: extension reload で orphan 化したら全 observer / timer を停止
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
       // 機能 ON かつ注入要素が居ない場合のみ再注入
       if (!f("subsLeftnavInjectAll") && !f("subsAllShortcut")) return;
       scheduleLeftnavReinject();
@@ -2069,6 +2090,8 @@
   function startSubsGridCardsObserver() {
     if (subsGridCardsObserver) return;
     subsGridCardsObserver = new MutationObserver(() => {
+      // /rere B2-012/B2-018: extension reload で orphan 化したら全 observer / timer を停止
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
       if (subsGridCardsScanTimer) return;
       subsGridCardsScanTimer = setTimeout(() => {
         subsGridCardsScanTimer = 0;
@@ -2203,7 +2226,17 @@
     search.placeholder = chrome.i18n.getMessage("subsSearchPlaceholder") || "チャンネル名で絞り込み";
     search.autocomplete = "off";
     search.spellcheck = false;
-    search.addEventListener("input", () => applySubsGridFilter());
+    // /rere C1-001 修正: 旧実装は debounce ゼロで毎打鍵に全 N×querySelector を走査していたため、
+    // 大規模 subs feed (数百〜数千 channel) で入力遅延が起きた。80ms debounce で IME 確定や
+    // 連打を 1 回に集約しつつ、体感は即時 (人間の入力 latency 知覚閾値 ~100ms より下)。
+    let subsGridFilterTimer = 0;
+    search.addEventListener("input", () => {
+      if (subsGridFilterTimer) clearTimeout(subsGridFilterTimer);
+      subsGridFilterTimer = setTimeout(() => {
+        subsGridFilterTimer = 0;
+        applySubsGridFilter();
+      }, 80);
+    });
 
     // sort UI は YouTube ネイティブの「名前順 / 登録順 / 最新アクティビティ順」combobox
     // (`<button role="combobox">`) と完全に役割が被るため拡張側からは出さない。
@@ -2785,5 +2818,34 @@
       }
     });
   }
+
+  // ---------- /rere B2-012 + B2-018 修正: orphan 化への対応 ----------
+  /**
+   * extension reload で content script が orphan 化したとき、MutationObserver / setInterval /
+   * setTimeout / window resize listener が止まらず CPU を消費し続けるリスクがあった。
+   * 他 9 ファイルの PATTERN SYNC (CLAUDE.md「Extension context invalidation guard PATTERN SYNC」)
+   * に倣って、各 MO callback 入口で chrome.runtime?.id を確認し、orphan 検知時に全 observer /
+   * timer / listener を停止する共通 cleanup を呼ぶ。
+   *
+   * pagehide でも同関数を呼んで browser cleanup を補助する。
+   *
+   * 多経路から呼ばれても `orphanCleanupRan` フラグで 1 回だけ実行される (再 attach 防止)。
+   */
+  let orphanCleanupRan = false;
+  function cleanupAllSearchFixerStateForOrphan() {
+    if (orphanCleanupRan) return;
+    orphanCleanupRan = true;
+    try { detachResultsObserver(); } catch {}
+    try { detachLiveChatObserver(); } catch {}
+    try { detachLeftnavObservers(); } catch {}
+    try { stopSubsGridCardsObserver(); } catch {}
+    try { stopSubsGridResizeListener(); } catch {}
+  }
+
+  window.addEventListener(
+    "pagehide",
+    () => cleanupAllSearchFixerStateForOrphan(),
+    { once: true }
+  );
 
 })();

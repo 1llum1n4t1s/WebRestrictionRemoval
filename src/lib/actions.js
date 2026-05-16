@@ -32,6 +32,8 @@ const Actions = Object.freeze({
   APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
   /** background → loupe content script: ルーペ機能の有効/無効を反映 */
   APPLY_LOUPE_CS: "applyLoupeCS",
+  /** background → rtx-enhancer content script: NVIDIA RTX Super Resolution 補助の有効/無効を反映 */
+  APPLY_RTX_ENHANCER_CS: "applyRtxEnhancerCS",
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
   /** popup → background: 指定タブのブーストを解放（スライダー 100% 復帰時） */
@@ -140,6 +142,12 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_MUTED_ENABLED: "volumeBoosterMutedEnabled",
   /** 動画ガンマ補正: マスタートグル（OFF 時は SVG filter 一切注入せず completely no-op） */
   VIDEO_GAMMA_ENABLED: "videoGammaEnabled",
+  /** RTX 動画強化: マスタートグル（OFF 時は hint オーバーレイ要素を一切 inject せず completely no-op、オプトイン）。
+   *  動画ストリーミング配信中に GPU の Super Resolution / 高画質補正処理を GPU ドライバが認識しやすくするため、
+   *  <video> 要素を含むページに極小の透明 hint 要素を挿入する独自実装。NVIDIA RTX Super Resolution / AMD FidelityFX
+   *  などのドライバ側機能が対象だが、本拡張機能はあくまでブラウザ側の hint inject のみで、ドライバ機能の有効化は
+   *  GPU 側の設定 (NVIDIA Control Panel など) に依存する。 */
+  RTX_ENHANCER_ENABLED: "rtxEnhancerEnabled",
   /** 動画ガンマ補正: ガンマ値（VideoGamma.MIN..MAX、デフォルト 1.0 = 補正なし） */
   VIDEO_GAMMA_VALUE: "videoGammaValue",
   /** ルーペ: マスタートグル（OFF 時は content script のレンズ DOM を即座に撤去し、リスナも全て解除） */
@@ -655,7 +663,12 @@ const ImageDownloader = Object.freeze({
   ALLOWED_HOSTS: Object.freeze({
     instagram: Object.freeze([
       /^scontent(-[a-z0-9]+)?(-[a-z0-9]+)?\.cdninstagram\.com$/,
-      /^[a-z0-9-]+\.cdninstagram\.com$/,
+      // /rere レビュー A2-002 修正: 旧 `[a-z0-9-]+\.cdninstagram\.com$` パターンは任意 1 段
+      // サブドメインを通過させ、Meta が将来 cdninstagram.com 配下に tracker / リダイレクタ /
+      // OAuth エンドポイント等を追加した場合に攻撃者注入 `<img src="https://tracker.cdninstagram.com/log">`
+      // から代理 fetch される経路ができる。fbcdn.net 系 (665, 670-676 行) や TikTok 側
+      // (`p\d+` 必須化) と対称防御原則を揃えて `scontent-` prefix 必須化する。
+      /^scontent-[a-z0-9-]+\.cdninstagram\.com$/,
       // Meta の正規 fbcdn CDN は `scontent.{POP}-{NUM}.fna.fbcdn.net` または
       // `scontent-{POP}.fna.fbcdn.net` 形式の 2 段サブドメイン。
       // 任意の `evil.attacker.fbcdn.net` を通さないため `scontent[-.]` で開始を限定する。
@@ -1257,9 +1270,46 @@ const PopupTabs = Object.freeze({
   },
 });
 
+  /**
+   * /rere レビュー B1-002 修正 (簡易版): APPLY_SETTINGS 経路で popup → background → content script
+   * 間で同期される設定の **単一情報源**。background.js の `normalizeSettings` / `toStorageRecord` /
+   * `notifyContentScripts` の 3 関数を手書きで実装する現状の保険として、本配列を test/actions.test.js
+   * から照合し、新機能追加時に「StorageKey と Actions の整合は取れているか」「3 関数すべてで配線が
+   * 揃っているか」を CI 検知する。
+   *
+   * v1.0.29 で発覚した RTX 動画強化機能完全破壊バグ (A2-001) と同型の drift を再発防止する。
+   *
+   * 各エントリ:
+   *   - field: settings オブジェクトのキー名 (popup → background で送る field 名)
+   *   - storageKey: chrome.storage.local のキー (StorageKeys 参照)
+   *   - applyAction: background → content script の APPLY_*_CS メッセージ (Actions 参照、null = 配信なし)
+   *
+   * 将来 schema 駆動化する場合は本配列に normalize / urlPattern / frameId 関数を追加し、
+   * 3 関数を generated にする (中規模リファクタ、別 PR シリーズ)。
+   */
+  const SettingsSchema = Object.freeze([
+    Object.freeze({ field: "keepAliveEnabled", storageKey: StorageKeys.KEEP_ALIVE_ENABLED, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
+    Object.freeze({ field: "keepAliveIntervalMs", storageKey: StorageKeys.KEEP_ALIVE_INTERVAL_MS, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
+    Object.freeze({ field: "keepAliveHttpPingEnabled", storageKey: StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
+    Object.freeze({ field: "keepAliveOrigins", storageKey: StorageKeys.KEEP_ALIVE_ORIGINS, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
+    Object.freeze({ field: "searchFixerEnabled", storageKey: StorageKeys.SEARCH_FIXER_ENABLED, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
+    Object.freeze({ field: "searchFixerFeatures", storageKey: StorageKeys.SEARCH_FIXER_FEATURES, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
+    Object.freeze({ field: "searchFixerGridItems", storageKey: StorageKeys.SEARCH_FIXER_GRID_ITEMS, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
+    Object.freeze({ field: "amazonDeliveryTotalEnabled", storageKey: StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED, applyAction: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS }),
+    Object.freeze({ field: "instagramCleanerEnabled", storageKey: StorageKeys.INSTAGRAM_CLEANER_ENABLED, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
+    Object.freeze({ field: "instagramCleanerFeatures", storageKey: StorageKeys.INSTAGRAM_CLEANER_FEATURES, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
+    Object.freeze({ field: "tiktokCleanerEnabled", storageKey: StorageKeys.TIKTOK_CLEANER_ENABLED, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
+    Object.freeze({ field: "tiktokCleanerFeatures", storageKey: StorageKeys.TIKTOK_CLEANER_FEATURES, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
+    Object.freeze({ field: "videoGammaEnabled", storageKey: StorageKeys.VIDEO_GAMMA_ENABLED, applyAction: Actions.APPLY_VIDEO_GAMMA_CS }),
+    Object.freeze({ field: "videoGammaValue", storageKey: StorageKeys.VIDEO_GAMMA_VALUE, applyAction: Actions.APPLY_VIDEO_GAMMA_CS }),
+    Object.freeze({ field: "loupeEnabled", storageKey: StorageKeys.LOUPE_ENABLED, applyAction: Actions.APPLY_LOUPE_CS }),
+    Object.freeze({ field: "rtxEnhancerEnabled", storageKey: StorageKeys.RTX_ENHANCER_ENABLED, applyAction: Actions.APPLY_RTX_ENHANCER_CS }),
+  ]);
+
   // P0-#2: 全定数を globalThis に明示的に公開する。これで content scripts / popup / offscreen /
   // background が `Actions.X` の bare 名でアクセスできる（globalThis のプロパティは bare 名で
   // 参照可能という JS 言語仕様）。Chrome 実装の script scope 共有に依存しない安全な設計。
+  globalThis.SettingsSchema = SettingsSchema;
   globalThis.Actions = Actions;
   globalThis.ExtensionPaths = ExtensionPaths;
   globalThis.SenderCheck = SenderCheck;

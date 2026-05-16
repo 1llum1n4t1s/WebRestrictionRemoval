@@ -1,4 +1,15 @@
-importScripts("/src/lib/actions.js");
+// Chrome service worker は importScripts で actions.js をロードする。
+// Firefox MV3 (event page) では importScripts は worker 限定 API のため呼べないが、
+// manifest.firefox.json の background.scripts に actions.js を併記してあり、
+// background.js 実行時には既に評価済みなのでここでは skip する。
+if (typeof importScripts === "function") {
+  importScripts("/src/lib/actions.js");
+}
+
+// 音量ブースター機能は offscreen + tabCapture API に依存する (Firefox MV3 未対応)。
+// このフラグで「Chrome ベースで動いてるか」を判定し、Firefox 環境では音量関連の処理を全て skip する。
+// popup.js 側でも同じ判定で UI 自体を非表示にしているので、storage への書き込みも発生しない設計。
+const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";
 
 // ---------- 初期化 ----------
 // onInstalled: 初回インストール / アップデート時
@@ -96,6 +107,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VIDEO_GAMMA_VALUE,
     StorageKeys.LOUPE_ENABLED,
     StorageKeys.LOUPE_ZOOM,
+    StorageKeys.RTX_ENHANCER_ENABLED,
     StorageKeys.LOUPE_SIZE,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
@@ -168,6 +180,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.LOUPE_ENABLED in stored)) {
     defaults[StorageKeys.LOUPE_ENABLED] = false;
   }
+  // RTX 動画強化: master OFF で初期化（オプトイン）。
+  // GPU ドライバ側の機能 (NVIDIA RTX Super Resolution など) はユーザーの GPU 設定に依存するため、
+  // ブラウザ側でデフォルト ON にしても効果がないケース（非対応 GPU / ドライバ未設定）が多い。
+  if (!(StorageKeys.RTX_ENHANCER_ENABLED in stored)) {
+    defaults[StorageKeys.RTX_ENHANCER_ENABLED] = false;
+  }
   if (!(StorageKeys.LOUPE_ZOOM in stored)) {
     defaults[StorageKeys.LOUPE_ZOOM] = Loupe.DEFAULT_ZOOM;
   }
@@ -212,6 +230,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
     // popup が user gesture を持つので、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
     if (!SenderCheck.isFromPopup(sender)) return;
+    if (!HAS_VOLUME_BOOSTER) {
+      // Firefox 版では popup UI 自体を非表示にしているのでここに到達するのは想定外だが、
+      // 防御深層として明示的に reject する (例外を吐かず popup の error 表示で安全に終わる)。
+      sendResponse({ ok: false, error: "volume-booster-unavailable" });
+      return true;
+    }
     setVolumeBoosterGain(
       request.data?.tabId,
       request.data?.gain,
@@ -225,6 +249,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_RELEASE_TAB) {
     if (!SenderCheck.isFromPopup(sender)) return;
+    if (!HAS_VOLUME_BOOSTER) {
+      sendResponse({ ok: false, error: "volume-booster-unavailable" });
+      return true;
+    }
     releaseVolumeBoosterTab(request.data?.tabId)
       .then((res) => sendResponse(res))
       .catch(() => sendResponse({ ok: false }));
@@ -244,12 +272,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // visibilitychange cleanup が将来何らかの理由で失敗した場合、バックグラウンドタブの
     // content script が別タブ (アクティブ) のピクセルを取得できる理論的経路がある。
     // sender.tab.id が windowId のアクティブタブと一致することを assert してから撮影する。
+    // /rere レビュー B2-021 修正: sendResponse の二重呼出を防ぎつつ、すべての完了経路で
+    // 必ず 1 回 sendResponse が呼ばれることを保証する。captureVisibleTab が null/undefined
+    // を resolve する Chrome 側の境界条件 (bug 報告複数あり) で content script が hang
+    // する経路を塞ぐ。
+    let responded = false;
+    const safeRespond = (msg) => {
+      if (responded) return;
+      responded = true;
+      sendResponse(msg);
+    };
     chrome.tabs
       .query({ active: true, windowId })
       .then((tabs) => {
         const activeTabId = tabs[0]?.id;
         if (activeTabId !== tabId) {
-          sendResponse({ ok: false, error: "tab-not-active" });
+          safeRespond({ ok: false, error: "tab-not-active" });
           return null;
         }
         // captureVisibleTab は背景 SW から activeTab 権限で動作する。
@@ -261,15 +299,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       })
       .then((dataUrl) => {
-        if (dataUrl != null) sendResponse({ ok: true, dataUrl });
+        if (dataUrl != null) {
+          safeRespond({ ok: true, dataUrl });
+        } else {
+          // Chrome API 仕様上ここに来るのは前段の `return null` (tab-not-active) のみで、
+          // その場合は既に safeRespond 済みなので no-op。captureVisibleTab が稀に
+          // null/undefined を resolve した場合のみここで初めて応答する。
+          safeRespond({ ok: false, error: "no-capture" });
+        }
       })
-      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+      .catch((err) => safeRespond({ ok: false, error: String(err?.message ?? err) }));
     return true;
   }
 });
 
 // ---------- タブクローズで音量ブーストを解放 ----------
 chrome.tabs.onRemoved.addListener((tabId) => {
+  if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効
   rememberRemovedVolumeBoosterTab(tabId);
   // P2-#19: タブが閉じられた時点でブースト中状態は確実に終了するため、ローカルキャッシュから即削除。
   // in-flight の set 処理が後から完了した場合も、removedVolumeBoosterTabIds で再登録を弾く。
@@ -293,6 +339,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 let cachedVolumeSettings = null;
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
+  if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効
   autoApplyVolumeBooster(tabId).catch(() => {});
 });
 
@@ -323,6 +370,7 @@ async function autoApplyVolumeBooster(tabId) {
 
 // ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
 chrome.storage.onChanged.addListener((changes) => {
+  if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効、設定変化も無視
   // 6 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes ||
@@ -343,6 +391,10 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 async function releaseAllVolumeBoosterTabs() {
+  // /rere B2-002 修正: SW 再起動直後 hydrate IIFE 未完了 → offscreenState='CLOSED' のまま
+  // この関数に到達する race window があった。hydrate 完了を待ってから判定する
+  // ことで offscreen 残存 AudioContext のリークを防ぐ。
+  await offscreenHydratePromise.catch(() => {});
   const tabIds = [...boostedTabIds];
   if (tabIds.length > 0) {
     await Promise.all(tabIds.map((id) => releaseVolumeBoosterTab(id).catch(() => {})));
@@ -419,6 +471,9 @@ function normalizeSettings(settings) {
     videoGammaEnabled: settings?.videoGammaEnabled === true,
     videoGammaValue: VideoGamma.clampValue(settings?.videoGammaValue),
     loupeEnabled: settings?.loupeEnabled === true,
+    // /rere レビュー A2-001 修正: rtxEnhancerEnabled が return に含まれないと
+    // toStorageRecord / notifyContentScripts に undefined が渡って RTX 機能が永久 OFF になる。
+    rtxEnhancerEnabled: settings?.rtxEnhancerEnabled === true,
   };
 }
 
@@ -440,6 +495,7 @@ function toStorageRecord(s) {
     [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
     [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
     [StorageKeys.LOUPE_ENABLED]: s.loupeEnabled,
+    [StorageKeys.RTX_ENHANCER_ENABLED]: s.rtxEnhancerEnabled,
   };
 }
 
@@ -490,6 +546,16 @@ async function notifyContentScripts(s) {
     .sendMessage(tab.id, {
       action: Actions.APPLY_LOUPE_CS,
       data: { enabled: s.loupeEnabled },
+    }, { frameId: 0 })
+    .catch(() => {});
+
+  // RTX 動画強化 content script も全 http(s) ページに注入済み (top frame のみ)。
+  // 有効/無効フラグだけを top frame に送る。content script 側は storage.onChanged でも同期するので、
+  // ここは active tab 即時反映用。
+  await chrome.tabs
+    .sendMessage(tab.id, {
+      action: Actions.APPLY_RTX_ENHANCER_CS,
+      data: { enabled: s.rtxEnhancerEnabled },
     }, { frameId: 0 })
     .catch(() => {});
 
@@ -761,7 +827,12 @@ function scheduleOffscreenClose() {
 // この処理は SW 再起動 / extension reload / Chrome 再起動の各経路で発火する。
 // `chrome.runtime.getContexts` は Chrome 116+ なので minimum_chrome_version 140 では
 // 直接呼んで良い（CLAUDE.md 規約）。
-(async () => {
+//
+// /rere B2-002 修正: Promise を保持して release 経路で await できるようにする。
+// SW 再起動直後に `storage.onChanged` で master OFF を検知する → `releaseAllVolumeBoosterTabs`
+// が走るが、hydrate 完了前なら `offscreenState === "CLOSED"` のまま fallback 経路に入らず
+// offscreen に残存 AudioContext がリークする経路があった。
+const offscreenHydratePromise = (async () => {
   try {
     const url = chrome.runtime.getURL(Offscreen.PATH);
     const contexts = await chrome.runtime.getContexts({

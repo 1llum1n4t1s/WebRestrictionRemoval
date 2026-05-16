@@ -1,6 +1,6 @@
 # 📖 Web Viewing Assist
 
-A Chrome extension that consolidates 9 features for comfortable browsing into a single popup: **Keep session alive** / **YouTube cleaner (29 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster** / **Video Gamma** / **Loupe** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
+A Chrome extension that consolidates 10 features for comfortable browsing into a single popup: **Keep session alive** / **YouTube cleaner (29 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster** / **Video Gamma** / **Loupe** / **RTX Video Enhancer** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
 
 > **Notable changes through v1.0.18**: The "restriction removal" features (right-click / selection / force paste & copy) have been fully removed; the Extension is now focused exclusively on web viewing assistance. The Extension was also renamed from "Web Restriction Removal Helper" to "Web Viewing Assist". Version numbers are finalized via the `/vava` skill at release time.
 
@@ -102,7 +102,7 @@ The "Color Picker" tab in the popup uses the `EyeDropper` API to pick a color fr
 3. For Volume Booster, drag the slider to set the amplification ratio.
 4. For Color Picker, switch to the "Color Picker" tab and trigger `EyeDropper`.
 
-Settings are stored in `chrome.storage.local` and persist across sessions. **All master toggles default to OFF on first install** (Keep session alive OFF / YouTube cleaner OFF / Amazon total OFF / Instagram cleaner OFF / TikTok cleaner OFF / Volume Booster OFF / Video Gamma OFF). The Extension does not modify any site behavior unless the user opts in. The Volume Booster releases its AudioContext when the master toggle is OFF, or when the master is ON but the slider is at 100% with all sub-toggles OFF.
+Settings are stored in `chrome.storage.local` and persist across sessions. **All master toggles default to OFF on first install** (Keep session alive OFF / YouTube cleaner OFF / Amazon total OFF / Instagram cleaner OFF / TikTok cleaner OFF / Volume Booster OFF / Video Gamma OFF / Loupe OFF / RTX Video Enhancer OFF). The Extension does not modify any site behavior unless the user opts in. The Volume Booster releases its AudioContext when the master toggle is OFF, or when the master is ON but the slider is at 100% with all sub-toggles and the mute toggle OFF.
 
 ## Install
 

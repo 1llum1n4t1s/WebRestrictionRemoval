@@ -62,6 +62,8 @@
 
   "loupeMaster": { "message": "Loupe" },
   "loupeMasterDesc": { "message": "Magnify the current view with a circular lens. Best used after pausing videos. Left-click to turn off." },
+  "rtxEnhancerMaster": { "message": "RTX video enhancement" },
+  "rtxEnhancerMasterDesc": { "message": "Inject a hint element on pages containing <video> so GPU drivers like NVIDIA RTX Super Resolution can detect the video and apply automatic enhancement (requires GPU-side activation, e.g., in NVIDIA Control Panel)." },
   "loupeZoomLabel": { "message": "Zoom" },
   "loupeZoomAriaLabel": { "message": "Select zoom level" },
   "loupeSizeLabel": { "message": "Lens size" },

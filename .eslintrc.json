@@ -1,0 +1,80 @@
+{
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true,
+    "webextensions": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "script"
+  },
+  "globals": {
+    "chrome": "readonly",
+    "browser": "readonly",
+    "importScripts": "readonly",
+    "EyeDropper": "readonly",
+    "__cpaEarlyFramework": "readonly",
+    "Actions": "readonly",
+    "ExtensionPaths": "readonly",
+    "SenderCheck": "readonly",
+    "Offscreen": "readonly",
+    "StorageKeys": "readonly",
+    "KeepAlive": "readonly",
+    "YouTubeShorts": "readonly",
+    "SearchFixer": "readonly",
+    "AmazonDeliveryTotal": "readonly",
+    "InstagramCleaner": "readonly",
+    "TikTokCleaner": "readonly",
+    "ImageDownloader": "readonly",
+    "VolumeBooster": "readonly",
+    "VideoGamma": "readonly",
+    "Loupe": "readonly",
+    "ColorPicker": "readonly",
+    "PopupTabs": "readonly"
+  },
+  "rules": {
+    "no-implicit-globals": "error",
+    "no-undef": "error",
+    "no-unused-vars": ["warn", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_"
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**/*.mjs", "webstore/generate-screenshots.js", "scripts/generate-icons.js"],
+      "parserOptions": {
+        "sourceType": "module"
+      },
+      "env": {
+        "browser": false,
+        "node": true
+      },
+      "globals": {
+        "chrome": "off",
+        "browser": "off"
+      }
+    },
+    {
+      "files": ["test/**/*.js"],
+      "env": {
+        "browser": false,
+        "node": true
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    "webstore/images/",
+    "webstore/popup-render.html",
+    "webstore/popup-shim.js",
+    "firefox-build/",
+    "web-ext-artifacts/",
+    "temp/",
+    "temp-build/",
+    "cxcx-out/",
+    "*.min.js"
+  ]
+}

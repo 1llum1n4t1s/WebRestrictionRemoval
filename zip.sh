@@ -1,39 +1,86 @@
 #!/bin/bash
 
 # WEB閲覧アシスト 拡張機能パッケージ生成スクリプト
+# 使い方:
+#   ./zip.sh                 # Chrome + Firefox 両方
+#   ./zip.sh chrome          # Chrome のみ
+#   ./zip.sh firefox         # Firefox のみ
+#
+# Firefox 版は manifest.firefox.json を manifest.json として同梱し、xpi 拡張子で出力する。
+# 音量ブースター関連 (offscreen / tabCapture) は Firefox MV3 未対応のため除外されている。
 
-cd "$(dirname "$0")" || exit 1
-echo "拡張機能パッケージを生成中..."
+set -euo pipefail
+cd "$(dirname "$0")"
 
-rm -f ./web-viewing-assist.zip ./web-restriction-remover.zip
+TARGET="${1:-both}"
+case "$TARGET" in
+  chrome|firefox|both) ;;
+  *) echo "Usage: $0 [chrome|firefox|both]"; exit 2 ;;
+esac
 
-if [ -f scripts/generate-icons.js ]; then
-  echo "アイコン生成中..."
-  if ! npm ci --silent; then
-    echo "npm ci に失敗しました"
-    exit 1
-  fi
-  if ! node scripts/generate-icons.js; then
-    echo "アイコン生成に失敗しました"
-    exit 1
-  fi
-fi
+echo "拡張機能パッケージを生成中... (Target: $TARGET)"
 
 if ! command -v zip &> /dev/null; then
-  echo "zipをインストールしてください"
+  echo "zip をインストールしてください"
   exit 1
 fi
 
-zip -r ./web-viewing-assist.zip \
-  manifest.json \
-  icons/ \
-  src/ \
-  -x "*.DS_Store" "*.swp" "*~"
-
-if [ $? -eq 0 ]; then
-  echo "ZIPファイルを作成しました: web-viewing-assist.zip"
-  ls -lh ./web-viewing-assist.zip
-else
-  echo "ZIPファイルの作成に失敗しました"
+# 依存インストール & アイコン生成
+echo "依存パッケージを lockfile どおりにインストール中..."
+if ! npm ci --silent; then
+  echo "npm ci に失敗しました"
   exit 1
 fi
+if ! node scripts/generate-icons.js; then
+  echo "アイコン生成に失敗しました"
+  exit 1
+fi
+
+build_pkg() {
+  local variant="$1"           # chrome | firefox
+  local manifest_src="$2"      # manifest.json | manifest.firefox.json
+  local output="$3"            # web-viewing-assist-chrome.zip | web-viewing-assist-firefox.xpi
+
+  echo ""
+  echo "==== $variant 版をビルド中 ===="
+  rm -f "$output"
+
+  local tmp="temp-build-$variant"
+  rm -rf "$tmp"
+  mkdir -p "$tmp"
+
+  # manifest を variant 用にコピー (Firefox は manifest.firefox.json を manifest.json にリネーム)
+  cp "$manifest_src" "$tmp/manifest.json"
+  cp -r icons "$tmp/"
+  cp -r src "$tmp/"
+  cp -r _locales "$tmp/"
+
+  # 不要ファイル除去
+  find "$tmp" \( -name "*.DS_Store" -o -name "*.swp" -o -name "*~" \) -delete
+
+  # アーカイブ作成 (zip / xpi いずれも zip 形式、拡張子だけが違う)
+  (cd "$tmp" && zip -r "../$output" . -x "*.DS_Store" "*.swp" "*~") >/dev/null
+  rm -rf "$tmp"
+
+  if [ -f "$output" ]; then
+    echo "$variant 版 作成成功: $output ($(ls -lh "$output" | awk '{print $5}'))"
+  else
+    echo "$variant 版 作成失敗"
+    exit 1
+  fi
+}
+
+# 旧名 zip を掃除
+rm -f web-viewing-assist.zip web-restriction-remover.zip
+
+if [ "$TARGET" = "chrome" ] || [ "$TARGET" = "both" ]; then
+  build_pkg "chrome" "manifest.json" "web-viewing-assist-chrome.zip"
+fi
+if [ "$TARGET" = "firefox" ] || [ "$TARGET" = "both" ]; then
+  build_pkg "firefox" "manifest.firefox.json" "web-viewing-assist-firefox.xpi"
+fi
+
+echo ""
+echo "✨ パッケージング完了"
+echo "   Chrome Web Store: https://chrome.google.com/webstore/devconsole"
+echo "   Firefox AMO:      https://addons.mozilla.org/developers/"

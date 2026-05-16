@@ -62,6 +62,8 @@
 
   "loupeMaster": { "message": "ルーペ" },
   "loupeMasterDesc": { "message": "現在の画面を円形レンズで拡大。動画は一時停止してから使うのがおすすめ。左クリックで OFF" },
+  "rtxEnhancerMaster": { "message": "RTX 動画強化" },
+  "rtxEnhancerMasterDesc": { "message": "video 要素のあるページに hint を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正を認識しやすくします（GPU 側で NVIDIA Control Panel 等の有効化が必要）" },
   "loupeZoomLabel": { "message": "倍率" },
   "loupeZoomAriaLabel": { "message": "倍率を選択" },
   "loupeSizeLabel": { "message": "レンズサイズ" },

@@ -1,6 +1,6 @@
 {
   "name": "web-viewing-assist",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "type": "commonjs",
   "description": "Chrome extension that bundles session keep-alive, YouTube cleaner, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {
@@ -8,12 +8,16 @@
     "generate-icons": "node scripts/generate-icons.js",
     "generate-screenshots": "node webstore/generate-screenshots.js",
     "build": "npm run generate-icons && npm run generate-screenshots",
-    "test": "node --test"
+    "test": "node --test",
+    "lint": "eslint src/ test/ scripts/"
   },
   "devDependencies": {
     "chrome-webstore-upload-cli": "3.5.0",
+    "eslint": "^8.57.1",
+    "globals": "^15.15.0",
     "puppeteer": "24.43.1",
-    "sharp": "0.34.5"
+    "sharp": "0.34.5",
+    "web-ext": "10.1.0"
   },
   "keywords": [
     "chrome-extension",

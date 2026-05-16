@@ -242,7 +242,9 @@ async function createAudioState(tabId, streamId) {
         },
         video: false,
       });
-    } catch {
+    } catch (err) {
+      // /rere F-001: フォールバック発動を可視化（mandatory 形式が拒否された Chrome 環境の検知用）
+      console.warn("[WebViewingAssist] getUserMedia mandatory failed, falling back to flat:", err);
       // 念のためフラット形式にもフォールバック
       stream = await navigator.mediaDevices.getUserMedia({
         audio: { chromeMediaSourceId: streamId },
@@ -258,7 +260,10 @@ async function createAudioState(tabId, streamId) {
     // resume() は同期的に成功するはず。失敗時は無視（後続の tickLoudnessNormalizer 等で
     // 自然に resume されるケースもある）。
     if (ctx.state === "suspended") {
-      try { await ctx.resume(); } catch {}
+      try { await ctx.resume(); } catch (err) {
+        // /rere F-001: AudioContext.resume() 失敗は無音化の主因の 1 つ。可視化必須。
+        console.warn("[WebViewingAssist] AudioContext.resume() failed:", err);
+      }
     }
     const source = ctx.createMediaStreamSource(stream);
     const normalizerAnalyzer = ctx.createAnalyser();
@@ -304,6 +309,8 @@ async function createAudioState(tabId, streamId) {
     audioStates.set(tabId, state);
     return state;
   } catch (err) {
+    // /rere F-001: 6 ノードチェーン構築失敗の可視化（getUserMedia / AudioContext / connect 失敗）
+    console.warn("[WebViewingAssist] createAudioState failed for tab", tabId, ":", err);
     stream?.getTracks().forEach((t) => t.stop());
     throw err;
   }
@@ -335,15 +342,25 @@ async function volumeReleaseTab(tabId) {
     stopLoudnessNormalizer(state);
     state.stream?.getTracks().forEach((t) => t.stop());
     await state.ctx.close();
-  } catch {
-    // close 失敗は致命的ではない（既に閉じている可能性）
+  } catch (err) {
+    // /rere F-001: close 失敗は致命的ではない（既に閉じている可能性）が、
+    // 観測性のため debug ログを残す（warn は info より少し下げて debug 相当）
+    console.warn("[WebViewingAssist] volumeReleaseTab close failed for tab", tabId, ":", err);
   }
   return { ok: true };
 }
 
 async function volumeReleaseAll() {
   const ids = Array.from(audioStates.keys());
-  await Promise.all(ids.map((id) => volumeReleaseTab(id)));
+  // /rere B2-020 修正: 旧実装は Promise.all で集約していたが volumeReleaseTab 内の try/catch で
+  // 全失敗が握りつぶされていた。allSettled で個別失敗を可視化して観測性を確保する。
+  // Map から audioStates.delete は volumeReleaseTab 側で行うため、最終状態は同一。
+  const results = await Promise.allSettled(ids.map((id) => volumeReleaseTab(id)));
+  for (let i = 0; i < results.length; i++) {
+    if (results[i].status === "rejected") {
+      console.warn("[WebViewingAssist] volumeReleaseAll: tab", ids[i], "failed:", results[i].reason);
+    }
+  }
   return { ok: true };
 }
 

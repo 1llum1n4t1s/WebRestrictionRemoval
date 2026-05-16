@@ -2,7 +2,7 @@
 
 > [English version](README.en.md) is also available.
 
-Web ブラウジングを快適にする 9 機能（**セッション維持** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Instagram クリーナー（11 サブ機能）** / **TikTok クリーナー（3 サブ機能）** / **音量ブースター** / **動画ガンマ補正** / **ルーペ** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。**画像ダウンロードボタン（Instagram / TikTok 共通）** も各クリーナーのサブ機能として利用できます。
+Web ブラウジングを快適にする 10 機能（**セッション維持** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Instagram クリーナー（11 サブ機能）** / **TikTok クリーナー（3 サブ機能）** / **音量ブースター** / **動画ガンマ補正** / **ルーペ** / **RTX 動画強化** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。**画像ダウンロードボタン（Instagram / TikTok 共通）** も各クリーナーのサブ機能として利用できます。
 
 > **v1.0.18 までの主な変更点**: 「制限解除（右クリック / 選択 / 強制ペースト・コピー）」機能を全面廃止し、Web 閲覧支援機能のみに特化しました。あわせて拡張機能名を「**WEB制限解除サポート**」から「**WEB閲覧アシスト**」に変更しています。バージョン番号は `/vava` スキル経由でリリース時に確定します。
 
@@ -104,7 +104,7 @@ Instagram / TikTok クリーナーに含まれる `imageDownload` サブ機能�
 3. 音量ブースターはスライダーで増幅率を直接調整
 4. カラーピッカーは「カラーピッカー」タブで `EyeDropper` を起動
 
-設定は `chrome.storage.local` に保存され、次回以降も維持されます。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Instagram クリーナー OFF / TikTok クリーナー OFF / 音量ブースター OFF / 動画ガンマ補正 OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはマスター OFF または「マスター ON かつスライダー 100% かつ全サブトグル OFF」の状態で AudioContext を解放しリソースを返却します。
+設定は `chrome.storage.local` に保存され、次回以降も維持されます。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Instagram クリーナー OFF / TikTok クリーナー OFF / 音量ブースター OFF / 動画ガンマ補正 OFF / ルーペ OFF / RTX 動画強化 OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはマスター OFF または「マスター ON かつスライダー 100% かつ全サブトグル OFF かつミュート OFF」の状態で AudioContext を解放しリソースを返却します。
 
 ## インストール
 
@@ -112,12 +112,22 @@ Instagram / TikTok クリーナーに含まれる `imageDownload` サブ機能�
 
 [Chrome Web Store](https://chrome.google.com/webstore) で「WEB閲覧アシスト」を検索してインストール。
 
+### Firefox AMO から
+
+[addons.mozilla.org](https://addons.mozilla.org/) で「Web Viewing Assist」を検索してインストール (Firefox 140 以降)。Firefox 版は音量ブースター機能を除く 9 機能を提供します。
+
 ### 開発版を手動インストール
 
+**Chrome**:
 1. このリポジトリをクローン
 2. `chrome://extensions/` を開く
-3. 「デベロッパー モード」をON
+3. 「デベロッパー モード」を ON
 4. 「パッケージ化されていない拡張機能を読み込む」でプロジェクトフォルダを選択
+
+**Firefox**:
+1. `powershell -ExecutionPolicy Bypass -File zip.ps1 -Target firefox` (Win) または `./zip.sh firefox` (Unix) で `web-viewing-assist-firefox.xpi` を生成
+2. `about:debugging#/runtime/this-firefox` を開く → 「一時的なアドオンを読み込む」で xpi を選択 (Firefox 再起動でアンロードされる)
+3. または `about:addons` → ⚙ → 「ファイルからアドオンをインストール」(署名済み xpi のみ、開発中は前者推奨)
 
 ## ビルド
 
@@ -131,14 +141,36 @@ npm run generate-screenshots # スクリーンショットのみ生成
 ### ストア申請用パッケージ生成
 
 ```bash
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -File zip.ps1
+# Chrome + Firefox 両方
+powershell -ExecutionPolicy Bypass -File zip.ps1                  # Win
+bash ./zip.sh                                                      # Unix
 
-# Unix
-bash ./zip.sh
+# Chrome のみ
+powershell -ExecutionPolicy Bypass -File zip.ps1 -Target chrome
+bash ./zip.sh chrome
+
+# Firefox のみ (xpi 出力)
+powershell -ExecutionPolicy Bypass -File zip.ps1 -Target firefox
+bash ./zip.sh firefox
 ```
 
-`web-viewing-assist.zip` が生成されます。
+生成物:
+- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (10 機能、音量ブースター込み)
+- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (9 機能、音量ブースター除外)
+
+旧名 `web-viewing-assist.zip` を期待する CI workflow (publish.yml) は本リポジトリでは別名を使ってるので影響なし。
+
+### CI 自動公開
+
+`release/<X.Y.Z>` ブランチを push すると、GitHub Actions が:
+1. **Chrome Web Store** へ Submit for review (`web-viewing-assist.zip`)
+2. **Firefox AMO** へ submission API で submit (`web-ext sign --channel=listed`)
+
+を並列実行します。必要 GitHub Secrets:
+- Chrome: `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN` / `CWS_EXTENSION_ID`
+- Firefox: `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` ([発行ページ](https://addons.mozilla.org/ja/developers/addon/api/key/))
+
+Chrome publish が失敗 (同 version 重複 upload 等) しても Firefox AMO step は `if: success() || failure()` で独立実行されます。
 
 ## 技術詳細
 

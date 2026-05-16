@@ -727,6 +727,67 @@ test("FEATURES 件数の固定アサート（ドキュメント整合性の再�
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });
 
+// /rere レビュー B3-006 修正: RTX_ENHANCER_ENABLED storage key と APPLY_RTX_ENHANCER_CS
+// アクションの drift 検知。actions.js への追加漏れ + popup / background / content script の
+// 配線漏れ（A2-001 で発覚した normalizeSettings 漏れと同型）を CI で検知できる単一情報源。
+// /rere レビュー B1-002 修正: SettingsSchema が StorageKeys / Actions と整合していることを検証。
+// 新機能追加時に SettingsSchema への追加忘れ / storageKey 不一致 / applyAction 不一致を CI 検知する。
+// A2-001 (RTX 機能完全破壊バグ) と同型の drift を再発防止するための単一情報源。
+test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が Actions に存在 (B1-002)", () => {
+  const validStorageValues = new Set(Object.values(G.StorageKeys));
+  const validActionValues = new Set(Object.values(G.Actions));
+  for (const entry of G.SettingsSchema) {
+    assert.ok(
+      validStorageValues.has(entry.storageKey),
+      `SettingsSchema field "${entry.field}": storageKey "${entry.storageKey}" が StorageKeys に存在しない`
+    );
+    assert.ok(
+      validActionValues.has(entry.applyAction),
+      `SettingsSchema field "${entry.field}": applyAction "${entry.applyAction}" が Actions に存在しない`
+    );
+  }
+  // 件数 drift 検知: 主要機能の field が SettingsSchema に揃っていることを確認
+  const fields = new Set(G.SettingsSchema.map((e) => e.field));
+  for (const required of [
+    "keepAliveEnabled",
+    "searchFixerEnabled",
+    "amazonDeliveryTotalEnabled",
+    "instagramCleanerEnabled",
+    "tiktokCleanerEnabled",
+    "videoGammaEnabled",
+    "loupeEnabled",
+    "rtxEnhancerEnabled",
+  ]) {
+    assert.ok(fields.has(required), `SettingsSchema に "${required}" field が存在する必要がある`);
+  }
+});
+
+// /rere レビュー A2-002 修正: cdninstagram.com の 1 段サブドメインを `scontent-` prefix 限定に
+// 絞り込んだことを検証する。`tracking.cdninstagram.com` / `auth.cdninstagram.com` 等の
+// 任意サブドメインへの代理 fetch が遮断されることを保証する（fbcdn / tiktok と対称防御）。
+test("ImageDownloader.isAllowedFetchUrl: cdninstagram.com は scontent- prefix 限定 (A2-002)", () => {
+  // 許可される（Instagram コンテンツ画像の正規 CDN）
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-iad3-1.cdninstagram.com/foo.jpg"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://scontent-foo-bar.cdninstagram.com/foo.jpg"), true);
+  // 拒否される（過剰許可だった経路）
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://tracker.cdninstagram.com/log"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://auth.cdninstagram.com/oauth"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://attacker.cdninstagram.com/exfil"), false);
+});
+
+test("StorageKeys.RTX_ENHANCER_ENABLED + Actions.APPLY_RTX_ENHANCER_CS が定義されている", () => {
+  // storage key のキー名は popup / background / content script 全てから参照されるため
+  // 文字列値も固定する（drift = 機能死活）。
+  assert.equal(typeof G.StorageKeys.RTX_ENHANCER_ENABLED, "string");
+  assert.equal(G.StorageKeys.RTX_ENHANCER_ENABLED, "rtxEnhancerEnabled");
+  // background → content script の配信 message も固定。
+  assert.equal(typeof G.Actions.APPLY_RTX_ENHANCER_CS, "string");
+  assert.ok(
+    G.Actions.APPLY_RTX_ENHANCER_CS.length > 0,
+    "Actions.APPLY_RTX_ENHANCER_CS は空文字列であってはならない"
+  );
+});
+
 // ALLOWED_HOSTS の fbcdn.net パターンが scontent- prefix 限定であることを検証する。
 // `tracking.fbcdn.net` / `video.fbcdn.net` 等の Meta 傘下非画像 CDN への代理
 // fetch が遮断されることを保証する（/rere レビュー A1+A2 指摘修正）。

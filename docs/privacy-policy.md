@@ -35,6 +35,7 @@
 - **`loupeEnabled`**（真偽値）: ルーペ機能のマスタートグル。デフォルト OFF。
 - **`loupeZoom`**（数値）: ルーペの倍率。1.5 / 2.5 / 4.0 のいずれか。デフォルト 2.5。
 - **`loupeSize`**（数値・150〜1000 / 10px step）: ルーペのレンズ直径 (px)。デフォルト 220。
+- **`rtxEnhancerEnabled`**（真偽値）: RTX 動画強化機能のマスタートグル。デフォルト OFF。ON 時は `<video>` 要素のあるページに極小の透明 hint 要素を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正の検知を補助します。ネットワーク通信は発生せず、DOM の追加のみ。
 - **`colorPickerHistory`**（配列・最大 20 件）: カラーピッカーで採取した色の履歴。各要素は `{ hex, ts }` の形式で、`hex` は `#RRGGBB`、`ts` は採取時刻のタイムスタンプ。
 - **`colorPickerDefaultFormat`**（文字列・`"hex"` / `"rgb"` / `"hsl"` のいずれか）: カラーピッカーで採取した色のクリップボード既定形式。
 - **`colorPickerHexHash`**（真偽値・デフォルト true）: HEX 形式でコピーする際に先頭の `#` を含めるかどうか。
@@ -62,7 +63,7 @@
 
 サブ機能「サーバーへの軽量 ping を併発」（オプトイン・デフォルト OFF）を有効化した場合に限り、サーバー側のセッションタイムアウトを延長するため、ユーザーが有効化したサイト自身（同一オリジン）の top frame から軽量なエンドポイントへ `HEAD` または `GET` リクエストを発行します。例として、SharePoint（`*.sharepoint.{com,cn,de,us}`）では `/_api/web` に GET、その他の多くのサイトでは現在のページ URL または origin root に軽量 HEAD を試行します。これは現にログイン済みであるサイト自身への通信のみであり、第三者サーバーへの送信ではありません（`credentials: same-origin` で同一オリジン以外には Cookie が送信されません）。認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発する可能性があるため、副作用を理解した上で有効化することを推奨します。
 
-YouTube / Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（YouTube: `i.ytimg.com` / `yt3.googleusercontent.com` / `yt3.ggpht.com`、Instagram: `*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `*.tiktokcdn.com` / `*.tiktokcdn-us.com`）に対して画像 GET を発行します。これは現にブラウザが `<img>` タグでロードしているドメインと同一であり、`credentials: "omit"` でクッキーは送信せず、`redirect: "manual"` で 302 経由の第三者ドメイン送信を遮断し、`referrerPolicy: "no-referrer"` でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されるのみで、外部送信は一切行いません。
+Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `p<数字>.tiktokcdn.com` / `p<数字>.tiktokcdn-us.com`）に対して画像 GET を発行します。これは現にブラウザが `<img>` タグでロードしているドメインと同一であり、`credentials: "omit"` でクッキーは送信せず、`redirect: "manual"` で 302 経由の第三者ドメイン送信を遮断し、`referrerPolicy: "no-referrer"` でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します（YouTube では本機能は提供されません）。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されるのみで、外部送信は一切行いません。
 
 ## 権限の使用目的
 

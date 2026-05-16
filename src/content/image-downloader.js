@@ -209,8 +209,11 @@
    */
   function isVisible(el) {
     if (!el || !el.isConnected) return false;
-    if (el.offsetParent === null && getComputedStyle(el).position !== "fixed") return false;
+    // /rere C1-002 修正: 旧実装は L212/L213 で同 elem に getComputedStyle を 2 回呼んでおり、
+    // SPA で画像が頻繁に差し替わる Instagram フィードでは無視できない CPU を消費していた。
+    // 1 回呼んだ結果を使い回す。
     const cs = getComputedStyle(el);
+    if (el.offsetParent === null && cs.position !== "fixed") return false;
     if (cs.display === "none" || cs.visibility === "hidden") return false;
     if (parseFloat(cs.opacity) === 0) return false;
     return true;

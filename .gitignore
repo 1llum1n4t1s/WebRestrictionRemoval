@@ -8,3 +8,20 @@ temp-build/
 .serena/
 .claude/
 temp/
+cxcx-out/
+cxcx-scenarios.*.yaml
+# Firefox AMO ビルド成果物
+firefox-build/
+web-ext-artifacts/
+*.xpi
+# /rere A3-002 修正: 開発者がローカルで update-amo-listing.mjs / chrome-webstore-upload-cli を
+# 実行する際に作成しがちな secret ファイルを git 混入から防ぐ (AMO_JWT_* / CWS_* OAuth refresh
+# token 等のうっかり commit を防ぐ defense-in-depth)
+.env
+.env.*
+secrets.json
+secrets.local.json
+credentials.json
+credentials.local.json
+*.pem
+*.key

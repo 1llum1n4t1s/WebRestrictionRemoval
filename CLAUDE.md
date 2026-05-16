@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 9 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 9 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカーは popup タブとして常時利用可（履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ）。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 10 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 10 機能のうち 9 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 popup は **5 タブ構成** (`調整 / YouTube / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
 
@@ -18,7 +18,8 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm test                     # Node.js 標準 test runner、59 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値を含む）
+npm run lint                 # ESLint v8 + no-implicit-globals + 17 globalThis 定数列挙 (/rere D-004 で v1.0.30 導入)
+npm test                     # Node.js 標準 test runner、61 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -49,6 +50,7 @@ node --check src/lib/actions.js \
   && node --check src/content/tiktok-cleaner.js \
   && node --check src/content/video-gamma.js \
   && node --check src/content/loupe.js \
+  && node --check src/content/rtx-enhancer.js \
   && node --check src/content/image-downloader.js \
   && node --check src/offscreen/offscreen.js
 ```
@@ -91,7 +93,7 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**8 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 29 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**9 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / RTX 動画強化 / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 29 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
 
 **クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
@@ -191,6 +193,19 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 - 再キャプチャ debounce 500ms は `chrome.tabs.captureVisibleTab` の Chrome 公式レート上限 (2fps = 500ms 周期) と一致させる安全値
 - background の `LOUPE_REQUEST_CAPTURE` ハンドラは **`tabId === activeTabId` を assert** してから撮影 (`chrome.tabs.query({ active: true, windowId })` で確認、バックグラウンドタブからの別タブピクセル取得を遮断 / /rere A1-I1)
 
+### RTX 動画強化 (`src/content/rtx-enhancer.js`)
+全 http(s) サイトの top frame に注入される独立機能。`rtxEnhancerEnabled` (boolean、デフォルト OFF オプトイン) 1 storage key で管理。ON 時に `<video>` 要素が存在するページに対して **極小の透明 hint 要素** (1×1 px / opacity:0 / pointer-events:none / aria-hidden) を video の直近祖先 (`parentElement`) に inject する。NVIDIA RTX Super Resolution / AMD FidelityFX Super Resolution for Browser などの GPU ドライバ側映像補正は「動画ページ」を検知して自動補正を入れるため、この hint 要素が動画ページ判定の補助となる。**ドライバ機能の有効化自体は GPU 側設定** (NVIDIA Control Panel など) に依存し、本拡張機能はブラウザ側の hint inject のみを担う。
+
+実装上の不変条件:
+- top frame 限定 (`window === window.top` 早期 return)、iframe 内 `<video>` は site 側 player に任せる
+- 同 `<video>` への重複 inject は `dataset.__cpaRtxAttached === "1"` マーカーで防ぐ
+- MutationObserver `subtree: true` で SPA 経路の遅延 inject された `<video>` も検知して追従
+- context invalidation guard (`chrome.runtime?.id` チェック) を主要 entry point に配置、orphan 化したら MutationObserver を必ず `disconnect` (CPU リーク防止)
+- master OFF / pagehide で全 hint 要素を `removeAllHints()` で撤去、site の DOM を残骸で汚さない
+- `readSettingsAndApply` は `applyInFlight` / `applyQueued` で並列実行を直列化 (storage.onChanged / runtime.onMessage 重複呼出のレース防止、ルーペと同じパターン)
+- pure DOM 操作のみ・外部送信ゼロ・ドライバ依存の有効化はユーザー責任 (privacy-policy にも明記)
+- アプローチは sabamotto/rtx-activator-extension (MIT) を **参考** にした独自実装 (コード行は reproduce せず、概念のみ)
+
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
 `*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
 
@@ -278,31 +293,60 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
+| `src/content/rtx-enhancer.js` | RTX 動画強化: 全 http(s) の top frame に注入、`<video>` を持つページに極小の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution など) の動画ページ検知を補助。`dataset.__cpaRtxAttached` マーカーで二重 inject 防止、MutationObserver で遅延 `<video>` 追従、master OFF/pagehide で `removeAllHints()` 撤去。外部送信ゼロ、ドライバ機能の有効化は GPU 側設定 (NVIDIA Control Panel 等) に依存 |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得 / URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
-| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは **8 マスタートグル** + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3 + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
+| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは **9 マスタートグル** + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3 + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー + RTX 動画強化 master、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット同梱 |
 | `src/offscreen/offscreen.{html,js}` | 音量ブースター専用 offscreen document: AudioContext + AnalyserNode + 自動 GainNode + 手動 GainNode + DynamicsCompressor × 2 (night mode / anti-clip) で正規化 + 増幅 + 圧縮 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt`。`generate-screenshots.js` が popup.html から `popup-render.html` + `popup-shim.js` を動的生成 → `01-popup-ui.html` が iframe で実 popup を埋め込んで撮影（drift ゼロ）。生成物 `popup-render.html` / `popup-shim.js` は .gitignore 対象 |
-| `zip.ps1` / `zip.sh` | ストア申請用 ZIP パッケージ生成 (Windows / Unix) |
+| `manifest.firefox.json` | Firefox AMO 申請用 manifest (Chrome 用 `manifest.json` から `offscreen` / `tabCapture` permission 除外 + `browser_specific_settings.gecko` + `background.scripts` 併記)。zip スクリプトが Firefox xpi 生成時にこれを `manifest.json` として同梱する |
+| `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
+| `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト 59 件: globalThis 17 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn は scontent- prefix 限定 / TikTok / YouTube 廃止) / detectHost / buildFilename / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** 等。件数 drift を CI で検知できる単一情報源 |
-| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで Chrome Web Store に **アップロード + Submit for review まで自動化**。OAuth Bearer Token を curl で取得し `token_response` / `access_token` 両方を `::add-mask::` 登録してから 2 ステップ実行: (1) ZIP を PUT で Draft 化 → uploadState=SUCCESS 確認、(2) Publish API (`publishTarget=default`) で全ユーザー公開キュー投入。レビュー結果はメール通知。**listing (説明文 / スクリーンショット / カテゴリ) 変更時は CWS API に更新エンドポイントが存在しないため Dashboard で先行手動更新が必要**。 |
+| `test/actions.test.js` | 純粋関数テスト 61 件: globalThis 17 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** 等。件数 drift を CI で検知できる単一情報源 |
+| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**listing (説明文 / スクリーンショット / カテゴリ) 変更時は CWS / AMO ともに API 更新エンドポイントが弱いため Dashboard で先行手動更新が必要**。 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
 ## Important Patterns
 
 新機能追加・既存機能の改修で踏むべき原則と、過去にハマった罠の対策。詳細はファイル冒頭コメントと該当セクションを参照。
 
+### Firefox AMO 対応 (2026-05-16 確立、ReplaceFontSelect の知見ベース)
+
+WebRestrictionRemoval は Chrome + Firefox 両対応で、**音量ブースター以外の 8 機能は Firefox MV3 でも動く**。Firefox 版ビルドの不変条件:
+
+1. **専用 manifest 分割** — `manifest.firefox.json` を別ファイルで持ち、zip スクリプトが Firefox xpi 生成時に `manifest.json` として同梱する。Chrome 版とは以下が違う:
+   - `offscreen` / `tabCapture` permission を **除外** (Firefox MV3 未対応)
+   - `browser_specific_settings.gecko` に gecko id + `strict_min_version: "140.0"` + `data_collection_permissions: {required: ["none"]}` を追加
+   - `background.service_worker` に加えて **`background.scripts` 併記** (Firefox event page 用フォールバック、Chrome は scripts を無視)
+   - `minimum_chrome_version` 削除
+   - `host_permissions: ["<all_urls>"]` を追加 (Firefox AMO 推奨)
+
+2. **`importScripts` ガード** — `background.js` 冒頭は `if (typeof importScripts === "function") importScripts("/src/lib/actions.js");` でガードする。Firefox event page では importScripts は worker 限定 API のため呼べないが、manifest の `background.scripts` で actions.js を先に評価しているので skip して OK。
+
+3. **`HAS_VOLUME_BOOSTER` ランタイム検知** — `const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";` を background.js で定義し、`VOLUME_BOOSTER_SET_GAIN` / `VOLUME_BOOSTER_RELEASE_TAB` メッセージ handler、`chrome.tabs.onActivated` / `chrome.tabs.onRemoved` / `chrome.storage.onChanged` の音量関連経路で早期 return する。
+
+4. **popup の UI 隠し** — `popup.html` の audio section に `id="audioGroupSection"` を付与、`popup.js` の DOMContentLoaded で `if (!HAS_VOLUME_BOOSTER) $audioSection.style.display = "none";`。section は DOM 上残るので `getElementById('volumeBoosterToggle')` が null にならず popup ロジック全体が壊れない設計。
+
+5. **AMO 初回登録** — CI からは新規 add-on 作成不可。ローカルで `WEB_EXT_API_KEY=$AMO_JWT_ISSUER WEB_EXT_API_SECRET=$AMO_JWT_SECRET npx --no web-ext sign --source-dir=firefox-build --channel=listed --amo-metadata=.amo-metadata.json` を実行 → gecko id (manifest 内) で AMO 上に新規 add-on 自動作成。**初回完了後は CI の `publish-firefox` job が新バージョン提出を担う**。
+
+6. **web-ext lint で受理性確認** — `npx --no web-ext lint --source-dir=firefox-build` で AMO validator 相当チェック。**errors 0 件なら submission 通過**、warnings は手動レビュー対象だが reject 要因にはなりにくい (許容: `BACKGROUND_SERVICE_WORKER_IGNORED` / `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` / `UNSUPPORTED_API` (実行時 guard 済) / `UNSAFE_VAR_ASSIGNMENT` (innerHTML 動的代入))。
+
+7. **`if: success() || failure()` で Chrome / Firefox 独立実行** — publish.yml の `publish-firefox` job に必須。Chrome publish が同 version 重複 upload 等で失敗しても Firefox AMO step は連鎖 skip されず独立 submit される (ReplaceFontSelect が release/3.0.3 で踏んで確立した不変条件)。
+
+8. **AMO listing は plain text 化される** — API 経由で送る `<ul>` 等は `&lt;ul&gt;` としてエスケープ保存される。リッチ HTML 表示は AMO Dashboard のリッチテキストエディタ経由のみ可能。`webstore/store-listing.firefox.{ja,en}.txt` は絵文字 + `・` 等で plain text 構造化済み。
+
+
 ### 設計の起点
 - **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する。FEATURES に追加すれば popup UI は自動生成される。actions.js は古典的グローバル定数方式（ES modules ではない）で 4 経路で共有: ① background の `importScripts()`、② manifest content_scripts の最初のエントリで全 http(s) フレームに自動注入、③ popup.html の `<script>` タグ、④ offscreen.html の `<script>` タグ。
 - **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` / `package-lock.json` の `version` フィールドおよびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
-- **デフォルト OFF 方針徹底** — 8 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / 音量ブースター）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF かつミュート OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。ルーペもマスター OFF で content script 内の DOM / リスナーがすべて撤去される（Blob URL も revoke）。
+- **デフォルト OFF 方針徹底** — 9 マスタートグル（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / RTX 動画強化 / 音量ブースター）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF かつミュート OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。ルーペもマスター OFF で content script 内の DOM / リスナーがすべて撤去される（Blob URL も revoke）。RTX 動画強化もマスター OFF で `removeAllHints()` で hint 要素を撤去 + MutationObserver 解除。
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
 - **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
 - **early script は共通フレームワーク経由** — `src/content/early-framework.js` が `<style>` 注入・pre クラス同期付与・`chrome.storage.local.get`・`storage.onChanged` 購読のボイラープレートを集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、各 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) が config を渡して setup を呼ぶ。新サイトの early script を追加する場合もこのパターンに乗せる。サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す (差異が大きすぎて framework に押し込むと config 肥大化する)。
-- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaLoupeRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` のみ `__cpa` プレフィックスなしの歴史的命名 (互換性のため変更しない)。
+- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaLoupeRunning` / `window.__cpaRtxEnhancerRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
 - **iframe 多重対策** — keepalive は `shouldFireHttpPing()` でトップフレーム or クロスオリジン iframe のみ ping を発射。同一オリジン iframe はトップに任せる。
 
 ### MutationObserver 取り扱い
@@ -312,7 +356,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 ### Extension context invalidation guard PATTERN SYNC (/rere v1.0.28+ 確立)
 拡張機能リロード / 自動更新後、既存タブの content script は **orphan 化** する。`chrome.runtime.id` が `undefined` になり、`chrome.i18n.getMessage` / `chrome.runtime.sendMessage` 等が "Extension context invalidated" で throw する。MutationObserver / setInterval は orphan でも止まらないため、自前で停止する必要がある。
 
-**実装済みファイル (9 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` / `keepalive.js` / `video-gamma.js` / `loupe.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
+**実装済みファイル (10 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
 
 **実装パターン** (PATTERN SYNC):
 - 主要 timer / observer callback / 高頻度発火関数の入口で `if (!chrome.runtime?.id)` チェック

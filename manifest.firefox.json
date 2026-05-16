@@ -4,6 +4,15 @@
   "description": "__MSG_appDescription__",
   "default_locale": "en",
   "version": "1.0.30",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{8b2f6c4e-9a1d-4e8f-b3a7-1c5d9e7f2a4b}",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -19,7 +28,11 @@
     "128": "icons/icon-128.png"
   },
   "background": {
-    "service_worker": "src/background/background.js"
+    "service_worker": "src/background/background.js",
+    "scripts": [
+      "src/lib/actions.js",
+      "src/background/background.js"
+    ]
   },
   "content_scripts": [
     {
@@ -96,12 +109,12 @@
   ],
   "permissions": [
     "activeTab",
-    "storage",
-    "offscreen",
-    "tabCapture"
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'; frame-ancestors 'none'"
-  },
-  "minimum_chrome_version": "140"
+  }
 }

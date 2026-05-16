@@ -1,0 +1,53 @@
+============================================================
+Firefox AMO Listing (English)
+※ For Chrome Web Store, see webstore/store-listing.en.txt
+※ For Japanese, see webstore/store-listing.firefox.ja.txt
+※ Firefox edition excludes Volume Booster (offscreen / tabCapture not supported on Firefox MV3)
+============================================================
+
+■ Name
+Web Viewing Assist (Firefox)
+
+■ Summary (250 chars max)
+Firefox extension that locally tunes the readability and continuity of the page you are viewing. 9 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Instagram/TikTok Cleaners, Video Gamma, Loupe, RTX Video Enhancer, Color Picker). All default OFF (opt-in). Zero external network calls.
+
+■ Description (16,000 chars max)
+A productivity helper that bundles 9 categories of features into a single popup.
+
+■ Features available on Firefox
+
+🔹 Session Keep-alive
+Dispatches synthesized activity events and same-origin HTTP pings to suppress auto-logout on intranet portals and admin dashboards. HTTP ping is opt-in (default OFF), uses 5-second AbortSignal timeout, same-origin only, redirect: manual to prevent credential leakage to third-party domains.
+
+🔹 YouTube Cleaner (29 sub-features)
+Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, subscription channel expansion (subs feed → grid + lazy thumbnail), and more granular controls for YouTube's verbose UI.
+
+🔹 Amazon Subscribe & Save totals
+On amazon.co.jp/auto-deliveries, computes per-month delivery totals and inserts them inline.
+
+🔹 Instagram Cleaner (11 sub-features)
+Hides Reels / Explore / Stories / Threads / like counts / videos / comments / Notes / message counters, and similar verbose UI. Uses only semantic selectors (aria-label / role / data-pagelet); no dependency on obfuscated class names.
+
+🔹 TikTok Cleaner (3 sub-features)
+Hide comments / hide "Suggested accounts" / image download button.
+
+🔹 Video Gamma
+Global slider applies gamma correction to `<video>` elements (custom SVG `<feComponentTransfer type="gamma">` implementation).
+
+🔹 Loupe
+Mouse-following circular magnifier. 3-step zoom / variable lens size. Uses `tabs.captureVisibleTab` so videos / iframes / canvases can also be magnified.
+
+🔹 RTX Video Enhancer
+Injects a 1×1 px invisible hint element on pages containing `<video>` elements to help GPU drivers (e.g., NVIDIA RTX Super Resolution / AMD FidelityFX) detect video pages. The driver-side feature itself must be enabled in the GPU settings (e.g., NVIDIA Control Panel). Zero external transmission.
+
+🔹 Color Picker (popup tab)
+EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).
+
+■ Differences from the Chrome edition
+The Chrome edition adds a Volume Booster (tab audio amplifier with auto gain, normalizer, night mode, etc.). Volume Booster depends on `chrome.offscreen` and `chrome.tabCapture`, neither of which is supported by Firefox MV3, so it is excluded from the Firefox build. We plan to port it once Firefox implements these APIs.
+
+■ Privacy
+Fully local execution; zero external network calls. Only `browser.storage.local` is used (no sync / no cloud). See docs/privacy-policy.md for details.
+
+■ Requirements
+Firefox 140 or later.

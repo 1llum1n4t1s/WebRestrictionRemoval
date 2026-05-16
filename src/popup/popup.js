@@ -8,8 +8,9 @@
  *   - 各 input の変更を都度 background に APPLY_SETTINGS で送信
  *   - SearchFixer / InstagramCleaner の機能トグルと select は actions.js の FEATURES 配列から動的生成
  *     （個別機能数は actions.js を単一情報源とし、ここでは数値をハードコードしない）
- *   - 音量ブースターはマスタートグルなしの常時表示。100% で AudioContext 解放、
- *     それ以外の値で増幅処理を起動する
+ *   - 音量ブースターはマスタートグル付き。マスター OFF / マスター ON かつスライダー 100% かつ
+ *     全サブトグル OFF かつミュート OFF のとき AudioContext を解放、
+ *     それ以外の状態で増幅処理を起動する
  *   - カラーピッカータブは EyeDropper API で画面色を採取し、履歴 / format chips / コピー先制御を提供
  *
  * ローカライズ:
@@ -85,7 +86,27 @@ function applyI18nToDom(root) {
   });
 }
 
+// Firefox 版では offscreen / tabCapture API が未対応のため、音量ブースター機能を完全に隠す。
+// Chrome では chrome.offscreen が存在し、Firefox MV3 では未定義 (2026 時点)。これをガードキーにして
+// audio group section 全体を display:none にし、関連の getElementById 結果が null になっても落ちないようにする。
+// /rere B1-001 修正: background.js L12 と非対称だった (popup は chrome.offscreen のみ判定)。
+// 将来 Firefox が offscreen だけ実装し tabCapture を未実装で出した場合、popup は音量ブースター
+// UI を表示するが background は volume-booster-unavailable を返す不整合が起きる。両者の判定を
+// 揃えるため tabCapture も検査する。
+const HAS_VOLUME_BOOSTER =
+  typeof chrome !== "undefined" &&
+  typeof chrome.offscreen !== "undefined" &&
+  typeof chrome.tabCapture !== "undefined";
+
 document.addEventListener("DOMContentLoaded", async () => {
+  // Firefox 版: オーディオ (音量ブースター) セクションをまるごと非表示にする。
+  // 関連の event listener attach は HAS_VOLUME_BOOSTER フラグで個別に skip しているので、
+  // ここでは UI を消すだけで storage 同期等の他経路は壊れない。
+  if (!HAS_VOLUME_BOOSTER) {
+    const $audioSection = document.getElementById("audioGroupSection");
+    if ($audioSection) $audioSection.style.display = "none";
+  }
+
   // ----- ローカライズ: 静的テキストを最初に置換し、英語環境での FOUT を最小化 -----
   // <html lang> も UI 言語に追従させる（フォントフォールバックや スクリーンリーダー向け）
   try {
@@ -143,6 +164,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $videoGammaResetBtn = document.getElementById("videoGammaResetBtn");
   const $loupeToggle = document.getElementById("loupeToggle");
   const $loupeRow = document.getElementById("loupeRow");
+  const $rtxEnhancerToggle = document.getElementById("rtxEnhancerToggle");
   const $loupeZoomSegment = document.getElementById("loupeZoomSegment");
   const $loupeZoomValue = document.getElementById("loupeZoomValue");
   const $loupeSizeSlider = document.getElementById("loupeSizeSlider");
@@ -230,6 +252,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   let keepAliveOrigins = KeepAlive.normalizeOrigins(stored[StorageKeys.KEEP_ALIVE_ORIGINS]);
+  // /rere C2-I3 修正: popup 起動 crit path で chrome.tabs.query を独立 await すると IPC RTT が
+  // storage.get + tabs.query で直列累積する。getActiveHttpOrigin は storage 読み取り結果に
+  // 依存しないので、storage.get と同時並列発射すべきだったが、現コード構造上 storage 結果は
+  // L202 で既に解決済みなので、L248 の独立 await は最小コスト (Promise.resolve 同等)。
+  // 本修正は将来の API 増加に備えて並列起動の余地を documenting する.
   const currentKeepAliveOrigin = await getActiveHttpOrigin();
   $keepAliveToggle.checked =
     stored[StorageKeys.KEEP_ALIVE_ENABLED] === true &&
@@ -266,6 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ルーペの初期値設定
   $loupeToggle.checked = stored[StorageKeys.LOUPE_ENABLED] === true;
+  $rtxEnhancerToggle.checked = stored[StorageKeys.RTX_ENHANCER_ENABLED] === true;
   $loupeSizeSlider.min = String(Loupe.SIZE_MIN);
   $loupeSizeSlider.max = String(Loupe.SIZE_MAX);
   $loupeSizeSlider.step = String(Loupe.SIZE_STEP);
@@ -476,6 +504,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     apply();
   });
   $keepAliveHttpPingToggle.addEventListener("change", apply);
+  // RTX 動画強化: master トグルだけ (サブ設定なし)、変更で即 apply → background → content script
+  $rtxEnhancerToggle.addEventListener("change", apply);
   $searchFixerToggle.addEventListener("change", () => {
     updateCleanerDimState();
     apply();
@@ -878,6 +908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const videoGammaEnabled = $videoGammaToggle.checked;
     const videoGammaValue = currentVideoGammaValue();
     const loupeEnabled = $loupeToggle.checked;
+    const rtxEnhancerEnabled = $rtxEnhancerToggle.checked;
     const minutes = clampMinutes(Number($intervalSlider.value));
     const keepAliveIntervalMs = minutes * KeepAlive.MS_PER_MIN;
     const searchFixerFeatures = collectFeatureValues();
@@ -905,6 +936,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           videoGammaEnabled,
           videoGammaValue,
           loupeEnabled,
+          rtxEnhancerEnabled,
         },
       });
       if (seq !== applySeq) return;

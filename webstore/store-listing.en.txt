@@ -12,7 +12,7 @@ Web Viewing Assist
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 9 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
+An extension that consolidates 10 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
 (In v1.0.18 the former "restriction removal" features were retired; the Extension is now focused exclusively on web viewing assistance.)
 
 ■ Main features
@@ -52,6 +52,10 @@ An extension that consolidates 9 categories of viewing aids — plus a shared su
 · 🎞️ Video Gamma (opt-in, default OFF)
   Applies gamma correction to <video> elements on the page using SVG <feComponentTransfer type="gamma">. Master toggle + slider; the slider center (1.0) means no correction, left is darker (max 3.0), right is brighter (min 0.3). The setting is shared across tabs, and <video> elements inside iframes (e.g. YouTube embeds) also receive the same correction via all_frames: true.
   ※ Video data is not read, recorded, or transmitted; the feature only attaches an SVG filter, fully client-side.
+
+· ✨ RTX Video Enhancer (opt-in, default OFF)
+  Helps GPU drivers (e.g., NVIDIA RTX Super Resolution / AMD FidelityFX) detect video pages by injecting a 1×1 px invisible hint element on pages containing `<video>` elements. The driver-side feature itself must be enabled in the GPU settings (e.g., NVIDIA Control Panel); the Extension only handles the browser-side hint injection.
+  ※ Zero external transmission. Only DOM injection — no video data is read or recorded.
 
 · 🔍 Loupe (opt-in, default OFF)
   A circular magnifier that follows the mouse cursor. When the master toggle is ON, the active tab is captured as a JPEG snapshot via chrome.tabs.captureVisibleTab, attached as the background-image of a circular position: fixed lens (clip-path: circle()), and the background-position is updated at 60 fps with rAF coalescing on mousemove to magnify the area under the cursor. Because the captured pixels include video / iframe / canvas content, this is ideal for "pause a video and inspect fine details". Zoom is selected from 1.5× / 2.5× / 4× in the popup segment control; the lens diameter is adjustable 150–1000 px via a slider. Left-clicking the page while the lens is showing removes it instantly and flips the master toggle OFF. Re-capture is triggered automatically on initial activation / scroll (500 ms debounced) / large DOM changes (MutationObserver) / window resize.
