@@ -259,10 +259,15 @@ jobs:
           fi
           # npx --no で package-lock.json integrity 検証済みのローカル版を呼ぶ (CWS 側と同じ
           # サプライチェーン方針)。--source-dir は package job で構築した firefox-build/。
+          # --amo-metadata=.amo-metadata.json で version.license: "MIT" を毎回 submission に含める
+          # (AMO API v5 仕様: 各 version 提出時に license 明示必須、過去 version からの継承なし)。
+          # .amo-metadata.json は categories + version.license のみで listing メタは含まないため、
+          # listing の plain text 化リスクなし (CLAUDE.md Important Patterns 8 参照)。
           npx --no web-ext sign \
             --source-dir=firefox-build \
             --artifacts-dir=web-ext-artifacts \
-            --channel=listed
+            --channel=listed \
+            --amo-metadata=.amo-metadata.json
           echo "🦊 Firefox AMO への submission 送信完了 (レビュー待ち)"
           echo "🔗 AMO Developer Hub: https://addons.mozilla.org/developers/"
           echo "⏰ レビュー結果は通常 1〜数日でメール通知"
