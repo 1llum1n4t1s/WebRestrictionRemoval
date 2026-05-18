@@ -14,7 +14,7 @@
   "devDependencies": {
     "chrome-webstore-upload-cli": "3.5.0",
     "eslint": "^8.57.1",
-    "globals": "^15.15.0",
+    "globals": "^17.6.0",
     "puppeteer": "24.43.1",
     "sharp": "0.34.5",
     "web-ext": "10.1.0"
