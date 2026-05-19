@@ -136,6 +136,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- 要素参照 -----
   const $keepAliveToggle = document.getElementById("keepAliveToggle");
+  const $keepAliveSitesCount = document.getElementById("keepAliveSitesCount");
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
   const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
@@ -230,6 +231,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.LOUPE_ENABLED,
     StorageKeys.LOUPE_ZOOM,
     StorageKeys.LOUPE_SIZE,
+    // RTX 動画強化マスタートグル。get リストから欠落していると popup load 時に常に
+    // OFF 表示 → apply() で false 送信 → storage の既存 true が上書きで OFF 化される
+    // 「いつの間にか OFF」現象の真因のひとつ。
+    StorageKeys.RTX_ENHANCER_ENABLED,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
@@ -267,6 +272,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     $keepAliveHttpPingToggle.disabled = true;
   }
   $keepAliveHttpPingToggle.checked = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
+  // 落とし穴 A: popup 初回表示で保存済みサイト数を即反映 (UX 改善)。
+  updateKeepAliveSitesCount();
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
@@ -377,7 +384,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: PopupTabs.PICKER, tab: $tabPicker, panel: $panelPicker },
   ];
   const $specimenCard = document.getElementById("specimenCard");
-  const $specimenSwatch = document.getElementById("specimenSwatch");
   const $specimenNo = document.getElementById("specimenNo");
   const $specimenTime = document.getElementById("specimenTime");
   const $specimenPill = document.getElementById("specimenPill");
@@ -418,7 +424,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 履歴があれば最新色を初期表示。無ければ空状態のまま。
   if (history.length > 0) {
-    setCurrentColor(history[0].hex, { time: history[0].ts, silent: true });
+    setCurrentColor(history[0].hex, { time: history[0].ts });
   } else {
     setEmptyState();
   }
@@ -495,6 +501,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.COLOR_PICKER_HEX_HASH]) {
       hexIncludeHash = changes[StorageKeys.COLOR_PICKER_HEX_HASH].newValue !== false;
       $hexHashCheck.checked = hexIncludeHash;
+    }
+    // 落とし穴 B 補強: 複数 popup 同時開きや別経路で keepAliveOrigins / keepAliveEnabled が
+    // 変わったら、popup 内変数とトグル UI を即同期する。これで「片方の popup が古い値で
+    // apply() を発火して、もう片方が追加した origin を wipe する」race を防ぐ。
+    let keepAliveStateDirty = false;
+    if (changes[StorageKeys.KEEP_ALIVE_ORIGINS]) {
+      keepAliveOrigins = KeepAlive.normalizeOrigins(
+        changes[StorageKeys.KEEP_ALIVE_ORIGINS].newValue
+      );
+      keepAliveStateDirty = true;
+    }
+    if (changes[StorageKeys.KEEP_ALIVE_ENABLED]) {
+      keepAliveStateDirty = true;
+    }
+    if (keepAliveStateDirty) {
+      syncKeepAliveToggleFromState();
+      updateKeepAliveSitesCount();
     }
   });
 
@@ -604,32 +627,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     await pushVolumeNow(VolumeBooster.DEFAULT);
   });
 
-  // 自動歪み防止 / 自動音量正規化トグル: storage に保存 + 現在 gain を再送信して即時反映。
+  // 自動歪み防止 / 自動音量正規化 / ナイトモード: storage に保存 + 現在 gain を再送信して即時反映。
   // ブースト中なら offscreen の compressor パラメータが書き換わり、UNITY (100%) なら次回ブースト時に有効。
   // cancelVolumePush() を先頭で呼ぶのは、debounce タイマー (120ms) が古いトグル状態のまま
   // 発火するレースを防ぐため。storage.set は fire-and-forget で OK（pushVolumeNow は DOM
   // のトグル状態を直接読むので storage 書き込み完了を待つ必要がない）。
-  $volumeAntiClipToggle.addEventListener("change", () => {
-    cancelVolumePush();
-    chrome.storage.local.set({
-      [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
-    }).catch(() => {});
-    applyCompressorTogglePush();
-  });
-  $volumeNormalizeToggle.addEventListener("change", () => {
-    cancelVolumePush();
-    chrome.storage.local.set({
-      [StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]: $volumeNormalizeToggle.checked,
-    }).catch(() => {});
-    applyCompressorTogglePush();
-  });
-  $volumeNightModeToggle.addEventListener("change", () => {
-    cancelVolumePush();
-    chrome.storage.local.set({
-      [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
-    }).catch(() => {});
-    applyCompressorTogglePush();
-  });
+  // /opop CL-5: 3 つの同型ハンドラを bindSubToggle で集約。
+  function bindVolumeSubToggle(toggleEl, storageKey) {
+    toggleEl.addEventListener("change", () => {
+      cancelVolumePush();
+      chrome.storage.local.set({ [storageKey]: toggleEl.checked }).catch(() => {});
+      applyCompressorTogglePush();
+    });
+  }
+  bindVolumeSubToggle($volumeAntiClipToggle, StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED);
+  bindVolumeSubToggle($volumeNormalizeToggle, StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED);
+  bindVolumeSubToggle($volumeNightModeToggle, StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED);
 
   // ミュートボタン: クリックで volumeMuted を toggle、storage 保存、現在 gain を再 push して即時反映。
   // ミュート ON でもスライダー値 / サブトグル設定は保持され、UNITY release 条件で AudioContext を解放しない。
@@ -819,78 +832,56 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function updateCleanerCountBadge() {
+  // /opop CL-4: 3 cleaner system (YouTube / Instagram / TikTok) で同型だった
+  // Badge / Dim / DOM 構築の 9 関数を 3 ヘルパー化して DRY 化。section title の grp-pill に
+  // 「ON 数 / 全数 機能」を集約表示する。
+  function updateCleanerPill($pill, inputMap) {
+    if (!$pill) return;
     let on = 0;
-    for (const input of featureInputs.values()) {
-      if (input.checked) on++;
-    }
-    const total = featureInputs.size;
-    // section title の grp-pill に「ON 数 / 全数 機能」を集約表示する。
-    // アコーディオン廃止に伴い旧 .acc-count バッジは削除し、pill 1 つに情報を統合。
-    if ($searchFixerPill) $searchFixerPill.textContent = i18n("pillTemplate", String(on), String(total));
+    for (const input of inputMap.values()) if (input.checked) on++;
+    $pill.textContent = i18n("pillTemplate", String(on), String(inputMap.size));
   }
 
-  function updateCleanerDimState() {
-    const dim = !$searchFixerToggle.checked;
-    $featureCategories.classList.toggle("cleaner-disabled", dim);
+  function updateCleanerDim($categories, $toggle) {
+    $categories.classList.toggle("cleaner-disabled", !$toggle.checked);
   }
 
-  // ----- Instagram クリーナー DOM 構築（YouTube クリーナーと共通の _buildAccordionCategories を再利用） -----
+  function updateCleanerCountBadge() { updateCleanerPill($searchFixerPill, featureInputs); }
+  function updateCleanerDimState() { updateCleanerDim($featureCategories, $searchFixerToggle); }
+
   function buildInstagramFeatureCategories() {
     _buildAccordionCategories(
-      $igFeatureCategories,
-      InstagramCleaner.CATEGORIES,
-      InstagramCleaner.FEATURES,
-      igFeatureInputs,
-      "ig-feature-",
-      "feat_ig_"
+      $igFeatureCategories, InstagramCleaner.CATEGORIES, InstagramCleaner.FEATURES,
+      igFeatureInputs, "ig-feature-", "feat_ig_"
     );
   }
+  function updateIgCleanerCountBadge() { updateCleanerPill($instagramCleanerPill, igFeatureInputs); }
+  function updateIgCleanerDimState() { updateCleanerDim($igFeatureCategories, $instagramCleanerToggle); }
 
-  function updateIgCleanerCountBadge() {
-    let on = 0;
-    for (const input of igFeatureInputs.values()) {
-      if (input.checked) on++;
-    }
-    const total = igFeatureInputs.size;
-    if ($instagramCleanerPill) $instagramCleanerPill.textContent = i18n("pillTemplate", String(on), String(total));
-  }
-
-  function updateIgCleanerDimState() {
-    const dim = !$instagramCleanerToggle.checked;
-    $igFeatureCategories.classList.toggle("cleaner-disabled", dim);
-  }
-
-  // ----- TikTok クリーナー DOM 構築（Instagram と同じ _buildAccordionCategories を再利用） -----
   function buildTikTokFeatureCategories() {
     _buildAccordionCategories(
-      $ttFeatureCategories,
-      TikTokCleaner.CATEGORIES,
-      TikTokCleaner.FEATURES,
-      ttFeatureInputs,
-      "tt-feature-",
-      "feat_tt_"
+      $ttFeatureCategories, TikTokCleaner.CATEGORIES, TikTokCleaner.FEATURES,
+      ttFeatureInputs, "tt-feature-", "feat_tt_"
     );
   }
-
-  function updateTtCleanerCountBadge() {
-    let on = 0;
-    for (const input of ttFeatureInputs.values()) {
-      if (input.checked) on++;
-    }
-    const total = ttFeatureInputs.size;
-    if ($tiktokCleanerPill) $tiktokCleanerPill.textContent = i18n("pillTemplate", String(on), String(total));
-  }
-
-  function updateTtCleanerDimState() {
-    const dim = !$tiktokCleanerToggle.checked;
-    $ttFeatureCategories.classList.toggle("cleaner-disabled", dim);
-  }
+  function updateTtCleanerCountBadge() { updateCleanerPill($tiktokCleanerPill, ttFeatureInputs); }
+  function updateTtCleanerDimState() { updateCleanerDim($ttFeatureCategories, $tiktokCleanerToggle); }
 
   // ----- 適用 -----
   async function apply() {
     const keepAliveSiteEnabled = $keepAliveToggle.checked;
-    const nextKeepAliveOrigins = new Set(keepAliveOrigins);
+    // 落とし穴 B 修正: popup 内変数 keepAliveOrigins は load 時のスナップショットなので、
+    // 複数 popup 同時開きや別経路の storage 書き込みで stale 化する可能性がある。
+    // apply() の入口で storage から最新値を取得し直すことで、後発の origin 追加が
+    // wipe される race を防ぐ。失敗時は popup 内変数にフォールバック。
+    let baseOrigins = keepAliveOrigins;
+    try {
+      const fresh = await chrome.storage.local.get(StorageKeys.KEEP_ALIVE_ORIGINS);
+      baseOrigins = KeepAlive.normalizeOrigins(fresh[StorageKeys.KEEP_ALIVE_ORIGINS]);
+    } catch {
+      // storage 読み取り失敗時は popup 内変数で続行 (極めて稀な経路)。
+    }
+    const nextKeepAliveOrigins = new Set(baseOrigins);
     if (currentKeepAliveOrigin) {
       if (keepAliveSiteEnabled) {
         nextKeepAliveOrigins.add(currentKeepAliveOrigin);
@@ -900,6 +891,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     keepAliveOrigins = KeepAlive.normalizeOrigins(Array.from(nextKeepAliveOrigins));
     const keepAliveEnabled = keepAliveOrigins.length > 0;
+    // 落とし穴 A: apply() で origin add/delete した直後にカウンタを更新する。
+    updateKeepAliveSitesCount();
     const keepAliveHttpPingEnabled = $keepAliveHttpPingToggle.checked;
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
@@ -962,29 +955,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function collectFeatureValues() {
-    const out = {};
-    for (const [key, input] of featureInputs) {
-      out[key] = input.checked;
+  /**
+   * popup load 時のトグル評価ロジック (3 条件 AND) を、外部からの storage 変更時にも
+   * 再現する。落とし穴 B 補強 (複数 popup 同時開き race 対策) で利用。
+   */
+  function syncKeepAliveToggleFromState() {
+    if (!currentKeepAliveOrigin) {
+      $keepAliveToggle.checked = false;
+      return;
     }
-    return out;
+    $keepAliveToggle.checked =
+      keepAliveOrigins.length > 0 &&
+      KeepAlive.isOriginAllowed(keepAliveOrigins, currentKeepAliveOrigin);
   }
 
-  function collectIgFeatureValues() {
-    const out = {};
-    for (const [key, input] of igFeatureInputs) {
-      out[key] = input.checked;
-    }
-    return out;
+  /**
+   * 落とし穴 A UX 改善: 保存済みサイト数を popup に表示する。
+   * 「サイト単位 ON / OFF」の表示意味を可視化し、別サイトで popup を開いたときに
+   * 「いつの間にか OFF になった！」と誤認されるのを防ぐ。
+   */
+  function updateKeepAliveSitesCount() {
+    if (!$keepAliveSitesCount) return;
+    const n = keepAliveOrigins.length;
+    $keepAliveSitesCount.textContent = n === 0 ? "" : i18n("keepAliveSitesCount", String(n));
+    $keepAliveSitesCount.classList.toggle("hidden", n === 0);
   }
 
-  function collectTtFeatureValues() {
+  // /opop CL-4: 3 cleaner で同型の収集ロジックを 1 ヘルパー化。
+  function collectInputValues(inputMap) {
     const out = {};
-    for (const [key, input] of ttFeatureInputs) {
-      out[key] = input.checked;
-    }
+    for (const [key, input] of inputMap) out[key] = input.checked;
     return out;
   }
+  function collectFeatureValues() { return collectInputValues(featureInputs); }
+  function collectIgFeatureValues() { return collectInputValues(igFeatureInputs); }
+  function collectTtFeatureValues() { return collectInputValues(ttFeatureInputs); }
 
   function buildOkMessage(
     keepAliveEnabled,
@@ -1382,7 +1387,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const btn of $copyBtns) btn.disabled = true;
   }
 
-  function setCurrentColor(hex, { silent = false, time = Date.now() } = {}) {
+  function setCurrentColor(hex, { time = Date.now() } = {}) {
     const norm = normalizeHex(hex);
     if (!norm) return;
     currentHex = norm;
@@ -1410,8 +1415,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     $specimenTime.textContent = formatTime(time);
     $specimenPill.textContent = norm.toUpperCase();
     for (const btn of $copyBtns) btn.disabled = false;
-
-    void silent;
   }
 
   function renderHistory() {

@@ -319,6 +319,25 @@ body {
   letter-spacing: 0.01em;
 }
 
+/* セッション維持の保存済みサイト数バッジ (落とし穴 A: サイト単位設計の可視化) */
+.ka-sites-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border-radius: 9px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ka-sites-count.hidden {
+  display: none;
+}
+
 .tr-desc {
   font-size: 10.5px;
   color: var(--ink-soft);

@@ -55,21 +55,21 @@
       if (!chrome.runtime || !chrome.runtime.id) {
         contextInvalidated = true;
       }
-    } catch (_) {
+    } catch {
       contextInvalidated = true;
     }
     if (contextInvalidated) {
       if (observer) {
-        try { observer.disconnect(); } catch (_) {}
+        try { observer.disconnect(); } catch {}
         observer = null;
       }
       if (rafHandle) {
-        try { cancelAnimationFrame(rafHandle); } catch (_) {}
+        try { cancelAnimationFrame(rafHandle); } catch {}
         rafHandle = 0;
       }
       scanScheduled = false;
       active = false;
-      try { removeAllTotals(); } catch (_) {}
+      try { removeAllTotals(); } catch {}
     }
     return contextInvalidated;
   }

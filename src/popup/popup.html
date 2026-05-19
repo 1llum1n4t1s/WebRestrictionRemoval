@@ -245,7 +245,12 @@
       <label class="toggle-row" id="keepAliveToggleRow">
           <span class="tr-icon" aria-hidden="true">🔄</span>
           <span class="tr-text">
-            <span class="tr-name" data-i18n="keepAliveMaster">セッション維持</span>
+            <span class="tr-name">
+              <span data-i18n="keepAliveMaster">セッション維持</span>
+              <!-- 落とし穴 A 修正: 保存済みサイト数バッジ。サイト単位 ON 設計を視覚化して
+                   「別サイトで popup を開いたら OFF 表示で消えたように見える」誤認を防ぐ。 -->
+              <span class="ka-sites-count hidden" id="keepAliveSitesCount"></span>
+            </span>
             <span class="tr-desc" data-i18n="keepAliveMasterDesc">現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット</span>
           </span>
         <span class="switch">

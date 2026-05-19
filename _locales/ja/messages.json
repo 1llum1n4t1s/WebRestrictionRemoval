@@ -82,6 +82,11 @@
 
   "keepAliveMaster": { "message": "セッション維持" },
   "keepAliveMasterDesc": { "message": "現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット" },
+  "keepAliveSitesCount": {
+    "message": "$N$ サイト保存中",
+    "description": "セッション維持で保存されているサイト数バッジ。サイト単位 ON 設計を可視化して「別サイトで popup を開いたら OFF 表示」誤認を防ぐ。",
+    "placeholders": { "n": { "content": "$1", "example": "3" } }
+  },
   "keepAliveIntervalLabel": { "message": "ポーリング間隔" },
   "keepAliveHttpPingLabel": { "message": "サーバーへの軽量 ping を併発" },
   "keepAliveHttpPingDesc": { "message": "このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨" },

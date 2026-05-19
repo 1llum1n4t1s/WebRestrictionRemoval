@@ -429,8 +429,37 @@ async function getActiveTab() {
  * 「制限解除」機能の削除に伴い、対応するハンドラ（contextMenus 再構築 /
  * MW インラインハンドラ除去 / clipboard 関連 / カスタム右クリック許可リスト）も削除済み。
  */
+// APPLY_SETTINGS payload で受け取った値だけを差分マージするために、
+// toStorageRecord が扱う全キーを 1 箇所に列挙する。settings に含まれないキーは
+// storage 既存値で補完してから normalizeSettings へ渡すことで、partial payload が
+// 来ても他キーが「正規化で false 化」されて消える事故 (= keepAliveEnabled が
+// いつの間にか OFF になる) を防ぐ二重防御。
+const APPLY_SETTINGS_KEYS = Object.freeze([
+  StorageKeys.KEEP_ALIVE_ENABLED,
+  StorageKeys.KEEP_ALIVE_INTERVAL_MS,
+  StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
+  StorageKeys.KEEP_ALIVE_ORIGINS,
+  StorageKeys.SEARCH_FIXER_ENABLED,
+  StorageKeys.SEARCH_FIXER_FEATURES,
+  StorageKeys.SEARCH_FIXER_GRID_ITEMS,
+  StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
+  StorageKeys.INSTAGRAM_CLEANER_ENABLED,
+  StorageKeys.INSTAGRAM_CLEANER_FEATURES,
+  StorageKeys.TIKTOK_CLEANER_ENABLED,
+  StorageKeys.TIKTOK_CLEANER_FEATURES,
+  StorageKeys.VIDEO_GAMMA_ENABLED,
+  StorageKeys.VIDEO_GAMMA_VALUE,
+  StorageKeys.LOUPE_ENABLED,
+  StorageKeys.RTX_ENHANCER_ENABLED,
+]);
+
 async function handleApplySettings(settings) {
-  const normalized = normalizeSettings(settings);
+  // 既存 storage 値で補完してから normalize: settings に含まれないキーがあっても
+  // 「現状の保存値」が引き継がれる。これで partial payload が紛れ込んでも
+  // 他キーが false で wipe されないことを保証する (落とし穴 C 修正)。
+  const existing = await chrome.storage.local.get(APPLY_SETTINGS_KEYS).catch(() => ({}));
+  const merged = { ...existing, ...(settings ?? {}) };
+  const normalized = normalizeSettings(merged);
   await chrome.storage.local.set(toStorageRecord(normalized));
   await notifyContentScripts(normalized);
 }
@@ -512,109 +541,73 @@ async function notifyContentScripts(s) {
   const url = tab.url ?? "";
   if (!url.startsWith("http://") && !url.startsWith("https://")) return;
 
-  // keepalive content script は全 http(s) ページに注入済みなので常に通知。
-  await chrome.tabs
-    .sendMessage(tab.id, {
-      action: Actions.APPLY_KEEP_ALIVE_CS,
-      data: {
-        keepAliveEnabled: s.keepAliveEnabled,
-        keepAliveIntervalMs: s.keepAliveIntervalMs,
-        keepAliveHttpPingEnabled: s.keepAliveHttpPingEnabled,
-        keepAliveOrigins: s.keepAliveOrigins,
-      },
-    })
-    .catch(() => {});
-
-  // 動画ガンマ補正 content script も全 http(s) ページに注入済みなので常に通知。
-  // all_frames: true 注入のため frameId を指定せず全フレームに broadcast する
-  // （iframe 内 <video> も補正対象にするため、各フレームの content script 自身が反応する）。
-  await chrome.tabs
-    .sendMessage(tab.id, {
-      action: Actions.APPLY_VIDEO_GAMMA_CS,
-      data: {
-        enabled: s.videoGammaEnabled,
-        value: s.videoGammaValue,
-      },
-    })
-    .catch(() => {});
-
-  // ルーペ content script も全 http(s) ページに注入済みなので常に通知。
-  // all_frames: false で top frame のみに注入されるため、TOP_FRAME 指定で
-  // 無駄なメッセージブロードキャストを避ける（zoom/size は content 側が storage から直接読むので
-  // ここでは enabled フラグのみ送る）。
-  await chrome.tabs
-    .sendMessage(tab.id, {
-      action: Actions.APPLY_LOUPE_CS,
-      data: { enabled: s.loupeEnabled },
-    }, { frameId: 0 })
-    .catch(() => {});
-
-  // RTX 動画強化 content script も全 http(s) ページに注入済み (top frame のみ)。
-  // 有効/無効フラグだけを top frame に送る。content script 側は storage.onChanged でも同期するので、
-  // ここは active tab 即時反映用。
-  await chrome.tabs
-    .sendMessage(tab.id, {
-      action: Actions.APPLY_RTX_ENHANCER_CS,
-      data: { enabled: s.rtxEnhancerEnabled },
-    }, { frameId: 0 })
-    .catch(() => {});
-
-  // A1-2 / #11 対策: youtube-shorts / search-fixer / amazon-delivery-total / instagram-cleaner は
-  // いずれも `all_frames: false` で top frame にしか注入されない。それでも sendMessage に
-  // frameId を指定しないと Chrome は全フレームへブロードキャストしてしまうため、`{ frameId: 0 }`
-  // で top frame に明示的に絞ってメッセージング負荷を最小化する。
-  // keepalive は `all_frames: true` で全フレームに注入されるため意図的に frameId 指定なし。
+  // A1-2 / #11 対策: top frame のみ注入の content script (search-fixer / amazon-delivery-total /
+  // instagram-cleaner / tiktok-cleaner / loupe / rtx-enhancer) は frameId 指定なしだと
+  // 全フレームへブロードキャストされるため、`{ frameId: 0 }` で明示する。
+  // keepalive は `all_frames: true` / video-gamma も `all_frames: true` で全フレーム必要なので
+  // 意図的に frameId 指定なし。
   const TOP_FRAME = { frameId: 0 };
 
+  // /opop PF-1 + CL-6: 各 sendMessage は独立 (受信側 cs は別 isolated world)、5〜8 RTT を
+  // 直列 await ではなく Promise.all で並列発射して apply 経路全体のレイテンシを max(各 RTT) に圧縮。
+  // 受信側不在 reject (chrome:// / about: / 非マッチタブ) は expected なので safeSendMessage で silent skip。
+  const messages = [
+    // keepalive: all_frames: true なので frameId 指定なし
+    [{ action: Actions.APPLY_KEEP_ALIVE_CS, data: {
+      keepAliveEnabled: s.keepAliveEnabled,
+      keepAliveIntervalMs: s.keepAliveIntervalMs,
+      keepAliveHttpPingEnabled: s.keepAliveHttpPingEnabled,
+      keepAliveOrigins: s.keepAliveOrigins,
+    } }, undefined],
+    // 動画ガンマ補正: all_frames: true (iframe 内 <video> も対象)
+    [{ action: Actions.APPLY_VIDEO_GAMMA_CS, data: {
+      enabled: s.videoGammaEnabled,
+      value: s.videoGammaValue,
+    } }, undefined],
+    // ルーペ: top frame のみ
+    [{ action: Actions.APPLY_LOUPE_CS, data: { enabled: s.loupeEnabled } }, TOP_FRAME],
+    // RTX 動画強化: top frame のみ
+    [{ action: Actions.APPLY_RTX_ENHANCER_CS, data: { enabled: s.rtxEnhancerEnabled } }, TOP_FRAME],
+  ];
   if (isYouTubeUrl(url)) {
-    // Shorts 削除も YouTube クリーナーのサブ機能 (features.removeShorts) として
-    // 統合されたため、メッセージは APPLY_SEARCH_FIXER_CS のみ。
-    // youtube-shorts.js / search-fixer.js の両方が同一 isolated world で
-    // この 1 メッセージを購読し、各々の責務に応じて反応する。
-    await chrome.tabs
-      .sendMessage(tab.id, {
-        action: Actions.APPLY_SEARCH_FIXER_CS,
-        data: {
-          enabled: s.searchFixerEnabled,
-          features: s.searchFixerFeatures,
-          gridItems: s.searchFixerGridItems,
-        },
-      }, TOP_FRAME)
-      .catch(() => {});
+    // Shorts 削除も YouTube クリーナーのサブ機能 (features.removeShorts) として統合されたため、
+    // メッセージは APPLY_SEARCH_FIXER_CS のみ。youtube-shorts.js / search-fixer.js の両方が
+    // 同一 isolated world でこの 1 メッセージを購読し、各々の責務に応じて反応する。
+    messages.push([{ action: Actions.APPLY_SEARCH_FIXER_CS, data: {
+      enabled: s.searchFixerEnabled,
+      features: s.searchFixerFeatures,
+      gridItems: s.searchFixerGridItems,
+    } }, TOP_FRAME]);
   }
-
   if (isAmazonAutoDeliveryUrl(url)) {
-    await chrome.tabs
-      .sendMessage(tab.id, {
-        action: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS,
-        data: { enabled: s.amazonDeliveryTotalEnabled },
-      }, TOP_FRAME)
-      .catch(() => {});
+    messages.push([{ action: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS, data: {
+      enabled: s.amazonDeliveryTotalEnabled,
+    } }, TOP_FRAME]);
   }
-
   if (isInstagramUrl(url)) {
-    await chrome.tabs
-      .sendMessage(tab.id, {
-        action: Actions.APPLY_INSTAGRAM_CLEANER_CS,
-        data: {
-          enabled: s.instagramCleanerEnabled,
-          features: s.instagramCleanerFeatures,
-        },
-      }, TOP_FRAME)
-      .catch(() => {});
+    messages.push([{ action: Actions.APPLY_INSTAGRAM_CLEANER_CS, data: {
+      enabled: s.instagramCleanerEnabled,
+      features: s.instagramCleanerFeatures,
+    } }, TOP_FRAME]);
   }
-
   if (isTikTokUrl(url)) {
-    await chrome.tabs
-      .sendMessage(tab.id, {
-        action: Actions.APPLY_TIKTOK_CLEANER_CS,
-        data: {
-          enabled: s.tiktokCleanerEnabled,
-          features: s.tiktokCleanerFeatures,
-        },
-      }, TOP_FRAME)
-      .catch(() => {});
+    messages.push([{ action: Actions.APPLY_TIKTOK_CLEANER_CS, data: {
+      enabled: s.tiktokCleanerEnabled,
+      features: s.tiktokCleanerFeatures,
+    } }, TOP_FRAME]);
   }
+  await Promise.all(messages.map(([msg, opts]) => safeSendMessage(tab.id, msg, opts)));
+}
+
+/**
+ * 受信側不在 reject (chrome:// / about: / 非マッチタブ / content script 未注入) は expected なので
+ * silent skip する。CLAUDE.md「`chrome.runtime.sendMessage` の expected error」参照。
+ */
+function safeSendMessage(tabId, message, options) {
+  const p = options
+    ? chrome.tabs.sendMessage(tabId, message, options)
+    : chrome.tabs.sendMessage(tabId, message);
+  return p.catch(() => {});
 }
 
 function isYouTubeUrl(url) {
@@ -976,18 +969,17 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
   }
 
   // 新規接続: tabCapture から streamId を取得。
+  // Chrome 119+ の Promise.withResolvers() で callback と Promise の参照位置を物理的に近く保つ
+  // (/opop MN-2 適用、minimum_chrome_version 140 で利用可能)
   let streamId = null;
   try {
-    streamId = await new Promise((resolve, reject) => {
-      chrome.tabCapture.getMediaStreamId(
-        { targetTabId: tabId },
-        (id) => {
-          const err = chrome.runtime.lastError;
-          if (err) reject(new Error(err.message));
-          else resolve(id);
-        }
-      );
+    const { promise, resolve, reject } = Promise.withResolvers();
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
+      const err = chrome.runtime.lastError;
+      if (err) reject(new Error(err.message));
+      else resolve(id);
     });
+    streamId = await promise;
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
   }

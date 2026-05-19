@@ -598,16 +598,21 @@
   }
 
   function removeAllOverlays() {
-    const buttons = document.querySelectorAll("." + ImageDownloader.BUTTON_CLASS);
-    buttons.forEach((b) => b.remove());
-    document.querySelectorAll("." + ImageDownloader.HOST_CLASS).forEach((h) => {
-      h.classList.remove(ImageDownloader.HOST_CLASS);
-    });
-    document.querySelectorAll("." + ImageDownloader.HOST_POSITIONED_CLASS).forEach((h) => {
-      h.classList.remove(ImageDownloader.HOST_POSITIONED_CLASS);
-    });
-    document.querySelectorAll(ImageDownloader.SCANNED_SRC_ATTR_SELECTOR).forEach((i) => {
-      delete i.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
+    // /opop PF-4: 4 連 document.querySelectorAll を `:is()` 統合で 1 回スキャンに圧縮。
+    // 大規模 DOM (IG フィード ~10 万ノード) で OFF 切替時の hitch (10-30ms) を削減。
+    // 関心事 (button.remove / host class / scanned dataset) は要素ごとに分岐する。
+    const sel =
+      `.${ImageDownloader.BUTTON_CLASS},.${ImageDownloader.HOST_CLASS},` +
+      `.${ImageDownloader.HOST_POSITIONED_CLASS},${ImageDownloader.SCANNED_SRC_ATTR_SELECTOR}`;
+    document.querySelectorAll(`:is(${sel})`).forEach((el) => {
+      if (el.classList.contains(ImageDownloader.BUTTON_CLASS)) {
+        el.remove();
+        return;
+      }
+      el.classList.remove(ImageDownloader.HOST_CLASS, ImageDownloader.HOST_POSITIONED_CLASS);
+      if (el.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] !== undefined) {
+        delete el.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
+      }
     });
   }
 

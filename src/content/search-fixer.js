@@ -1066,7 +1066,11 @@
   function highlightThumbnails() {
     if (!isResultsPage()) return;
     const enabled = f("highlightThumb");
-    const isDark = document.documentElement.hasAttribute("dark");
+    // /opop PF-2: OFF かつ未装飾なら querySelectorAll を走らせず即 return。
+    // highlightThumb はデフォルト OFF なので、99% のユーザーで毎 scan 空走査になる経路を回避。
+    const root = document.documentElement;
+    if (!enabled && !root.classList.contains("__cpa-sfx-thumb-applied")) return;
+    const isDark = root.hasAttribute("dark");
     const items = document.querySelectorAll(
       "ytd-video-renderer.style-scope.ytd-item-section-renderer"
     );
@@ -1079,9 +1083,9 @@
     // 装飾済みマーカー: SPA で検索結果ページから離れた後の clearThumbnailHighlight が
     // querySelectorAll を走らせるかどうかをこのフラグで判定 (空走査回避)
     if (enabled && items.length > 0) {
-      document.documentElement.classList.add("__cpa-sfx-thumb-applied");
+      root.classList.add("__cpa-sfx-thumb-applied");
     } else {
-      document.documentElement.classList.remove("__cpa-sfx-thumb-applied");
+      root.classList.remove("__cpa-sfx-thumb-applied");
     }
   }
 
@@ -1131,6 +1135,12 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
+  // ストップワードは英語の汎用語のみ。日本語の助詞は分かち書きされていないため除外不可（実害最小）。
+  // /opop PF-3: rAF ごとの Set 再生成を避けて module-scope に移動 (GC プレッシャ削減)。
+  const STOP_WORDS = new Set([
+    "a", "an", "the", "is", "are", "of", "in", "on", "at", "for", "with", "by", "and", "or",
+  ]);
+
   function highlightMismatchedVideos() {
     if (!isResultsPage()) return;
     if (!f("demoteUnmatched")) return;
@@ -1139,14 +1149,10 @@
     const query = (params.get("search_query") ?? "").trim();
     if (!query) return;
 
-    // ストップワードは英語の汎用語のみ。日本語の助詞は分かち書きされていないため除外不可（実害最小）
-    const stopWords = new Set([
-      "a", "an", "the", "is", "are", "of", "in", "on", "at", "for", "with", "by", "and", "or",
-    ]);
     const keywords = query
       .toLowerCase()
       .split(/\s+/)
-      .filter((w) => w.length > 1 && !stopWords.has(w));
+      .filter((w) => w.length > 1 && !STOP_WORDS.has(w));
     if (keywords.length === 0) return;
 
     const videos = document.querySelectorAll(

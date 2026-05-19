@@ -18,7 +18,7 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm run lint                 # ESLint v8 + no-implicit-globals + 17 globalThis 定数列挙 (/rere D-004 で v1.0.30 導入)
+npm run lint                 # ESLint v9 flat config + no-implicit-globals (warn) + 18 globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で v1.0.30 導入)
 npm test                     # Node.js 標準 test runner、61 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
@@ -279,7 +279,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` |
-| `src/lib/actions.js` | `Object.freeze` された 17 個の定数を IIFE wrap + globalThis 公開: Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / Loupe / ColorPicker / PopupTabs |
+| `src/lib/actions.js` | `Object.freeze` された 18 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / Loupe / ColorPicker / PopupTabs |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |

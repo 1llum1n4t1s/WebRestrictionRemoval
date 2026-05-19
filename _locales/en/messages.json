@@ -82,6 +82,11 @@
 
   "keepAliveMaster": { "message": "Keep session alive" },
   "keepAliveMasterDesc": { "message": "Reset idle detection on the current site by dispatching synthetic events." },
+  "keepAliveSitesCount": {
+    "message": "$N$ site(s) saved",
+    "description": "Badge showing the number of sites enabled for the keep-alive feature. Makes the per-site design visible so users don't misread it as 'turned off' when opening popup on another site.",
+    "placeholders": { "n": { "content": "$1", "example": "3" } }
+  },
   "keepAliveIntervalLabel": { "message": "Polling interval" },
   "keepAliveHttpPingLabel": { "message": "Also send a lightweight server ping" },
   "keepAliveHttpPingDesc": { "message": "HEAD/GET only against the top frame of this site. Disable behind auth proxies." },

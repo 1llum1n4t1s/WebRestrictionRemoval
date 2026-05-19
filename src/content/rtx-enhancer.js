@@ -32,6 +32,9 @@
   // hint 要素のクラス名と video 側のマーカー属性 (cleanup と重複検知に使う)
   const HINT_CLASS = "__cpa-rtx-hint";
   const VIDEO_MARKER = "__cpaRtxAttached"; // data-* dataset key (camelCase で data-* attribute に対応)
+  // querySelector で attribute selector を組むときは kebab-case 化が必要。コンパイル時定数化で
+  // ランタイム camelToKebab(VIDEO_MARKER) 計算を排除 (/opop MN-1)
+  const VIDEO_MARKER_ATTR = "data-__cpa-rtx-attached";
 
   let mutationObserver = null;
   // /rere B2-014: rAF coalesce 用、複数 mutation を 1 フレームに圧縮
@@ -91,14 +94,10 @@
     hints.forEach((h) => {
       try { h.remove(); } catch {}
     });
-    const taggedVideos = document.querySelectorAll("video[data-" + camelToKebab(VIDEO_MARKER) + "]");
+    const taggedVideos = document.querySelectorAll("video[" + VIDEO_MARKER_ATTR + "]");
     taggedVideos.forEach((v) => {
       try { delete v.dataset[VIDEO_MARKER]; } catch {}
     });
-  }
-
-  function camelToKebab(s) {
-    return s.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
   }
 
   /**
