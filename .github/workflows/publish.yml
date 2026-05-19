@@ -263,11 +263,27 @@ jobs:
           # (AMO API v5 仕様: 各 version 提出時に license 明示必須、過去 version からの継承なし)。
           # .amo-metadata.json は categories + version.license のみで listing メタは含まないため、
           # listing の plain text 化リスクなし (CLAUDE.md Important Patterns 8 参照)。
+          #
+          # /vava v1.0.31 + CLAUDE.md「Firefox AMO 対応 #9」: `web-ext sign --channel=listed` は
+          # AMO の auto-sign を待たずに 15 分で timeout exceeded を返して exit 1 になる既知挙動。
+          # submission 自体は受理済み (URL から確認できる) なので、timeout exceeded を検出したら
+          # warning 扱いで exit 0 に書き換えて CI を green 化する。それ以外の exit 1 はそのまま fail。
+          set +e
           npx --no web-ext sign \
             --source-dir=firefox-build \
             --artifacts-dir=web-ext-artifacts \
             --channel=listed \
-            --amo-metadata=.amo-metadata.json
+            --amo-metadata=.amo-metadata.json 2>&1 | tee /tmp/web-ext.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            if grep -q "Approval: timeout exceeded" /tmp/web-ext.log; then
+              echo "::warning::web-ext sign が timeout exceeded で exit 1 を返したが submission は AMO に受理済み (CLAUDE.md「Firefox AMO 対応 #9」既知挙動)。CI green 化のため exit 0 扱いに変換します"
+            else
+              echo "::error::web-ext sign が timeout exceeded 以外の理由で失敗しました (rc=$rc)。ログ確認要"
+              exit "$rc"
+            fi
+          fi
           echo "🦊 Firefox AMO への submission 送信完了 (レビュー待ち)"
           echo "🔗 AMO Developer Hub: https://addons.mozilla.org/developers/"
           echo "⏰ レビュー結果は通常 1〜数日でメール通知"
