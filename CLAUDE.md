@@ -19,7 +19,7 @@ npm run build                # アイコン + スクリーンショット一括�
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
 npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 18 globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-npm test                     # Node.js 標準 test runner、61 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値を含む）
+npm test                     # Node.js 標準 test runner、62 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -105,7 +105,7 @@ Popup (src/popup/popup.{html,js,css})
 
 ### Background (`src/background/background.js`)
 Service worker。役割:
-1. **設定の集約と各 content script への配布**: `APPLY_SETTINGS` を popup から受信し、storage 保存と active tab 通知を行う。YouTube タブ / Amazon `auto-deliveries` タブ判定は URL パターンで行う。非マッチタブには receiver 不在で例外になるため `try/catch` でガード。
+1. **設定の集約と各 content script への配布**: `APPLY_SETTINGS` を popup から受信し、`handleApplySettings` で **storage 既存値とマージしてから** `normalizeSettings` → `chrome.storage.local.set` + `notifyContentScripts` の順で処理する (`APPLY_SETTINGS_KEYS` 列挙ベースの merge 防御、Important Patterns「APPLY_SETTINGS 経路の partial payload 防御」参照)。`notifyContentScripts` は 5〜8 個の `chrome.tabs.sendMessage` を **`Promise.all` で並列発射** し、各 send は `safeSendMessage` ヘルパーで `.catch(() => {})` 集約 (受信側不在は expected error として silent skip)。YouTube タブ / Amazon `auto-deliveries` タブ判定は URL パターンで条件付き dispatch。
 2. **Offscreen Document ライフサイクル管理**: `ensureOffscreenDocument()` で並行作成ガード、`scheduleOffscreenClose()` で 30 秒アイドル後に自動クローズ。**音量ブースト中タブが残っている間は close を再延期**（`isVolumeBoosterActive` で確認、SW 再起動直後は安全側に倒す）。`reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。
 3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode, muted)` がエントリ。UNITY release 条件・既存 AudioContext 経路・自動ゲイン / compressor preset・ミュート時の gain ramp to 0 の詳細は Important Patterns 参照。
 4. **音量ブースター自動適用**: `chrome.tabs.onActivated` で `autoApplyVolumeBooster(tabId)` を呼び出し。**既に boost 中のタブのみ**（`boostedTabIds.has(tabId)` ガード）が対象。新規タブは `tabCapture.getMediaStreamId` の user gesture 要件によりpopup open が必要。`chrome.storage.onChanged` で `volumeBoosterEnabled` が `false` になったら `releaseAllVolumeBoosterTabs()` で全 AudioContext を即座に解放（SW 再起動後 `boostedTabIds` が空の場合は offscreen に `ACTION_VOLUME_RELEASE_ALL` を直接送信するフォールバック経路あり）。
@@ -303,7 +303,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト 61 件: globalThis 17 個公開 / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** 等。件数 drift を CI で検知できる単一情報源 |
+| `test/actions.test.js` | 純粋関数テスト 62 件: globalThis 18 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合** 等。件数 drift を CI で検知できる単一情報源 |
 | `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**listing (説明文 / スクリーンショット / カテゴリ) 変更時は CWS / AMO ともに API 更新エンドポイントが弱いため Dashboard で先行手動更新が必要**。 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
@@ -335,6 +335,8 @@ WebRestrictionRemoval は Chrome + Firefox 両対応で、**音量ブースタ�
 7. **`if: success() || failure()` で Chrome / Firefox 独立実行** — publish.yml の `publish-firefox` job に必須。Chrome publish が同 version 重複 upload 等で失敗しても Firefox AMO step は連鎖 skip されず独立 submit される (ReplaceFontSelect が release/3.0.3 で踏んで確立した不変条件)。
 
 8. **AMO listing は plain text 化される** — API 経由で送る `<ul>` 等は `&lt;ul&gt;` としてエスケープ保存される。リッチ HTML 表示は AMO Dashboard のリッチテキストエディタ経由のみ可能。`webstore/store-listing.firefox.{ja,en}.txt` は絵文字 + `・` 等で plain text 構造化済み。
+
+9. **`web-ext sign --channel=listed` の `Approval: timeout exceeded` は warning 化済み** (v1.0.31 publish.yml で実装) — Mozilla の AMO 自動 sign は listed channel で動かないため、CLI は 15 分待って `WebExtError: Approval: timeout exceeded` で `exit 1` を返す。 ただし submission 自体は **AMO に受理済み** (ログ URL `addons.mozilla.org/.../versions/<id>` で確認可能)。publish.yml では `tee /tmp/web-ext.log` + `grep "Approval: timeout exceeded"` で検出時のみ `::warning::` + `exit 0` 化して CI を green に保つ。それ以外の `exit 1` (credentials 不備等) はそのまま fail として残す設計。同 version 再 push は AMO に重複拒否されるため、release/X.Y.Z への fast-forward は控える運用。
 
 
 ### 設計の起点
@@ -451,6 +453,42 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 ### マイグレーション
 - **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。注: `volumeBoosterEnabled` は過去に廃止→再導入されたキー。legacy 削除リストに含めないこと。
 - **新規 storage key は `onInstalled` で必ず初期化** — `volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `searchFixerFeatures.hideComments` のような後追いキーは未設定時 `undefined` で UI 側に出るとトグルが表示されない・無効状態になるため、必ず `onInstalled` で `false` (boolean) / `VolumeBooster.DEFAULT` (数値) 初期化する。`normalizeSettings()` 側でも `=== true` 防御的判定を入れる（`!!value` だと storage の落ちた object 値で誤判定が出るため）。
+
+### APPLY_SETTINGS 経路の partial payload 防御 (v1.0.31 で確立、「いつの間にか OFF」4 経路対策)
+
+ユーザーが「拡張機能の更新で設定がいつの間にか OFF になる」と感じる現象は **コードレベルの 4 つの落とし穴** が原因。各経路は独立しているため **複合防御** が必須。新規 master トグル / storage key 追加時は本セクションのチェックリストを必ず通すこと。
+
+**経路 A: サイト単位 ON 設計の不可視性 (UX)**
+セッション維持のように「現在のサイト単位」で ON/OFF する設計だと、別サイトで popup を開いた瞬間にトグルが OFF 表示される → 「消えた」と誤認される。
+- 対策: popup に「N サイト保存中」型のサマリバッジを必ず添える (`updateKeepAliveSitesCount()` パターン、i18n キーは `<feature>SitesCount` 形式)。サイト単位設計を採用する新機能でも同様に visualize する
+
+**経路 B: popup 内変数の stale 化 race**
+popup の `apply()` が popup load 時のスナップショット変数を元に storage を書き戻すと、複数 popup 同時開きや別経路書き換えで race が起きて他 popup の追加分が wipe される。
+- 対策 1: popup の `apply()` 入口で対象キーを `chrome.storage.local.get(KEY)` で **再取得してからマージ**する。失敗時のみ popup 内変数フォールバック
+- 対策 2: popup の `chrome.storage.onChanged` リスナーで対象キーを監視 → popup 内変数 + UI を即同期 (二重防御)
+- 対策 3: 該当 syncing をヘルパー関数化 (`syncKeepAliveToggleFromState()` 等) して popup load 時の評価ロジックと共通化
+
+**経路 C: handleApplySettings の partial payload による上書き**
+`normalizeSettings(settings)` は `settings?.X === true` で正規化するため、popup が送らないキーは `undefined` → `false` に化けて全キー一括 storage 書き込みで既存 true が wipe される。
+- 対策: `handleApplySettings` で **storage 既存値とマージしてから** normalize する。`APPLY_SETTINGS_KEYS` 配列で対象キーをホワイトリスト化:
+  ```js
+  const existing = await chrome.storage.local.get(APPLY_SETTINGS_KEYS).catch(() => ({}));
+  const merged = { ...existing, ...(settings ?? {}) };
+  const normalized = normalizeSettings(merged);
+  await chrome.storage.local.set(toStorageRecord(normalized));
+  ```
+- popup の `apply()` が全キーを送る現行設計と組み合わせて二重防御。新規 storage key を追加したら `APPLY_SETTINGS_KEYS` にも追加すること
+
+**経路 D: popup の stored get リスト欠落 (致命バグパターン、RTX で発覚)**
+popup load 時の `stored = await chrome.storage.local.get([...keys])` リストと、stored 参照箇所 (`stored[KEY]`) は完全に対応している必要がある。**get リストに無いキーを参照すると `undefined` → UI で常に false 表示 → apply() で false 上書き → storage の既存 true が破壊**される。
+- 対策: 新規 master トグル / 設定キー追加時の **6 ポイントチェックリスト** を必ず通す
+  1. `StorageKeys.<KEY>` を `src/lib/actions.js` に追加
+  2. `onInstalled` の defaults 初期化リスト (`background.js`) に `<KEY>` を追加
+  3. `APPLY_SETTINGS_KEYS` / `normalizeSettings` / `toStorageRecord` の 3 関数全てに `<KEY>` を追加 (drift 防止)
+  4. **popup の `stored = chrome.storage.local.get([...])` リストに `<KEY>` を追加** ⚠️
+  5. popup の `apply()` payload に `<KEY>` を含める
+  6. `test/actions.test.js` の `SettingsSchema` 整合アサートで件数を更新
+- 過去事例: v1.0.31 で `RTX_ENHANCER_ENABLED` が #4 だけ漏れていて、popup 表示が常に OFF → 別トグル変更で storage 上書き → 永久 OFF 化する致命バグを修正
 
 ### 音量ブースター popup → storage 直書きの防御 (/rere v1.0.28 確立)
 **音量ブースター 6 キー** (`volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterMutedEnabled`) のみ popup から直接 `chrome.storage.local.set` する設計で、background の `normalizeSettings` を経由しない。
