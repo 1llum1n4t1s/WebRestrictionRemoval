@@ -60,6 +60,17 @@
   "videoGammaResetBtn": { "message": "Reset to 1.0" },
   "videoGammaResetAria": { "message": "Reset gamma to 1.0" },
 
+  "videoFillMaster": { "message": "Remove video black bars" },
+  "videoFillMasterDesc": { "message": "Removes letterbox/pillarbox black bars on ultrawide screens by zooming or stretching the video to fill the screen." },
+  "videoFillModeLabel": { "message": "Display mode" },
+  "videoFillModeAriaLabel": { "message": "Select display mode" },
+  "videoFillModeZoom": { "message": "Zoom" },
+  "videoFillModeStretch": { "message": "Stretch" },
+  "videoFillTargetLabel": { "message": "Your monitor" },
+  "videoFillTargetDesc": { "message": "Pick your screen's aspect ratio or resolution; each video's shape is auto-detected to remove black bars." },
+  "videoFillGroupAspect": { "message": "Aspect ratio" },
+  "videoFillGroupResolution": { "message": "Resolution" },
+
   "loupeMaster": { "message": "Loupe" },
   "loupeMasterDesc": { "message": "Magnify the current view with a circular lens. Best used after pausing videos. Left-click to turn off." },
   "rtxEnhancerMaster": { "message": "RTX video enhancement" },
@@ -79,6 +90,13 @@
     "message": "Show a per-month total on the <code class=\"tr-code\">/auto-deliveries</code> page.",
     "description": "Master toggle description (HTML allowed)"
   },
+  "amazonRankingJumpMaster": { "message": "Jump-to-ranking button" },
+  "amazonRankingJumpMasterDesc": {
+    "message": "Show a \"Go to this product's ranking\" button at the top of product pages.",
+    "description": "Master toggle description for the Amazon jump-to-ranking button"
+  },
+  "amazonRankingJumpButton": { "message": "Go to this product's ranking" },
+  "amazonRankingJumpAriaLabel": { "message": "Go to this product's ranking" },
 
   "keepAliveMaster": { "message": "Keep session alive" },
   "keepAliveMasterDesc": { "message": "Reset idle detection on the current site by dispatching synthetic events." },
@@ -92,7 +110,7 @@
   "keepAliveHttpPingDesc": { "message": "HEAD/GET only against the top frame of this site. Disable behind auth proxies." },
 
   "searchFixerMaster": { "message": "YouTube cleaner" },
-  "searchFixerMasterDesc": { "message": "Manage 29 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
+  "searchFixerMasterDesc": { "message": "Manage 30 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
 
   "instagramCleanerMaster": { "message": "Instagram cleaner" },
   "instagramCleanerMasterDesc": { "message": "Hide redundant UI such as Reels, Explore, and Stories in one toggle." },
@@ -191,6 +209,9 @@
   "categoryVideoFilter": { "message": "Video filter" },
   "categoryWatchPage": { "message": "Watch page" },
   "categorySearchOnly": { "message": "Search results" },
+  "ytCleanerSubtabsAria": { "message": "YouTube cleaner categories" },
+  "igCleanerSubtabsAria": { "message": "Instagram cleaner categories" },
+  "tuneSubtabsAria": { "message": "Tune categories" },
   "categoryIgMain": { "message": "Main" },
   "categoryIgExtra": { "message": "Extras" },
   "categoryTtMain": { "message": "Main" },
@@ -198,9 +219,11 @@
   "applyOkSession": { "message": "Keep-alive" },
   "applyOkSearchFixer": { "message": "YT cleaner" },
   "applyOkAmazon": { "message": "Amazon" },
+  "applyOkAmazonRanking": { "message": "Ranking jump" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
   "applyOkVideoGamma": { "message": "Video gamma" },
+  "applyOkVideoFill": { "message": "Black bar removal" },
   "applyOkLoupe": { "message": "Loupe" },
   "applyOkAllStopped": { "message": "⏹  All stopped" },
   "applyOkPrefix": { "message": "✓  " },
@@ -277,7 +300,7 @@
   "feat_sf_redirectShortsUrl_label": { "message": "Redirect Shorts URL to /watch" },
   "feat_sf_redirectShortsUrl_desc": { "message": "Force a /shorts/<ID> vertical-video page to the regular /watch?v=<ID> player." },
   "feat_sf_searchGrid_label": { "message": "Show search results as grid" },
-  "feat_sf_searchGrid_desc": { "message": "Convert search results from a single-column list to a multi-column grid (uses Home columns 4/5/6 if set; otherwise 3 columns)." },
+  "feat_sf_searchGrid_desc": { "message": "Convert search results from a single-column list to a multi-column grid (column count follows the grid setting; Auto matches the Home column count)." },
   "feat_sf_removeShortsChip_label": { "message": "Shorts filter chip" },
   "feat_sf_removeShortsChip_desc": { "message": "Remove only the \"Shorts\" chip from the filter row (\"All / Videos / Shorts / Playlists …\") at the top of the search page." },
   "feat_sf_removeShortsSidebar_label": { "message": "Shorts sidebar entry" },
@@ -288,6 +311,8 @@
   "feat_sf_subsAllShortcut_desc": { "message": "Add a one-click entry to /feed/channels at the top of the left sidebar Subscriptions section, styled like a native menu item." },
   "feat_sf_subsChannelsGrid_label": { "message": "Subscriptions page as grid (with search & sort)" },
   "feat_sf_subsChannelsGrid_desc": { "message": "Reshape /feed/channels into a responsive grid like a video feed, with a search box and sort toggle (name / subscribers / subscription order). Each card lazy-fetches the latest video thumbnail when entering the viewport (cached 24h)." },
+  "feat_sf_homeGrid_label": { "message": "Align Home/feeds as grid" },
+  "feat_sf_homeGrid_desc": { "message": "Lay out the Home and subscription feeds as a gap-free grid (packs videos across shelves like Shorts). Also aligns when columns are set to Auto (with 4/5/6 columns it always grids, even with this toggle off)." },
 
   "feat_ig_reels_label": { "message": "Remove Reels" },
   "feat_ig_reels_desc": { "message": "Hide the Reels entry in the sidebar/navigation and force-redirect /reels/ URLs to Home." },

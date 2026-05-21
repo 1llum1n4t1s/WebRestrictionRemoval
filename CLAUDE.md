@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 10 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能）」「Amazon 定期おトク便 月別合計」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 10 機能のうち 9 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 12 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）」「Amazon 定期おトク便 月別合計」「Amazon ランキングへ移動ボタン（商品詳細欄の売れ筋ランキングリンクを商品情報最上部の集約ボタンにまとめ、一番細かいサブカテゴリへ同タブ移動）」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「動画の黒帯除去（ウルトラワイド画面などで動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出・全タブ共通設定）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 12 機能のうち 11 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 popup は **5 タブ構成** (`調整 / YouTube / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
 
@@ -46,6 +46,7 @@ node --check src/lib/actions.js \
   && node --check src/content/search-fixer.js \
   && node --check src/content/keepalive.js \
   && node --check src/content/amazon-delivery-total.js \
+  && node --check src/content/amazon-ranking-jump.js \
   && node --check src/content/instagram-cleaner.js \
   && node --check src/content/tiktok-cleaner.js \
   && node --check src/content/video-gamma.js \
@@ -93,7 +94,7 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**9 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / RTX 動画強化 / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 29 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**9 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / RTX 動画強化 / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 30 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
 
 **クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
@@ -140,7 +141,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 **サイドバー 多言語対応**: `aria-label="Shorts"` (英語) と `aria-label="ショート"` (日本語) を CSS selector に併記する。日本語ロケールの初期 flash を CSS で即時非表示にするため。`title` 属性も同様。
 
 ### YouTube クリーナー (`src/content/search-fixer.js`)
-`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。29 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
+`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) の 3 キーで管理（変数名は履歴的に `searchFixer*` を使用）。30 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
 
 **`hideComments` 実装上の注意**: `applyWatchPageClasses()` は `<html>` に `__cpa-sfx-hide-comments` クラスを付け外しする実装で、**`isWatchPage()` 判定を経由せず無条件に呼ぶ**こと。watch page 限定にすると SPA で video → home に遷移したとき `<html>` クラスが残置されて他ページに副作用が出る（CodeRabbit レビューで実際に指摘された罠）。CSS 側は `html.__cpa-sfx-hide-comments ytd-comments#comments { display: none !important; }` で watch page 以外には影響しないため、JS は無条件 toggle で良い。
 
@@ -216,6 +217,13 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 **動作対象**: top frame 限定、`[data-delivery-type]` セクションの `.subscription-price` を `/\D/g` で数値化して合計、各セクションの `.a-fixed-left-grid-col` に `__cpa-amzn-delivery-total` クラスのルート要素を append。OFF 時は observer 切断 + 既存挿入要素を全部撤去（撤去操作も同じ guard 経由）。
 
+### Amazon ランキングへ移動ボタン (`src/content/amazon-ranking-jump.js` + `src/content/amazon-ranking-jump.css`)
+`*://www.amazon.co.jp/*` 限定（top frame のみ）。`amazonRankingJumpEnabled` (boolean、デフォルト OFF オプトイン) 1 storage key で master 制御。商品詳細欄の「Amazon 売れ筋ランキング」リンクは商品ページごとに出現位置がバラバラで探しにくいので、商品情報の最上部（`#title_feature_div` の直前を第一候補にフォールバック順に挿入）に「この商品が所属するランキングへ移動」ボタン (`<a href>`) を 1 つ集約して表示する。クリックでブラウザ標準ナビゲーションにより**同じタブ**でランキングへ移動。外部送信ゼロ・純粋 DOM 操作（価格・履歴の取得は一切しない）。
+
+**移動先選定**: `AmazonRankingJump.DETAIL_CONTAINER_SELECTORS`（`#detailBulletsWrapper_feature_div` 等の商品詳細コンテナ id 群）の中の `a[href*="bestsellers/"]` だけを走査する（カテゴリページ等の無関係なベストセラーリンクを拾わず**商品ページで自己ゲート**）。集めた href から `AmazonRankingJump.selectTargetHref` で「一番細かいサブカテゴリ」= ノード id を持つサブカテゴリリンク (`/bestsellers/<slug>/<digits>/`) のうち DOM 上で最後のものを選ぶ（Amazon は広い→細かいの順に並べるため）。サブカテゴリが無ければ最後のリンクにフォールバック。`isSubcategoryHref` / `selectTargetHref` は actions.js の純粋関数で、`test/actions.test.js` が境界値を検証する。
+
+**実装上の不変条件**: top frame 限定、`window.__cpaAmazonRankingJumpRunning` で二重実行防止。MutationObserver で遅延読み込みされる商品詳細欄に追従し、自分のボタン挿入 / href 更新による再発火は **rAF coalesce + disconnect → render → takeRecords → observe ガード**（定期おトク便と同型）で抑える。ボタンは差分更新（href / カテゴリ名が変化時のみ書き込み）+ `isConnected` チェックで Amazon の再 render による剥落時に再挿入。context invalidation guard で orphan 化時に observer disconnect + ボタン撤去。master OFF / 非商品ページ（ランキングリンク無し）でボタン撤去。
+
 ### Instagram クリーナー (`src/content/instagram-cleaner.js` + `src/content/instagram-cleaner.css`)
 `*://*.instagram.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に `run_at: document_idle` で注入。`window.__cpaInstagramCleanerRunning` で二重実行防止。`instagramCleanerEnabled` (master) + `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理。11 機能の単一情報源は `actions.js` の `InstagramCleaner.FEATURES`。
 
@@ -279,18 +287,19 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` |
-| `src/lib/actions.js` | `Object.freeze` された 18 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / Loupe / ColorPicker / PopupTabs |
+| `src/lib/actions.js` | `Object.freeze` された 20 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
 | `src/content/youtube-early.js` | YouTube watch ページ向け `document_start` 注入の最小スクリプト。hideLiveChat ON 時に `<html>` へ `__cpa-sfx-hide-live-chat-pre` クラスを最速付与し、ライブチャット枠の体感ラグを消す。early-framework.js 経由でボイラープレート共通化、サイト固有の MutationObserver / force-hide のみ独自実装 |
 | `src/content/youtube-shorts.{js,css}` | YouTube クリーナーの Shorts 5 サブ機能（Shelf / Chip / Sidebar / Redirect / Btn、top frame のみ）: MutationObserver + URL リダイレクト + 機能ごとの `__cpa-yt-shorts-hide-{shelf,chip,sidebar}` / `__cpa-yt-shorts-redirect-active` クラスで `display: none` |
-| `src/content/search-fixer.{js,css}` | YouTube クリーナー（29 機能 = 検索結果ノイズ除去・Shorts 5 サブ機能・動画ページ整形・グリッド列数・登録チャンネル拡張 3 機能を含む）: master + features + gridItems で駆動、`/feed/channels` グリッド化 / leftnav 全件展開 / すべての登録チャンネルショートカットを含む |
+| `src/content/search-fixer.{js,css}` | YouTube クリーナー（30 機能 = 検索結果ノイズ除去・Shorts 5 サブ機能・動画ページ整形・グリッド列数・ホーム/フィードのグリッド整列・登録チャンネル拡張 3 機能を含む）: master + features + gridItems で駆動、`/feed/channels` グリッド化 / leftnav 全件展開 / すべての登録チャンネルショートカットを含む |
 | `src/content/amazon-delivery-total.{js,css}` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 + `__cpa-amzn-delivery-total` 配色 |
 | `src/content/instagram-early.js` | Instagram 向け `document_start` 注入の最小スクリプト。hideComments ON 時に `<html>` へ `__cpa-ig-comments-pre` クラスを最速付与し、`div:has(> ul._a9ym)`（各コメント UL の親 div）を CSS rule + MutationObserver inline force-hide で先制非表示にする。`_a9z6`（外側 UL）には post caption が同居しているので触らず、`_a9ym` 親 div だけを対象にして caption 巻き込み防止（actions.js は読み込まない） |
 | `src/content/instagram-cleaner.{js,css}` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ + 意味論的セレクタのみ（aria-label / href / role / data-pagelet / SVG path data） |
 | `src/content/tiktok-early.js` | TikTok 用 `document_start` 注入の最小スクリプト。`tiktokCleanerEnabled` + `tiktokCleanerFeatures` を読んで `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` 同期付与 + inline `<style>` で主要セレクタ焼き込み（FOUC 防止、actions.js 非依存） |
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
+| `src/content/amazon-ranking-jump.{js,css}` | Amazon ランキングへ移動ボタン: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の売れ筋ランキングリンクから「一番細かいサブカテゴリ」を選んで商品情報最上部に集約ボタン (`<a href>`) を挿入、同じタブで移動。商品ページで自己ゲート、rAF coalesce + observer guard、外部送信ゼロ |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/rtx-enhancer.js` | RTX 動画強化: 全 http(s) の top frame に注入、`<video>` を持つページに極小の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution など) の動画ページ検知を補助。`dataset.__cpaRtxAttached` マーカーで二重 inject 防止、MutationObserver で遅延 `<video>` 追従、master OFF/pagehide で `removeAllHints()` 撤去。外部送信ゼロ、ドライバ機能の有効化は GPU 側設定 (NVIDIA Control Panel 等) に依存 |
@@ -303,7 +312,7 @@ Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + A
 | `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト 62 件: globalThis 18 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 29 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合** 等。件数 drift を CI で検知できる単一情報源 |
+| `test/actions.test.js` | 純粋関数テスト 62 件: globalThis 18 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 30 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合** 等。件数 drift を CI で検知できる単一情報源 |
 | `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**listing (説明文 / スクリーンショット / カテゴリ) 変更時は CWS / AMO ともに API 更新エンドポイントが弱いため Dashboard で先行手動更新が必要**。 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 

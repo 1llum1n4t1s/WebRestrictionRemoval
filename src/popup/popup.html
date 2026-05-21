@@ -144,7 +144,7 @@
     </section>
 
     <!-- ===== Video Group ===== -->
-    <section class="grp" data-i18n-attr="aria-label:groupVideo" aria-label="映像">
+    <section class="grp" id="videoGroupSection" data-i18n-attr="aria-label:groupVideo" aria-label="映像">
       <h2 class="grp-title">
         <span class="grp-title-text" data-i18n="groupVideo">映像</span>
       </h2>
@@ -177,6 +177,44 @@
                   data-i18n-attr="aria-label:videoGammaResetAria"
                   aria-label="ガンマ値を 1.0 に戻す">1.0 に戻す</button>
         </div>
+      </div>
+
+      <!-- 動画黒帯除去（ワイド表示）マスタートグル -->
+      <label class="toggle-row" id="videoFillToggleRow">
+        <span class="tr-icon" aria-hidden="true">🖥️</span>
+        <span class="tr-text">
+          <span class="tr-name" data-i18n="videoFillMaster">動画の黒帯除去</span>
+          <span class="tr-desc" data-i18n="videoFillMasterDesc">ウルトラワイド画面などで動画の上下/左右の黒帯を、ズームまたは引き伸ばしで除去して画面いっぱいに表示します</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="videoFillToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <!-- マスタートグル ON 時のみ表示する表示モード + 拡大率 -->
+      <div class="sub-block hidden" id="videoFillRow">
+        <div class="sub-head">
+          <span class="sub-label">
+            <span aria-hidden="true">🖥️</span>&nbsp;<span data-i18n="videoFillModeLabel">表示モード</span>
+          </span>
+        </div>
+        <div class="fill-mode-segment" id="videoFillModeSegment" role="group"
+             data-i18n-attr="aria-label:videoFillModeAriaLabel"
+             aria-label="表示モードを選択">
+          <button type="button" class="seg-btn is-active" data-mode="zoom" data-i18n="videoFillModeZoom">ズーム</button>
+          <button type="button" class="seg-btn" data-mode="stretch" data-i18n="videoFillModeStretch">引き伸ばし</button>
+        </div>
+
+        <div class="sub-head sub-head--gap">
+          <span class="sub-label">
+            <span aria-hidden="true">🖥️</span>&nbsp;<span data-i18n="videoFillTargetLabel">お使いのモニター</span>
+          </span>
+        </div>
+        <div class="tr-desc" data-i18n="videoFillTargetDesc">画面の縦横比または解像度を選ぶと、動画ごとの形を自動判別して黒帯を除去します</div>
+        <!-- options は popup.js が VideoFill.PRESETS から optgroup 付きで生成する -->
+        <select id="videoFillTargetSelect" class="select select--block"
+                data-i18n-attr="aria-label:videoFillTargetLabel" aria-label="お使いのモニター"></select>
       </div>
 
       <!-- ルーペ機能マスタートグル -->
@@ -217,10 +255,25 @@
         <div class="tr-desc" data-i18n="loupeSizeDesc">レンズの直径を 150〜1000px の範囲で調整できます</div>
         <input type="range" id="loupeSizeSlider" class="range" />
       </div>
+
+      <!-- RTX 動画強化 master トグル: <video> 要素のあるページに極小の透明 hint 要素を inject して、
+           NVIDIA RTX Super Resolution / AMD FidelityFX などの GPU ドライバ側映像補正の検知を補助する。
+           ドライバ機能の有効化自体は GPU 側設定 (NVIDIA Control Panel 等) に依存。オプトイン・デフォルト OFF -->
+      <label class="toggle-row" id="rtxEnhancerToggleRow">
+        <span class="tr-icon" aria-hidden="true">🔆</span>
+        <span class="tr-text">
+          <span class="tr-name" data-i18n="rtxEnhancerMaster">RTX 動画強化</span>
+          <span class="tr-desc" data-i18n="rtxEnhancerMasterDesc">video 要素のあるページに hint を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正を認識しやすくします（GPU 側で NVIDIA Control Panel 等の有効化が必要）</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="rtxEnhancerToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
     </section>
 
     <!-- ===== Amazon Group ===== -->
-    <section class="grp" data-i18n-attr="aria-label:groupAmazon" aria-label="Amazon">
+    <section class="grp" id="amazonGroupSection" data-i18n-attr="aria-label:groupAmazon" aria-label="Amazon">
       <h2 class="grp-title">
         <span class="grp-title-text" data-i18n="groupAmazon">Amazon</span>
       </h2>
@@ -236,10 +289,22 @@
           <span class="switch-track" aria-hidden="true"></span>
         </span>
       </label>
+
+      <label class="toggle-row" id="amazonRankingJumpToggleRow">
+        <span class="tr-icon" aria-hidden="true">🏆</span>
+        <span class="tr-text">
+          <span class="tr-name" data-i18n="amazonRankingJumpMaster">ランキングへ移動ボタン</span>
+          <span class="tr-desc" data-i18n="amazonRankingJumpMasterDesc">商品ページ上部に「この商品が所属するランキングへ移動」ボタンを表示</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="amazonRankingJumpToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
     </section>
 
     <!-- ===== Session ===== -->
-    <section class="grp" data-i18n-attr="aria-label:groupSession" aria-label="セッション">
+    <section class="grp" id="sessionGroupSection" data-i18n-attr="aria-label:groupSession" aria-label="セッション">
       <h2 class="grp-title"><span class="grp-title-text" data-i18n="groupSession">セッション</span></h2>
 
       <label class="toggle-row" id="keepAliveToggleRow">
@@ -281,25 +346,11 @@
         </label>
       </div>
 
-      <!-- RTX 動画強化 master トグル: <video> 要素のあるページに極小の透明 hint 要素を inject して、
-           NVIDIA RTX Super Resolution / AMD FidelityFX などの GPU ドライバ側映像補正の検知を補助する。
-           ドライバ機能の有効化自体は GPU 側設定 (NVIDIA Control Panel 等) に依存。オプトイン・デフォルト OFF -->
-      <label class="toggle-row" id="rtxEnhancerToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔆</span>
-        <span class="tr-text">
-          <span class="tr-name" data-i18n="rtxEnhancerMaster">RTX 動画強化</span>
-          <span class="tr-desc" data-i18n="rtxEnhancerMasterDesc">video 要素のあるページに hint を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正を認識しやすくします（GPU 側で NVIDIA Control Panel 等の有効化が必要）</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="rtxEnhancerToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
     </section>
 
     </div><!-- /panel.tune -->
 
-    <!-- ===== Panel: YouTube (クリーナー 29 機能 + ホーム列数) ===== -->
+    <!-- ===== Panel: YouTube (クリーナー 30 機能 + ホーム列数) ===== -->
     <div class="panel panel--youtube" id="panelYoutube"
          role="tabpanel" aria-labelledby="tabYoutube" hidden>
 
@@ -313,7 +364,7 @@
           <span class="tr-icon" aria-hidden="true">🧹</span>
           <span class="tr-text">
             <span class="tr-name" data-i18n="searchFixerMaster">YouTube クリーナー</span>
-            <span class="tr-desc" data-i18n="searchFixerMasterDesc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 29 サブ機能を一括管理</span>
+            <span class="tr-desc" data-i18n="searchFixerMasterDesc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 30 サブ機能を一括管理</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="searchFixerToggle" />

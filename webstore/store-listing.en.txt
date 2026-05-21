@@ -12,7 +12,7 @@ Web Viewing Assist
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 10 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
+An extension that consolidates 12 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
 (In v1.0.18 the former "restriction removal" features were retired; the Extension is now focused exclusively on web viewing assistance.)
 
 ■ Main features
@@ -26,10 +26,14 @@ An extension that consolidates 10 categories of viewing aids — plus a shared s
 
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
-  In addition, the YouTube cleaner offers 29 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements).
+  In addition, the YouTube cleaner offers 30 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements).
 
 · 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
   Shows a per-month total on https://www.amazon.co.jp/auto-deliveries.
+
+· 🏆 Amazon jump-to-ranking button (opt-in, default OFF)
+  The "Amazon Bestsellers Rank" links in a product's detail section appear in different positions on every page, making them hard to find. This consolidates a single "Go to this product's ranking" button at the top of the product info; clicking it navigates (same tab) to the most specific subcategory ranking. It only scans the bestsellers links inside the product-detail containers, so the button appears only on product pages that have a ranking link.
+  ※ Pure DOM manipulation; no price/history reading or external transmission.
 
 · 📷 Instagram cleaner (opt-in, default OFF)
   Hides Instagram's redundant UI through 11 sub-features.
@@ -52,6 +56,10 @@ An extension that consolidates 10 categories of viewing aids — plus a shared s
 · 🎞️ Video Gamma (opt-in, default OFF)
   Applies gamma correction to <video> elements on the page using SVG <feComponentTransfer type="gamma">. Master toggle + slider; the slider center (1.0) means no correction, left is darker (max 3.0), right is brighter (min 0.3). The setting is shared across tabs, and <video> elements inside iframes (e.g. YouTube embeds) also receive the same correction via all_frames: true.
   ※ Video data is not read, recorded, or transmitted; the feature only attaches an SVG filter, fully client-side.
+
+· 🖥️ Remove video black bars (opt-in, default OFF)
+  Removes the letterbox/pillarbox black bars seen on ultrawide monitors by Zoom (aspect-preserving crop) or Stretch (expand only the deficient axis) to fill the screen. Master toggle + display-mode selection + target-monitor preset; the video's aspect ratio is auto-detected from videoWidth / videoHeight. Shared across tabs, and <video> inside iframes also receive the same treatment via all_frames: true.
+  ※ Video data is not read, recorded, or transmitted; the feature only applies a CSS transform, fully client-side.
 
 · ✨ RTX Video Enhancer (opt-in, default OFF)
   Helps GPU drivers (e.g., NVIDIA RTX Super Resolution / AMD FidelityFX) detect video pages by injecting a 1×1 px invisible hint element on pages containing `<video>` elements. The driver-side feature itself must be enabled in the GPU settings (e.g., NVIDIA Control Panel); the Extension only handles the browser-side hint injection.
@@ -147,16 +155,19 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
 ■ Host-permission justifications
 
   http://*/* and https://*/*:
-  Required so that the keep-session-alive and Video Gamma content scripts can be injected on all http(s) sites.
+  Required so that the keep-session-alive, Video Gamma, and Remove-video-black-bars content scripts can be injected on all http(s) sites.
   (1) Keep session alive: the injected content script only starts the poller for origins the user explicitly enabled in the popup (keepAliveOrigins allowlist), and dispatches synthetic mousemove / pointermove / scroll / focus events. The HTTP ping is a separate sub-toggle (default OFF) and only fires same-origin HEAD / GET when ON.
   (2) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
   Neither feature reads, modifies, or transmits the page DOM (Video Gamma only attaches a filter to <video>; it does not read or save video data).
 
   *://*.youtube.com/*:
-  Required for the YouTube cleaner (29 sub-features including Shorts removal and subscriptions enhancements). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
+  Required for the YouTube cleaner (30 sub-features including Shorts removal and subscriptions enhancements). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
 
   *://www.amazon.co.jp/auto-deliveries*:
-  Required to show a per-month total on the Amazon recurring-delivery page. The script reads `subscription-price` per month and inserts the computed total into the same page. Scoped to /auto-deliveries (not the whole amazon.co.jp). Nothing read is transmitted off-device.
+  Required to show a per-month total on the Amazon recurring-delivery page. The script reads `subscription-price` per month and inserts the computed total into the same page. Nothing read is transmitted off-device.
+
+  *://www.amazon.co.jp/*:
+  Required for the Amazon jump-to-ranking button. The script scans only the "Amazon Bestsellers Rank" links (a[href*="bestsellers/"]) inside the product-detail containers and inserts a consolidated button at the top of the product info that links to the most specific subcategory. It self-gates to product pages and performs no price/history reading or external transmission.
 
   *://*.instagram.com/*:
   Required for the Instagram cleaner (11 sub-features). Hides / adds Reels / Explore / Stories tray / Threads promotion / vanity counts / video playback / comment list / Notes / message counters / image download button using semantic selectors based on aria-label / href / role / data-pagelet / SVG path data. URL redirects (e.g. /reels/, /explore/) are also opt-in. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.cdninstagram.com / scontent-*.fna.fbcdn.net), with credentials:omit + redirect:manual blocking third-party transmission. Nothing read is transmitted off-device.

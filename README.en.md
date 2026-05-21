@@ -1,6 +1,6 @@
 # 📖 Web Viewing Assist
 
-A Chrome extension that consolidates 10 features for comfortable browsing into a single popup: **Keep session alive** / **YouTube cleaner (29 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster** / **Video Gamma** / **Loupe** / **RTX Video Enhancer** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
+A Chrome extension that consolidates 12 features for comfortable browsing into a single popup: **Keep session alive** / **YouTube cleaner (30 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Amazon jump-to-ranking button** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster** / **Video Gamma** / **Remove video black bars** / **Loupe** / **RTX Video Enhancer** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
 
 > **Notable changes through v1.0.18**: The "restriction removal" features (right-click / selection / force paste & copy) have been fully removed; the Extension is now focused exclusively on web viewing assistance. The Extension was also renamed from "Web Restriction Removal Helper" to "Web Viewing Assist". Version numbers are finalized via the `/vava` skill at release time.
 
@@ -24,7 +24,7 @@ No third-party server is contacted. With the HTTP ping enabled, the Extension on
 
 ### 🧹 YouTube cleaner (opt-in, default OFF)
 
-Cleans up YouTube search results, watch pages, and the home grid through **29 sub-features** (3 of them subscription enhancements) plus a **home grid column count** setting. Each sub-feature is shown one toggle per row with a detailed description, so you know what will happen before you flip it.
+Cleans up YouTube search results, watch pages, and the home grid through **30 sub-features** (3 of them subscription enhancements) plus a **home grid column count** setting. Each sub-feature is shown one toggle per row with a detailed description, so you know what will happen before you flip it.
 
 - 📺 **Site-wide**: Shorts removal (sidebar / shelf / chip removal + `/shorts/<id>` → `/watch?v=<id>` redirect)
 - 🗑️ **Search-result noise**: video shelf / card list / playlist / mix / course / channel / Shorts shelf / single Shorts / live / related-search block
@@ -40,6 +40,10 @@ Cleans up YouTube search results, watch pages, and the home grid through **29 su
 ### 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
 
 Shows a per-month total on `https://www.amazon.co.jp/auto-deliveries`. The MutationObserver follows a disconnect → write → reconnect pattern to prevent re-firing caused by its own DOM writes.
+
+### 🏆 Amazon jump-to-ranking button (opt-in, default OFF)
+
+The "Amazon Bestsellers Rank" links in a product's detail section appear in different positions on every product page, making them hard to find. This feature consolidates a single "Go to this product's ranking" button at the top of the product info. Clicking it navigates (in the same tab) to the **most specific subcategory** ranking. It only scans `a[href*="bestsellers/"]` inside the product-detail containers and picks the target (the last subcategory link that carries a node id), so the button only appears on product pages that have a ranking link. It is pure DOM manipulation with zero data collection or external transmission.
 
 ### 📷 Instagram cleaner (opt-in, default OFF)
 
@@ -76,6 +80,10 @@ Amplifies the active tab's volume from **0% to 300%**. With the **master toggle 
 ### 🎞️ Video Gamma (opt-in, default OFF)
 
 Applies gamma correction to `<video>` elements on the page (custom implementation based on SVG `<feComponentTransfer type="gamma">`). Master toggle + slider; the slider center (1.0) means no correction, moving left makes the video darker (max 3.0), moving right makes it brighter (min 0.3). The setting is shared across all tabs, and `<video>` elements inside iframes (e.g. YouTube embeds) also receive the same correction via `all_frames: true`.
+
+### 🖥️ Remove video black bars (opt-in, default OFF)
+
+Removes the letterbox/pillarbox black bars that appear on ultrawide monitors by either **Zoom** (aspect-preserving crop) or **Stretch** (expand only the deficient axis) to fill the screen. Master toggle + display-mode selection + target-monitor preset; the video's own aspect ratio is auto-detected from `videoWidth` / `videoHeight`. The setting is shared across all tabs and `<video>` elements inside iframes also receive the same treatment via `all_frames: true`.
 
 ### 🔍 Loupe (opt-in, default OFF)
 

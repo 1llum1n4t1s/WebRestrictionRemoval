@@ -747,6 +747,14 @@
       scanRaf = 0;
       scanScheduled = false;
       if (!active || !isVideoFilterPage()) return;
+      // 検索グリッド: フルリロード直後は ytd-video-renderer がまだ DOM に無く、
+      // onSettingsChanged 時点の applySearchGridStyle が空振りして #contents に
+      // .yt-grid-active が付かない（SPA 遷移では yt-navigate-finish 後に renderer が
+      // 揃ってから再実行されるので効くが、ハードリロードだと再実行経路が無く
+      // OFF 時のデフォルト表示のままになる）。observer 経由の scan で renderer 出現後に
+      // 再適用することでリロード初回でもグリッド化される。内部で f("searchGrid") &&
+      // isResultsPage() ゲート済みなので空振りは無害。
+      applySearchGridStyle();
       // 検索ページ向け（既存ロジック）。内部で isResultsPage() ゲートあり。
       removeDistractions();
       highlightThumbnails();
@@ -862,30 +870,40 @@
     }
 
     // ===== Pass 3: playlist / mix の独立判定（badge or href ベース） =====
+    // YouTube は検索結果のプレイリスト/ミックスを複数バリアントでレンダする:
+    //   - 横型:      yt-lockup-view-model--horizontal
+    //   - 縦型ラッパ: yt-lockup-view-model.lockup.ytLockupViewModelWrapper（--horizontal を持たない）
+    // 旧実装は `--horizontal` + 旧バッジクラス `.yt-badge-shape__text` + content-image link
+    // 限定だったため、縦型ラッパ + 新バッジクラス `.ytBadgeShapeText`(host は `.ytBadgeShapeHost`)
+    // + content-image link を持たないバリアントを全て取りこぼしていた（実機 ChromeMCP で確認:
+    // 「N 本の動画」バッジ付き縦型プレイリストが消えない）。feed 側 purgeFeedDistractions と同じ
+    // 「全 yt-lockup-view-model を走査し `.ytBadgeShapeHost` と href で判定」方式に統一する。
+    // removeDistractions は冒頭 isResultsPage() ゲート済みなので document 全体走査でも検索結果限定。
     if (f("playlist") || f("mix")) {
       const checkPlaylist = f("playlist");
       const checkMix = f("mix");
       try {
-        document.querySelectorAll(".yt-lockup-view-model--horizontal").forEach((item) => {
+        document.querySelectorAll("yt-lockup-view-model").forEach((item) => {
           if (!item.isConnected) return;
           let isPlaylist = false;
           let isMix = false;
-          const badge = item.querySelector(".yt-badge-shape__text");
-          if (badge) {
-            const t = badge.textContent.trim().toLowerCase();
-            if (/\d+\s*videos?/i.test(t) || /\d+\s*episodes?/i.test(t)) isPlaylist = true;
-            else if (t === "mix") isMix = true;
-          }
-          if (!isPlaylist && !isMix) {
-            const link = item.querySelector("a.yt-lockup-view-model-wiz__content-image");
+          // 新旧両バッジクラスを併記（新: .ytBadgeShapeHost / 旧: .yt-badge-shape__text）。
+          const badgeTexts = Array.from(
+            item.querySelectorAll(".ytBadgeShapeHost, .yt-badge-shape__text")
+          ).map((b) => (b.textContent ?? "").trim());
+          if (badgeTexts.some((t) => FEED_MIX_BADGE_TEXTS.has(t))) {
+            isMix = true;
+          } else if (badgeTexts.some((t) => FEED_PLAYLIST_BADGE_RE.test(t))) {
+            isPlaylist = true;
+          } else {
+            // href フォールバック: content-image link を持たないバリアントもあるので
+            // list= を含む任意の a を見る。RD / start_radio はミックス、それ以外は playlist。
+            const link = item.querySelector('a[href*="list="]');
             const href = link?.getAttribute("href") ?? "";
-            if (
-              href.includes("/playlist?list=") ||
-              (href.includes("&list=") && !href.includes("list=RD") && !href.includes("&start_radio=1"))
-            ) {
-              isPlaylist = true;
-            } else if (href.includes("&list=RD") && href.includes("&start_radio=1")) {
+            if (href.includes("&list=RD") || href.includes("&start_radio=1")) {
               isMix = true;
+            } else if (href.includes("/playlist?list=") || href.includes("&list=")) {
+              isPlaylist = true;
             }
           }
           if (checkPlaylist && isPlaylist) item.remove();
@@ -1183,15 +1201,49 @@
   // ---------- ホームのリッチグリッド列数 ----------
   function applyHomeGridStyle() {
     const existing = document.getElementById(STYLE_ID_HOME_GRID);
-    const valid = active && (gridItems === 4 || gridItems === 5 || gridItems === 6);
+    // 列数を 4/5/6 に明示指定したときは従来どおりグリッド化（非破壊）。さらに `homeGrid` トグル
+    // ON のときは列数『自動』(gridItems=0) でもグリッド化する（列数は YouTube 標準列数 = var）。
+    const fixedCols = gridItems === 4 || gridItems === 5 || gridItems === 6;
+    const valid = active && (fixedCols || f("homeGrid"));
     if (!valid) {
       if (existing) existing.remove();
       return;
     }
-    const cssRule = `ytd-rich-item-renderer[rendered-from-rich-grid] {
-      --ytd-rich-item-row-usable-width: calc(100% - var(--ytd-rich-grid-gutter-margin)*2);
-      width: calc(var(--ytd-rich-item-row-usable-width) / ${gridItems} - var(--ytd-rich-grid-item-margin) - .01px) !important;
-    }`;
+    // 列数: 4/5/6 はその固定値、それ以外（自動 + homeGrid ON）は YouTube 標準列数を保持する
+    // CSS 変数 `--ytd-rich-grid-items-per-row`（メディアクエリ追従、未定義時 3 フォールバック）。
+    const columnsDecl = fixedCols
+      ? `repeat(${gridItems}, minmax(0, 1fr))`
+      : "repeat(var(--ytd-rich-grid-items-per-row, 3), minmax(0, 1fr))";
+    // ホームのリッチグリッドは `ytd-rich-grid-renderer > #contents` が
+    // `display:flex; flex-wrap:wrap` で、`ytd-rich-item-renderer` と全幅の
+    // `ytd-rich-section-renderer`(Shorts 等の棚) がフラットに並ぶ。旧実装はアイテム幅だけを
+    // 上書きしていたが、全幅の棚が flex-wrap 中に挟まると手前の行が埋まりきらず棚が次行に回り、
+    // 「追加読み込みで N 件目以降が空きセルを飛ばして左端から並ぶ」隙間が出る（実機確認済み）。
+    // → コンテナ自体を CSS Grid 化し、`grid-auto-flow: row dense` で棚の手前の空きセルを
+    //    後続アイテムで埋めて連続配置する。棚 / continuation は 1 行全幅 span。
+    const cssRule = `
+      ytd-rich-grid-renderer > #contents {
+        display: grid !important;
+        grid-template-columns: ${columnsDecl} !important;
+        grid-auto-flow: row dense !important;
+        column-gap: 16px !important;
+        row-gap: 24px !important;
+        align-items: start !important;
+      }
+      ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer {
+        width: auto !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+      }
+      /* 全幅の棚 (Shorts 等) と infinite scroll トリガ (continuation) は 1 行全幅。
+       * continuation は display:none にすると IntersectionObserver が発火せず追加読み込みが
+       * 止まるため、隠さず grid-column span のみでレイアウト維持する。 */
+      ytd-rich-grid-renderer > #contents > ytd-rich-section-renderer,
+      ytd-rich-grid-renderer > #contents > ytd-continuation-item-renderer {
+        grid-column: 1 / -1 !important;
+      }
+    `;
     if (existing) {
       if (existing.textContent !== cssRule) existing.textContent = cssRule;
       return;
@@ -1214,15 +1266,19 @@
         .forEach((c) => c.classList.remove("yt-grid-active"));
       return;
     }
-    // grid-active クラスを付与（observer 経由で動的に追加されるノードにも対応するため、
-    // ここでは既存ノードに付け、新規ノード分は scheduleScan の経路で別途付ける）
+    // grid クラスは「全 section を束ねる外側コンテナ」(ytd-section-list-renderer > #contents)
+    // に付ける。検索は追加読み込みごとに別の ytd-item-section-renderer (= 別の内側 #contents)
+    // を作るため、内側 #contents ごとに grid 化すると各 section が左端から再配置されて境界に
+    // 隙間ができる (5 列で 7 件 → 8 件目が次行左端から、の現象)。外側に grid を当て、内側の
+    // section / #contents を CSS で display:contents に畳むことで、全 ytd-video-renderer を
+    // section をまたいだ単一グリッドに連続配置する (buildSearchGridCss 側で実装)。
+    // 外側コンテナは continuation でも安定して存在し続けるので、scheduleScan 経由の再適用でも
+    // 同じ要素にクラスが付くだけ (冪等)。
     document
-      .querySelectorAll("ytd-search ytd-video-renderer")
-      .forEach((v) => v.closest("#contents")?.classList.add("yt-grid-active"));
+      .querySelectorAll("ytd-search ytd-section-list-renderer > #contents")
+      .forEach((c) => c.classList.add("yt-grid-active"));
 
-    // 列数: gridItems が 0（自動）でも検索ページでは 3 列をデフォルトに
-    const columns = gridItems >= 4 ? gridItems : 3;
-    const cssRule = buildSearchGridCss(columns);
+    const cssRule = buildSearchGridCss(gridItems);
     if (existing) {
       if (existing.textContent !== cssRule) existing.textContent = cssRule;
       return;
@@ -1234,7 +1290,23 @@
   }
 
   function buildSearchGridCss(columns) {
-    const validColumns = columns >= 1 ? columns : 3;
+    // columns: 4/5/6 = ユーザー指定の固定列、それ以外 (0 = 自動) = ホームのリッチグリッドと
+    // 同じ列数に揃える。
+    //
+    // 自動時に YouTube が `<html>` に設定する CSS 変数 `--ytd-rich-grid-items-per-row`
+    // （ホームの動画グリッドの現在の列数 = メディアクエリ追従）をそのまま使うことで、
+    // 「ホームは 4 列なのに検索は 2 列」のような列数不一致を防ぐ。検索ページには
+    // `ytd-rich-grid-renderer` 自体は無いが、この変数は html から継承されるので参照可能
+    // （subsChannelsGrid も同じ変数活用の発想）。未定義時は 3 をフォールバック。
+    //
+    // 重要: トラックは必ず `minmax(0, 1fr)` を使う。`1fr` (= `minmax(auto, 1fr)`) だと
+    // 検索結果カード内のサムネ / タイトルの min-content がトラックを押し広げて列幅が
+    // バラバラになり「490px 689px 490px」のような破綻を起こす（subsChannelsGrid も
+    // 同じ理由で `minmax(0, 1fr)` を採用済み）。
+    const columnsDecl =
+      columns >= 4
+        ? `repeat(${columns}, minmax(0, 1fr))`
+        : "repeat(var(--ytd-rich-grid-items-per-row, 3), minmax(0, 1fr))";
     return `
       ytd-search ytd-two-column-search-results-renderer {
         width: 100% !important;
@@ -1246,16 +1318,52 @@
         padding-right: 0 !important;
       }
       ytd-search ytd-item-section-renderer { max-width: 100% !important; }
+      /* grid クラスは全 section を束ねる外側コンテナ
+       * (ytd-section-list-renderer > #contents) に付く。これを単一グリッドにする。 */
       ytd-search #contents.yt-grid-active {
         display: grid !important;
-        grid-template-columns: repeat(${validColumns}, 1fr) !important;
+        grid-template-columns: ${columnsDecl} !important;
+        /* align-items:start + grid-auto-rows:max-content でカードが行内の最長カードに
+         * 引き伸ばされず、各カードが自身のコンテンツ高さに収まる（subsChannelsGrid と同様）。 */
+        align-items: start !important;
+        grid-auto-rows: max-content !important;
         column-gap: 16px !important;
-        row-gap: 32px !important;
+        row-gap: 28px !important;
         margin-top: 24px !important;
       }
-      ytd-search #contents.yt-grid-active > *:not(ytd-video-renderer) {
+      /* 中間ラッパ (各 section と内側 #contents) を display:contents で畳み、全 section の
+       * ytd-video-renderer を外側グリッドの直接アイテムとして連続配置する。これをやらないと
+       * section ごとに独立グリッドになり、追加読み込みの新 section が左端から再配置されて
+       * 境界に隙間ができる。 */
+      ytd-search #contents.yt-grid-active > ytd-item-section-renderer,
+      ytd-search #contents.yt-grid-active ytd-item-section-renderer > #contents {
+        display: contents !important;
+      }
+      /* 空の構造ラッパは hide（mid-stream で 1 セル占有して隙間を作るのを防ぐ）。
+       * section 内の #continuations は旧トリガで通常空。広告も消す。 */
+      ytd-search #contents.yt-grid-active ytd-item-section-renderer > #header,
+      ytd-search #contents.yt-grid-active ytd-item-section-renderer > #spinner-container,
+      ytd-search #contents.yt-grid-active ytd-item-section-renderer > #continuations,
+      ytd-search #contents.yt-grid-active ytd-search-pyv-renderer,
+      ytd-search #contents.yt-grid-active ytd-ad-slot-renderer {
+        display: none !important;
+      }
+      /* infinite scroll の本体トリガ (外側 ytd-continuation-item-renderer) は display:none に
+       * すると IntersectionObserver が発火せず追加読み込みが止まるため、隠さず全幅 span で
+       * レイアウト維持する（末尾に来るので隙間は最下部のみで実害なし）。 */
+      ytd-search #contents.yt-grid-active > ytd-continuation-item-renderer {
         grid-column: 1 / -1 !important;
-        width: 100% !important;
+      }
+      /* 動画以外の横長要素（棚 / チャンネル / 横スクロールリスト / プレイリスト lockup 等）は
+       * display:contents で外側グリッドのアイテムに昇格するので 1 行全幅にする。
+       * （shelf/channel/reel 等は対応機能 ON 時は removeDistractions が DOM 削除する。） */
+      ytd-search #contents.yt-grid-active ytd-shelf-renderer,
+      ytd-search #contents.yt-grid-active ytd-reel-shelf-renderer,
+      ytd-search #contents.yt-grid-active grid-shelf-view-model,
+      ytd-search #contents.yt-grid-active ytd-channel-renderer,
+      ytd-search #contents.yt-grid-active ytd-horizontal-card-list-renderer,
+      ytd-search #contents.yt-grid-active yt-lockup-view-model {
+        grid-column: 1 / -1 !important;
       }
       ytd-search #contents.yt-grid-active ytd-video-renderer {
         width: 100% !important;
@@ -1279,6 +1387,27 @@
       ytd-search #contents.yt-grid-active ytd-video-renderer ytd-thumbnail a,
       ytd-search #contents.yt-grid-active ytd-video-renderer ytd-thumbnail img {
         border-radius: 12px !important;
+      }
+      /* 検索結果の text-wrapper は本来サムネ右の flex カラム（高さ 0 で overflow 前提）。
+       * grid カードでは縦積みにするため display:block にして自然な高さを持たせる。
+       * これをやらないと中の title / channel が height:0 の親に切られて見えなくなる。 */
+      ytd-search #contents.yt-grid-active ytd-video-renderer .text-wrapper {
+        display: block !important;
+        width: 100% !important;
+        padding-top: 4px !important;
+      }
+      /* ホームフィードのグリッドカードに見た目を揃えるため、検索固有のはみ出しノイズを除去。
+       * metadata-snippet-container は通常版と -one-line 版の 2 バリアントあるので部分一致で両対応。 */
+      ytd-search #contents.yt-grid-active ytd-video-renderer #description-text,
+      ytd-search #contents.yt-grid-active ytd-video-renderer [class*="metadata-snippet-container"],
+      ytd-search #contents.yt-grid-active ytd-video-renderer #buttons,
+      ytd-search #contents.yt-grid-active ytd-video-renderer #expandable-metadata,
+      ytd-search #contents.yt-grid-active ytd-video-renderer ytd-badge-supported-renderer {
+        display: none !important;
+      }
+      ytd-search #contents.yt-grid-active ytd-video-renderer #channel-info {
+        padding: 0 !important;
+        margin-top: 6px !important;
       }
       ytd-search #contents.yt-grid-active ytd-video-renderer #video-title {
         font-size: 1.4rem !important;

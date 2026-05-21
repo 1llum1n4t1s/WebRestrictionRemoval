@@ -20,14 +20,17 @@
 - **`keepAliveIntervalMs`**（数値・ミリ秒）: セッション維持のポーリング間隔（1〜15 分の範囲）。
 - **`keepAliveHttpPingEnabled`**（真偽値）: セッション維持の「軽量 HTTP ping」サブ機能の有効/無効（オプトイン・デフォルト OFF）。
 - **`keepAliveOrigins`**（配列）: セッション維持を有効化したサイト origin（例: `https://example.com`）の一覧。現在のサイトだけに適用するために使用します。
-- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 29 サブ機能の親）の有効/無効。
-- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 29 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張）の個別 ON/OFF 状態。
+- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能の親）の有効/無効。
+- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 30 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張）の個別 ON/OFF 状態。
 - **`searchFixerGridItems`**（数値）: YouTube ホームグリッドの列数指定（0=自動 / 4 / 5 / 6）。
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。
+- **`amazonRankingJumpEnabled`**（真偽値）: Amazon 商品ページの「この商品が所属するランキングへ移動」ボタンの有効/無効。デフォルト OFF。
 - **`instagramCleanerEnabled`**（真偽値）: Instagram クリーナー機能の有効/無効。
 - **`instagramCleanerFeatures`**（オブジェクト）: Instagram クリーナーの 11 個のサブ機能（Reels 削除 / Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示 / いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`tiktokCleanerEnabled`**（真偽値）: TikTok クリーナー機能の有効/無効。
 - **`tiktokCleanerFeatures`**（オブジェクト）: TikTok クリーナーの 3 個のサブ機能（コメント欄非表示 / おすすめのアカウント非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
+- **`volumeBoosterEnabled`**（真偽値）: 音量ブースターのマスタートグル。デフォルト OFF。
+- **`volumeBoosterLastGain`**（数値・0〜300）: 音量ブースターのスライダー位置（%）。デフォルト 100。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（高速リミッタとして動作する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNormalizeEnabled`**（真偽値）: 音量ブースターのサブトグル「自動音量正規化」（`AnalyserNode` で短時間 RMS を測定し `GainNode` のゲインを自動調整する方式。`DynamicsCompressor` は使用しません）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNightModeEnabled`**（真偽値）: 音量ブースターのサブトグル「ナイトモード」（夜間視聴向けにダイナミックレンジを圧縮する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
@@ -36,6 +39,11 @@
 - **`loupeZoom`**（数値）: ルーペの倍率。1.5 / 2.5 / 4.0 のいずれか。デフォルト 2.5。
 - **`loupeSize`**（数値・150〜1000 / 10px step）: ルーペのレンズ直径 (px)。デフォルト 220。
 - **`rtxEnhancerEnabled`**（真偽値）: RTX 動画強化機能のマスタートグル。デフォルト OFF。ON 時は `<video>` 要素のあるページに極小の透明 hint 要素を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正の検知を補助します。ネットワーク通信は発生せず、DOM の追加のみ。
+- **`videoGammaEnabled`**（真偽値）: 動画ガンマ補正のマスタートグル。デフォルト OFF。
+- **`videoGammaValue`**（数値・0.3〜3.0）: 動画ガンマ補正のガンマ値。デフォルト 1.0（補正なし）。
+- **`videoFillEnabled`**（真偽値）: 動画の黒帯除去のマスタートグル。デフォルト OFF。
+- **`videoFillMode`**（文字列・`"zoom"` / `"stretch"`）: 動画の黒帯除去の表示モード（ズーム / 引き伸ばし）。
+- **`videoFillTarget`**（文字列）: 動画の黒帯除去の目標モニター縦横比プリセット id。
 - **`colorPickerHistory`**（配列・最大 20 件）: カラーピッカーで採取した色の履歴。各要素は `{ hex, ts }` の形式で、`hex` は `#RRGGBB`、`ts` は採取時刻のタイムスタンプ。
 - **`colorPickerDefaultFormat`**（文字列・`"hex"` / `"rgb"` / `"hsl"` のいずれか）: カラーピッカーで採取した色のクリップボード既定形式。
 - **`colorPickerHexHash`**（真偽値・デフォルト true）: HEX 形式でコピーする際に先頭の `#` を含めるかどうか。

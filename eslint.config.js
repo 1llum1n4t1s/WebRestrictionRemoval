@@ -5,7 +5,7 @@
  * v9 で flat config が標準化されたため、`.eslintrc.*` 系は廃止。
  *
  * 設計方針:
- * - `src/` の IIFE + globalThis 公開 18 定数を明示列挙 (no-implicit-globals 違反を防ぎつつ、
+ * - `src/` の IIFE + globalThis 公開 20 定数を明示列挙 (no-implicit-globals 違反を防ぎつつ、
  *   actions.js が公開する定数を読み取り専用 global として承認する)
  * - `scripts/` / `webstore/generate-screenshots.js` は Node ESM/CJS 環境
  * - `test/` は Node 標準 test runner 環境
@@ -14,7 +14,7 @@
 const globals = require("globals");
 
 const ACTIONS_GLOBALS = {
-  // src/lib/actions.js が globalThis に公開する 18 個 (順序は actions.js L1312-L1329 と一致)。
+  // src/lib/actions.js が globalThis に公開する 20 個。
   // 新規 globalThis 公開を追加したら本リストにも追加すること。
   SettingsSchema: "readonly",
   Actions: "readonly",
@@ -26,11 +26,13 @@ const ACTIONS_GLOBALS = {
   YouTubeShorts: "readonly",
   SearchFixer: "readonly",
   AmazonDeliveryTotal: "readonly",
+  AmazonRankingJump: "readonly",
   InstagramCleaner: "readonly",
   TikTokCleaner: "readonly",
   ImageDownloader: "readonly",
   VolumeBooster: "readonly",
   VideoGamma: "readonly",
+  VideoFill: "readonly",
   Loupe: "readonly",
   ColorPicker: "readonly",
   PopupTabs: "readonly",

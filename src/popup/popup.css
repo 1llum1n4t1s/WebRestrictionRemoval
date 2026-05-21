@@ -493,13 +493,15 @@ body {
 /* ---------- Loupe zoom segment control ----------
    ルーペの倍率を 3 段階のセグメント (1.5× / 2.5× / 4×) で選択する radio button 風の UI。
    選択中は accent カラー塗り、未選択は ghost-btn 風 outline 表現。 */
-.loupe-zoom-segment {
+.loupe-zoom-segment,
+.fill-mode-segment {
   display: flex;
   gap: 6px;
   margin-bottom: 4px;
 }
 
-.loupe-zoom-segment .seg-btn {
+.loupe-zoom-segment .seg-btn,
+.fill-mode-segment .seg-btn {
   flex: 1;
   min-width: 0;
   padding: 6px 0;
@@ -515,18 +517,21 @@ body {
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
 
-.loupe-zoom-segment .seg-btn:hover {
+.loupe-zoom-segment .seg-btn:hover,
+.fill-mode-segment .seg-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.loupe-zoom-segment .seg-btn.is-active {
+.loupe-zoom-segment .seg-btn.is-active,
+.fill-mode-segment .seg-btn.is-active {
   background: var(--accent);
   color: var(--bg);
   border-color: var(--accent);
 }
 
-.loupe-zoom-segment .seg-btn:focus-visible {
+.loupe-zoom-segment .seg-btn:focus-visible,
+.fill-mode-segment .seg-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -725,6 +730,81 @@ body {
   color: var(--accent-deep);
 }
 
+/* ---------- YouTube クリーナー カテゴリサブタブ ----------
+   29 機能を 4 カテゴリ（メニュー/UI・動画フィルタ・動画ページ・検索結果）のサブタブで
+   切り替える。1 画面に全機能を縦積みすると非常に長くなるため、カテゴリ単位で表示を
+   切り替えて縦の情報量を圧縮する。active は accent 塗り、ON 機能を持つカテゴリは
+   件数バッジで「どこに有効機能があるか」を一目で示す。 */
+.cat-subtabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.cat-subtab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+  background: var(--paper-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.cat-subtab-icon {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.cat-subtab-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.cat-subtab:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cat-subtab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper-card);
+}
+
+.cat-subtab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cat-panel[hidden] {
+  display: none;
+}
+
+/* 調整タブのサブタブ: 非アクティブセクションを隠す（クリーナーの cat-panel と同等の役割）。 */
+.tune-section-hidden {
+  display: none;
+}
+
+/* master OFF 時はサブタブもまとめて dim（パネル内 cat-list は .cleaner-disabled .cat-list で dim 済み）。 */
+.cleaner-disabled .cat-subtabs {
+  opacity: 0.5;
+}
+
 /* ---------- Feature category (YouTube / Instagram タブ内に直接展開する機能リスト) ---------- */
 .cat {
   margin-bottom: 10px;
@@ -913,6 +993,14 @@ body {
 .select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* select-row 内ではなく単独で置く select（黒帯除去のモニター選択）。横幅いっぱい + 少し高め。 */
+.select--block {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
 }
 
 /* ---------- Footer status ---------- */

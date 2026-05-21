@@ -22,6 +22,8 @@ const Actions = Object.freeze({
   APPLY_SEARCH_FIXER_CS: "applySearchFixerCS",
   /** background → Amazon 定期おトク便 content script: 合計金額表示の有効/無効を反映 */
   APPLY_AMAZON_DELIVERY_TOTAL_CS: "applyAmazonDeliveryTotalCS",
+  /** background → Amazon ランキング移動 content script: 「ランキングへ移動」ボタンの有効/無効を反映 */
+  APPLY_AMAZON_RANKING_JUMP_CS: "applyAmazonRankingJumpCS",
   /** background → keepalive content script: セッション維持設定を反映 */
   APPLY_KEEP_ALIVE_CS: "applyKeepAliveCS",
   /** background → Instagram content script: Instagram クリーナー設定を反映 */
@@ -30,6 +32,8 @@ const Actions = Object.freeze({
   APPLY_TIKTOK_CLEANER_CS: "applyTiktokCleanerCS",
   /** background → video-gamma content script: <video> ガンマ補正設定を反映（全タブ共通設定） */
   APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
+  /** background → video-fill content script: <video> 黒帯除去（ズーム/引き伸ばし）設定を反映（全タブ共通設定） */
+  APPLY_VIDEO_FILL_CS: "applyVideoFillCS",
   /** background → loupe content script: ルーペ機能の有効/無効を反映 */
   APPLY_LOUPE_CS: "applyLoupeCS",
   /** background → rtx-enhancer content script: NVIDIA RTX Super Resolution 補助の有効/無効を反映 */
@@ -111,7 +115,7 @@ const StorageKeys = Object.freeze({
   KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
   /** セッション維持を許可した origin 一覧（例: https://example.com）。サイト単位で効かせる。 */
   KEEP_ALIVE_ORIGINS: "keepAliveOrigins",
-  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 29 サブ機能の親） */
+  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 30 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -119,6 +123,8 @@ const StorageKeys = Object.freeze({
   SEARCH_FIXER_GRID_ITEMS: "searchFixerGridItems",
   /** Amazon 定期おトク便ページの月別合計金額表示の有効/無効 */
   AMAZON_DELIVERY_TOTAL_ENABLED: "amazonDeliveryTotalEnabled",
+  /** Amazon 商品ページに「この商品が所属するランキングへ移動」ボタンを表示するか（オプトイン・デフォルト OFF） */
+  AMAZON_RANKING_JUMP_ENABLED: "amazonRankingJumpEnabled",
   /** Instagram クリーナーマスタートグル */
   INSTAGRAM_CLEANER_ENABLED: "instagramCleanerEnabled",
   /** Instagram クリーナーの個別機能オン/オフ（オブジェクト） */
@@ -150,6 +156,13 @@ const StorageKeys = Object.freeze({
   RTX_ENHANCER_ENABLED: "rtxEnhancerEnabled",
   /** 動画ガンマ補正: ガンマ値（VideoGamma.MIN..MAX、デフォルト 1.0 = 補正なし） */
   VIDEO_GAMMA_VALUE: "videoGammaValue",
+  /** 動画黒帯除去: マスタートグル（OFF または拡大率 1.0 のとき style 一切注入せず completely no-op、オプトイン） */
+  VIDEO_FILL_ENABLED: "videoFillEnabled",
+  /** 動画黒帯除去: 表示モード（"zoom" = アスペクト維持で拡大クロップ / "stretch" = 不足軸のみ引き伸ばし） */
+  VIDEO_FILL_MODE: "videoFillMode",
+  /** 動画黒帯除去: 目標モニターのプリセット id（VideoFill.PRESETS のいずれか、デフォルト "21:9"）。
+   *  動画側の縦横比は content script が videoWidth/videoHeight から自動検出するため保存しない。 */
+  VIDEO_FILL_TARGET: "videoFillTarget",
   /** ルーペ: マスタートグル（OFF 時は content script のレンズ DOM を即座に撤去し、リスナも全て解除） */
   LOUPE_ENABLED: "loupeEnabled",
   /** ルーペ: 倍率（Loupe.ZOOM_LEVELS のいずれか、デフォルト 2.5）。popup の倍率セグメントで選択 */
@@ -335,6 +348,9 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({ key: "subsLeftnavInjectAll", category: "menu_ui" }),
   Object.freeze({ key: "subsAllShortcut", category: "menu_ui" }),
   Object.freeze({ key: "subsChannelsGrid", category: "menu_ui" }),
+  // ホーム / 登録 / 急上昇等のフィードを隙間なく dense グリッド整列する。列数『自動』のときも
+  // 有効化したいユーザー向けのトグル（4/5/6 列を選んだ場合は本トグル OFF でも従来どおりグリッド化）。
+  Object.freeze({ key: "homeGrid", category: "menu_ui" }),
 ]);
 
 const SearchFixerDefaultFeatures = Object.freeze(
@@ -460,6 +476,67 @@ const AmazonDeliveryTotal = Object.freeze({
   INSERT_TARGET_SELECTOR: ".a-fixed-left-grid-col",
   TOTAL_ROOT_CLASS: "__cpa-amzn-delivery-total",
   PRICE_NORMALIZE_RE: /\D/g,
+});
+
+/**
+ * @readonly Amazon 商品ページの「この商品が所属するランキングへ移動」ボタン機能の定数（独自実装）。
+ *
+ * 商品詳細欄の「Amazon 売れ筋ランキング」に含まれる売れ筋ランキングへのリンクは、商品ページごとに
+ * 出現位置がバラバラで探しにくい。これを商品ページ上部の固定ボタンに集約し、ワンクリックで
+ * 「この商品が所属する一番細かいサブカテゴリ」のランキングへ移動できるようにする。
+ *
+ * 動作対象: `*://www.amazon.co.jp/*`（manifest content_scripts.matches で限定）。
+ * 売れ筋ランキングリンクを含む商品ページでのみボタンを出す（自己ゲート）。外部送信ゼロ・純粋 DOM 操作。
+ *
+ * セレクタ戦略: 難読化 class には依存せず、商品詳細コンテナ（id ベース）の中の
+ * `a[href*="bestsellers/"]` のみを対象にする。これによりカテゴリページ等の無関係な
+ * ベストセラーリンクを拾わず、商品ページ限定で動作する。
+ */
+const AmazonRankingJump = Object.freeze({
+  /** ボタンと装飾クラスの接頭辞 */
+  ROOT_CLASS: "__cpa-amzn-ranking-jump",
+  /** 売れ筋ランキングリンクを探す商品詳細コンテナ群（この中だけを走査して非商品ページの誤検出を防ぐ） */
+  DETAIL_CONTAINER_SELECTORS: Object.freeze([
+    "#detailBulletsWrapper_feature_div",
+    "#detailBullets_feature_div",
+    "#productDetails_detailBullets_sections1",
+    "#prodDetails",
+    "#SalesRank",
+  ]),
+  /** 売れ筋ランキングへのアンカー（商品詳細コンテナ内から取得） */
+  BESTSELLER_LINK_SELECTOR: 'a[href*="bestsellers/"]',
+  /**
+   * サブカテゴリのランキングリンク判定。
+   * 例: `/gp/bestsellers/electronics/19349884051/ref=pd_zg_hrsr_electronics`
+   *  → カテゴリ slug の後ろに数値ノード id があるものを「細かいサブカテゴリ」とみなす。
+   * 広いカテゴリの「○○の売れ筋ランキングを見る」リンク (`/gp/bestsellers/electronics/ref=...`) は
+   * ノード id を持たないので false。
+   */
+  SUBCATEGORY_PATH_RE: /\/bestsellers\/[^/]+\/\d+(?:[/?]|$)/,
+
+  /** href（絶対 / 相対どちらも可）が細かいサブカテゴリのランキングリンクか判定する純粋関数。 */
+  isSubcategoryHref(href) {
+    if (typeof href !== "string" || href.length === 0) return false;
+    let pathname;
+    try {
+      pathname = new URL(href, "https://www.amazon.co.jp").pathname;
+    } catch {
+      return false;
+    }
+    return AmazonRankingJump.SUBCATEGORY_PATH_RE.test(pathname);
+  },
+
+  /**
+   * 売れ筋ランキングリンク href の配列（DOM 出現順）から移動先を 1 つ選ぶ純粋関数。
+   * 「一番細かいサブカテゴリ」= サブカテゴリリンクのうち DOM 上で最後のもの
+   * （Amazon は広い→細かいの順に並べるため）。サブカテゴリが無ければ最後のリンク、空なら null。
+   */
+  selectTargetHref(hrefs) {
+    if (!Array.isArray(hrefs) || hrefs.length === 0) return null;
+    const subs = hrefs.filter((h) => AmazonRankingJump.isSubcategoryHref(h));
+    const pool = subs.length > 0 ? subs : hrefs;
+    return pool[pool.length - 1] ?? null;
+  },
 });
 
 /**
@@ -1049,6 +1126,106 @@ const VideoGamma = Object.freeze({
 });
 
 /**
+ * @readonly 動画黒帯除去（ワイド表示）の定数。
+ *
+ * ウルトラワイド画面（21:9 / 32:9 等）で動画の上下/左右に出るレターボックス黒帯を、
+ * `<video>` 要素への CSS `transform` で除去する独自実装。考え方は "UltraWide Video" 系
+ * 拡張機能を参考にしているが、コードは流用せず、動画メタの外部送信等は一切行わない
+ * （本プロジェクトの「外部送信ゼロ」方針を堅持）。
+ *
+ * **方式: 「モニターの縦横比だけユーザーが選び、動画側の縦横比は自動検出」**
+ *   - ユーザーは popup のドロップダウンで「お使いのモニターの縦横比 / 解像度」(= targetAspect) を選ぶ。
+ *   - content script は各 `<video>` の intrinsic 縦横比 (videoWidth/videoHeight) を読み、
+ *     targetAspect いっぱいに収まる拡大率を **動画ごとに** 計算して transform を当てる。
+ *   - これにより 16:9 動画でも 21:9 シネマ動画でも 4:3 動画でも、それぞれ正しく黒帯を除去できる
+ *     （「動画は 16:9 固定」と決め打ちしないので、動画がワイドなケースでも破綻しない）。
+ *
+ * 2 モード:
+ *   - zoom    : `scale(s)` でアスペクト比を保ったまま拡大（はみ出した辺はクロップ）
+ *   - stretch : `scaleX(s)` / `scaleY(s)` で不足軸のみ引き伸ばし（比率は変わるがクロップなし）
+ *
+ * content script は per-video で `el.style.transform` を `!important` で当て/外しする
+ * （MutationObserver で新規 video を追従、loadedmetadata で intrinsic サイズ確定を待つ）。
+ * マスター OFF、または「動画とモニターの縦横比が一致して補正不要」のときは transform を外す。
+ */
+const VideoFill = Object.freeze({
+  MODE_ZOOM: "zoom",
+  MODE_STRETCH: "stretch",
+  DEFAULT_MODE: "zoom",
+  /** 計算結果の拡大率の上限（4:3 動画 → 32:9 等の極端な組み合わせの暴走を防ぐ）。 */
+  MAX_SCALE: 4.0,
+  /** ON 直後の既定ターゲット（最も普及しているウルトラワイド）。 */
+  DEFAULT_TARGET: "21:9",
+  /**
+   * モニターのプリセット一覧（popup のドロップダウンの単一情報源）。
+   *   - id     : storage に保存する識別子
+   *   - group  : "aspect"（縦横比）/ "resolution"（解像度）。optgroup 振り分け用
+   *   - label  : 表示文字列（数値のみなのでロケール非依存、i18n 不要）
+   *   - aspect : 目標縦横比（W/H）。解像度は実ピクセルから算出した値を直接持つ
+   */
+  PRESETS: Object.freeze([
+    Object.freeze({ id: "16:9", group: "aspect", label: "16:9", aspect: 16 / 9 }),
+    Object.freeze({ id: "16:10", group: "aspect", label: "16:10", aspect: 16 / 10 }),
+    Object.freeze({ id: "21:9", group: "aspect", label: "21:9", aspect: 2560 / 1080 }),
+    Object.freeze({ id: "24:10", group: "aspect", label: "24:10", aspect: 24 / 10 }),
+    Object.freeze({ id: "32:9", group: "aspect", label: "32:9", aspect: 32 / 9 }),
+    Object.freeze({ id: "1920x1080", group: "resolution", label: "1920×1080 (16:9)", aspect: 1920 / 1080 }),
+    Object.freeze({ id: "2560x1080", group: "resolution", label: "2560×1080 (21:9)", aspect: 2560 / 1080 }),
+    Object.freeze({ id: "3440x1440", group: "resolution", label: "3440×1440 (21:9)", aspect: 3440 / 1440 }),
+    Object.freeze({ id: "3840x1600", group: "resolution", label: "3840×1600 (24:10)", aspect: 3840 / 1600 }),
+    Object.freeze({ id: "5120x1440", group: "resolution", label: "5120×1440 (32:9)", aspect: 5120 / 1440 }),
+  ]),
+  /** optgroup の並び順とラベル i18n キー。 */
+  GROUPS: Object.freeze([
+    Object.freeze({ id: "aspect", messageKey: "videoFillGroupAspect" }),
+    Object.freeze({ id: "resolution", messageKey: "videoFillGroupResolution" }),
+  ]),
+  normalizeMode(mode) {
+    return mode === VideoFill.MODE_STRETCH ? VideoFill.MODE_STRETCH : VideoFill.MODE_ZOOM;
+  },
+  /** ターゲット id を検証。未知の値は DEFAULT_TARGET にフォールバック。 */
+  normalizeTarget(id) {
+    for (const p of VideoFill.PRESETS) if (p.id === id) return id;
+    return VideoFill.DEFAULT_TARGET;
+  },
+  /** ターゲット id → 目標縦横比（W/H）。未知なら DEFAULT_TARGET の縦横比。 */
+  targetAspect(id) {
+    for (const p of VideoFill.PRESETS) if (p.id === id) return p.aspect;
+    for (const p of VideoFill.PRESETS) if (p.id === VideoFill.DEFAULT_TARGET) return p.aspect;
+    return 16 / 9;
+  },
+  /**
+   * 目標縦横比 (targetAspect) と動画の実寸 (videoW × videoH) から、その動画を
+   * モニターいっぱいに収めるための CSS transform 文字列を組み立てる pure function。
+   *
+   * - zoom    : アスペクト比を保ったまま、収まっている側の辺を埋めるよう一様 `scale(s)`。
+   *             s = (target >= video) ? target/video : video/target （常に 1 以上、はみ出しはクロップ）。
+   * - stretch : 不足している軸だけを引き伸ばす（`scaleX` または `scaleY`）。クロップは発生しない。
+   *
+   * 補正不要（動画とモニターの縦横比がほぼ一致）なら空文字を返し、呼び出し側は transform を外す。
+   * 値は数値のみを埋め込む（ユーザー入力経路なし）ため XSS リスクゼロ。MAX_SCALE で clamp。
+   *
+   * @returns {string} "scale(1.33)" / "scaleX(1.33)" / "scaleY(1.2)" / "" のいずれか
+   */
+  computeTransform(targetAspect, videoW, videoH, mode) {
+    const ta = Number(targetAspect);
+    const va = Number(videoW) / Number(videoH);
+    if (!Number.isFinite(ta) || ta <= 0) return "";
+    if (!Number.isFinite(va) || va <= 0) return "";
+    const clamp = (s) => Math.round(Math.min(VideoFill.MAX_SCALE, Math.max(1, s)) * 1000) / 1000;
+    const EPS = 0.01;
+    if (VideoFill.normalizeMode(mode) === VideoFill.MODE_STRETCH) {
+      if (ta > va + EPS) return `scaleX(${clamp(ta / va)})`;
+      if (va > ta + EPS) return `scaleY(${clamp(va / ta)})`;
+      return "";
+    }
+    const s = ta >= va ? ta / va : va / ta;
+    if (s <= 1 + 0.005) return "";
+    return `scale(${clamp(s)})`;
+  },
+});
+
+/**
  * @readonly ルーペ機能（独自実装）の定数。
  *
  * `chrome.tabs.captureVisibleTab` で active tab の静止画を JPEG quality:70 で取得し、
@@ -1237,7 +1414,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube クリーナー (29 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
+ * YouTube クリーナー (30 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
@@ -1296,12 +1473,16 @@ const PopupTabs = Object.freeze({
     Object.freeze({ field: "searchFixerFeatures", storageKey: StorageKeys.SEARCH_FIXER_FEATURES, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerGridItems", storageKey: StorageKeys.SEARCH_FIXER_GRID_ITEMS, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "amazonDeliveryTotalEnabled", storageKey: StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED, applyAction: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS }),
+    Object.freeze({ field: "amazonRankingJumpEnabled", storageKey: StorageKeys.AMAZON_RANKING_JUMP_ENABLED, applyAction: Actions.APPLY_AMAZON_RANKING_JUMP_CS }),
     Object.freeze({ field: "instagramCleanerEnabled", storageKey: StorageKeys.INSTAGRAM_CLEANER_ENABLED, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "instagramCleanerFeatures", storageKey: StorageKeys.INSTAGRAM_CLEANER_FEATURES, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "tiktokCleanerEnabled", storageKey: StorageKeys.TIKTOK_CLEANER_ENABLED, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
     Object.freeze({ field: "tiktokCleanerFeatures", storageKey: StorageKeys.TIKTOK_CLEANER_FEATURES, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
     Object.freeze({ field: "videoGammaEnabled", storageKey: StorageKeys.VIDEO_GAMMA_ENABLED, applyAction: Actions.APPLY_VIDEO_GAMMA_CS }),
     Object.freeze({ field: "videoGammaValue", storageKey: StorageKeys.VIDEO_GAMMA_VALUE, applyAction: Actions.APPLY_VIDEO_GAMMA_CS }),
+    Object.freeze({ field: "videoFillEnabled", storageKey: StorageKeys.VIDEO_FILL_ENABLED, applyAction: Actions.APPLY_VIDEO_FILL_CS }),
+    Object.freeze({ field: "videoFillMode", storageKey: StorageKeys.VIDEO_FILL_MODE, applyAction: Actions.APPLY_VIDEO_FILL_CS }),
+    Object.freeze({ field: "videoFillTarget", storageKey: StorageKeys.VIDEO_FILL_TARGET, applyAction: Actions.APPLY_VIDEO_FILL_CS }),
     Object.freeze({ field: "loupeEnabled", storageKey: StorageKeys.LOUPE_ENABLED, applyAction: Actions.APPLY_LOUPE_CS }),
     Object.freeze({ field: "rtxEnhancerEnabled", storageKey: StorageKeys.RTX_ENHANCER_ENABLED, applyAction: Actions.APPLY_RTX_ENHANCER_CS }),
   ]);
@@ -1319,11 +1500,13 @@ const PopupTabs = Object.freeze({
   globalThis.YouTubeShorts = YouTubeShorts;
   globalThis.SearchFixer = SearchFixer;
   globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
+  globalThis.AmazonRankingJump = AmazonRankingJump;
   globalThis.InstagramCleaner = InstagramCleaner;
   globalThis.TikTokCleaner = TikTokCleaner;
   globalThis.ImageDownloader = ImageDownloader;
   globalThis.VolumeBooster = VolumeBooster;
   globalThis.VideoGamma = VideoGamma;
+  globalThis.VideoFill = VideoFill;
   globalThis.Loupe = Loupe;
   globalThis.ColorPicker = ColorPicker;
   globalThis.PopupTabs = PopupTabs;

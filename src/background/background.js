@@ -93,6 +93,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
+    StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -105,6 +106,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VIDEO_GAMMA_ENABLED,
     StorageKeys.VIDEO_GAMMA_VALUE,
+    StorageKeys.VIDEO_FILL_ENABLED,
+    StorageKeys.VIDEO_FILL_MODE,
+    StorageKeys.VIDEO_FILL_TARGET,
     StorageKeys.LOUPE_ENABLED,
     StorageKeys.LOUPE_ZOOM,
     StorageKeys.RTX_ENHANCER_ENABLED,
@@ -137,6 +141,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED in stored)) {
     defaults[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] = false;
+  }
+  if (!(StorageKeys.AMAZON_RANKING_JUMP_ENABLED in stored)) {
+    defaults[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] = false;
   }
   if (!(StorageKeys.INSTAGRAM_CLEANER_ENABLED in stored)) {
     defaults[StorageKeys.INSTAGRAM_CLEANER_ENABLED] = false;
@@ -174,6 +181,16 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.VIDEO_GAMMA_VALUE in stored)) {
     defaults[StorageKeys.VIDEO_GAMMA_VALUE] = VideoGamma.DEFAULT;
+  }
+  // 動画黒帯除去: master OFF / モード zoom / ターゲット DEFAULT_TARGET で初期化（インストール直後は完全に無処理）
+  if (!(StorageKeys.VIDEO_FILL_ENABLED in stored)) {
+    defaults[StorageKeys.VIDEO_FILL_ENABLED] = false;
+  }
+  if (!(StorageKeys.VIDEO_FILL_MODE in stored)) {
+    defaults[StorageKeys.VIDEO_FILL_MODE] = VideoFill.DEFAULT_MODE;
+  }
+  if (!(StorageKeys.VIDEO_FILL_TARGET in stored)) {
+    defaults[StorageKeys.VIDEO_FILL_TARGET] = VideoFill.DEFAULT_TARGET;
   }
   // ルーペ: master OFF / 倍率 DEFAULT_ZOOM (2.5) / サイズ SIZE_DEFAULT (220) で初期化。
   // インストール直後は完全に無処理（content script ロードはされるが activate しない）。
@@ -443,12 +460,16 @@ const APPLY_SETTINGS_KEYS = Object.freeze([
   StorageKeys.SEARCH_FIXER_FEATURES,
   StorageKeys.SEARCH_FIXER_GRID_ITEMS,
   StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
+  StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
   StorageKeys.INSTAGRAM_CLEANER_ENABLED,
   StorageKeys.INSTAGRAM_CLEANER_FEATURES,
   StorageKeys.TIKTOK_CLEANER_ENABLED,
   StorageKeys.TIKTOK_CLEANER_FEATURES,
   StorageKeys.VIDEO_GAMMA_ENABLED,
   StorageKeys.VIDEO_GAMMA_VALUE,
+  StorageKeys.VIDEO_FILL_ENABLED,
+  StorageKeys.VIDEO_FILL_MODE,
+  StorageKeys.VIDEO_FILL_TARGET,
   StorageKeys.LOUPE_ENABLED,
   StorageKeys.RTX_ENHANCER_ENABLED,
 ]);
@@ -493,12 +514,16 @@ function normalizeSettings(settings) {
     searchFixerFeatures: SearchFixer.mergeFeatures(settings?.searchFixerFeatures),
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
     amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
+    amazonRankingJumpEnabled: settings?.amazonRankingJumpEnabled === true,
     instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
     tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
     tiktokCleanerFeatures: TikTokCleaner.mergeFeatures(settings?.tiktokCleanerFeatures),
     videoGammaEnabled: settings?.videoGammaEnabled === true,
     videoGammaValue: VideoGamma.clampValue(settings?.videoGammaValue),
+    videoFillEnabled: settings?.videoFillEnabled === true,
+    videoFillMode: VideoFill.normalizeMode(settings?.videoFillMode),
+    videoFillTarget: VideoFill.normalizeTarget(settings?.videoFillTarget),
     loupeEnabled: settings?.loupeEnabled === true,
     // /rere レビュー A2-001 修正: rtxEnhancerEnabled が return に含まれないと
     // toStorageRecord / notifyContentScripts に undefined が渡って RTX 機能が永久 OFF になる。
@@ -517,12 +542,16 @@ function toStorageRecord(s) {
     [StorageKeys.SEARCH_FIXER_FEATURES]: s.searchFixerFeatures,
     [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: s.searchFixerGridItems,
     [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
+    [StorageKeys.AMAZON_RANKING_JUMP_ENABLED]: s.amazonRankingJumpEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
     [StorageKeys.TIKTOK_CLEANER_ENABLED]: s.tiktokCleanerEnabled,
     [StorageKeys.TIKTOK_CLEANER_FEATURES]: s.tiktokCleanerFeatures,
     [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
     [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
+    [StorageKeys.VIDEO_FILL_ENABLED]: s.videoFillEnabled,
+    [StorageKeys.VIDEO_FILL_MODE]: s.videoFillMode,
+    [StorageKeys.VIDEO_FILL_TARGET]: s.videoFillTarget,
     [StorageKeys.LOUPE_ENABLED]: s.loupeEnabled,
     [StorageKeys.RTX_ENHANCER_ENABLED]: s.rtxEnhancerEnabled,
   };
@@ -564,6 +593,12 @@ async function notifyContentScripts(s) {
       enabled: s.videoGammaEnabled,
       value: s.videoGammaValue,
     } }, undefined],
+    // 動画黒帯除去: all_frames: true (iframe 内 <video> も対象)
+    [{ action: Actions.APPLY_VIDEO_FILL_CS, data: {
+      enabled: s.videoFillEnabled,
+      mode: s.videoFillMode,
+      target: s.videoFillTarget,
+    } }, undefined],
     // ルーペ: top frame のみ
     [{ action: Actions.APPLY_LOUPE_CS, data: { enabled: s.loupeEnabled } }, TOP_FRAME],
     // RTX 動画強化: top frame のみ
@@ -582,6 +617,13 @@ async function notifyContentScripts(s) {
   if (isAmazonAutoDeliveryUrl(url)) {
     messages.push([{ action: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS, data: {
       enabled: s.amazonDeliveryTotalEnabled,
+    } }, TOP_FRAME]);
+  }
+  if (isAmazonUrl(url)) {
+    // ランキング移動ボタンは www.amazon.co.jp 全ページ (商品ページで自己ゲート) に注入されるため
+    // auto-deliveries 判定とは別に Amazon ドメイン全体で配信する。
+    messages.push([{ action: Actions.APPLY_AMAZON_RANKING_JUMP_CS, data: {
+      enabled: s.amazonRankingJumpEnabled,
     } }, TOP_FRAME]);
   }
   if (isInstagramUrl(url)) {
@@ -627,6 +669,17 @@ function isAmazonAutoDeliveryUrl(url) {
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
     if (u.hostname.toLowerCase() !== "www.amazon.co.jp") return false;
     return u.pathname.startsWith("/auto-deliveries");
+  } catch {
+    return false;
+  }
+}
+
+/** www.amazon.co.jp の任意ページ（ランキング移動ボタンの対象。商品ページかは content script が自己判定） */
+function isAmazonUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    return u.hostname.toLowerCase() === "www.amazon.co.jp";
   } catch {
     return false;
   }

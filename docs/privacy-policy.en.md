@@ -18,14 +18,17 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`keepAliveIntervalMs`** (number, milliseconds): polling interval for keep-session-alive (1–15 minutes).
 - **`keepAliveHttpPingEnabled`** (boolean): whether the lightweight HTTP ping sub-feature for keep-session-alive is enabled (opt-in, default OFF).
 - **`keepAliveOrigins`** (array): list of site origins (e.g. `https://example.com`) for which keep-session-alive has been enabled. Used to scope the feature per-site.
-- **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 29 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
-- **`searchFixerFeatures`** (object): on/off state of each of the 29 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
+- **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 30 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
+- **`searchFixerFeatures`** (object): on/off state of each of the 30 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
+- **`amazonRankingJumpEnabled`** (boolean): whether the "Go to this product's ranking" button on Amazon product pages is enabled. Default OFF.
 - **`instagramCleanerEnabled`** (boolean): whether the Instagram cleaner is enabled.
 - **`instagramCleanerFeatures`** (object): on/off state of each of the 11 Instagram cleaner sub-features (Remove Reels / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion / Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Image download button).
 - **`tiktokCleanerEnabled`** (boolean): whether the TikTok cleaner is enabled.
 - **`tiktokCleanerFeatures`** (object): on/off state of each of the 3 TikTok cleaner sub-features (Hide comments / Hide suggested accounts / Image download button).
+- **`volumeBoosterEnabled`** (boolean): Volume Booster master toggle. Default OFF.
+- **`volumeBoosterLastGain`** (number, 0–300): Volume Booster slider position (%). Default 100.
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` acting as a fast limiter) is enabled. Default OFF.
 - **`volumeBoosterNormalizeEnabled`** (boolean): whether the Volume Booster's "Auto Volume Normalization" sub-toggle is enabled. Implemented with `AnalyserNode` short-window RMS measurement plus an auto `GainNode` (no `DynamicsCompressor` is used). Default OFF.
 - **`volumeBoosterNightModeEnabled`** (boolean): whether the Volume Booster's "Night Mode" sub-toggle (a `DynamicsCompressor` that compresses dynamic range for night listening) is enabled. Default OFF.
@@ -34,6 +37,11 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`loupeZoom`** (number): Loupe magnification. One of 1.5 / 2.5 / 4.0. Default 2.5.
 - **`loupeSize`** (number, 150 – 1000 / 10 px step): Loupe lens diameter in px. Default 220.
 - **`rtxEnhancerEnabled`** (boolean): RTX video enhancement master toggle. Default OFF. When ON, inserts a tiny invisible hint element on pages containing `<video>` elements to help GPU drivers (e.g., NVIDIA RTX Super Resolution) detect the video and apply automatic enhancement. No network traffic; DOM insertion only.
+- **`videoGammaEnabled`** (boolean): Video Gamma master toggle. Default OFF.
+- **`videoGammaValue`** (number, 0.3–3.0): Video Gamma value. Default 1.0 (no correction).
+- **`videoFillEnabled`** (boolean): Remove-video-black-bars master toggle. Default OFF.
+- **`videoFillMode`** (string, `"zoom"` / `"stretch"`): display mode for black-bar removal (zoom / stretch).
+- **`videoFillTarget`** (string): target-monitor aspect-ratio preset id for black-bar removal.
 - **`colorPickerHistory`** (array, up to 20 items): history of colors picked with the color picker. Each entry is `{ hex, ts }` where `hex` is `#RRGGBB` and `ts` is the pick timestamp.
 - **`colorPickerDefaultFormat`** (string, one of `"hex"` / `"rgb"` / `"hsl"`): default clipboard format for picked colors.
 - **`colorPickerHexHash`** (boolean, default true): whether to include the leading `#` when copying in HEX format.

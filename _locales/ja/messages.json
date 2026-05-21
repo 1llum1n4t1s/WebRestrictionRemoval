@@ -60,6 +60,17 @@
   "videoGammaResetBtn": { "message": "1.0 に戻す" },
   "videoGammaResetAria": { "message": "ガンマ値を 1.0 に戻す" },
 
+  "videoFillMaster": { "message": "動画の黒帯除去" },
+  "videoFillMasterDesc": { "message": "ウルトラワイド画面などで動画の上下/左右の黒帯を、ズームまたは引き伸ばしで除去して画面いっぱいに表示します" },
+  "videoFillModeLabel": { "message": "表示モード" },
+  "videoFillModeAriaLabel": { "message": "表示モードを選択" },
+  "videoFillModeZoom": { "message": "ズーム" },
+  "videoFillModeStretch": { "message": "引き伸ばし" },
+  "videoFillTargetLabel": { "message": "お使いのモニター" },
+  "videoFillTargetDesc": { "message": "画面の縦横比または解像度を選ぶと、動画ごとの形を自動判別して黒帯を除去します" },
+  "videoFillGroupAspect": { "message": "縦横比" },
+  "videoFillGroupResolution": { "message": "解像度" },
+
   "loupeMaster": { "message": "ルーペ" },
   "loupeMasterDesc": { "message": "現在の画面を円形レンズで拡大。動画は一時停止してから使うのがおすすめ。左クリックで OFF" },
   "rtxEnhancerMaster": { "message": "RTX 動画強化" },
@@ -79,6 +90,13 @@
     "message": "配送月ごとの合計金額を <code class=\"tr-code\">/auto-deliveries</code> ページに表示",
     "description": "Amazon 定期おトク便マスタートグルの説明 (HTML を含む)"
   },
+  "amazonRankingJumpMaster": { "message": "ランキングへ移動ボタン" },
+  "amazonRankingJumpMasterDesc": {
+    "message": "商品ページ上部に「この商品が所属するランキングへ移動」ボタンを表示",
+    "description": "Amazon ランキング移動ボタンマスタートグルの説明"
+  },
+  "amazonRankingJumpButton": { "message": "この商品が所属するランキングへ移動" },
+  "amazonRankingJumpAriaLabel": { "message": "この商品が所属するランキングへ移動" },
 
   "keepAliveMaster": { "message": "セッション維持" },
   "keepAliveMasterDesc": { "message": "現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット" },
@@ -92,7 +110,7 @@
   "keepAliveHttpPingDesc": { "message": "このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨" },
 
   "searchFixerMaster": { "message": "YouTube クリーナー" },
-  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 29 サブ機能を一括管理" },
+  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 30 サブ機能を一括管理" },
 
   "instagramCleanerMaster": { "message": "Instagram クリーナー" },
   "instagramCleanerMasterDesc": { "message": "Reels / Explore / Stories などの冗長 UI を一括非表示" },
@@ -191,6 +209,9 @@
   "categoryVideoFilter": { "message": "動画フィルタ" },
   "categoryWatchPage": { "message": "動画ページ" },
   "categorySearchOnly": { "message": "検索結果" },
+  "ytCleanerSubtabsAria": { "message": "YouTube クリーナーのカテゴリ" },
+  "igCleanerSubtabsAria": { "message": "Instagram クリーナーのカテゴリ" },
+  "tuneSubtabsAria": { "message": "調整カテゴリ" },
   "categoryIgMain": { "message": "主要機能" },
   "categoryIgExtra": { "message": "追加機能" },
   "categoryTtMain": { "message": "主要機能" },
@@ -198,9 +219,11 @@
   "applyOkSession": { "message": "セッション維持" },
   "applyOkSearchFixer": { "message": "YT クリーナー" },
   "applyOkAmazon": { "message": "Amazon" },
+  "applyOkAmazonRanking": { "message": "ランキング移動" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
   "applyOkVideoGamma": { "message": "映像補正" },
+  "applyOkVideoFill": { "message": "黒帯除去" },
   "applyOkLoupe": { "message": "ルーペ" },
   "applyOkAllStopped": { "message": "⏹  すべて停止" },
   "applyOkPrefix": { "message": "✓  " },
@@ -277,7 +300,7 @@
   "feat_sf_redirectShortsUrl_label": { "message": "Shorts URL を /watch にリダイレクト" },
   "feat_sf_redirectShortsUrl_desc": { "message": "/shorts/<ID> で開いた縦動画ページを通常の /watch?v=<ID> プレイヤーに強制リダイレクト" },
   "feat_sf_searchGrid_label": { "message": "検索結果をグリッド表示" },
-  "feat_sf_searchGrid_desc": { "message": "検索結果を 1 列リストから複数列グリッドに変更（ホーム列数が 4/5/6 ならその値、自動なら 3 列）" },
+  "feat_sf_searchGrid_desc": { "message": "検索結果を 1 列リストから複数列グリッドに変更（列数はグリッド表示設定に従い、自動ならホームと同じ列数）" },
   "feat_sf_removeShortsChip_label": { "message": "Shorts フィルタチップ" },
   "feat_sf_removeShortsChip_desc": { "message": "検索ページ上部のフィルタチップ「すべて / 動画 / Shorts / プレイリスト …」のうち「Shorts」チップだけを除去" },
   "feat_sf_removeShortsSidebar_label": { "message": "Shorts サイドバーメニュー" },
@@ -288,6 +311,8 @@
   "feat_sf_subsAllShortcut_desc": { "message": "左サイドバーの「登録チャンネル」セクションの最上に /feed/channels への 1 クリックエントリを公式メニュー風に追加" },
   "feat_sf_subsChannelsGrid_label": { "message": "登録チャンネル一覧をグリッド化（検索/ソート付き）" },
   "feat_sf_subsChannelsGrid_desc": { "message": "/feed/channels ページを動画フィードのようなレスポンシブグリッドに変形 + 上部に検索ボックスとソート切替（名前/登録者数/登録順）。各カードは viewport 進入時に lazy fetch で最新動画サムネを表示（24h キャッシュ）" },
+  "feat_sf_homeGrid_label": { "message": "ホーム/フィードをグリッド整列" },
+  "feat_sf_homeGrid_desc": { "message": "ホームや登録チャンネル等のフィードを隙間なくグリッド配置（Shorts 等の棚をまたいで動画を詰める）。列数『自動』のときも整列する（4/5/6 列を選んだ場合は本トグル OFF でも常にグリッド）" },
 
   "feat_ig_reels_label": { "message": "Reels 削除" },
   "feat_ig_reels_desc": { "message": "サイドバー / ナビの Reels 項目を非表示 + /reels/ URL アクセス時にホーム / へ強制リダイレクト" },

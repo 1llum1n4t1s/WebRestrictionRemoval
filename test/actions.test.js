@@ -131,6 +131,71 @@ test("VideoGamma.isUnity: DEFAULT 近傍で true、それ以外で false", () =>
   assert.equal(G.VideoGamma.isUnity(2.0), false);
 });
 
+// ---------- VideoFill (動画黒帯除去) ----------
+
+test("VideoFill.normalizeMode: stretch のみ stretch、それ以外は zoom にフォールバック", () => {
+  assert.equal(G.VideoFill.normalizeMode("stretch"), "stretch");
+  assert.equal(G.VideoFill.normalizeMode("zoom"), "zoom");
+  assert.equal(G.VideoFill.normalizeMode("bogus"), "zoom");
+  assert.equal(G.VideoFill.normalizeMode(undefined), "zoom");
+  assert.equal(G.VideoFill.normalizeMode(null), "zoom");
+});
+
+test("VideoFill.normalizeTarget: 既知 id はそのまま、未知は DEFAULT_TARGET", () => {
+  assert.equal(G.VideoFill.normalizeTarget("21:9"), "21:9");
+  assert.equal(G.VideoFill.normalizeTarget("3440x1440"), "3440x1440");
+  assert.equal(G.VideoFill.normalizeTarget("bogus"), G.VideoFill.DEFAULT_TARGET);
+  assert.equal(G.VideoFill.normalizeTarget(undefined), G.VideoFill.DEFAULT_TARGET);
+  // DEFAULT_TARGET は実在するプリセット
+  assert.ok(G.VideoFill.PRESETS.some((p) => p.id === G.VideoFill.DEFAULT_TARGET));
+});
+
+test("VideoFill.targetAspect: プリセットの縦横比を返す（解像度 id も実ピクセル比）", () => {
+  assert.ok(Math.abs(G.VideoFill.targetAspect("16:9") - 16 / 9) < 1e-9);
+  assert.ok(Math.abs(G.VideoFill.targetAspect("32:9") - 32 / 9) < 1e-9);
+  assert.ok(Math.abs(G.VideoFill.targetAspect("3440x1440") - 3440 / 1440) < 1e-9);
+  // 未知 id は DEFAULT_TARGET の縦横比
+  assert.equal(G.VideoFill.targetAspect("bogus"), G.VideoFill.targetAspect(G.VideoFill.DEFAULT_TARGET));
+});
+
+test("VideoFill.computeTransform[zoom]: 16:9 動画を 21:9 モニターに → 一様 scale でクロップ", () => {
+  // target 21:9 (2560/1080 ≈ 2.370), video 16:9 (1.778) → scale = 2.370/1.778 ≈ 1.333
+  const t = G.VideoFill.computeTransform(2560 / 1080, 1920, 1080, "zoom");
+  assert.match(t, /^scale\(1\.33\d*\)$/, t);
+});
+
+test("VideoFill.computeTransform[zoom]: ワイド動画 (21:9) を 16:9 モニターに → video/target で拡大", () => {
+  // 動画の方がワイドなケース（ゆろさん指摘）。target 16:9 < video 21:9 なので scale = va/ta
+  const t = G.VideoFill.computeTransform(16 / 9, 2560, 1080, "zoom");
+  // va=2.370, ta=1.778 → 1.333
+  assert.match(t, /^scale\(1\.33\d*\)$/, t);
+});
+
+test("VideoFill.computeTransform[zoom]: 縦横比が一致したら補正不要（空文字）", () => {
+  assert.equal(G.VideoFill.computeTransform(16 / 9, 1920, 1080, "zoom"), "");
+});
+
+test("VideoFill.computeTransform[stretch]: 不足軸だけを引き伸ばす（横不足→scaleX / 縦不足→scaleY）", () => {
+  // target 21:9 > video 16:9 → 横不足 → scaleX
+  assert.match(G.VideoFill.computeTransform(2560 / 1080, 1920, 1080, "stretch"), /^scaleX\(/);
+  // target 16:9 < video 21:9 → 縦不足 → scaleY
+  assert.match(G.VideoFill.computeTransform(16 / 9, 2560, 1080, "stretch"), /^scaleY\(/);
+  // 一致なら空
+  assert.equal(G.VideoFill.computeTransform(16 / 9, 1920, 1080, "stretch"), "");
+});
+
+test("VideoFill.computeTransform: 不正な寸法（0 / NaN / metadata 未確定）は空文字", () => {
+  assert.equal(G.VideoFill.computeTransform(21 / 9, 0, 0, "zoom"), "");
+  assert.equal(G.VideoFill.computeTransform(21 / 9, 1920, 0, "zoom"), "");
+  assert.equal(G.VideoFill.computeTransform(NaN, 1920, 1080, "zoom"), "");
+});
+
+test("VideoFill.computeTransform: 極端な組み合わせは MAX_SCALE で clamp", () => {
+  // 縦長 9:16 動画を 32:9 モニターに → 倍率 ≈ 6.3 → MAX_SCALE (4.0) で頭打ち
+  const t = G.VideoFill.computeTransform(32 / 9, 900, 1600, "zoom");
+  assert.equal(t, `scale(${G.VideoFill.MAX_SCALE})`);
+});
+
 // ---------- Loupe ----------
 
 test("Loupe.validateZoom: ZOOM_LEVELS 内はそのまま、それ以外は DEFAULT_ZOOM", () => {
@@ -528,7 +593,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 17 個の定数を公開する", () => {
+test("actions.js は globalThis に 18 個の定数を公開する", () => {
   const required = [
     "Actions",
     "ExtensionPaths",
@@ -544,6 +609,7 @@ test("actions.js は globalThis に 17 個の定数を公開する", () => {
     "ImageDownloader",
     "VolumeBooster",
     "VideoGamma",
+    "VideoFill",
     "Loupe",
     "ColorPicker",
     "PopupTabs",
@@ -722,7 +788,7 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 29, "SearchFixer.FEATURES は 29 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 30, "SearchFixer.FEATURES は 30 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 11, "InstagramCleaner.FEATURES は 11 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });
@@ -752,9 +818,11 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
     "keepAliveEnabled",
     "searchFixerEnabled",
     "amazonDeliveryTotalEnabled",
+    "amazonRankingJumpEnabled",
     "instagramCleanerEnabled",
     "tiktokCleanerEnabled",
     "videoGammaEnabled",
+    "videoFillEnabled",
     "loupeEnabled",
     "rtxEnhancerEnabled",
   ]) {
@@ -786,6 +854,55 @@ test("StorageKeys.RTX_ENHANCER_ENABLED + Actions.APPLY_RTX_ENHANCER_CS が定義
     G.Actions.APPLY_RTX_ENHANCER_CS.length > 0,
     "Actions.APPLY_RTX_ENHANCER_CS は空文字列であってはならない"
   );
+});
+
+// Amazon ランキング移動ボタンの storage key / action の drift 検知（機能死活の単一情報源）。
+test("StorageKeys.AMAZON_RANKING_JUMP_ENABLED + Actions.APPLY_AMAZON_RANKING_JUMP_CS が定義されている", () => {
+  assert.equal(typeof G.StorageKeys.AMAZON_RANKING_JUMP_ENABLED, "string");
+  assert.equal(G.StorageKeys.AMAZON_RANKING_JUMP_ENABLED, "amazonRankingJumpEnabled");
+  assert.equal(typeof G.Actions.APPLY_AMAZON_RANKING_JUMP_CS, "string");
+  assert.ok(
+    G.Actions.APPLY_AMAZON_RANKING_JUMP_CS.length > 0,
+    "Actions.APPLY_AMAZON_RANKING_JUMP_CS は空文字列であってはならない"
+  );
+});
+
+// AmazonRankingJump.isSubcategoryHref: ノード id を持つサブカテゴリリンクだけを true 判定する。
+test("AmazonRankingJump.isSubcategoryHref: サブカテゴリ（ノード id あり）のみ true", () => {
+  // 細かいサブカテゴリ（カテゴリ slug の後ろに数値ノード id）
+  assert.equal(
+    G.AmazonRankingJump.isSubcategoryHref("https://www.amazon.co.jp/gp/bestsellers/electronics/19349884051/ref=pd_zg_hrsr_electronics"),
+    true
+  );
+  // 相対 href でも判定できる
+  assert.equal(
+    G.AmazonRankingJump.isSubcategoryHref("/gp/bestsellers/electronics/19349884051/"),
+    true
+  );
+  // 広いカテゴリの「○○の売れ筋ランキングを見る」リンク（ノード id なし）は false
+  assert.equal(
+    G.AmazonRankingJump.isSubcategoryHref("https://www.amazon.co.jp/gp/bestsellers/electronics/ref=pd_zg_ts_electronics"),
+    false
+  );
+  // ベストセラートップ（カテゴリ slug のみ）も false
+  assert.equal(G.AmazonRankingJump.isSubcategoryHref("/gp/bestsellers/electronics"), false);
+  // 無効入力
+  assert.equal(G.AmazonRankingJump.isSubcategoryHref(""), false);
+  assert.equal(G.AmazonRankingJump.isSubcategoryHref(null), false);
+});
+
+// AmazonRankingJump.selectTargetHref: サブカテゴリ優先で DOM 上の最後（一番細かい）を選ぶ。
+test("AmazonRankingJump.selectTargetHref: 細かいサブカテゴリ優先で最後を選ぶ", () => {
+  const broad = "/gp/bestsellers/electronics/ref=pd_zg_ts_electronics";
+  const sub1 = "/gp/bestsellers/electronics/19349884051/ref=pd_zg_hrsr";
+  const sub2 = "/gp/bestsellers/electronics/2151981051/ref=pd_zg_hrsr";
+  // 広い + サブ 2 件 → サブの最後（より細かい）を選ぶ
+  assert.equal(G.AmazonRankingJump.selectTargetHref([broad, sub1, sub2]), sub2);
+  // サブが無ければ最後のリンク（広いカテゴリ）にフォールバック
+  assert.equal(G.AmazonRankingJump.selectTargetHref([broad]), broad);
+  // 空 / 非配列は null
+  assert.equal(G.AmazonRankingJump.selectTargetHref([]), null);
+  assert.equal(G.AmazonRankingJump.selectTargetHref(null), null);
 });
 
 // ALLOWED_HOSTS の fbcdn.net パターンが scontent- prefix 限定であることを検証する。

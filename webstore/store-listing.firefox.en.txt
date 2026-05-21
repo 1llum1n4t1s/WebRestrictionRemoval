@@ -9,21 +9,24 @@ Firefox AMO Listing (English)
 Web Viewing Assist (Firefox)
 
 ■ Summary (250 chars max)
-Firefox extension that locally tunes the readability and continuity of the page you are viewing. 9 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Instagram/TikTok Cleaners, Video Gamma, Loupe, RTX Video Enhancer, Color Picker). All default OFF (opt-in). Zero external network calls.
+Firefox extension that locally tunes the readability and continuity of the page you are viewing. 11 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker). All default OFF (opt-in). Zero external network calls.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 9 categories of features into a single popup.
+A productivity helper that bundles 11 categories of features into a single popup.
 
 ■ Features available on Firefox
 
 🔹 Session Keep-alive
 Dispatches synthesized activity events and same-origin HTTP pings to suppress auto-logout on intranet portals and admin dashboards. HTTP ping is opt-in (default OFF), uses 5-second AbortSignal timeout, same-origin only, redirect: manual to prevent credential leakage to third-party domains.
 
-🔹 YouTube Cleaner (29 sub-features)
+🔹 YouTube Cleaner (30 sub-features)
 Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, subscription channel expansion (subs feed → grid + lazy thumbnail), and more granular controls for YouTube's verbose UI.
 
 🔹 Amazon Subscribe & Save totals
 On amazon.co.jp/auto-deliveries, computes per-month delivery totals and inserts them inline.
+
+🔹 Amazon jump-to-ranking button
+The bestseller-rank links in a product's detail section appear in different positions on every page and are hard to find, so this consolidates a "Go to this product's ranking" button at the top of the product info. Clicking it navigates (same tab) to the most specific subcategory ranking. Pure DOM manipulation, zero external transmission.
 
 🔹 Instagram Cleaner (11 sub-features)
 Hides Reels / Explore / Stories / Threads / like counts / videos / comments / Notes / message counters, and similar verbose UI. Uses only semantic selectors (aria-label / role / data-pagelet); no dependency on obfuscated class names.
@@ -33,6 +36,9 @@ Hide comments / hide "Suggested accounts" / image download button.
 
 🔹 Video Gamma
 Global slider applies gamma correction to `<video>` elements (custom SVG `<feComponentTransfer type="gamma">` implementation).
+
+🔹 Remove video black bars
+Removes the letterbox/pillarbox black bars on ultrawide screens by Zoom (aspect-preserving crop) or Stretch (expand only the deficient axis) to fill the screen. The video's aspect ratio is auto-detected; setting is shared across all tabs.
 
 🔹 Loupe
 Mouse-following circular magnifier. 3-step zoom / variable lens size. Uses `tabs.captureVisibleTab` so videos / iframes / canvases can also be magnified.

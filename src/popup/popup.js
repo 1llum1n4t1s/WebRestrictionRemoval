@@ -139,6 +139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $keepAliveSitesCount = document.getElementById("keepAliveSitesCount");
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
+  const $amazonRankingJumpToggle = document.getElementById("amazonRankingJumpToggle");
   const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
   const $volumeRow = document.getElementById("volumeRow");
   const $volumeSlider = document.getElementById("volumeSlider");
@@ -163,6 +164,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $videoGammaSlider = document.getElementById("videoGammaSlider");
   const $videoGammaValueLabel = document.getElementById("videoGammaValueLabel");
   const $videoGammaResetBtn = document.getElementById("videoGammaResetBtn");
+  const $videoFillToggle = document.getElementById("videoFillToggle");
+  const $videoFillRow = document.getElementById("videoFillRow");
+  const $videoFillModeSegment = document.getElementById("videoFillModeSegment");
+  const $videoFillTargetSelect = document.getElementById("videoFillTargetSelect");
   const $loupeToggle = document.getElementById("loupeToggle");
   const $loupeRow = document.getElementById("loupeRow");
   const $rtxEnhancerToggle = document.getElementById("rtxEnhancerToggle");
@@ -187,6 +192,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const igFeatureInputs = new Map();
   /** @type {Map<string, HTMLInputElement>} TikTok クリーナーの個別機能入力 */
   const ttFeatureInputs = new Map();
+  /** 動画黒帯除去の表示モード（"zoom" | "stretch"）。モードセグメントのクリックで更新。 */
+  let videoFillMode = VideoFill.DEFAULT_MODE;
 
   // ----- スライダー単位は分、storage は ms -----
   const MIN_MIN = Math.round(KeepAlive.MIN_INTERVAL_MS / KeepAlive.MS_PER_MIN);
@@ -200,6 +207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // _buildAccordionCategories が cat.id === "menu_ui" のとき _buildGridItemsRow で生成する。
   const $gridItemsSelect = document.getElementById("gridItemsSelect");
   buildGridSelect();
+  buildVideoFillTargetSelect();
   buildInstagramFeatureCategories();
   buildTikTokFeatureCategories();
 
@@ -216,6 +224,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
+    StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -228,6 +237,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VIDEO_GAMMA_ENABLED,
     StorageKeys.VIDEO_GAMMA_VALUE,
+    StorageKeys.VIDEO_FILL_ENABLED,
+    StorageKeys.VIDEO_FILL_MODE,
+    StorageKeys.VIDEO_FILL_TARGET,
     StorageKeys.LOUPE_ENABLED,
     StorageKeys.LOUPE_ZOOM,
     StorageKeys.LOUPE_SIZE,
@@ -276,6 +288,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateKeepAliveSitesCount();
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
+  $amazonRankingJumpToggle.checked = stored[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
   $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
@@ -297,6 +310,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   $videoGammaSlider.value = String(VideoGamma.valueToSlider(storedGamma));
   updateVideoGammaLabel(storedGamma);
   updateVideoGammaRowVisibility();
+
+  $videoFillToggle.checked = stored[StorageKeys.VIDEO_FILL_ENABLED] === true;
+  videoFillMode = VideoFill.normalizeMode(stored[StorageKeys.VIDEO_FILL_MODE]);
+  updateVideoFillModeSegment(videoFillMode);
+  $videoFillTargetSelect.value = VideoFill.normalizeTarget(stored[StorageKeys.VIDEO_FILL_TARGET]);
+  updateVideoFillRowVisibility();
 
   // ルーペの初期値設定
   $loupeToggle.checked = stored[StorageKeys.LOUPE_ENABLED] === true;
@@ -356,6 +375,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateIgCleanerDimState();
   updateTtCleanerCountBadge();
   updateTtCleanerDimState();
+
+  // 調整タブを 4 セクション（オーディオ / 映像 / Amazon / セッション）のサブタブに分割する。
+  // 各セクションのマスタートグルは復元済みなので、ここで初期 badge 件数も確定する。
+  buildTuneSubTabs();
 
   // ============================================================
   // ===== タブナビ + 顔料アトリエ（カラーピッカー） =====
@@ -534,6 +557,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     apply();
   });
   $amazonDeliveryToggle.addEventListener("change", apply);
+  $amazonRankingJumpToggle.addEventListener("change", apply);
 
   $instagramCleanerToggle.addEventListener("change", () => {
     updateIgCleanerDimState();
@@ -559,6 +583,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateVideoGammaLabel(VideoGamma.DEFAULT);
     apply();
   });
+
+  // 動画黒帯除去: master toggle / モードセグメント / 拡大率スライダー
+  $videoFillToggle.addEventListener("change", () => {
+    updateVideoFillRowVisibility();
+    apply();
+  });
+  $videoFillModeSegment.addEventListener("click", (e) => {
+    const btn = e.target.closest(".seg-btn");
+    if (!btn || !$videoFillModeSegment.contains(btn)) return;
+    videoFillMode = VideoFill.normalizeMode(btn.dataset.mode);
+    updateVideoFillModeSegment(videoFillMode);
+    apply();
+  });
+  $videoFillTargetSelect.addEventListener("change", apply);
 
   // ルーペ: マスタートグル
   $loupeToggle.addEventListener("change", () => {
@@ -741,6 +779,64 @@ document.addEventListener("DOMContentLoaded", async () => {
    * @param {string} messageKeyPrefix `feat_sf_` / `feat_ig_` / `feat_tt_` のいずれか。
    *   これに `${item.key}_label` / `${item.key}_desc` を後置して messages.json から取得する。
    */
+  /**
+   * 機能トグル 1 行（ラベル + 説明文 + switch）を構築して inputMap に登録し、`<label>` を返す。
+   * YouTube クリーナーのサブタブ表示 / Instagram / TikTok のスタック表示で共通利用する。
+   */
+  function _buildFeatureRow(item, inputMap, idPrefix, messageKeyPrefix) {
+    const row = document.createElement("label");
+    row.className = "feature-row";
+
+    const text = document.createElement("span");
+    text.className = "fr-text";
+
+    const name = document.createElement("span");
+    name.className = "fr-name";
+    name.textContent = i18n(`${messageKeyPrefix}${item.key}_label`);
+    text.appendChild(name);
+
+    const descMessage = i18n(`${messageKeyPrefix}${item.key}_desc`);
+    if (descMessage) {
+      const desc = document.createElement("span");
+      desc.className = "fr-desc";
+      desc.textContent = descMessage;
+      text.appendChild(desc);
+    }
+
+    const sw = document.createElement("span");
+    sw.className = "switch";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = `${idPrefix}${item.key}`;
+    input.dataset.featureKey = item.key;
+    const track = document.createElement("span");
+    track.className = "switch-track";
+    track.setAttribute("aria-hidden", "true");
+    sw.append(input, track);
+
+    row.append(text, sw);
+    inputMap.set(item.key, input);
+    return row;
+  }
+
+  /**
+   * 1 カテゴリ分の `cat-list`（機能トグル行の集合）を構築して返す。
+   * menu_ui カテゴリのときは末尾にホーム列数 select 行を挿入する。
+   */
+  function _buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix) {
+    const list = document.createElement("div");
+    list.className = "cat-list";
+    for (const item of items) {
+      list.appendChild(_buildFeatureRow(item, inputMap, idPrefix, messageKeyPrefix));
+    }
+    // menu_ui カテゴリの末尾にホーム列数 select 行を挿入。
+    // （Instagram / TikTok クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
+    if (cat.id === "menu_ui") {
+      _buildGridItemsRow(list);
+    }
+    return list;
+  }
+
   function _buildAccordionCategories(rootEl, categories, features, inputMap, idPrefix, messageKeyPrefix) {
     const frag = document.createDocumentFragment();
     for (const cat of categories) {
@@ -761,65 +857,108 @@ document.addEventListener("DOMContentLoaded", async () => {
       headLabel.textContent = i18n(categoryMessageKey(cat.id));
       head.append(headIcon, headLabel);
 
-      const list = document.createElement("div");
-      list.className = "cat-list";
-
-      for (const item of items) {
-        const row = document.createElement("label");
-        row.className = "feature-row";
-
-        const text = document.createElement("span");
-        text.className = "fr-text";
-
-        const name = document.createElement("span");
-        name.className = "fr-name";
-        name.textContent = i18n(`${messageKeyPrefix}${item.key}_label`);
-        text.appendChild(name);
-
-        const descMessage = i18n(`${messageKeyPrefix}${item.key}_desc`);
-        if (descMessage) {
-          const desc = document.createElement("span");
-          desc.className = "fr-desc";
-          desc.textContent = descMessage;
-          text.appendChild(desc);
-        }
-
-        const sw = document.createElement("span");
-        sw.className = "switch";
-        const input = document.createElement("input");
-        input.type = "checkbox";
-        input.id = `${idPrefix}${item.key}`;
-        input.dataset.featureKey = item.key;
-        const track = document.createElement("span");
-        track.className = "switch-track";
-        track.setAttribute("aria-hidden", "true");
-        sw.append(input, track);
-
-        row.append(text, sw);
-        list.appendChild(row);
-        inputMap.set(item.key, input);
-      }
-
-      // menu_ui カテゴリの末尾にホーム列数 select 行を挿入。
-      // （Instagram / TikTok クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
-      if (cat.id === "menu_ui") {
-        _buildGridItemsRow(list);
-      }
-
-      wrap.append(head, list);
+      wrap.append(head, _buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix));
       frag.appendChild(wrap);
     }
     rootEl.appendChild(frag);
   }
 
+  /**
+   * カテゴリをサブタブで切り替える DOM を構築する（YouTube / Instagram クリーナーで共用）。
+   *
+   * 機能数が多いクリーナー（YouTube 30 機能 / Instagram 11 機能）を 1 画面に縦積みすると
+   * 非常に長くなるため、カテゴリごとにサブタブで切り替えられるようにして縦の情報量を圧縮する。
+   * 各機能の `<input>` は全カテゴリ分まとめて DOM / inputMap に存在し続ける（非表示パネルでも
+   * checked 状態は保持され、ON 数カウントや apply() の収集に影響しない）。
+   *
+   * @param {string} ariaLabelKey tablist の aria-label に使う messages.json キー。
+   */
+  function _buildSubTabbedCategories(rootEl, categories, features, inputMap, idPrefix, messageKeyPrefix, ariaLabelKey) {
+    const cats = categories.filter((cat) => {
+      const items = features.filter((f) => f.category === cat.id);
+      return items.length > 0 || cat.id === "menu_ui";
+    });
+
+    const tablist = document.createElement("div");
+    tablist.className = "cat-subtabs";
+    tablist.setAttribute("role", "tablist");
+    tablist.setAttribute("aria-label", i18n(ariaLabelKey));
+
+    const panelsWrap = document.createElement("div");
+    panelsWrap.className = "cat-panels";
+
+    const tabs = [];
+    const panels = [];
+
+    // idx 番目のサブタブをアクティブにし、他を非アクティブ化する（roving tabindex）。
+    const activate = (idx) => {
+      tabs.forEach((tab, i) => {
+        const on = i === idx;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+        panels[i].hidden = !on;
+      });
+    };
+
+    cats.forEach((cat, idx) => {
+      const items = features.filter((f) => f.category === cat.id);
+
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "cat-subtab";
+      tab.setAttribute("role", "tab");
+
+      const icon = document.createElement("span");
+      icon.className = "cat-subtab-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = cat.icon;
+
+      const label = document.createElement("span");
+      label.className = "cat-subtab-label";
+      label.textContent = i18n(categoryMessageKey(cat.id));
+
+      tab.append(icon, label);
+
+      const panel = document.createElement("div");
+      panel.className = "cat-panel";
+      panel.setAttribute("role", "tabpanel");
+      panel.appendChild(_buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix));
+
+      tab.addEventListener("click", () => activate(idx));
+
+      tabs.push(tab);
+      panels.push(panel);
+      tablist.appendChild(tab);
+      panelsWrap.appendChild(panel);
+    });
+
+    // ← / → でサブタブ間を移動（role="tablist" の標準キーボード操作）。
+    tablist.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const current = tabs.findIndex((t) => t.classList.contains("is-active"));
+      if (current < 0) return;
+      const next = e.key === "ArrowRight"
+        ? (current + 1) % tabs.length
+        : (current - 1 + tabs.length) % tabs.length;
+      activate(next);
+      tabs[next].focus();
+      e.preventDefault();
+    });
+
+    activate(0);
+    rootEl.append(tablist, panelsWrap);
+  }
+
   function buildFeatureCategories() {
-    _buildAccordionCategories(
+    _buildSubTabbedCategories(
       $featureCategories,
       SearchFixer.CATEGORIES,
       SearchFixer.FEATURES,
       featureInputs,
       "feature-",
-      "feat_sf_"
+      "feat_sf_",
+      "ytCleanerSubtabsAria"
     );
   }
 
@@ -846,16 +985,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     $categories.classList.toggle("cleaner-disabled", !$toggle.checked);
   }
 
-  function updateCleanerCountBadge() { updateCleanerPill($searchFixerPill, featureInputs); }
+  function updateCleanerCountBadge() {
+    updateCleanerPill($searchFixerPill, featureInputs);
+  }
   function updateCleanerDimState() { updateCleanerDim($featureCategories, $searchFixerToggle); }
 
   function buildInstagramFeatureCategories() {
-    _buildAccordionCategories(
+    _buildSubTabbedCategories(
       $igFeatureCategories, InstagramCleaner.CATEGORIES, InstagramCleaner.FEATURES,
-      igFeatureInputs, "ig-feature-", "feat_ig_"
+      igFeatureInputs, "ig-feature-", "feat_ig_", "igCleanerSubtabsAria"
     );
   }
-  function updateIgCleanerCountBadge() { updateCleanerPill($instagramCleanerPill, igFeatureInputs); }
+  function updateIgCleanerCountBadge() {
+    updateCleanerPill($instagramCleanerPill, igFeatureInputs);
+  }
   function updateIgCleanerDimState() { updateCleanerDim($igFeatureCategories, $instagramCleanerToggle); }
 
   function buildTikTokFeatureCategories() {
@@ -866,6 +1009,86 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   function updateTtCleanerCountBadge() { updateCleanerPill($tiktokCleanerPill, ttFeatureInputs); }
   function updateTtCleanerDimState() { updateCleanerDim($ttFeatureCategories, $tiktokCleanerToggle); }
+
+  /**
+   * 調整タブ（#panelTune）の 4 セクションをサブタブで切り替えられるようにする。
+   *
+   * クリーナータブと違い「単一マスター + 動的 FEATURES」ではなく、オーディオ / 映像 / Amazon /
+   * セッションという 4 つの静的セクション（各自マスタートグルを持つ）を縦積みしているため、
+   * FEATURES ベースの _buildSubTabbedCategories ではなく、既存セクションの表示切替で実装する。
+   * サブタブの見た目（.cat-subtabs / .cat-subtab）はクリーナーと共通の CSS を再利用する。
+   * Firefox など音量ブースター非対応環境ではオーディオセクションを除外する。
+   */
+  function buildTuneSubTabs() {
+    const panel = document.getElementById("panelTune");
+    if (!panel) return;
+
+    const defs = [
+      { icon: "🔊", labelKey: "groupAudio",   sectionId: "audioGroupSection" },
+      { icon: "🎞️", labelKey: "groupVideo",   sectionId: "videoGroupSection" },
+      { icon: "📦", labelKey: "groupAmazon",  sectionId: "amazonGroupSection" },
+      { icon: "🔄", labelKey: "groupSession", sectionId: "sessionGroupSection" },
+    ];
+
+    const entries = defs
+      .map((d) => ({ ...d, section: document.getElementById(d.sectionId) }))
+      .filter((d) => d.section && !(d.sectionId === "audioGroupSection" && !HAS_VOLUME_BOOSTER));
+    if (entries.length === 0) return;
+
+    const tablist = document.createElement("div");
+    tablist.className = "cat-subtabs cat-subtabs--tune";
+    tablist.setAttribute("role", "tablist");
+    tablist.setAttribute("aria-label", i18n("tuneSubtabsAria"));
+
+    const tabs = [];
+
+    const activate = (idx) => {
+      entries.forEach((e, i) => {
+        const on = i === idx;
+        tabs[i].classList.toggle("is-active", on);
+        tabs[i].setAttribute("aria-selected", on ? "true" : "false");
+        tabs[i].tabIndex = on ? 0 : -1;
+        e.section.classList.toggle("tune-section-hidden", !on);
+      });
+    };
+
+    entries.forEach((e, idx) => {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "cat-subtab";
+      tab.setAttribute("role", "tab");
+
+      const icon = document.createElement("span");
+      icon.className = "cat-subtab-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = e.icon;
+
+      const label = document.createElement("span");
+      label.className = "cat-subtab-label";
+      label.textContent = i18n(e.labelKey);
+
+      tab.append(icon, label);
+      tab.addEventListener("click", () => activate(idx));
+      tabs.push(tab);
+      tablist.appendChild(tab);
+    });
+
+    // ← / → でサブタブ間を移動（role="tablist" の標準キーボード操作）。
+    tablist.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+      const cur = tabs.findIndex((t) => t.classList.contains("is-active"));
+      if (cur < 0) return;
+      const next = ev.key === "ArrowRight"
+        ? (cur + 1) % tabs.length
+        : (cur - 1 + tabs.length) % tabs.length;
+      activate(next);
+      tabs[next].focus();
+      ev.preventDefault();
+    });
+
+    panel.insertBefore(tablist, panel.firstChild);
+    activate(0);
+  }
 
   // ----- 適用 -----
   async function apply() {
@@ -896,10 +1119,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const keepAliveHttpPingEnabled = $keepAliveHttpPingToggle.checked;
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
+    const amazonRankingJumpEnabled = $amazonRankingJumpToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
     const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
     const videoGammaValue = currentVideoGammaValue();
+    const videoFillEnabled = $videoFillToggle.checked;
+    const videoFillTarget = VideoFill.normalizeTarget($videoFillTargetSelect.value);
     const loupeEnabled = $loupeToggle.checked;
     const rtxEnhancerEnabled = $rtxEnhancerToggle.checked;
     const minutes = clampMinutes(Number($intervalSlider.value));
@@ -922,12 +1148,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           searchFixerFeatures,
           searchFixerGridItems,
           amazonDeliveryTotalEnabled,
+          amazonRankingJumpEnabled,
           instagramCleanerEnabled,
           instagramCleanerFeatures,
           tiktokCleanerEnabled,
           tiktokCleanerFeatures,
           videoGammaEnabled,
           videoGammaValue,
+          videoFillEnabled,
+          videoFillMode,
+          videoFillTarget,
           loupeEnabled,
           rtxEnhancerEnabled,
         },
@@ -939,9 +1169,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             keepAliveSiteEnabled,
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
+            amazonRankingJumpEnabled,
             instagramCleanerEnabled,
             tiktokCleanerEnabled,
             videoGammaEnabled,
+            videoFillEnabled,
             loupeEnabled
           ),
           "ok"
@@ -995,18 +1227,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     keepAliveEnabled,
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
+    amazonRankingJumpEnabled,
     instagramCleanerEnabled,
     tiktokCleanerEnabled,
     videoGammaEnabled,
+    videoFillEnabled,
     loupeEnabled
   ) {
     const parts = [];
     if (keepAliveEnabled) parts.push(i18n("applyOkSession"));
     if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
     if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
+    if (amazonRankingJumpEnabled) parts.push(i18n("applyOkAmazonRanking"));
     if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
     if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
     if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
+    if (videoFillEnabled) parts.push(i18n("applyOkVideoFill"));
     if (loupeEnabled) parts.push(i18n("applyOkLoupe"));
     if (parts.length === 0) return i18n("applyOkAllStopped");
     return i18n("applyOkPrefix") + parts.join(i18n("applyOkSeparator"));
@@ -1033,6 +1269,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function updateVideoGammaRowVisibility() {
     $videoGammaRow.classList.toggle("hidden", !$videoGammaToggle.checked);
+  }
+
+  // ----- 動画黒帯除去 ヘルパー -----
+  // モニター選択ドロップダウンを VideoFill.PRESETS から optgroup 付きで構築する
+  // （「縦横比」「解像度」の 2 グループ）。動画側の縦横比は content script が自動検出するので
+  // ここで選ぶのは「お使いのモニター」だけ。
+  function buildVideoFillTargetSelect() {
+    for (const group of VideoFill.GROUPS) {
+      const items = VideoFill.PRESETS.filter((p) => p.group === group.id);
+      if (items.length === 0) continue;
+      const og = document.createElement("optgroup");
+      og.label = i18n(group.messageKey);
+      for (const preset of items) {
+        const o = document.createElement("option");
+        o.value = preset.id;
+        o.textContent = preset.label;
+        og.appendChild(o);
+      }
+      $videoFillTargetSelect.appendChild(og);
+    }
+  }
+
+  function updateVideoFillRowVisibility() {
+    $videoFillRow.classList.toggle("hidden", !$videoFillToggle.checked);
+  }
+
+  function updateVideoFillModeSegment(mode) {
+    const m = VideoFill.normalizeMode(mode);
+    $videoFillModeSegment.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.mode === m);
+    });
   }
 
   // ----- ルーペ ヘルパー -----

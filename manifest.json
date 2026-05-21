@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -49,6 +49,13 @@
       "all_frames": false
     },
     {
+      "matches": ["*://www.amazon.co.jp/*"],
+      "js": ["src/lib/actions.js", "src/content/amazon-ranking-jump.js"],
+      "css": ["src/content/amazon-ranking-jump.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
       "matches": ["*://*.instagram.com/*"],
       "js": ["src/content/early-framework.js", "src/content/instagram-early.js"],
       "run_at": "document_start",
@@ -76,7 +83,7 @@
     },
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/video-gamma.js"],
+      "js": ["src/lib/actions.js", "src/content/video-gamma.js", "src/content/video-fill.js"],
       "run_at": "document_idle",
       "all_frames": true
     },
