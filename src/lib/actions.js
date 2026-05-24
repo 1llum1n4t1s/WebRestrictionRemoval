@@ -1044,6 +1044,80 @@ const VolumeBooster = Object.freeze({
     attack: 0.003,
     release: 0.25,
   }),
+
+  /**
+   * EME (DRM) 動画を多用するサイトの hostname ブラックリスト。
+   *
+   * これらのサイトでは MediaElementSource 経路 (content script の volume-booster.js) を
+   * 起動しない。理由: `createMediaElementSource(video)` で video の音声経路を AudioContext に
+   * redirect すると、EME 保護動画は復号後の音声 sample を AudioContext に流さない仕様
+   * (Chrome/Firefox 共通) のため、結果として **動画の音そのものが完全無音化** する副作用がある。
+   *
+   * 代わりに popup 経由の旧 tabCapture 経路を使う。`chrome.tabCapture` は OS / ブラウザ
+   * レベルで復号された後のタブ音声出力を捕獲するため、EME 動画でもブースト可能。
+   *
+   * トレードオフ: これらのサイトでは「popup を一度開いて user gesture を発生させる」
+   * 必要があり、popup を開かない限り音量ブースターは無効。代わりに動画は普通に再生される。
+   *
+   * このリストにないサイトでも runtime で EME を検出した場合 (encrypted event) は
+   * volume-booster.js が detach する fallback がある (一瞬無音化 + detach 後の復帰が
+   * 保証されないリスクは残る)。完璧な保護はホスト名ブラックリストのみ。
+   *
+   * 追加要望があったら hostname を確認して RegExp を追加すること。
+   */
+  EME_HOSTS: Object.freeze([
+    /(^|\.)netflix\.com$/,
+    /(^|\.)primevideo\.com$/,
+    // Amazon Prime Video は amazon.co.jp / amazon.com の `/gp/video/` 配下に統合されているため
+    // 親ドメイン全体を入れる。Amazon ランキング機能 (amazon-ranking-jump.js) と同居するが、
+    // ランキングは商品ページ DOM 操作 + 外部送信ゼロなので衝突しない (volume-booster だけ EME skip)。
+    /(^|\.)amazon\.co\.jp$/,
+    /(^|\.)amazon\.com$/,
+    /(^|\.)dazn\.com$/,
+    /(^|\.)disneyplus\.com$/,
+    /(^|\.)hulu\.com$/,
+    /(^|\.)hulu\.jp$/,
+    /(^|\.)tv\.apple\.com$/,
+    /(^|\.)abema\.tv$/,
+    /(^|\.)unext\.jp$/,
+    /(^|\.)tver\.jp$/,
+    /(^|\.)nhk-ondemand\.jp$/,
+    /(^|\.)spotify\.com$/,
+    /(^|\.)fod\.fujitv\.co\.jp$/,
+    /(^|\.)spoox\.jp$/,
+  ]),
+
+  /**
+   * hostname が EME_HOSTS のいずれかに該当するか判定する純粋関数。
+   * popup (tabCapture 経路に分岐) と content script (MES 起動を skip) の両方から呼ぶ。
+   *
+   * @param {string|null|undefined} hostname `location.hostname` または URL から抽出した hostname
+   * @returns {boolean} true なら EME 多用サイトで MES 経路を使わない
+   */
+  isEmeHost(hostname) {
+    if (typeof hostname !== "string" || hostname.length === 0) return false;
+    const lower = hostname.toLowerCase();
+    for (const re of VolumeBooster.EME_HOSTS) {
+      if (re.test(lower)) return true;
+    }
+    return false;
+  },
+
+  /**
+   * URL 文字列から hostname を抽出して isEmeHost を呼ぶ便利関数。
+   * popup 側で `tab.url` を直接判定するときに使う。
+   *
+   * @param {string|null|undefined} url 完全な URL 文字列
+   * @returns {boolean} true なら EME ホスト
+   */
+  isEmeUrl(url) {
+    if (typeof url !== "string" || url.length === 0) return false;
+    try {
+      return VolumeBooster.isEmeHost(new URL(url).hostname);
+    } catch {
+      return false;
+    }
+  },
 });
 
 /**

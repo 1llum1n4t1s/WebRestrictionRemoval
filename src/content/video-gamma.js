@@ -13,9 +13,11 @@
  * content script もそれぞれ自分のドキュメントに対して inject する。
  *
  * 設計メモ:
- *   - SVG は innerHTML で組み立てる。createElementNS では `color-interpolation-filters`
- *     等の hyphen 付き属性や namespace 解釈で Chromium が filter を解決できないケースが
- *     報告されており、HTML5 パーサに名前空間ごと解釈させたほうが安定する。
+ *   - SVG は DOMParser("image/svg+xml") で XML として組み立て、document.importNode で
+ *     取り込む。createElementNS では `color-interpolation-filters` 等の hyphen 付き属性や
+ *     namespace 解釈で Chromium が filter を解決できないケースが報告されているが、XML
+ *     パーサに名前空間ごと解釈させれば安定する（HTML5 パーサ + innerHTML 経路は AMO の
+ *     UNSAFE_VAR_ASSIGNMENT 警告対象になるため不採用）。
  *   - CSS セレクタは `html body video` で specificity を 0,0,0,3 まで底上げし、
  *     サイト側の `.foo { filter: ... !important }` (0,0,1,0) との競合に勝てるようにする。
  *   - `<style>` は `<head>` 末尾、`<svg>` は `<body>` 末尾に置き、SPA 等で body 配下が
@@ -36,15 +38,16 @@
   }
 
   /**
-   * SVG filter 用の HTML 文字列を組み立てる。innerHTML 経由で挿入することで HTML5
-   * パーサが SVG namespace で正しく解釈してくれる。
+   * SVG filter ノードを DOMParser("image/svg+xml") で構築し、現ドキュメントに
+   * importNode で取り込んで返す。XML パーサが SVG namespace を正しく解釈するため、
+   * createElementNS の hyphen 付き属性問題も innerHTML の AMO 警告も両方回避できる。
    *
    * 値は VideoGamma.clampValue で数値化済みの exponent のみで、ユーザー入力や外部
    * 文字列を埋め込む経路はないため XSS 経路はゼロ。
    */
-  function buildSvgMarkup(exponent) {
+  function buildSvgFilter(exponent) {
     const e = String(VideoGamma.clampValue(exponent));
-    return (
+    const markup =
       `<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" focusable="false" aria-hidden="true">` +
         `<defs>` +
           `<filter id="${VideoGamma.FILTER_ID}" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">` +
@@ -55,20 +58,21 @@
             `</feComponentTransfer>` +
           `</filter>` +
         `</defs>` +
-      `</svg>`
-    );
+      `</svg>`;
+    const doc = new DOMParser().parseFromString(markup, "image/svg+xml");
+    return document.importNode(doc.documentElement, true);
   }
 
   /**
-   * SVG filter ホスト要素を確保 / 更新。`<div>` でラップし HTML5 パーサに SVG を
-   * 解釈させる。同じ host を innerHTML 差し替えで再構築することで、createElementNS
-   * 経由で残った古い filter ノードがメモリに残らないようにする。
+   * SVG filter ホスト要素を確保 / 更新。`<div>` でラップし、子ノードを差し替える形で
+   * 再構築する。innerHTML を使わないことで AMO の UNSAFE_VAR_ASSIGNMENT 警告を回避。
    */
   function ensureSvgFilter(exponent) {
     let host = document.getElementById(VideoGamma.SVG_ID);
-    const markup = buildSvgMarkup(exponent);
+    const svg = buildSvgFilter(exponent);
     if (host) {
-      host.innerHTML = markup;
+      while (host.firstChild) host.removeChild(host.firstChild);
+      host.appendChild(svg);
       return;
     }
     host = document.createElement("div");
@@ -85,7 +89,7 @@
       "height:1px!important;" +
       "overflow:hidden!important;" +
       "pointer-events:none!important;";
-    host.innerHTML = markup;
+    host.appendChild(svg);
     (document.body || document.documentElement).appendChild(host);
   }
 

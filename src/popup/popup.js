@@ -15,7 +15,7 @@
  *
  * ローカライズ:
  *   - 全 UI 文字列は `_locales/{en,ja}/messages.json` から `chrome.i18n.getMessage` 経由で取得する
- *   - 静的テキストは popup.html の `data-i18n` / `data-i18n-html` / `data-i18n-attr` 属性で指定し、
+ *   - 静的テキストは popup.html の `data-i18n` / `data-i18n-attr` 属性で指定し、
  *     applyI18nToDom() が DOMContentLoaded で一括適用する
  *   - 動的テキスト（status / picker note / pill 等）は i18n() ヘルパー経由
  *   - ブラウザ UI 言語が ja → 日本語、それ以外 → 英語にフォールバック
@@ -54,8 +54,12 @@ function categoryMessageKey(categoryId) {
  * DOMContentLoaded 直後にここで上書きすることで、英語環境でも違和感のない UI を出す。
  *
  * - data-i18n="key": textContent を上書き
- * - data-i18n-html="key": innerHTML を上書き（messages.json は信頼できるソースのみなので XSS リスク無し）
  * - data-i18n-attr="attr1:key1;attr2:key2": 任意属性を上書き（aria-label / placeholder / title 等）
+ *
+ * 注: 以前あった `data-i18n-html` (innerHTML 上書き) は AMO の UNSAFE_VAR_ASSIGNMENT
+ * 警告対象だったため廃止し、HTML 構造を持つ説明文は popup.html 側で
+ * `<span data-i18n=...>前半</span><code>...</code><span data-i18n=...>後半</span>` の
+ * 3 セグメント分割で表現するようにした。
  */
 function applyI18nToDom(root) {
   const scope = root || document;
@@ -64,12 +68,6 @@ function applyI18nToDom(root) {
     const key = el.getAttribute("data-i18n");
     const msg = i18n(key);
     if (msg) el.textContent = msg;
-  });
-  // innerHTML（<code> タグ等のマークアップを含む説明文用）
-  scope.querySelectorAll("[data-i18n-html]").forEach((el) => {
-    const key = el.getAttribute("data-i18n-html");
-    const msg = i18n(key);
-    if (msg) el.innerHTML = msg;
   });
   // 属性
   scope.querySelectorAll("[data-i18n-attr]").forEach((el) => {
@@ -1355,29 +1353,51 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * gain と compressor フラグを background に送って反映する。100% 時は background 側で
-   * release を呼ぶため、ここではただ送るだけでよい。エラー時は res.error をユーザーに
-   * 伝えてデバッグしやすくする。
+   * 音量関連 6 キー全部を storage に書き込む。content script (volume-booster.js) が
+   * storage.onChanged で反応して全タブ全フレームの `<video>` / `<audio>` に
+   * MediaElementSource + 6 ノードチェーンを attach する設計 (v1.0.33 から MES 経路をデフォルト化)。
    *
-   * antiClip / normalize は現在のトグル状態を都度読み取るため、トグルだけ変えて gain は
-   * 据え置く操作も「現在 gain を再 push」だけで反映できる。
+   * MES 経路は user gesture 不要で **動画再生開始前から自動適用** される (旧 tabCapture 経路の
+   * 「popup を一度開かないと boost されない」制約を解消)。
+   *
+   * ただし EME 保護動画 (Netflix / Prime Video / DAZN 等、VolumeBooster.EME_HOSTS に列挙) では
+   * MediaElementSource が動画音声を完全無音化するため MES 経路は使えない。これらのサイトでは
+   * **旧 tabCapture 経路 (background → offscreen) で boost する** (popup 必須、改修前と同じ動き)。
+   *
+   * antiClip / normalize / nightMode / muted は現在のトグル状態を都度読み取るため、
+   * トグルだけ変えて gain は据え置く操作も「pushVolumeNow(現在値)」で全反映できる。
    */
   async function pushVolumeNow(value) {
     if (!$volumeBoosterToggle.checked) return;
-    // popup → background は normalizeSettings を経由しない直接書き込み経路のため、
-    // popup 側で必ず VolumeBooster.clampValue を通す。background ハンドラ側でも clamp
-    // するが、storage に範囲外値が紛れ込むのを防ぐため二重防御 (/rere B1-S1-1)。
+    // popup 側で必ず VolumeBooster.clampValue を通して storage に範囲外値が
+    // 紛れ込むのを防ぐ (二重防御 /rere B1-S1-1)。
     const clamped = VolumeBooster.clampValue(value);
-    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped }).catch(() => {});
+    // popup クローズ後の orphan await から戻ったときに DOM が detached になっている
+    // ケースは storage 書き込みも副作用ゼロ路に倒して終了 (/rere B1-S2-1)。
+    if (!document.body?.isConnected) return;
+    chrome.storage.local.set({
+      [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped,
+      [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
+      [StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]: $volumeNormalizeToggle.checked,
+      [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
+      [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
+    }).catch(() => {});
+
+    // EME ホスト判定: active tab が EME 多用サイトなら旧 tabCapture 経路で boost する。
+    // MES 経路は volume-booster.js 冒頭の isEmeHost guard で skip されている。
     const tab = await getActiveHttpTab();
-    // popup クローズ後の orphan await から戻ったときは DOM が detached になっていることが
-    // ある。`document.body.isConnected` が false なら setVolumeHint も storage 書き込みも
-    // 副作用ゼロ路に倒して終了する (/rere B1-S2-1)。
     if (!document.body?.isConnected) return;
     if (!tab) {
-      setVolumeHint(i18n("volumeErrorUnsupportedPage"), true);
+      setVolumeHint("");
       return;
     }
+    if (!VolumeBooster.isEmeUrl(tab.url)) {
+      // 普通のサイトは MES が自動適用するので popup 側は storage 書き込みだけで完了
+      setVolumeHint("");
+      return;
+    }
+
+    // EME ホスト: tabCapture 経路で boost (旧方式と同じ、user gesture = popup open)
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.VOLUME_BOOSTER_SET_GAIN,

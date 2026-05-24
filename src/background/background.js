@@ -752,6 +752,10 @@ async function markVolumeBoosterTabActive(tabId) {
 
 async function ensureOffscreenDocument() {
   if (!chrome.offscreen) return false;
+  // __FIREFOX_STRIP_BEGIN__: Firefox MV3 は chrome.offscreen 未対応のため、build 時に
+  // このブロックを削除する。chrome.offscreen guard により実行時はこの行に到達しないが、
+  // AMO linter の static analysis は chrome.offscreen.createDocument(...) を検出して
+  // UNSUPPORTED_API 警告を出すため、コード自体を物理的に削除して警告ゼロ化する。
 
   if (offscreenClosingPromise) {
     try { await offscreenClosingPromise; } catch {}
@@ -813,6 +817,7 @@ async function ensureOffscreenDocument() {
     });
   offscreenCreatingPromise = localPromise;
   return await localPromise;
+  // __FIREFOX_STRIP_END__
 }
 
 function scheduleOffscreenClose() {
@@ -820,6 +825,7 @@ function scheduleOffscreenClose() {
   offscreenIdleTimer = setTimeout(async () => {
     offscreenIdleTimer = null;
     if (!chrome.offscreen) return;
+    // __FIREFOX_STRIP_BEGIN__: Firefox MV3 は chrome.offscreen.closeDocument 未対応のため build 時に削除
     // EC-6 対策: CREATING 中はもちろん、CLOSING 中の二重呼び出しもガードする
     // （await `isVolumeBoosterActive` の最中に別タイマーが発火するケースで二重 close を防ぐ）。
     if (offscreenState === "CREATING" || offscreenState === "CLOSING") return;
@@ -862,6 +868,7 @@ function scheduleOffscreenClose() {
         // が新規 createDocument を発行できるようにする（B1-B1 修正の対）。
         offscreenCreatingPromise = null;
       });
+    // __FIREFOX_STRIP_END__
   }, Offscreen.IDLE_MS);
 }
 
@@ -1024,6 +1031,9 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
   // 新規接続: tabCapture から streamId を取得。
   // Chrome 119+ の Promise.withResolvers() で callback と Promise の参照位置を物理的に近く保つ
   // (/opop MN-2 適用、minimum_chrome_version 140 で利用可能)
+  // __FIREFOX_STRIP_BEGIN__: Firefox MV3 は chrome.tabCapture 未対応のため build 時に削除。
+  // この関数は HAS_VOLUME_BOOSTER guard により Firefox では呼ばれず、また到達前に
+  // ensureOffscreenDocument が false を返して早期 return するため、strip しても実害ゼロ。
   let streamId = null;
   try {
     const { promise, resolve, reject } = Promise.withResolvers();
@@ -1036,6 +1046,7 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
   }
+  // __FIREFOX_STRIP_END__
 
   try {
     const res = await chrome.runtime.sendMessage({

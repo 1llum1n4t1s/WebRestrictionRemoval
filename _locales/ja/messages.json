@@ -51,10 +51,8 @@
   "volumeNightModeDesc": { "message": "大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます" },
 
   "videoGammaMaster": { "message": "動画ガンマ補正" },
-  "videoGammaMasterDescHtml": {
-    "message": "ページ上の <code class=\"tr-code\">&lt;video&gt;</code> 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利",
-    "description": "動画ガンマ補正マスタートグルの説明 (HTML を含む)"
-  },
+  "videoGammaMasterDescPre": { "message": "ページ上の " },
+  "videoGammaMasterDescPost": { "message": " 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利" },
   "videoGammaSubLabel": { "message": "ガンマ値" },
   "videoGammaSubDesc": { "message": "1.0 で補正なし。1.0 未満で暗部を持ち上げて明るく、1.0 超でコントラストを上げて暗く" },
   "videoGammaResetBtn": { "message": "1.0 に戻す" },
@@ -86,10 +84,8 @@
   "loupeErrorUnknown": { "message": "⚠ ルーペの起動に失敗しました" },
 
   "amazonDeliveryMaster": { "message": "定期おトク便 月別合計" },
-  "amazonDeliveryMasterDescHtml": {
-    "message": "配送月ごとの合計金額を <code class=\"tr-code\">/auto-deliveries</code> ページに表示",
-    "description": "Amazon 定期おトク便マスタートグルの説明 (HTML を含む)"
-  },
+  "amazonDeliveryMasterDescPre": { "message": "配送月ごとの合計金額を " },
+  "amazonDeliveryMasterDescPost": { "message": " ページに表示" },
   "amazonRankingJumpMaster": { "message": "ランキングへ移動ボタン" },
   "amazonRankingJumpMasterDesc": {
     "message": "商品ページ上部に「この商品が所属するランキングへ移動」ボタンを表示",

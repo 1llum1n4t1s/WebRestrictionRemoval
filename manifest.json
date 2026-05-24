@@ -89,6 +89,12 @@
     },
     {
       "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/lib/actions.js", "src/content/volume-booster.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
       "js": ["src/lib/actions.js", "src/content/loupe.js"],
       "css": ["src/content/loupe.css"],
       "run_at": "document_idle",

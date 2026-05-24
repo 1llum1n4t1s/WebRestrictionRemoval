@@ -65,6 +65,17 @@ function Build-Package {
     # 不要ファイル除去
     Get-ChildItem -Path $tempDir -Recurse -Include "*.DS_Store","*.swp","*~" | Remove-Item -Force
 
+    if ($Variant -eq "firefox") {
+        # Firefox 版は chrome.offscreen / chrome.tabCapture の呼び出しブロックを物理削除する。
+        # AMO linter の UNSUPPORTED_API 警告 3 件を消すため、__FIREFOX_STRIP_BEGIN__ から
+        # __FIREFOX_STRIP_END__ までを (マーカー行を含めて) 削除する。
+        $bgPath = "$tempDir/src/background/background.js"
+        $content = Get-Content $bgPath -Raw
+        $stripped = [regex]::Replace($content, '(?s)\s*//\s*__FIREFOX_STRIP_BEGIN__.*?//\s*__FIREFOX_STRIP_END__\s*\r?\n', "`n")
+        Set-Content -Path $bgPath -Value $stripped -NoNewline -Encoding UTF8
+        Write-Host "Firefox build: background.js の chrome.offscreen / chrome.tabCapture 呼び出しを strip 済み" -ForegroundColor DarkGray
+    }
+
     Write-Host "アーカイブを作成中..." -ForegroundColor Cyan
     # Compress-Archive は zip 形式。Firefox 用は拡張子を xpi に変えるだけで Firefox AMO が受理する。
     $tempZip = "$OutputName.tmp.zip"

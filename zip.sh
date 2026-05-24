@@ -58,6 +58,14 @@ build_pkg() {
   # 不要ファイル除去
   find "$tmp" \( -name "*.DS_Store" -o -name "*.swp" -o -name "*~" \) -delete
 
+  if [ "$variant" = "firefox" ]; then
+    # Firefox 版は chrome.offscreen / chrome.tabCapture の呼び出しブロックを物理削除する。
+    # AMO linter の UNSUPPORTED_API 警告 3 件を消すため、__FIREFOX_STRIP_BEGIN__ から
+    # __FIREFOX_STRIP_END__ までを (マーカー行を含めて) 削除する。
+    perl -i -0pe 's{\s*//\s*__FIREFOX_STRIP_BEGIN__.*?//\s*__FIREFOX_STRIP_END__\s*\n}{\n}gs' "$tmp/src/background/background.js"
+    echo "Firefox build: background.js の chrome.offscreen / chrome.tabCapture 呼び出しを strip 済み"
+  fi
+
   # アーカイブ作成 (zip / xpi いずれも zip 形式、拡張子だけが違う)
   (cd "$tmp" && zip -r "../$output" . -x "*.DS_Store" "*.swp" "*~") >/dev/null
   rm -rf "$tmp"

@@ -51,10 +51,8 @@
   "volumeNightModeDesc": { "message": "Gently compress loud voices and explosions so quiet game audio is not buried." },
 
   "videoGammaMaster": { "message": "Video Gamma" },
-  "videoGammaMasterDescHtml": {
-    "message": "Apply gamma correction to <code class=\"tr-code\">&lt;video&gt;</code> elements on the page. Brightens dark videos and softens overly bright ones.",
-    "description": "Master toggle description (HTML allowed)"
-  },
+  "videoGammaMasterDescPre": { "message": "Apply gamma correction to " },
+  "videoGammaMasterDescPost": { "message": " elements on the page. Brightens dark videos and softens overly bright ones." },
   "videoGammaSubLabel": { "message": "Gamma value" },
   "videoGammaSubDesc": { "message": "1.0 means no correction. Below 1.0 lifts shadows (brighter); above 1.0 boosts contrast (darker)." },
   "videoGammaResetBtn": { "message": "Reset to 1.0" },
@@ -86,10 +84,8 @@
   "loupeErrorUnknown": { "message": "⚠ Failed to start the loupe" },
 
   "amazonDeliveryMaster": { "message": "Subscribe & Save monthly total" },
-  "amazonDeliveryMasterDescHtml": {
-    "message": "Show a per-month total on the <code class=\"tr-code\">/auto-deliveries</code> page.",
-    "description": "Master toggle description (HTML allowed)"
-  },
+  "amazonDeliveryMasterDescPre": { "message": "Show a per-month total on the " },
+  "amazonDeliveryMasterDescPost": { "message": " page." },
   "amazonRankingJumpMaster": { "message": "Jump-to-ranking button" },
   "amazonRankingJumpMasterDesc": {
     "message": "Show a \"Go to this product's ranking\" button at the top of product pages.",

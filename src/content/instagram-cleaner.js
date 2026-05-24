@@ -36,15 +36,19 @@
   /** @type {number|null} URL リダイレクト用ポーリングタイマー */
   let urlGuardTimer = null;
 
-  // i18n / セレクタ崩壊の watch dog (#10): href ベースセレクタが DOM にマッチしないとき
-  // Instagram の DOM 構造／aria-label/href が変わった可能性があるので開発者コンソールに 1 度だけ警告。
+  // i18n / セレクタ崩壊の watch dog (#10): href + aria-label の全バリアントが同時に DOM に
+  // 見当たらないとき、Instagram の DOM 構造が根本変化した可能性を開発者コンソールに 1 度だけ警告。
+  // CSS と同じ union 配列で照合し、1 つでもマッチしたら黙る（false positive 抑制）。
+  // 即時チェックは React 遅延 hydrate 前に吠えるため、settings 適用から 1.5s 待ってから 1 度だけ実行。
   // ユーザーへの直接通知は出さず、本番ユーザーが DevTools を開いたときの診断補助に留める。
   /** @type {Set<string>} 警告済み機能キー */
   const i18nWarned = new Set();
   const I18N_WATCHDOG_SELECTORS = Object.freeze({
-    reels: 'a[href="/reels/"]',
-    explore: 'a[href="/explore/"]',
+    reels: 'a[href="/reels/"], a[href^="/reels/"], [aria-label="Reels"], [aria-label="リール"]',
+    explore: 'a[href="/explore/"], a[href^="/explore/"], [aria-label="Explore"], [aria-label="発見"]',
   });
+  /** @type {number|null} React 遅延 hydrate を待つ 1.5s 遅延チェック用タイマー */
+  let i18nWatchdogTimer = null;
 
   // ---------- 機能アクセサ ----------
   // master が false ならすべて false 扱い。
@@ -103,7 +107,18 @@
     for (const [key, className] of Object.entries(InstagramCleaner.BODY_CLASS)) {
       root.classList.toggle(className, f(key));
     }
-    checkI18nWatchdog();
+    // 既存の保留タイマーをキャンセル（連続トグル時の重複起動防止 + active=false 切替時の停止）。
+    if (i18nWatchdogTimer !== null) {
+      clearTimeout(i18nWatchdogTimer);
+      i18nWatchdogTimer = null;
+    }
+    if (!active) return;
+    // SPA 遷移 / 初回ロード直後は React で sidebar が遅延 hydrate される。
+    // 即時チェックすると hydration 前で false positive を吠えるため 1.5s 待ってから 1 度だけ実行。
+    i18nWatchdogTimer = setTimeout(() => {
+      i18nWatchdogTimer = null;
+      if (active && chrome.runtime?.id) checkI18nWatchdog();
+    }, 1500);
   }
 
   /**

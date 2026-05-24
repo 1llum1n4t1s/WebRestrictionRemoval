@@ -83,8 +83,9 @@ jobs:
       - name: Firefox 用ソースディレクトリを構築
         # manifest.firefox.json を manifest.json として配置し、icons / src / _locales を同梱。
         # 音量ブースター関連 permission (offscreen / tabCapture) は manifest.firefox.json で
-        # 除外済み。Firefox MV3 では `background.service_worker` を ignored 警告するが
-        # `background.scripts` 併記でフォールバック動作する。
+        # 除外済み。さらに background.js から chrome.offscreen / chrome.tabCapture の呼び出し
+        # ブロックを __FIREFOX_STRIP_BEGIN__ / __FIREFOX_STRIP_END__ マーカー間で物理削除する
+        # (AMO linter の UNSUPPORTED_API 警告 3 件を消すため、v1.0.33 で導入)。
         # web-ext sign は zip ではなく source-dir を受け取って自身で xpi を構築するため、
         # ここでは source dir のまま保存する (二度手間の zip 化を避ける)。
         run: |
@@ -94,6 +95,9 @@ jobs:
           cp -r src firefox-build/
           cp -r _locales firefox-build/
           find firefox-build \( -name "*.DS_Store" -o -name "*.swp" -o -name "*~" \) -delete
+          # Firefox 未対応 API 呼び出しブロックを strip (AMO linter UNSUPPORTED_API 警告対策)
+          perl -i -0pe 's{\s*//\s*__FIREFOX_STRIP_BEGIN__.*?//\s*__FIREFOX_STRIP_END__\s*\n}{\n}gs' firefox-build/src/background/background.js
+          echo "🦊 Firefox strip 完了 (chrome.offscreen / chrome.tabCapture 呼び出しを削除)"
           echo "📂 firefox-build 内容:"
           ls -la firefox-build/
 
