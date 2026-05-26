@@ -84,16 +84,30 @@ chrome.runtime.onInstalled.addListener(async () => {
       .catch(() => {});
   }
 
+  // セッション維持の全タブ共通化に伴い旧キー keepAliveOrigins (サイト単位 origin allowlist) を撤去。
+  // ゆろさん指示でクリーンスタート方針: 既存ユーザーは一旦 keepAliveEnabled も false に戻し、
+  // popup で改めて ON を選んでもらう。旧 origin リストは情報として残しても無意味なので削除。
+  // 重要: onInstalled は install / update / chrome_update / shared_module_update / リロードのたびに
+  // 走るため、旧キー存在検知でマイグレーションを 1 度きりに gate する (毎リロードで keepAliveEnabled を
+  // 強制 false にする経路を回避)。
+  const legacyOriginsCheck = await chrome.storage.local.get("keepAliveOrigins").catch(() => ({}));
+  if ("keepAliveOrigins" in legacyOriginsCheck) {
+    await chrome.storage.local.remove("keepAliveOrigins").catch(() => {});
+    await chrome.storage.local
+      .set({ [StorageKeys.KEEP_ALIVE_ENABLED]: false })
+      .catch(() => {});
+  }
+
   const stored = await chrome.storage.local.get([
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
     StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-    StorageKeys.KEEP_ALIVE_ORIGINS,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
+    StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -127,9 +141,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     // HTTP ping は副作用大（認証プロキシ環境で 401/302 ループ誘発）のためデフォルト OFF
     defaults[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] = false;
   }
-  if (!(StorageKeys.KEEP_ALIVE_ORIGINS in stored)) {
-    defaults[StorageKeys.KEEP_ALIVE_ORIGINS] = [];
-  }
   if (!(StorageKeys.SEARCH_FIXER_ENABLED in stored)) {
     defaults[StorageKeys.SEARCH_FIXER_ENABLED] = false;
   }
@@ -144,6 +155,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.AMAZON_RANKING_JUMP_ENABLED in stored)) {
     defaults[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] = false;
+  }
+  if (!(StorageKeys.AMAZON_RELEASE_DATE_ENABLED in stored)) {
+    defaults[StorageKeys.AMAZON_RELEASE_DATE_ENABLED] = false;
   }
   if (!(StorageKeys.INSTAGRAM_CLEANER_ENABLED in stored)) {
     defaults[StorageKeys.INSTAGRAM_CLEANER_ENABLED] = false;
@@ -455,12 +469,12 @@ const APPLY_SETTINGS_KEYS = Object.freeze([
   StorageKeys.KEEP_ALIVE_ENABLED,
   StorageKeys.KEEP_ALIVE_INTERVAL_MS,
   StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-  StorageKeys.KEEP_ALIVE_ORIGINS,
   StorageKeys.SEARCH_FIXER_ENABLED,
   StorageKeys.SEARCH_FIXER_FEATURES,
   StorageKeys.SEARCH_FIXER_GRID_ITEMS,
   StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
   StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
+  StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
   StorageKeys.INSTAGRAM_CLEANER_ENABLED,
   StorageKeys.INSTAGRAM_CLEANER_FEATURES,
   StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -509,12 +523,12 @@ function normalizeSettings(settings) {
     keepAliveEnabled: settings?.keepAliveEnabled === true,
     keepAliveIntervalMs: KeepAlive.clampIntervalMs(settings?.keepAliveIntervalMs),
     keepAliveHttpPingEnabled: settings?.keepAliveHttpPingEnabled === true,
-    keepAliveOrigins: KeepAlive.normalizeOrigins(settings?.keepAliveOrigins),
     searchFixerEnabled: settings?.searchFixerEnabled === true,
     searchFixerFeatures: SearchFixer.mergeFeatures(settings?.searchFixerFeatures),
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
     amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
     amazonRankingJumpEnabled: settings?.amazonRankingJumpEnabled === true,
+    amazonReleaseDateEnabled: settings?.amazonReleaseDateEnabled === true,
     instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
     tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
@@ -537,12 +551,12 @@ function toStorageRecord(s) {
     [StorageKeys.KEEP_ALIVE_ENABLED]: s.keepAliveEnabled,
     [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: s.keepAliveIntervalMs,
     [StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED]: s.keepAliveHttpPingEnabled,
-    [StorageKeys.KEEP_ALIVE_ORIGINS]: s.keepAliveOrigins,
     [StorageKeys.SEARCH_FIXER_ENABLED]: s.searchFixerEnabled,
     [StorageKeys.SEARCH_FIXER_FEATURES]: s.searchFixerFeatures,
     [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: s.searchFixerGridItems,
     [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
     [StorageKeys.AMAZON_RANKING_JUMP_ENABLED]: s.amazonRankingJumpEnabled,
+    [StorageKeys.AMAZON_RELEASE_DATE_ENABLED]: s.amazonReleaseDateEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
     [StorageKeys.TIKTOK_CLEANER_ENABLED]: s.tiktokCleanerEnabled,
@@ -586,7 +600,6 @@ async function notifyContentScripts(s) {
       keepAliveEnabled: s.keepAliveEnabled,
       keepAliveIntervalMs: s.keepAliveIntervalMs,
       keepAliveHttpPingEnabled: s.keepAliveHttpPingEnabled,
-      keepAliveOrigins: s.keepAliveOrigins,
     } }, undefined],
     // 動画ガンマ補正: all_frames: true (iframe 内 <video> も対象)
     [{ action: Actions.APPLY_VIDEO_GAMMA_CS, data: {
@@ -624,6 +637,10 @@ async function notifyContentScripts(s) {
     // auto-deliveries 判定とは別に Amazon ドメイン全体で配信する。
     messages.push([{ action: Actions.APPLY_AMAZON_RANKING_JUMP_CS, data: {
       enabled: s.amazonRankingJumpEnabled,
+    } }, TOP_FRAME]);
+    // 取り扱い開始日表示も ranking と同じく Amazon ドメイン全体で配信し、商品ページで自己ゲート。
+    messages.push([{ action: Actions.APPLY_AMAZON_RELEASE_DATE_CS, data: {
+      enabled: s.amazonReleaseDateEnabled,
     } }, TOP_FRAME]);
   }
   if (isInstagramUrl(url)) {

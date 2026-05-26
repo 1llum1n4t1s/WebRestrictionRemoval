@@ -134,10 +134,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- 要素参照 -----
   const $keepAliveToggle = document.getElementById("keepAliveToggle");
-  const $keepAliveSitesCount = document.getElementById("keepAliveSitesCount");
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
   const $amazonRankingJumpToggle = document.getElementById("amazonRankingJumpToggle");
+  const $amazonReleaseDateToggle = document.getElementById("amazonReleaseDateToggle");
   const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
   const $volumeRow = document.getElementById("volumeRow");
   const $volumeSlider = document.getElementById("volumeSlider");
@@ -217,12 +217,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.KEEP_ALIVE_ENABLED,
     StorageKeys.KEEP_ALIVE_INTERVAL_MS,
     StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-    StorageKeys.KEEP_ALIVE_ORIGINS,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
+    StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -266,27 +266,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       .catch(() => {});
   }
 
-  let keepAliveOrigins = KeepAlive.normalizeOrigins(stored[StorageKeys.KEEP_ALIVE_ORIGINS]);
-  // /rere C2-I3 修正: popup 起動 crit path で chrome.tabs.query を独立 await すると IPC RTT が
-  // storage.get + tabs.query で直列累積する。getActiveHttpOrigin は storage 読み取り結果に
-  // 依存しないので、storage.get と同時並列発射すべきだったが、現コード構造上 storage 結果は
-  // L202 で既に解決済みなので、L248 の独立 await は最小コスト (Promise.resolve 同等)。
-  // 本修正は将来の API 増加に備えて並列起動の余地を documenting する.
-  const currentKeepAliveOrigin = await getActiveHttpOrigin();
-  $keepAliveToggle.checked =
-    stored[StorageKeys.KEEP_ALIVE_ENABLED] === true &&
-    currentKeepAliveOrigin !== null &&
-    KeepAlive.isOriginAllowed(keepAliveOrigins, currentKeepAliveOrigin);
-  if (!currentKeepAliveOrigin) {
-    $keepAliveToggle.disabled = true;
-    $keepAliveHttpPingToggle.disabled = true;
-  }
+  // セッション維持: 全タブ共通設計に変更したため、現在タブの origin チェックは廃止。
+  // popup 起動時は storage の master トグルをそのまま反映するだけ。
+  $keepAliveToggle.checked = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
   $keepAliveHttpPingToggle.checked = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
-  // 落とし穴 A: popup 初回表示で保存済みサイト数を即反映 (UX 改善)。
-  updateKeepAliveSitesCount();
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $amazonRankingJumpToggle.checked = stored[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] === true;
+  $amazonReleaseDateToggle.checked = stored[StorageKeys.AMAZON_RELEASE_DATE_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
   $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
@@ -523,22 +510,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       hexIncludeHash = changes[StorageKeys.COLOR_PICKER_HEX_HASH].newValue !== false;
       $hexHashCheck.checked = hexIncludeHash;
     }
-    // 落とし穴 B 補強: 複数 popup 同時開きや別経路で keepAliveOrigins / keepAliveEnabled が
-    // 変わったら、popup 内変数とトグル UI を即同期する。これで「片方の popup が古い値で
-    // apply() を発火して、もう片方が追加した origin を wipe する」race を防ぐ。
-    let keepAliveStateDirty = false;
-    if (changes[StorageKeys.KEEP_ALIVE_ORIGINS]) {
-      keepAliveOrigins = KeepAlive.normalizeOrigins(
-        changes[StorageKeys.KEEP_ALIVE_ORIGINS].newValue
-      );
-      keepAliveStateDirty = true;
-    }
+    // セッション維持: 全タブ共通設計で keepAliveEnabled 単一 boolean のみ監視。
+    // 別 popup や別経路 (例えば DevTools 経由 storage.local.set) で keepAliveEnabled が
+    // 変更されたら、現 popup の master トグル UI を即同期する。
     if (changes[StorageKeys.KEEP_ALIVE_ENABLED]) {
-      keepAliveStateDirty = true;
-    }
-    if (keepAliveStateDirty) {
-      syncKeepAliveToggleFromState();
-      updateKeepAliveSitesCount();
+      $keepAliveToggle.checked = changes[StorageKeys.KEEP_ALIVE_ENABLED].newValue === true;
     }
   });
 
@@ -556,6 +532,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   $amazonDeliveryToggle.addEventListener("change", apply);
   $amazonRankingJumpToggle.addEventListener("change", apply);
+  $amazonReleaseDateToggle.addEventListener("change", apply);
 
   $instagramCleanerToggle.addEventListener("change", () => {
     updateIgCleanerDimState();
@@ -1090,34 +1067,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- 適用 -----
   async function apply() {
-    const keepAliveSiteEnabled = $keepAliveToggle.checked;
-    // 落とし穴 B 修正: popup 内変数 keepAliveOrigins は load 時のスナップショットなので、
-    // 複数 popup 同時開きや別経路の storage 書き込みで stale 化する可能性がある。
-    // apply() の入口で storage から最新値を取得し直すことで、後発の origin 追加が
-    // wipe される race を防ぐ。失敗時は popup 内変数にフォールバック。
-    let baseOrigins = keepAliveOrigins;
-    try {
-      const fresh = await chrome.storage.local.get(StorageKeys.KEEP_ALIVE_ORIGINS);
-      baseOrigins = KeepAlive.normalizeOrigins(fresh[StorageKeys.KEEP_ALIVE_ORIGINS]);
-    } catch {
-      // storage 読み取り失敗時は popup 内変数で続行 (極めて稀な経路)。
-    }
-    const nextKeepAliveOrigins = new Set(baseOrigins);
-    if (currentKeepAliveOrigin) {
-      if (keepAliveSiteEnabled) {
-        nextKeepAliveOrigins.add(currentKeepAliveOrigin);
-      } else {
-        nextKeepAliveOrigins.delete(currentKeepAliveOrigin);
-      }
-    }
-    keepAliveOrigins = KeepAlive.normalizeOrigins(Array.from(nextKeepAliveOrigins));
-    const keepAliveEnabled = keepAliveOrigins.length > 0;
-    // 落とし穴 A: apply() で origin add/delete した直後にカウンタを更新する。
-    updateKeepAliveSitesCount();
+    // セッション維持: 全タブ共通設計に変更。master トグルの boolean をそのまま使う。
+    const keepAliveEnabled = $keepAliveToggle.checked;
     const keepAliveHttpPingEnabled = $keepAliveHttpPingToggle.checked;
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
     const amazonRankingJumpEnabled = $amazonRankingJumpToggle.checked;
+    const amazonReleaseDateEnabled = $amazonReleaseDateToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
     const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
@@ -1141,12 +1097,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           keepAliveEnabled,
           keepAliveIntervalMs,
           keepAliveHttpPingEnabled,
-          keepAliveOrigins,
           searchFixerEnabled,
           searchFixerFeatures,
           searchFixerGridItems,
           amazonDeliveryTotalEnabled,
           amazonRankingJumpEnabled,
+          amazonReleaseDateEnabled,
           instagramCleanerEnabled,
           instagramCleanerFeatures,
           tiktokCleanerEnabled,
@@ -1164,10 +1120,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (res?.ok) {
         showStatus(
           buildOkMessage(
-            keepAliveSiteEnabled,
+            keepAliveEnabled,
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
             amazonRankingJumpEnabled,
+            amazonReleaseDateEnabled,
             instagramCleanerEnabled,
             tiktokCleanerEnabled,
             videoGammaEnabled,
@@ -1185,32 +1142,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  /**
-   * popup load 時のトグル評価ロジック (3 条件 AND) を、外部からの storage 変更時にも
-   * 再現する。落とし穴 B 補強 (複数 popup 同時開き race 対策) で利用。
-   */
-  function syncKeepAliveToggleFromState() {
-    if (!currentKeepAliveOrigin) {
-      $keepAliveToggle.checked = false;
-      return;
-    }
-    $keepAliveToggle.checked =
-      keepAliveOrigins.length > 0 &&
-      KeepAlive.isOriginAllowed(keepAliveOrigins, currentKeepAliveOrigin);
-  }
-
-  /**
-   * 落とし穴 A UX 改善: 保存済みサイト数を popup に表示する。
-   * 「サイト単位 ON / OFF」の表示意味を可視化し、別サイトで popup を開いたときに
-   * 「いつの間にか OFF になった！」と誤認されるのを防ぐ。
-   */
-  function updateKeepAliveSitesCount() {
-    if (!$keepAliveSitesCount) return;
-    const n = keepAliveOrigins.length;
-    $keepAliveSitesCount.textContent = n === 0 ? "" : i18n("keepAliveSitesCount", String(n));
-    $keepAliveSitesCount.classList.toggle("hidden", n === 0);
-  }
-
   // /opop CL-4: 3 cleaner で同型の収集ロジックを 1 ヘルパー化。
   function collectInputValues(inputMap) {
     const out = {};
@@ -1226,6 +1157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
     amazonRankingJumpEnabled,
+    amazonReleaseDateEnabled,
     instagramCleanerEnabled,
     tiktokCleanerEnabled,
     videoGammaEnabled,
@@ -1237,6 +1169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
     if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
     if (amazonRankingJumpEnabled) parts.push(i18n("applyOkAmazonRanking"));
+    if (amazonReleaseDateEnabled) parts.push(i18n("applyOkAmazonReleaseDate"));
     if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
     if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
     if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
@@ -1496,12 +1429,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch {
       return null;
     }
-  }
-
-  async function getActiveHttpOrigin() {
-    const tab = await getActiveHttpTab();
-    if (!tab?.url) return null;
-    return KeepAlive.normalizeOrigin(tab.url);
   }
 
   function clampMinutes(min) {

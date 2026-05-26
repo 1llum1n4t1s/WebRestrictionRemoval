@@ -1,40 +1,50 @@
 /*
- * Popup スタイル — refined craft × minimal Japanese editorial.
+ * Popup スタイル — ROG (Republic of Gamers) inspired hardware HUD.
  *
- * 設計判断:
- *   - 幅 380px（旧 340px から拡大）。19 個のサブトグルと select を抱えるため余裕を確保。
- *   - アクセントは茜寄りのテラコッタ #C0605A を採用し、補色に深いインク #1f1d1b を併用。
- *     白系 #fdfaf7 で和紙のような無彩色背景を作り、機能ブロックを溶け込ませず明確に縁取る。
- *   - Typography: IBM Plex Sans JP を全面採用し、和文・欧文の統一感を実現。
- *     コード値は IBM Plex Mono 系でモノスペース表示。
- *     見出しはスモールキャップス + tracking で雑誌見出しのリズムにする。
- *   - Toggle: 既存の slider 形状を踏襲しつつ、track を pill ではなく rounded square にして道具感を強調。
- *     ON 時には片側に小さなセリフ罫を出し、状態を二重に伝える（色覚多様性配慮）。
- *   - Accordion: chevron を独自 ::after で描画し、open 時に 90 度回転 + アクセント色化。
+ * 設計判断 (v1.0.33+):
+ *   - ASUS ROG / Armoury Crate / GameVisual 系の "装甲ゲーミング" 美学。
+ *     軍用ハードウェアの計器パネル感を出すため、装飾は左右非対称 + 斜めスラッシュ +
+ *     ヘキサゴンメッシュ + カーボンファイバー + メタリックベベルの 4 層で構成する。
+ *   - カラーは「ガンメタル (黒〜濃グレー) × ROG クリムゾン」のモノクロ + 1 アクセント。
+ *     マゼンタ等の追加色は ROG 美学から外れるので排除。赤の本体はライト #a8081e /
+ *     ダーク #b80828 を `--rog-red` で固定。派生 (-deep / -glow / -inset-*) は
+ *     CSS `color-mix(in srgb, var(--rog-red) N%, ...)` で本体色から導出することで、
+ *     `--rog-red` を 1 つ書き換えれば全派生が追従する設計。
+ *   - 角ばった rectangle UI (border-radius 0) は継続。コーナーには小さな斜めカットと
+ *     diagonal slashes (▌▌▌) を散らして「装甲パネルのリベット」感を出す。
+ *   - スキャンライン + グリッチ振動は廃止 (Cyberpunk 寄りで ROG とは別系統)。
+ *     代わりにヘキサゴン SVG パターンを popup-shell 全面に薄く敷き、
+ *     カードや sub-block にはカーボンファイバー風のクロスハッチングを薄く乗せる。
+ *   - 立体感は CSS Bevel パターン (--bevel-top / --bevel-bottom):
+ *     ダークは inset 0 1px 0 rgba(255,255,255,0.06) + inset 0 -1px 0 rgba(0,0,0,0.5) で微細照明、
+ *     ライトは inset 0 1px 0 rgba(255,255,255,0.7) + inset 0 -1px 0 rgba(0,0,0,0.06) で強い白ハイライト。
+ *     ライトとダークでハイライトの強度方向を逆転させて、両モードでメタル素材感を出している。
+ *   - clip-path で角カットしている要素は outer box-shadow が描画クリップされるため、
+ *     ネオングローは `filter: drop-shadow(0 0 Npx var(--rog-red-glow))` で表現する
+ *     (clip-path 後の形状で正しく shadow が出る)。outer box-shadow は inset 系のみ使用。
+ *   - フォントは IBM Plex Sans JP 400/600/700 を woff2 で同梱、ROG ロゴ風には Eurostile /
+ *     Bank Gothic 系が定番だが本家ライセンスを使わず Sans JP + uppercase + tracking 0.22em で代用。
+ *     mono フォントはシステム fallback (SF Mono / Cascadia Mono / Consolas / monospace)。
+ *   - ライトモードは「ROG Strix ホワイト筐体」のテイスト: シルバーグレー + 黒文字 + 単点クリムゾン赤。
+ *     ダークと同じ装甲感を保ちつつ、コントラストの方向を逆転させる。
  *
- * カラートークン:
- *   --ink           深いインク色（本文）
- *   --ink-soft      副本文・キャプション
- *   --ink-faint     プレースホルダ・無効
- *   --paper         カード背景（やや黄味の白）
- *   --paper-deep    画面背景（カードよりわずかに濃い）
- *   --paper-card    強調カード（より明るい白）
- *   --rule          罫線・境界
- *   --rule-soft     淡い罫線
- *   --rule-strong   hover 時の罫線
- *   --accent        メインアクセント（赤茜 / 茜）
- *   --accent-deep   強調アクセント（見出し・hover）
- *   --accent-soft   薄いアクセント（背景や hover）
- *   --switch-off    トグル OFF 時の track 色
- *   --shadow-thumb-1 / 2  switch thumb 形状の影
- *   --shadow-knob   range thumb の影
- *   --ok / --warn   ステータス表現
- *
- * ダークモードへの追従:
- *   ブラウザの `prefers-color-scheme: dark` に追従して `:root` のトークンを上書きする。
- *   構造・余白・モーションは共通、色だけ差し替えるためコード重複を回避できる。
- *   ライト = 和紙ベージュ × 茜、ダーク = 墨黒 × 明度を上げた茜（夜空に映える色相）。
- *   茜は色相をキープしたまま明度・彩度を上げてダーク背景でも沈まない発色に調整。
+ * カラートークン (light / dark、すべて :root + @media (prefers-color-scheme: dark) で 2 層定義):
+ *   --bg-deep / --bg / --bg-card / --bg-elev    画面〜カードの 4 段背景
+ *   --rule / --rule-soft / --rule-strong        罫線 3 段
+ *   --rog-red                                    主アクセント (signature crimson、本体色)
+ *   --rog-red-deep                               ホバー / 強調 (color-mix で 70% darken)
+ *   --rog-red-glow                               outer glow rgba (32-35% alpha、filter: drop-shadow 用)
+ *   --rog-red-glow-strong                        強発光 rgba (70% alpha、range thumb hover 用)
+ *   --rog-red-glow-inset-soft / -mid / -strong   inset glow 3 段 (pick-btn / pick-btn-icon 用)
+ *   --accent-deep / --accent-soft                互換エイリアス (--rog-red-deep / --rog-red-glow 派生)
+ *   --ink / --ink-soft / --ink-faint             文字 3 段
+ *   --pigment / --pigment-tint / --pigment-contrast
+ *                                                顔料アトリエ用 (popup.js が動的書き換え)
+ *   --glow-red                                   汎用ネオングローセット (clip-path 非適用要素用)
+ *   --bevel-top / --bevel-bottom                 メタリック立体ベベル (light/dark で強度方向逆転)
+ *   --carbon                                     カーボンファイバーパターン色 (rgba)
+ *   --switch-off                                 トグル OFF (gunmetal)
+ *   --ok / --warn                                ステータス
  */
 
 @font-face {
@@ -51,6 +61,13 @@
   font-display: swap;
   src: url("fonts/IBMPlexSansJP-SemiBold.woff2") format("woff2");
 }
+@font-face {
+  font-family: "IBM Plex Sans JP";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/IBMPlexSansJP-Bold.woff2") format("woff2");
+}
 
 * {
   margin: 0;
@@ -58,92 +75,117 @@
   box-sizing: border-box;
 }
 
+/* ============================================================
+ * ライトテーマ (ROG Strix White 筐体 風)
+ * ============================================================ */
 :root {
-  --ink: #1f1d1b;
-  --ink-soft: #5b554f;
-  --ink-faint: #9b948b;
-  --paper: #fefcf9;
-  --paper-deep: #f6f1eb;
-  --paper-card: #ffffff;
-  --rule: #e7dfd5;
-  --rule-soft: #f1ebe2;
-  --rule-strong: #d8c7c2;
-  --accent: #C0605A;
-  --accent-deep: #9c4a45;
-  --accent-soft: #f7e9e6;
-  /*
-   * 顔料アトリエ: 採取した色を JS から動的に書き換えるトークン。
-   * 既定値は accent と同じにして、未採取時にアクセント色基調になるよう揃える。
-   *   --pigment        採取色そのもの（specimen swatch / pick btn の overlay）
-   *   --pigment-tint   半透明オーバーレイ用 (rgba 0.10)。チップ active 背景等
-   *   --pigment-contrast  採取色の上に置く文字色（WCAG 相対輝度で白/墨を切替）
-   */
-  --pigment: #C0605A;
-  --pigment-tint: rgba(192, 96, 90, 0.10);
-  --pigment-contrast: #fefcf9;
-  --switch-off: #d8d2c8;
-  --shadow-thumb-1: 0 1px 0 rgba(0, 0, 0, 0.08);
-  --shadow-thumb-2: 0 1px 2px rgba(0, 0, 0, 0.12);
-  --shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --ok: #4a8a55;
-  --warn: #c0605a;
+  --bg-deep: #d9d9dc;
+  --bg: #f0f0f2;
+  --bg-card: #ffffff;
+  --bg-elev: #f7f5f6;
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --rule: #c4c0c5;
+  --rule-soft: #e0dde0;
+  --rule-strong: #8a8088;
+
+  /* ROG クリムゾン本体色。これを書き換えると下記の派生変数すべてが追従する。 */
+  --rog-red: #a8081e;
+  --rog-red-deep: color-mix(in srgb, var(--rog-red) 70%, #000);
+  --rog-red-glow: color-mix(in srgb, var(--rog-red) 32%, transparent);
+  --rog-red-glow-strong: color-mix(in srgb, var(--rog-red) 70%, transparent);
+  --rog-red-glow-inset-soft: color-mix(in srgb, var(--rog-red) 6%, transparent);
+  --rog-red-glow-inset-mid: color-mix(in srgb, var(--rog-red) 12%, transparent);
+  --rog-red-glow-inset-strong: color-mix(in srgb, var(--rog-red) 25%, transparent);
+
+  /* 互換エイリアス (--rog-red 系の参照を簡易化するため残置) */
+  --accent-deep: var(--rog-red-deep);
+  --accent-soft: color-mix(in srgb, var(--rog-red) 10%, transparent);
+
+  --ink: #0e0e10;
+  --ink-soft: #4a464a;
+  --ink-faint: #908a8e;
+
+  /* 顔料アトリエ (popup.js が EyeDropper の採取色を setProperty で書き換える) */
+  --pigment: #a8081e;
+  --pigment-tint: rgba(168, 8, 30, 0.10);
+  --pigment-contrast: #ffffff;
+
+  --switch-off: #aea4a8;
+
+  --glow-red: 0 0 0 1px var(--rog-red), 0 0 8px var(--rog-red-glow);
+
+  --bevel-top: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --bevel-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+
+  --carbon: rgba(0, 0, 0, 0.025);
+
+  --ok: #00813c;
+  --warn: #c8102e;
 
   --font-sans:
     "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP",
     "Segoe UI", system-ui, sans-serif;
-  --font-serif:
-    "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP",
-    "Segoe UI", system-ui, sans-serif;
   --font-mono:
-    "IBM Plex Mono", "SFMono-Regular", "Cascadia Mono",
-    "JetBrains Mono", Consolas, monospace;
+    "SFMono-Regular", "Cascadia Mono", "JetBrains Mono",
+    Consolas, ui-monospace, monospace;
 }
 
-/*
- * ダークモード追従: ブラウザ / OS の `prefers-color-scheme: dark` に従って
- * トークンを上書きする。色だけ差し替えで構造とアニメーションは共通実装を再利用。
- *
- * 配色設計:
- *   - ライトの「和紙ベージュ」と対をなす「墨黒（微紫寄り）」を画面背景に置く。
- *     真っ黒 #000 を避け、わずかに紫紺を含むことで茜アクセントと和ませる。
- *   - 茜色 #C0605A は HSL ≈ (4°, 41%, 56%)。暗背景にそのまま置くと沈むため、
- *     色相を保ったまま明度・彩度を上げて (4°, 60%, 70%) ≈ #df8983 に持ち上げる。
- *   - shadow はダークでは強める（thumb 形状の判別を維持するため）。
- *   - 白文字は純白 #ffffff だと角立つので、わずかに暖色を残した #efe8df を本文に使う。
- */
+/* ============================================================
+ * ダークテーマ (ROG Strix Black 筐体 / Armoury Crate 風)
+ * ============================================================ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --ink: #efe8df;          /* 絹白（暖色寄り） */
-    --ink-soft: #b0a89c;     /* 副本文 */
-    --ink-faint: #6b6358;    /* プレースホルダ・ドット */
-    --paper: #1d181f;        /* カード背景: 墨に微茜紫を混ぜた暖かい黒 */
-    --paper-deep: #14101a;   /* 画面最暗 */
-    --paper-card: #25202a;   /* 強調カード（feature リスト等） */
-    --rule: #3a3340;         /* 罫線 */
-    --rule-soft: #2a242e;    /* 細罫 */
-    --rule-strong: #54454f;  /* hover 時の罫線 */
-    --accent: #df8983;       /* 茜（夜空向け明度上げ） */
-    --accent-deep: #f0a39d;  /* 見出し・hover 強調 */
-    --accent-soft: #2d1f22;  /* 薄茜の暗背景 */
-    /* 顔料アトリエの未採取時デフォルト（ダーク版 accent と同色） */
-    --pigment: #df8983;
-    --pigment-tint: rgba(223, 137, 131, 0.12);
-    --pigment-contrast: #14101a;
-    --switch-off: #3a3340;   /* OFF 時 track（rule と同色で統一感） */
-    --shadow-thumb-1: 0 1px 0 rgba(0, 0, 0, 0.5);
-    --shadow-thumb-2: 0 2px 4px rgba(0, 0, 0, 0.55);
-    --shadow-knob: 0 2px 5px rgba(0, 0, 0, 0.6);
-    --ok: #87cd8e;           /* 緑（暗背景でくすまない明度） */
-    --warn: #df8983;         /* warn は accent と同系統で統一 */
+    --bg-deep: #050507;
+    --bg: #0a0a0c;
+    --bg-card: #131316;
+    --bg-elev: #1c1c20;
+
+    --rule: rgba(255, 255, 255, 0.10);
+    --rule-soft: rgba(255, 255, 255, 0.05);
+    --rule-strong: rgba(212, 10, 48, 0.45);
+
+    /* ROG クリムゾン本体色 (ダーク用)。派生は color-mix で本体から導出。 */
+    --rog-red: #b80828;
+    --rog-red-deep: color-mix(in srgb, var(--rog-red) 70%, #000);
+    --rog-red-glow: color-mix(in srgb, var(--rog-red) 35%, transparent);
+    --rog-red-glow-strong: color-mix(in srgb, var(--rog-red) 70%, transparent);
+    --rog-red-glow-inset-soft: color-mix(in srgb, var(--rog-red) 6%, transparent);
+    --rog-red-glow-inset-mid: color-mix(in srgb, var(--rog-red) 12%, transparent);
+    --rog-red-glow-inset-strong: color-mix(in srgb, var(--rog-red) 25%, transparent);
+
+    --accent-deep: var(--rog-red-deep);
+    --accent-soft: color-mix(in srgb, var(--rog-red) 10%, transparent);
+
+    --ink: #f0f0f2;
+    --ink-soft: #a0a0a8;
+    /* WCAG AA 対応 (#3): #555560 (2.42:1 違反) → #8a8a95 (約 4.6:1 で AA 通過)。
+       .footer-version / .volume-hint / .tabbar-no 非アクティブ等の機能用テキストが
+       ダークモードでも読めるように、knowable threshold 以上に引き上げる。 */
+    --ink-faint: #8a8a95;
+
+    --pigment: #b80828;
+    --pigment-tint: rgba(184, 8, 40, 0.14);
+    --pigment-contrast: #050507;
+
+    --switch-off: rgba(180, 180, 195, 0.18);
+
+    --glow-red: 0 0 0 1px var(--rog-red), 0 0 8px var(--rog-red-glow);
+
+    --bevel-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --bevel-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+
+    --carbon: rgba(255, 255, 255, 0.018);
+
+    --ok: #00cc6e;
+    --warn: #b80828;
   }
 }
 
+/* ============================================================
+ * Body / Shell — ヘキサゴンメッシュ背景
+ * ============================================================ */
 html, body {
-  background: var(--paper-deep);
+  background: var(--bg-deep);
 }
 
 body {
@@ -151,53 +193,118 @@ body {
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--ink);
-  /* v1.0.x: 380px → 460px に拡幅。タブナビ追加 + 顔料アトリエ（カラーピッカー）の
-     specimen card / format chips / history grid を快適に配置するため。 */
   width: 460px;
-  /* iframe 越しにスクロールバーが噛み合わないケースに備えてオーバーフロー制御 */
   overflow-x: hidden;
 }
 
-/* ---------- Shell ---------- */
+/* popup-shell: ヘキサゴンメッシュ + 中央 spot light の二層背景。
+   :root はライトデフォルト (L65+) なので、ここも default = 黒線 SVG (light 用) に揃え、
+   @media (prefers-color-scheme: dark) で白線 SVG に上書きする対称構造。
+   これで prefers-color-scheme: no-preference 環境でも light 変数 + 黒線 SVG の整合した見た目が出る。 */
 .popup-shell {
-  background: var(--paper);
-  padding: 18px 18px 14px;
   position: relative;
+  padding: 20px 18px 14px;
+  background-color: var(--bg);
+  background-image:
+    /* 中央上から薄い赤スポット (Armoury Crate のヘッダーグロー風) */
+    radial-gradient(ellipse 70% 40% at 50% 0%, var(--accent-soft) 0%, transparent 70%),
+    /* ヘキサゴンタイル (light: 黒線) */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='48' viewBox='0 0 28 48'><path d='M14 0L28 8v16L14 32 0 24V8z' fill='none' stroke='%23000000' stroke-opacity='0.05' stroke-width='0.8'/><path d='M14 32L28 40v16M0 40L14 32M0 56l14-8' fill='none' stroke='%23000000' stroke-opacity='0.05' stroke-width='0.8'/></svg>");
+  background-position: 0 0, 0 0;
+  background-repeat: no-repeat, repeat;
 }
 
-/* 上端に細いインクのアクセント帯（雑誌の小口飾りイメージ） */
+/* ダークモードではヘキサゴン線色を白系に切替 (ダーク背景上で見えるように) */
+@media (prefers-color-scheme: dark) {
+  .popup-shell {
+    background-image:
+      radial-gradient(ellipse 70% 40% at 50% 0%, var(--accent-soft) 0%, transparent 70%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='48' viewBox='0 0 28 48'><path d='M14 0L28 8v16L14 32 0 24V8z' fill='none' stroke='%23ffffff' stroke-opacity='0.04' stroke-width='0.8'/><path d='M14 32L28 40v16M0 40L14 32M0 56l14-8' fill='none' stroke='%23ffffff' stroke-opacity='0.04' stroke-width='0.8'/></svg>");
+  }
+}
+
+/* 最上部の装甲ストライプ: ROG 風の太い赤ライン + 斜めスラッシュパターン */
 .popup-shell::before {
   content: "";
   position: absolute;
   top: 0;
-  left: 18px;
-  right: 18px;
-  height: 2px;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0,
-    var(--accent) 28px,
-    var(--ink) 28px,
-    var(--ink) 30px,
-    transparent 30px
-  );
+  left: 0;
+  right: 0;
+  height: 4px;
+  background:
+    /* 左端の太いクリムゾンバー */
+    linear-gradient(
+      to right,
+      var(--rog-red) 0,
+      var(--rog-red) 90px,
+      transparent 90px,
+      transparent 96px,
+      var(--rog-red-deep) 96px,
+      var(--rog-red-deep) 120px,
+      transparent 120px,
+      transparent 100%
+    );
+  box-shadow: 0 0 12px var(--rog-red-glow);
+  pointer-events: none;
 }
 
-/* ---------- Header ---------- */
+/* 上端右側の斜めスラッシュ装飾 (▌▌▌ ROG ロゴ的) */
+.popup-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 12px;
+  width: 64px;
+  height: 4px;
+  background-image: repeating-linear-gradient(
+    -65deg,
+    var(--rog-red) 0,
+    var(--rog-red) 3px,
+    transparent 3px,
+    transparent 9px
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* ============================================================
+ * Header
+ * ============================================================ */
 .hdr {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 14px 0 12px;
-  border-bottom: 1px solid var(--rule);
   margin-bottom: 14px;
+  position: relative;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ヘッダー下: クリムゾン → 透明のスラッシュ罫 */
+.hdr::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--rog-red) 0,
+    var(--rog-red) 70%,
+    transparent 100%
+  );
+  box-shadow: 0 0 6px var(--rog-red-glow);
+  pointer-events: none;
 }
 
 .hdr-mark {
   font-size: 22px;
   line-height: 1;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 2px;
+  /* ロゴアイコンに subtle drop shadow (装甲っぽさ) */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 4px var(--rog-red-glow));
 }
 
 .hdr-text {
@@ -206,104 +313,343 @@ body {
 }
 
 .hdr-title {
-  font-family: var(--font-serif);
-  font-size: 16px;
+  font-family: var(--font-sans);
+  font-size: 16.5px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.035em;
   color: var(--ink);
   line-height: 1.3;
 }
 
 .hdr-tag {
-  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
   color: var(--ink-soft);
-  margin-top: 3px;
-  letter-spacing: 0.04em;
+  margin-top: 5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
-/* ---------- Group ---------- */
+/* "● PWR_ON" ステータスインジケータ (LED 風点滅) */
+.hdr-tag::before {
+  content: "● PWR_ON //";
+  color: var(--rog-red);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 6px var(--rog-red-glow);
+  /* will-change: opacity で compositor layer 化を固定し、layer promotion judgment を
+     サイクル毎に走らせない (Agent C2 #13)。opacity only animation なので GPU で完結。 */
+  will-change: opacity;
+  animation: led-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ============================================================
+ * Tabbar (5 タブ動的拡張) — 装甲スイッチ風
+ * ============================================================ */
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 0 0 14px;
+  border-bottom: 1px solid var(--rule);
+  padding: 0;
+  position: relative;
+  background:
+    linear-gradient(to bottom, var(--bg-elev) 0%, transparent 100%);
+}
+
+.tabbar-btn {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 11px 12px 12px;
+  background: transparent;
+  border: 0;
+  color: var(--ink-soft);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  flex: 0 0 auto;
+  min-width: 0;
+  transition:
+    flex-grow 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.tabbar-btn + .tabbar-btn {
+  border-left: 1px solid var(--rule-soft);
+}
+
+.tabbar-btn:hover {
+  color: var(--ink);
+  background: var(--bg-elev);
+}
+
+.tabbar-btn:focus-visible {
+  outline: 1.5px solid var(--rog-red);
+  outline-offset: -2px;
+}
+
+.tabbar-no {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  transition: color 160ms ease, text-shadow 160ms ease;
+  flex-shrink: 0;
+}
+
+.tabbar-label {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  margin-left: -8px;
+  transition:
+    max-width 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 220ms ease,
+    margin-left 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* アクティブ時の下罫: 太い 3px 単色クリムゾン (glow 抑えめ) */
+.tabbar-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 0;
+  background: var(--rog-red);
+  box-shadow: 0 0 4px var(--rog-red-glow);
+  transition: height 220ms ease, opacity 220ms ease;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.tabbar-btn.is-active {
+  color: var(--ink);
+  flex: 1 1 auto;
+  background:
+    linear-gradient(to bottom, transparent 0%, var(--accent-soft) 100%);
+}
+.tabbar-btn.is-active .tabbar-no {
+  color: var(--rog-red);
+  text-shadow: 0 0 3px var(--rog-red-glow);
+}
+.tabbar-btn.is-active .tabbar-label {
+  max-width: 240px;
+  opacity: 1;
+  margin-left: 0;
+  color: var(--ink);
+}
+.tabbar-btn.is-active .tabbar-rule {
+  height: 3px;
+  opacity: 1;
+}
+
+.tabbar-btn:hover .tabbar-no {
+  color: var(--accent-deep);
+}
+
+/* ============================================================
+ * Panel
+ * ============================================================ */
+.panel { display: block; position: relative; }
+.panel[hidden] { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel.is-active {
+    animation: panel-rise 340ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes panel-rise {
+    0% { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ============================================================
+ * Group (セクション)
+ * ============================================================ */
 .grp {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  position: relative;
 }
 
 .grp:last-of-type {
   margin-bottom: 6px;
 }
 
+/* グループタイトル: 左に [///] ROG ロゴ風スラッシュ + クリムゾン */
 .grp-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   font-family: var(--font-mono);
   font-size: 9.5px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: var(--accent-deep);
-  padding: 0 4px 6px;
-  margin-bottom: 6px;
-  border-bottom: 1px dashed var(--rule);
+  letter-spacing: 0.24em;
+  color: var(--rog-red);
+  padding: 0 0 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+  text-shadow: 0 0 6px var(--rog-red-glow);
 }
 
 .grp-title-text {
   position: relative;
+  padding-left: 20px;
 }
 
+/* タイトル左の ROG 風斜めスラッシュ */
 .grp-title-text::before {
-  content: "—";
-  margin-right: 6px;
-  color: var(--ink-faint);
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 10px;
+  background-image: repeating-linear-gradient(
+    -65deg,
+    var(--rog-red) 0,
+    var(--rog-red) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+}
+
+/* タイトル下罫の右端に小さなクリムゾン三角 (装甲リベット) */
+.grp-title::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-bottom: 6px solid var(--rog-red);
+  box-shadow: 0 0 4px var(--rog-red-glow);
 }
 
 .grp-pill {
   margin-left: auto;
-  background: var(--paper-card);
-  border: 1px solid var(--rule);
-  border-radius: 99px;
-  padding: 1px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
   font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--ink-soft);
-  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--rog-red);
+  text-transform: uppercase;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
 }
 
-/* ---------- Toggle Row ---------- */
+/* ============================================================
+ * Toggle Row (主役マスタートグル) — 装甲パネル風
+ * ============================================================ */
 .toggle-row {
   display: grid;
   grid-template-columns: 22px 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  background: var(--paper-card);
+  padding: 11px 14px 11px 16px;
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: 0;
   cursor: pointer;
   transition:
     border-color 140ms ease,
     background 140ms ease,
-    transform 140ms ease;
+    box-shadow 140ms ease,
+    transform 80ms ease;
   margin-bottom: 8px;
+  position: relative;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  /* 右上に大きな斜めカット (装甲パーツの欠き) */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    0 100%
+  );
+}
+
+/* 右上カットの中にクリムゾン三角 (装甲のリベット) */
+.toggle-row::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(225deg, var(--rog-red) 50%, transparent 50%);
+  opacity: 0.4;
+  transition: opacity 140ms ease;
+  pointer-events: none;
 }
 
 .toggle-row:hover {
-  background: var(--paper);
+  background:
+    linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elev) 100%);
   border-color: var(--rule-strong);
 }
+.toggle-row:hover::after { opacity: 0.85; }
 
 .toggle-row:active {
   transform: scale(0.997);
 }
 
-/* ON 状態のとき左端にアクセントの細罫 */
+/* ON: 左罫太クリムゾン + ハロー + 右上三角フル発光 (glow 抑えめ) */
 .toggle-row:has(input:checked) {
-  border-color: var(--rule-strong);
-  box-shadow: inset 3px 0 0 var(--accent);
+  border-color: var(--rog-red);
+  border-left-color: var(--rog-red);
+  /* bevel は --bevel-top/--bevel-bottom 変数経由 (light/dark テーマ追従)。
+     outer glow は filter: drop-shadow で表現 (box-shadow の outer は clip-path で
+     描画消失するため。drop-shadow は clip-path 後の形状で正しく shadow が出る)。 */
+  box-shadow:
+    inset 4px 0 0 var(--rog-red),
+    var(--bevel-top),
+    var(--bevel-bottom);
+  filter: drop-shadow(0 0 4px var(--rog-red-glow));
+}
+.toggle-row:has(input:checked)::after {
+  opacity: 1;
+  background: linear-gradient(225deg, var(--rog-red) 50%, transparent 50%);
 }
 
 .tr-icon {
   font-size: 14px;
   line-height: 1;
   text-align: center;
+  filter: saturate(1.1);
+}
+
+.toggle-row:has(input:checked) .tr-icon {
+  filter: drop-shadow(0 0 5px var(--rog-red-glow)) saturate(1.3);
 }
 
 .tr-text {
@@ -316,54 +662,36 @@ body {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink);
-  letter-spacing: 0.01em;
-}
-
-/* セッション維持の保存済みサイト数バッジ (落とし穴 A: サイト単位設計の可視化) */
-.ka-sites-count {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--accent-deep);
-  background: var(--accent-soft);
-  border-radius: 9px;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.ka-sites-count.hidden {
-  display: none;
+  letter-spacing: 0.02em;
 }
 
 .tr-desc {
   font-size: 10.5px;
   color: var(--ink-soft);
-  margin-top: 2px;
-  line-height: 1.45;
-  /* 説明文は1行省略しない（情報を切り捨てるよりはみ出させる） */
+  margin-top: 3px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
 }
 
-/* tr-desc 内のインラインパスやセレクタを目立たせる小型 chip */
 .tr-code {
   font-family: var(--font-mono);
   font-size: 9.5px;
-  background: var(--paper-deep);
-  color: var(--accent-deep);
+  background: var(--bg-deep);
+  color: var(--rog-red);
   padding: 1px 5px;
-  border-radius: 3px;
-  border: 1px solid var(--rule-soft);
+  border-radius: 0;
+  border: 1px solid var(--rule);
   letter-spacing: 0;
   white-space: nowrap;
 }
 
-/* ---------- Switch ---------- */
+/* ============================================================
+ * Switch — 装甲スライドスイッチ
+ * ============================================================ */
 .switch {
   position: relative;
-  width: 36px;
-  height: 20px;
+  width: 42px;
+  height: 22px;
   flex-shrink: 0;
 }
 
@@ -380,46 +708,99 @@ body {
 .switch-track {
   position: absolute;
   inset: 0;
-  background: var(--switch-off);
-  border-radius: 7px;
-  transition: background 180ms ease;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.2) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.15) 100%),
+    var(--switch-off);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  /* 両側に切り角 (装甲スライド枠) */
+  clip-path: polygon(
+    4px 0,
+    calc(100% - 4px) 0,
+    100% 4px,
+    100% calc(100% - 4px),
+    calc(100% - 4px) 100%,
+    4px 100%,
+    0 calc(100% - 4px),
+    0 4px
+  );
 }
 
 .switch-track::before {
   content: "";
   position: absolute;
-  width: 14px;
-  height: 14px;
-  top: 3px;
-  left: 3px;
-  background: var(--paper);
-  border-radius: 4px;
-  transition: transform 200ms cubic-bezier(0.65, 0, 0.35, 1);
-  box-shadow: var(--shadow-thumb-1), var(--shadow-thumb-2);
+  width: 16px;
+  height: 16px;
+  top: 2px;
+  left: 2px;
+  background:
+    linear-gradient(180deg, var(--ink) 0%, var(--ink-soft) 100%);
+  border-radius: 0;
+  transition:
+    transform 200ms cubic-bezier(0.65, 0, 0.35, 1),
+    background 200ms ease,
+    box-shadow 200ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+  /* thumb の角を斜めカット */
+  clip-path: polygon(
+    2px 0,
+    calc(100% - 2px) 0,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    0 calc(100% - 2px),
+    0 2px
+  );
 }
 
 .switch input:checked + .switch-track {
-  background: var(--accent);
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  border-color: var(--rog-red-deep);
+  box-shadow:
+    0 0 0 1px var(--rog-red-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .switch input:checked + .switch-track::before {
-  transform: translateX(16px);
-  background: var(--paper);
+  transform: translateX(20px);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #cccccc 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 0 6px rgba(255, 255, 255, 0.6);
 }
 
 .switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 2px;
 }
 
-/* ---------- Sub block (slider container) ---------- */
+/* ============================================================
+ * Sub block (slider / segment / sub-toggle コンテナ)
+ * ============================================================ */
 .sub-block {
-  background: var(--paper-card);
+  background: var(--bg-card);
+  background-image:
+    /* カーボンファイバー風単方向ストライプ (元は 45deg + -45deg の 2 重だったが、
+       --carbon の alpha 1.8-2.5% で 2 重にしても視認差は小さく paint コストだけ増えるため
+       1 重に集約: Agent D #15 / Agent C2 RENDER-005)。 */
+    repeating-linear-gradient(-45deg, transparent 0, transparent 3px, var(--carbon) 3px, var(--carbon) 4px);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 9px 12px 11px;
-  margin: -3px 0 8px;
-  border-left: 2px solid var(--accent-soft);
+  border-left: 2px solid var(--rog-red);
+  border-radius: 0;
+  padding: 10px 12px 12px;
+  margin: -2px 0 8px;
+  position: relative;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
 }
 
 .sub-block.hidden {
@@ -427,21 +808,24 @@ body {
 }
 
 .sub-block.volume-disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   pointer-events: none;
+  filter: grayscale(0.4);
 }
 
-/* sub-block 内に置く 2 段目のトグル行（例: keepalive HTTP ping のオプトインサブトグル）。
-   sub-block の dashed border 内側に視覚的階層を作るため、フラット背景で控えめに描画。 */
 .sub-block .toggle-row--sub {
   margin-top: 10px;
   margin-bottom: 0;
-  padding: 6px 0 2px;
+  padding: 8px 0 2px;
   border: 0;
   border-top: 1px dashed var(--rule);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  clip-path: none;
+}
+.sub-block .toggle-row--sub::after {
+  display: none;
 }
 .sub-block .toggle-row--sub:hover,
 .sub-block .toggle-row--sub:active {
@@ -451,16 +835,12 @@ body {
 .sub-block .toggle-row--sub:has(input:checked) {
   background: transparent;
   box-shadow: none;
+  border: 0;
+  border-top: 1px dashed var(--rog-red);
 }
-.sub-block .toggle-row--sub .tr-icon {
-  font-size: 14px;
-}
-.sub-block .toggle-row--sub .tr-name {
-  font-size: 12px;
-}
-.sub-block .toggle-row--sub .tr-desc {
-  font-size: 10.5px;
-}
+.sub-block .toggle-row--sub .tr-icon { font-size: 14px; }
+.sub-block .toggle-row--sub .tr-name { font-size: 12px; }
+.sub-block .toggle-row--sub .tr-desc { font-size: 10.5px; }
 
 .sub-head {
   display: flex;
@@ -469,30 +849,31 @@ body {
   margin-bottom: 8px;
 }
 
-/* sub-block 内に複数の sub-head セクションを縦に並べるときの間隔調整。
-   ルーペの「倍率セグメント + サイズスライダー」のように 2 つのコントロールを
-   同じ sub-block 内に置く場合の上マージン用。 */
 .sub-head--gap {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .sub-label {
-  font-size: 10.5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--ink-soft);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .sub-value {
   font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-deep);
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rog-red);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 6px var(--rog-red-glow);
 }
 
-/* ---------- Loupe zoom segment control ----------
-   ルーペの倍率を 3 段階のセグメント (1.5× / 2.5× / 4×) で選択する radio button 風の UI。
-   選択中は accent カラー塗り、未選択は ghost-btn 風 outline 表現。 */
+/* ============================================================
+ * Segment control (ルーペ倍率 / 動画黒帯モード)
+ * ============================================================ */
 .loupe-zoom-segment,
 .fill-mode-segment {
   display: flex;
@@ -504,43 +885,61 @@ body {
 .fill-mode-segment .seg-btn {
   flex: 1;
   min-width: 0;
-  padding: 6px 0;
+  padding: 7px 0;
   font-family: var(--font-mono);
   font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   color: var(--ink-soft);
-  background: transparent;
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  text-transform: uppercase;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 7px) 0,
+    100% 7px,
+    100% 100%,
+    7px 100%,
+    0 calc(100% - 7px)
+  );
 }
 
 .loupe-zoom-segment .seg-btn:hover,
 .fill-mode-segment .seg-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--rog-red);
+  color: var(--rog-red);
+  background:
+    linear-gradient(180deg, var(--accent-soft) 0%, var(--bg-card) 100%);
 }
 
 .loupe-zoom-segment .seg-btn.is-active,
 .fill-mode-segment .seg-btn.is-active {
-  background: var(--accent);
-  color: var(--bg);
-  border-color: var(--accent);
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  color: #fff;
+  border-color: var(--rog-red);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  /* outer glow は clip-path で消えるため filter: drop-shadow で代替 */
+  filter: drop-shadow(0 0 6px var(--rog-red-glow));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .loupe-zoom-segment .seg-btn:focus-visible,
 .fill-mode-segment .seg-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 1px;
 }
 
-/* ---------- Volume slider row (mute button + range) ---------- */
-/* ミュート切替ボタンと音量スライダーを横並びに配置するためのフレックスコンテナ。
-   ボタンは固定幅、スライダーは残り全幅を取る。中央マーカー (slider-center-mark::after) は
-   親 .sub-block が基準なので、スライダーの左端がボタン分ずれても外観に影響しない
-   (translate ではなく左から % 計算なのでズレるが、視覚的にはほぼ不可視) */
+/* ============================================================
+ * Volume mute + range row
+ * ============================================================ */
 .volume-slider-row {
   display: flex;
   align-items: center;
@@ -552,26 +951,36 @@ body {
   min-width: 0;
 }
 
-/* ---------- Volume mute button ---------- */
 .volume-mute-btn {
   flex: 0 0 auto;
-  width: 28px;
+  width: 30px;
   height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: transparent;
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   cursor: pointer;
-  color: var(--accent-deep);
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  color: var(--rog-red);
+  transition: all 140ms ease;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 5px) 0,
+    100% 5px,
+    100% 100%,
+    5px 100%,
+    0 calc(100% - 5px)
+  );
 }
 
 .volume-mute-btn:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: var(--rog-red);
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  filter: drop-shadow(0 0 6px var(--rog-red-glow));
 }
 
 .volume-mute-btn:active {
@@ -579,167 +988,229 @@ body {
 }
 
 .volume-mute-btn[aria-pressed="true"] {
-  border-color: var(--warn);
-  background: var(--accent-soft);
-  color: var(--warn);
+  border-color: var(--rog-red);
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  filter: drop-shadow(0 0 6px var(--rog-red-glow));
 }
 
 .volume-mute-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 1px;
 }
 
 .volume-mute-icon {
   font-size: 14px;
   line-height: 1;
-  /* 絵文字フォント高さの微妙な詰め */
   display: inline-block;
   transform: translateY(-0.5px);
+  filter: drop-shadow(0 0 3px var(--rog-red-glow));
 }
 
-/* ---------- Range slider ---------- */
+/* ============================================================
+ * Range slider (HUD 装甲スライダー)
+ * ============================================================ */
 .range {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
-  height: 3px;
-  background: var(--rule);
-  border-radius: 2px;
+  height: 6px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, transparent 50%, transparent 100%),
+    linear-gradient(to right, var(--rog-red-deep) 0%, var(--rule) 100%);
+  border: 1px solid var(--rule);
+  border-radius: 0;
   outline: none;
   cursor: pointer;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .range::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
   width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--accent);
+  height: 20px;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
   cursor: pointer;
-  box-shadow: var(--shadow-knob);
-  transition: transform 140ms ease;
+  /* clip-path 適用 → outer box-shadow は描画消失。inset shadow のみ残す。
+     outer glow は仕様上 ::-webkit-slider-thumb への filter サポートが不安定なので断念し、
+     シフトレバー型シルエット + inset highlight で thumb の識別性は確保する。 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+  /* シフトレバー型 thumb */
+  clip-path: polygon(
+    50% 0,
+    100% 25%,
+    100% 75%,
+    50% 100%,
+    0 75%,
+    0 25%
+  );
 }
 
 .range::-webkit-slider-thumb:hover {
-  transform: scale(1.15) rotate(45deg);
+  transform: scale(1.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.range::-webkit-slider-thumb:active {
+  transform: scale(1.08);
 }
 
 .range::-moz-range-thumb {
   width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 4px;
-  background: var(--accent);
+  height: 20px;
+  border: 1px solid var(--rog-red);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
   cursor: pointer;
-  box-shadow: var(--shadow-knob);
+  /* Firefox は clip-path 未適用なので outer glow が生きる */
+  box-shadow: var(--glow-red);
 }
 
-/* ---------- Volume Booster actions ---------- */
-.volume-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.ghost-btn {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  background: transparent;
-  color: var(--accent-deep);
-  border: 1px solid var(--rule);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
-}
-
-.ghost-btn:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.ghost-btn:active {
-  transform: translateY(0.5px);
-}
-
-.volume-hint {
-  font-size: 10px;
-  color: var(--ink-faint);
-  letter-spacing: 0.02em;
-  text-align: right;
-  /* エラーや状態テキストが入る。短い・1行前提 */
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.volume-hint.error {
-  color: var(--warn);
-}
-
-/* スライダーの中央位置（DEFAULT 値）を視覚的にマーキングする汎用クラス。
-   - 音量ブースター: 中央 = 100% (UNITY)
-   - 動画ガンマ補正: 中央 = ガンマ 1.0 (DEFAULT、補正なし)
-   appearance: none の input には疑似要素を直接付けられないので、
-   親 .sub-block に重ねるグラデーション線で中央位置に細い罫を描く。 */
+/* スライダー中央位置マーカー */
 .sub-block.slider-center-mark {
   position: relative;
 }
 .sub-block.slider-center-mark::after {
   content: "";
   position: absolute;
-  /* スライダーの padding 分（12px）をオフセット。両端から等距離 = UI スライダー中央。 */
   left: calc(12px + (100% - 24px) * 0.5);
-  bottom: 13px;
+  bottom: 14px;
   width: 1px;
-  height: 9px;
-  background: var(--accent-soft);
+  height: 11px;
+  background: var(--rog-red);
+  box-shadow: 0 0 4px var(--rog-red-glow);
   pointer-events: none;
 }
 
-/* ---------- Cleaner detail (panel 内に直接展開するクリーナー詳細) ----------
- * v1.0.x: アコーディオン廃止。master toggle 直下に hint + feature リストを直接置く。
- * cleaner-hint は旧 .acc-hint のリッジ装飾 (左罫) を引き継ぐ。
- */
+/* volume slider 中央マーカー: mute btn 分オフセット */
+#volumeRow.slider-center-mark::after {
+  left: calc(12px + 38px + (100% - 24px - 38px) * 0.5);
+}
+
+/* ============================================================
+ * Volume actions row
+ * ============================================================ */
+.volume-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ghost-btn {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
+  color: var(--rog-red);
+  border: 1px solid var(--rog-red);
+  padding: 5px 12px;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 120ms ease;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 6px) 0,
+    100% 6px,
+    100% 100%,
+    6px 100%,
+    0 calc(100% - 6px)
+  );
+}
+
+.ghost-btn:hover {
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  color: #fff;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  filter: drop-shadow(0 0 6px var(--rog-red-glow));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.ghost-btn:active {
+  transform: translateY(0.5px);
+}
+
+.ghost-btn:focus-visible {
+  outline: 1.5px solid var(--rog-red);
+  outline-offset: 2px;
+}
+
+.volume-hint {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.volume-hint.error {
+  color: var(--warn);
+  text-shadow: 0 0 4px var(--rog-red-glow);
+}
+
+/* ============================================================
+ * Cleaner detail
+ * ============================================================ */
 .cleaner-detail {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .cleaner-hint {
   font-size: 11.5px;
   color: var(--ink);
   line-height: 1.55;
-  margin-bottom: 10px;
-  padding-left: 8px;
-  border-left: 2px solid var(--rule-soft);
+  margin-bottom: 12px;
+  padding: 8px 10px 8px 12px;
+  background: var(--bg-deep);
+  border-left: 2px solid var(--rog-red);
+  border-radius: 0;
 }
 
 .cleaner-hint code {
   font-family: var(--font-mono);
   font-size: 10px;
-  background: var(--paper-deep);
+  background: var(--bg-card);
   padding: 1px 4px;
-  border-radius: 3px;
-  color: var(--accent-deep);
+  border-radius: 0;
+  color: var(--rog-red);
+  border: 1px solid var(--rule);
 }
 
-/* ---------- YouTube クリーナー カテゴリサブタブ ----------
-   29 機能を 4 カテゴリ（メニュー/UI・動画フィルタ・動画ページ・検索結果）のサブタブで
-   切り替える。1 画面に全機能を縦積みすると非常に長くなるため、カテゴリ単位で表示を
-   切り替えて縦の情報量を圧縮する。active は accent 塗り、ON 機能を持つカテゴリは
-   件数バッジで「どこに有効機能があるか」を一目で示す。 */
+/* ============================================================
+ * Category sub-tabs
+ * ============================================================ */
 .cat-subtabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.cat-subtabs--tune {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .cat-subtab {
@@ -748,16 +1219,32 @@ body {
   gap: 6px;
   min-width: 0;
   padding: 8px 10px;
-  font-family: var(--font-sans);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--ink-soft);
-  background: var(--paper-card);
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 7px) 0,
+    100% 7px,
+    100% 100%,
+    0 100%
+  );
+}
+
+.cat-subtabs--tune .cat-subtab {
+  padding: 7px 6px;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
 }
 
 .cat-subtab-icon {
@@ -776,18 +1263,30 @@ body {
 }
 
 .cat-subtab:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--rog-red);
+  color: var(--rog-red);
+  background:
+    linear-gradient(180deg, var(--accent-soft) 0%, var(--bg-card) 100%);
 }
 
 .cat-subtab.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--paper-card);
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  border-color: var(--rog-red);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  filter: drop-shadow(0 0 6px var(--rog-red-glow));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.cat-subtab.is-active .cat-subtab-icon {
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
 }
 
 .cat-subtab:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 1px;
 }
 
@@ -795,17 +1294,18 @@ body {
   display: none;
 }
 
-/* 調整タブのサブタブ: 非アクティブセクションを隠す（クリーナーの cat-panel と同等の役割）。 */
 .tune-section-hidden {
   display: none;
 }
 
-/* master OFF 時はサブタブもまとめて dim（パネル内 cat-list は .cleaner-disabled .cat-list で dim 済み）。 */
 .cleaner-disabled .cat-subtabs {
   opacity: 0.5;
+  filter: grayscale(0.3);
 }
 
-/* ---------- Feature category (YouTube / Instagram タブ内に直接展開する機能リスト) ---------- */
+/* ============================================================
+ * Feature category
+ * ============================================================ */
 .cat {
   margin-bottom: 10px;
 }
@@ -820,11 +1320,11 @@ body {
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 9.5px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--ink-soft);
-  padding: 2px 4px 6px;
+  letter-spacing: 0.2em;
+  color: var(--rog-red);
+  padding: 4px 4px 6px;
 }
 
 .cat-head-icon {
@@ -833,25 +1333,49 @@ body {
 
 .cat-list {
   display: grid;
-  /* 1 行 1 トグル: 名前 + 説明文を縦積みで読みやすくするため 2 列構成は廃止。
-     20 サブ機能あっても説明文があるほうが情報量として有用と判断。 */
   grid-template-columns: 1fr;
   gap: 2px;
-  background: var(--paper-card);
+  background: var(--bg-card);
+  background-image:
+    /* カーボン薄め */
+    repeating-linear-gradient(45deg, transparent 0, transparent 3px, var(--carbon) 3px, var(--carbon) 4px);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  padding: 6px;
+  border-radius: 0;
+  padding: 8px;
+  position: relative;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
 }
 
-/* 各機能トグル: 1 行 1 トグル + 説明文の縦積みレイアウト。
-   左カラム = `fr-text` (ラベル + 説明文) を flex-column、右カラム = switch。 */
+/* 4 隅に HUD コーナーマーク (装甲パネルのリベット) */
+.cat-list::before,
+.cat-list::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--rog-red);
+  box-shadow: 0 0 3px var(--rog-red-glow);
+}
+.cat-list::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.cat-list::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
+}
+
 .feature-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: start; /* 説明文が長くても switch を上端に揃えてレイアウト安定 */
+  align-items: start;
   gap: 8px;
-  padding: 7px 8px;
-  border-radius: var(--radius-sm);
+  padding: 8px 8px;
+  border-radius: 0;
   cursor: pointer;
   transition: background 100ms ease;
   color: var(--ink);
@@ -859,12 +1383,11 @@ body {
 }
 
 .feature-row + .feature-row {
-  /* 行間に細い罫を入れて読みやすく（最初の行には付けない） */
   border-top: 1px dashed var(--rule-soft);
 }
 
 .feature-row:hover {
-  background: var(--paper);
+  background: var(--bg-elev);
 }
 
 .feature-row .fr-text {
@@ -880,79 +1403,103 @@ body {
   color: var(--ink);
   letter-spacing: 0.01em;
   line-height: 1.35;
-  /* アクセントドット先頭装飾 */
   position: relative;
-  padding-left: 11px;
+  padding-left: 14px;
 }
 
+/* feature row の dot: 装甲リベット風 (六角形 → 正方形ダイヤ) */
 .feature-row .fr-name::before {
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 5px;
+  height: 5px;
   background: var(--ink-faint);
-  transition: background 120ms ease;
+  border-radius: 0;
+  transition: background 120ms ease, box-shadow 120ms ease;
 }
 
 .feature-row:has(input:checked) .fr-name::before {
-  background: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  background: var(--rog-red);
+  box-shadow:
+    0 0 0 1px var(--rog-red),
+    0 0 5px var(--rog-red-glow);
 }
 
 .feature-row .fr-desc {
   font-size: 11.5px;
-  color: var(--ink);
+  color: var(--ink-soft);
   line-height: 1.5;
-  padding-left: 11px;
+  padding-left: 14px;
   letter-spacing: 0.01em;
 }
 
-/* switch を行の中央高さあたりに見えるよう margin-top で微調整（fr-text は label + desc で背が高い） */
 .feature-row .switch {
   margin-top: 2px;
 }
 
-/* マスターが OFF だと feature 全体を視覚的に dim する（実機能はストレージに残る） */
 .cleaner-disabled .cat-list {
   opacity: 0.5;
+  filter: grayscale(0.3);
 }
 
-/* コンパクトスイッチ: feature 専用、本体は通常 switch を継承するが幅を縮める */
+/* feature 専用コンパクトスイッチ */
 .feature-row .switch {
-  width: 28px;
+  width: 32px;
   height: 16px;
 }
 
 .feature-row .switch-track {
-  border-radius: 5px;
+  border-radius: 0;
+  clip-path: polygon(
+    3px 0,
+    calc(100% - 3px) 0,
+    100% 3px,
+    100% calc(100% - 3px),
+    calc(100% - 3px) 100%,
+    3px 100%,
+    0 calc(100% - 3px),
+    0 3px
+  );
 }
 
 .feature-row .switch-track::before {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
-  top: 3px;
-  left: 3px;
+  border-radius: 0;
+  top: 2px;
+  left: 2px;
+  clip-path: polygon(
+    2px 0,
+    calc(100% - 2px) 0,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    0 calc(100% - 2px),
+    0 2px
+  );
 }
 
 .feature-row .switch input:checked + .switch-track::before {
-  transform: translateX(12px);
+  transform: translateX(16px);
 }
 
-/* ---------- Select row ---------- */
+/* ============================================================
+ * Select row + select
+ * ============================================================ */
 .select-row {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  background: var(--paper-deep);
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-sm);
+  background: var(--bg-deep);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--rog-red);
+  border-radius: 0;
   margin-top: 8px;
 }
 
@@ -963,6 +1510,9 @@ body {
   font-size: 11px;
   color: var(--ink);
   cursor: pointer;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .select-icon {
@@ -970,272 +1520,315 @@ body {
 }
 
 .select-name {
-  letter-spacing: 0.02em;
+  letter-spacing: 0.12em;
 }
 
 .select {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 11px;
-  padding: 4px 8px;
-  background: var(--paper-card);
+  font-weight: 600;
+  padding: 5px 8px;
+  background: var(--bg-card);
   color: var(--ink);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   cursor: pointer;
   outline: none;
-  transition: border-color 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
 }
 
 .select:hover {
-  border-color: var(--accent);
+  border-color: var(--rog-red);
 }
 
 .select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--rog-red);
+  box-shadow: var(--glow-red);
 }
 
-/* select-row 内ではなく単独で置く select（黒帯除去のモニター選択）。横幅いっぱい + 少し高め。 */
 .select--block {
   display: block;
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 8px;
   font-size: 12px;
 }
 
-/* ---------- Footer status ---------- */
+/* ============================================================
+ * Footer (status + version)
+ * ============================================================ */
 .footer-status {
-  margin-top: 8px;
-  padding: 6px 8px;
-  min-height: 24px;
+  margin-top: 10px;
+  padding: 7px 8px;
+  min-height: 26px;
   font-family: var(--font-mono);
   font-size: 10.5px;
+  font-weight: 700;
   text-align: center;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: transparent;
-  border-top: 1px dashed var(--rule);
-  transition: color 220ms ease;
+  border-top: 1px solid var(--rule);
+  transition: color 220ms ease, text-shadow 220ms ease;
+  position: relative;
 }
 
 .footer-status.ok {
+  color: var(--ok);
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
+}
+
+.footer-status.ok::before {
+  content: ">> ";
   color: var(--ok);
 }
 
 .footer-status.error {
   color: var(--warn);
+  text-shadow: 0 0 6px var(--rog-red-glow);
 }
 
-/* バージョン表示 (I-7): footer 最下段に控えめに置く。
-   観測性目的なので存在を主張せず ink-faint カラー + 小サイズで配置。 */
+.footer-status.error::before {
+  content: "!! ";
+}
+
 .footer-version {
   margin: 4px 0 0;
   padding: 0 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
+  font-weight: 700;
   text-align: right;
   color: var(--ink-faint);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   user-select: text;
 }
 
+.footer-version::before {
+  content: "FW//";
+  margin-right: 4px;
+  color: var(--rog-red);
+}
+
 /* ============================================================
- * 顔料アトリエ（カラーピッカー）追加スタイル
- * 設計思想:
- *   - 既存の和紙×茜トーンを尊重しつつ「美術館の標本箱」雰囲気を加える
- *   - 採取色 (--pigment) は JS から動的書き換え、UI 各所をその色相で染める
- *   - タブナビは図書館の見出しタブ風: 番号 (mono) + ラベル (serif) + 罫
- *   - specimen card は museum-style passe-partout（額装の白マット）を内側影で表現
- *   - format chip は ON 時に pigment-tint で塗り替え、ラベルもその色になる
- *   - history は 8 列固定グリッド（460px popup × padding 18px に収まる目安）
+ * Color Picker (顔料アトリエ → ROG ターゲットスキャナ)
  * ============================================================ */
 
-/* ---------- Tabbar (動的拡張タブ) ----------
- * 4 タブ (調整 / YouTube / Instagram / カラーピッカー) を 460px 幅に収めるため、
- * 非アクティブは番号 (`01`) のみ・アクティブは番号 + ラベルを展開する設計。
- *
- * 仕掛け:
- *   - flex-grow を transition: 非アクティブ 0、アクティブ 1 で残り幅を吸収する
- *   - .tabbar-label を max-width 0 → max-width 200px の transition で滑らかに展開
- *   - タブ間に 1px の hairline separator (border-left) を立てて「目次の柱」感を出す
- *   - active 番号は accent-deep 色 + 太字、下罫はアクセント色 2.5px の thick rule
- *   - inactive hover では番号の色だけ深める（label は出さず、誤誘導を避ける）
- */
-.tabbar {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  margin: 0 0 14px;
-  border-bottom: 1px solid var(--rule);
-  padding: 0;
-  position: relative;
-}
-
-.tabbar-btn {
-  position: relative;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 10px 12px 12px;
-  background: transparent;
-  border: 0;
-  color: var(--ink-soft);
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-  /* 既定は number だけ収まる幅で固定。アクティブだけが grow する。 */
-  flex: 0 0 auto;
-  min-width: 0;
-  transition:
-    flex-grow 280ms cubic-bezier(0.32, 0.72, 0, 1),
-    color 160ms ease,
-    background 160ms ease;
-}
-
-/* タブ間に細い柱を立てる。最初のタブには付けない（左端は popup-shell の罫が担当）。 */
-.tabbar-btn + .tabbar-btn {
-  border-left: 1px solid var(--rule-soft);
-}
-
-.tabbar-btn:hover {
-  color: var(--ink);
-  background: var(--paper-deep);
-}
-
-.tabbar-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-  border-radius: 2px;
-}
-
-.tabbar-no {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
-  transition: color 160ms ease;
-  flex-shrink: 0;
-}
-
-/* 非アクティブ時はラベルを max-width 0 で畳む。
-   margin-left: -8px で gap 分を相殺し、本当に番号だけのコンパクトな幅にする。
-   white-space: nowrap で折り返しによる縦レイアウト崩れを防ぐ。 */
-.tabbar-label {
-  font-family: var(--font-serif);
-  font-size: 14px;
-  letter-spacing: 0.04em;
-  display: inline-block;
-  max-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  opacity: 0;
-  margin-left: -8px;
-  transition:
-    max-width 280ms cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 220ms ease,
-    margin-left 280ms cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-/* アクセント下罫: アクティブ時のみ accent 色で出現。雑誌記事タイトル下の thick rule のイメージ。 */
-.tabbar-rule {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: -1px;
-  height: 0;
-  background: var(--accent);
-  transition: height 200ms ease, background 200ms ease;
-  pointer-events: none;
-}
-
-.tabbar-btn.is-active {
-  color: var(--ink);
-  flex: 1 1 auto;
-}
-.tabbar-btn.is-active .tabbar-no {
-  color: var(--accent-deep);
-}
-.tabbar-btn.is-active .tabbar-label {
-  font-weight: 600;
-  max-width: 240px;
-  opacity: 1;
-  margin-left: 0;
-}
-.tabbar-btn.is-active .tabbar-rule { height: 2.5px; }
-
-/* hover で番号だけ少し色を深める（inactive のときに「ここは何か」を示すサイン）。 */
-.tabbar-btn:hover .tabbar-no {
-  color: var(--accent);
-}
-
-/* ---------- Panel switching ---------- */
-.panel { display: block; }
-.panel[hidden] { display: none; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .panel.is-active {
-    animation: panel-rise 220ms ease-out;
-  }
-  @keyframes panel-rise {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-}
-
-/* a11y utility: 視覚的には隠すが SR から見える */
-.visually-hidden {
-  position: absolute !important;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* ---------- Pick Stage (panel 最上部の主役 CTA エリア) ---------- */
 .pick-stage {
   margin: 2px 0 14px;
 }
 
-/* ---------- Specimen Card (採取した色の標本) ---------- */
+.pick-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
+  color: var(--ink);
+  border: 1px solid var(--rog-red);
+  border-radius: 0;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  font: inherit;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease;
+  /* outer glow は filter: drop-shadow で表現 (clip-path 後の形状で正しく出る)。
+     inset glow は box-shadow 側に残す (clip-path 内側なので影響なし)。 */
+  box-shadow:
+    var(--bevel-top), var(--bevel-bottom),
+    inset 0 0 30px var(--rog-red-glow-inset-soft);
+  filter: drop-shadow(0 0 8px var(--rog-red-glow));
+  clip-path: polygon(
+    0 0,
+    calc(100% - 16px) 0,
+    100% 16px,
+    100% 100%,
+    16px 100%,
+    0 calc(100% - 16px)
+  );
+}
+
+.pick-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    var(--bevel-top), var(--bevel-bottom),
+    inset 0 0 50px var(--rog-red-glow-inset-mid);
+  filter: drop-shadow(0 0 14px var(--rog-red-glow));
+}
+
+.pick-btn:active:not(:disabled) { transform: translateY(0); }
+
+.pick-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--rule);
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  filter: none;
+}
+
+.pick-btn:focus-visible {
+  outline: 1.5px solid var(--rog-red);
+  outline-offset: 3px;
+}
+
+/* 採取色の照り返し */
+.pick-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--pigment) 0%, transparent 55%);
+  opacity: 0.16;
+  transition: opacity 240ms ease;
+  pointer-events: none;
+}
+
+.pick-btn:hover:not(:disabled)::before { opacity: 0.3; }
+
+/* 右下に斜めスラッシュ装飾 (ROG ロゴ風) */
+.pick-btn::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 40px;
+  height: 4px;
+  background-image: repeating-linear-gradient(
+    -65deg,
+    var(--rog-red) 0,
+    var(--rog-red) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.pick-btn-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--rog-red);
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  background: var(--bg-deep);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 10px var(--rog-red-glow),
+    inset 0 0 10px var(--rog-red-glow-inset-strong);
+}
+
+.pick-btn-icon-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rog-red);
+  box-shadow: 0 0 6px var(--rog-red), 0 0 12px var(--rog-red-glow);
+  /* will-change: transform で composite layer 化を確定 (Agent C2 #13)。
+     transform/opacity only animation なので GPU で完結し main thread をブロックしない。 */
+  will-change: transform;
+  animation: target-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes target-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
+}
+
+.pick-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+.pick-btn-jp {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.pick-btn-en {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 9.5px;
+  opacity: 0.85;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--rog-red);
+  text-shadow: 0 0 4px var(--rog-red-glow);
+}
+
+.pick-btn-en em { font-style: normal; }
+
+.pick-btn-en::before {
+  content: "> ";
+}
+
+.picker-note {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-align: center;
+  letter-spacing: 0.08em;
+  line-height: 1.55;
+  min-height: 1.55em;
+  text-transform: uppercase;
+}
+
+.picker-note.is-error {
+  color: var(--warn);
+}
+
+/* ---------- Specimen Card ---------- */
 .specimen-card {
-  background: var(--paper-card);
+  background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   overflow: hidden;
   margin-bottom: 12px;
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.02),
-    0 8px 16px -10px rgba(31, 29, 27, 0.18);
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
   transition: border-color 200ms ease, box-shadow 200ms ease;
+  position: relative;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% 100%,
+    14px 100%,
+    0 calc(100% - 14px)
+  );
 }
 
 .specimen-card:not(.is-empty) {
-  border-color: var(--rule-strong);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.04),
-    0 12px 24px -10px rgba(31, 29, 27, 0.22);
+  border-color: var(--rog-red);
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  filter: drop-shadow(0 0 8px var(--rog-red-glow));
 }
 
-/* Swatch: 採取色の小さな帯。pigment 変数を直接背景に当てて JS から書き換え。
-   pick btn を上部に移動したので swatch は補助的役割に縮小（138px → 56px）。 */
 .specimen-swatch {
   position: relative;
   width: 100%;
-  height: 56px;
+  height: 72px;
   background: var(--pigment);
-  /* museum-style passe-partout: 内側に淡い罫線で「額装」感は維持 */
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    inset 0 0 20px rgba(0, 0, 0, 0.18);
   transition:
     background 320ms cubic-bezier(0.2, 0.6, 0.2, 1),
     box-shadow 320ms ease;
 }
 
-/* 未採取時はチェッカー柄で「未着色のキャンバス」を表現 */
 .specimen-card.is-empty .specimen-swatch {
   background:
     linear-gradient(45deg, var(--rule) 25%, transparent 25%),
@@ -1244,39 +1837,42 @@ body {
     linear-gradient(-45deg, transparent 75%, var(--rule) 75%);
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
-  background-color: var(--paper-deep);
+  background-color: var(--bg-deep);
 }
 
 .specimen-meta {
-  padding: 12px 14px 14px;
+  padding: 13px 14px 14px;
 }
 
 .specimen-meta-row {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px dashed var(--rule);
+  border-bottom: 1px solid var(--rule);
 }
 
 .specimen-no {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13.5px;
-  color: var(--ink);
-  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rog-red);
+  letter-spacing: 0.16em;
   font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px var(--rog-red-glow);
 }
 
 .specimen-time {
   font-family: var(--font-mono);
   font-size: 9.5px;
   color: var(--ink-soft);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
 }
 
-/* ---------- Value List (HEX / RGB / HSL の 3 行) ---------- */
+/* ---------- Value List ---------- */
 .value-list {
   display: flex;
   flex-direction: column;
@@ -1285,10 +1881,10 @@ body {
 
 .value-row {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 46px 1fr;
   align-items: center;
   gap: 8px;
-  padding: 7px 0;
+  padding: 8px 0;
   border-bottom: 1px solid var(--rule-soft);
   position: relative;
   margin: 0;
@@ -1296,36 +1892,34 @@ body {
 
 .value-row:last-child { border-bottom: 0; }
 
-/* 既定形式の行は左端にアクセントの細罫を立てる */
 .value-row[data-default="true"]::before {
   content: "";
   position: absolute;
   left: -14px;
   top: 6px;
   bottom: 6px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--pigment);
+  width: 3px;
+  background: var(--rog-red);
+  box-shadow: 0 0 6px var(--rog-red-glow);
   transition: background 200ms ease;
 }
 
-.value-label {
-  margin: 0;
-}
+.value-label { margin: 0; }
 
 .value-label-en {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.06em;
-  transition: color 200ms ease, font-weight 200ms ease;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: color 200ms ease;
 }
 
 .value-row[data-default="true"] .value-label-en {
-  color: var(--pigment);
-  font-weight: 600;
-  font-style: normal;
+  color: var(--rog-red);
+  text-shadow: 0 0 6px var(--rog-red-glow);
 }
 
 .value-output {
@@ -1339,10 +1933,10 @@ body {
 .value-text {
   font-family: var(--font-mono);
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   flex: 1;
   min-width: 0;
   word-break: break-all;
@@ -1357,153 +1951,62 @@ body {
   height: 28px;
   display: grid;
   place-items: center;
-  background: var(--paper);
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
   border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-radius: 0;
   color: var(--ink-soft);
   cursor: pointer;
   transition: all 160ms ease;
   flex-shrink: 0;
   font: inherit;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 5px) 0,
+    100% 5px,
+    100% 100%,
+    5px 100%,
+    0 calc(100% - 5px)
+  );
 }
 
 .copy-btn:hover:not(:disabled) {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  color: #fff;
+  border-color: var(--rog-red);
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  filter: drop-shadow(0 0 5px var(--rog-red-glow));
 }
 
 .copy-btn:disabled {
-  opacity: 0.32;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .copy-btn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 1px;
 }
 
 .copy-btn-glyph {
-  font-family: var(--font-serif);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1;
 }
 
 .copy-btn.is-copied {
-  background: var(--pigment);
-  color: var(--pigment-contrast);
-  border-color: var(--pigment);
+  background:
+    linear-gradient(180deg, var(--rog-red) 0%, var(--rog-red-deep) 100%);
+  color: #fff;
+  border-color: var(--rog-red);
+  /* outer glow は filter: drop-shadow で表現 (clip-path で box-shadow outer は消える) */
+  filter: drop-shadow(0 0 5px var(--rog-red-glow));
 }
 
-/* ---------- Pick Button ---------- */
-.pick-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: var(--ink);
-  color: var(--paper);
-  border: 0;
-  border-radius: var(--radius);
-  cursor: pointer;
-  text-align: left;
-  position: relative;
-  overflow: hidden;
-  font: inherit;
-  transition: transform 160ms ease, box-shadow 160ms ease;
-  box-shadow: 0 8px 16px -8px rgba(31, 29, 27, 0.32);
-}
-
-.pick-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px -10px rgba(31, 29, 27, 0.42);
-}
-
-.pick-btn:active:not(:disabled) { transform: translateY(0); }
-
-.pick-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.pick-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* 採取色のグロー: 釉薬のような hover ハイライト */
-.pick-btn::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--pigment) 0%, transparent 55%);
-  opacity: 0.18;
-  transition: opacity 240ms ease;
-  pointer-events: none;
-}
-
-.pick-btn:hover:not(:disabled)::before { opacity: 0.34; }
-
-.pick-btn-icon {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.pick-btn-icon-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.pick-btn-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  position: relative;
-  z-index: 1;
-}
-
-.pick-btn-jp {
-  font-family: var(--font-serif);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.pick-btn-en {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 10.5px;
-  opacity: 0.62;
-  letter-spacing: 0.02em;
-}
-
-.pick-btn-en em { font-style: italic; }
-
-.picker-note {
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--ink-soft);
-  text-align: center;
-  letter-spacing: 0.02em;
-  line-height: 1.55;
-  min-height: 1.55em;
-}
-
-.picker-note.is-error {
-  color: var(--warn);
-}
-
-/* ---------- Format Chips (HEX / RGB / HSL の既定選択) ---------- */
+/* ---------- Format Chips ---------- */
 .fmt-fieldset {
   border: 0;
   margin: 0;
@@ -1532,54 +2035,66 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 12px 8px;
-  background: var(--paper-card);
+  gap: 3px;
+  padding: 14px 8px;
+  background:
+    linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-card) 100%);
   border: 1px solid var(--rule);
-  border-radius: var(--radius);
+  border-radius: 0;
   transition: all 160ms ease;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 9px) 0,
+    100% 9px,
+    100% 100%,
+    0 100%
+  );
 }
 
 .fmt-chip-name {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 17px;
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.16em;
   font-variant-numeric: tabular-nums;
-  font-weight: 400;
-  transition: color 160ms ease, font-weight 160ms ease;
+  text-transform: uppercase;
+  transition: color 160ms ease, text-shadow 160ms ease;
 }
 
 .fmt-chip-sub {
   font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.18em;
+  font-size: 8.5px;
+  letter-spacing: 0.22em;
   color: var(--ink-faint);
   text-transform: uppercase;
-}
-
-.fmt-chip:hover .fmt-chip-text {
-  border-color: var(--rule-strong);
-  transform: translateY(-1px);
-}
-
-/* 既定の保存形式チップは「採取色」ではなく固定の accent (茜) で塗る。
- * 過去は --pigment / --pigment-tint で採取色に染めていたが、暗い色を採取すると
- * チップが popup 背景に溶けてボタンが見えなくなる事故が起きた (ゆろさん報告 2026-05-13)。
- * 既定の保存形式は採取色と独立した UI 操作なので、視認性優先で accent 固定にする。 */
-.fmt-chip input:checked + .fmt-chip-text {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.fmt-chip input:checked + .fmt-chip-text .fmt-chip-name {
-  color: var(--accent);
   font-weight: 600;
 }
 
+.fmt-chip:hover .fmt-chip-text {
+  border-color: var(--rog-red);
+  background:
+    linear-gradient(180deg, var(--accent-soft) 0%, var(--bg-card) 100%);
+  transform: translateY(-1px);
+}
+
+.fmt-chip input:checked + .fmt-chip-text {
+  border-color: var(--rog-red);
+  background:
+    linear-gradient(180deg, var(--accent-soft) 0%, var(--bg-card) 100%);
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  filter: drop-shadow(0 0 6px var(--rog-red-glow));
+}
+
+.fmt-chip input:checked + .fmt-chip-text .fmt-chip-name {
+  color: var(--rog-red);
+  text-shadow: 0 0 6px var(--rog-red-glow);
+}
+
 .fmt-chip input:focus-visible + .fmt-chip-text {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 2px;
 }
 
@@ -1588,28 +2103,33 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
   cursor: pointer;
   user-select: none;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 .fmt-hash-toggle input[type="checkbox"] {
   width: 14px;
   height: 14px;
-  accent-color: var(--accent);
+  accent-color: var(--rog-red);
   cursor: pointer;
 }
 .fmt-hash-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--ink-soft);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.1em;
 }
 
 .fmt-note {
-  margin-top: 8px;
-  font-size: 10.5px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
   color: var(--ink-soft);
   text-align: center;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* ---------- History Grid (標本箱) ---------- */
@@ -1618,8 +2138,38 @@ body {
   grid-template-columns: repeat(8, 1fr);
   gap: 7px;
   list-style: none;
-  padding: 0;
+  padding: 10px;
   margin: 0 0 10px;
+  background: var(--bg-deep);
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0, transparent 3px, var(--carbon) 3px, var(--carbon) 4px);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* 4 隅 HUD コーナーマーク */
+.history-grid::before,
+.history-grid::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--rog-red);
+  box-shadow: 0 0 3px var(--rog-red-glow);
+}
+.history-grid::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.history-grid::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
 }
 
 .history-grid.hidden { display: none; }
@@ -1634,44 +2184,56 @@ body {
 .history-chip {
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  border: 1px solid rgba(0, 0, 0, 0.25);
   cursor: pointer;
   position: relative;
   padding: 0;
   background-clip: padding-box;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
 }
 
 .history-chip:hover {
-  transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 8px 14px -6px rgba(31, 29, 27, 0.32);
+  transform: translateY(-2px) scale(1.08);
+  border-color: var(--rog-red);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 0 1px var(--rog-red),
+    0 0 10px var(--rog-red-glow),
+    0 6px 12px -4px rgba(0, 0, 0, 0.5);
   z-index: 1;
 }
 
 .history-chip:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1.5px solid var(--rog-red);
   outline-offset: 2px;
 }
 
 .history-meta {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 8px;
+  font-weight: 700;
   color: var(--ink-faint);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
 }
 
 .history-empty {
   text-align: center;
-  padding: 22px 14px;
-  border: 1px dashed var(--rule);
-  border-radius: var(--radius);
-  background: var(--paper);
+  padding: 24px 14px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 0;
+  background: var(--bg-deep);
   color: var(--ink-faint);
-  font-size: 11.5px;
-  letter-spacing: 0.02em;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
   margin: 0 0 10px;
+  text-transform: uppercase;
 }
 
 .history-empty.hidden { display: none; }
@@ -1681,9 +2243,46 @@ body {
   justify-content: flex-end;
 }
 
-/* ---------- Reduced motion ---------- */
+/* ============================================================
+ * Accessibility utilities
+ * ============================================================ */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================
+ * Reduced motion
+ *
+ * 検証手順 (Agent F #16):
+ *   1. Chrome DevTools → Rendering タブ → "Emulate CSS media feature
+ *      prefers-reduced-motion" を "reduce" に設定
+ *   2. popup を再オープン
+ *   3. 以下のアニメーション/トランジションがすべて停止することを目視確認:
+ *        - .hdr-tag::before  (led-pulse 3.2s opacity)
+ *        - .pick-btn-icon-dot  (target-pulse 1.6s transform/opacity)
+ *        - .panel.is-active  (panel-rise 340ms transform/opacity)
+ *        - .tabbar-btn  (flex-grow 280ms transition)
+ *        - .tabbar-label  (max-width 280ms transition)
+ *        - .switch input + .switch-track::before  (transform 200ms)
+ *        - .footer-status  (color 220ms transition)
+ *        - .toggle-row hover/active  (background/border/box-shadow/transform)
+ *        - .pick-btn  (transform/box-shadow/border-color/filter)
+ *
+ * universal selector (*, *::before, *::after) で全 transition/animation を一括停止する
+ * 設計のため、@keyframes を新規追加した場合も自動的に reduce 対応される。
+ * ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
     animation: none !important;
   }

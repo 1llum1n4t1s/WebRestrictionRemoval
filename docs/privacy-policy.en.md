@@ -14,10 +14,9 @@ The Extension does not collect any personal information.
 
 The Extension stores the following settings only on the user's device (`chrome.storage.local`):
 
-- **`keepAliveEnabled`** (boolean): whether keep-session-alive is enabled.
+- **`keepAliveEnabled`** (boolean): whether keep-session-alive is enabled. When ON, the feature applies to all http(s) tabs.
 - **`keepAliveIntervalMs`** (number, milliseconds): polling interval for keep-session-alive (1–15 minutes).
 - **`keepAliveHttpPingEnabled`** (boolean): whether the lightweight HTTP ping sub-feature for keep-session-alive is enabled (opt-in, default OFF).
-- **`keepAliveOrigins`** (array): list of site origins (e.g. `https://example.com`) for which keep-session-alive has been enabled. Used to scope the feature per-site.
 - **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 30 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
 - **`searchFixerFeatures`** (object): on/off state of each of the 30 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
@@ -77,6 +76,7 @@ When the Instagram / TikTok cleaner's "Show download button on images" sub-featu
 - **storage**: used to save and restore the keys listed in "Data stored locally" on the device.
 - **offscreen**: used to host an offscreen document (extension context) so the Volume Booster's `AudioContext` can be maintained outside the Service Worker lifecycle.
 - **tabCapture**: used to capture the active tab's audio stream for amplification, normalization, compression, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute is enabled at 100%. No recording, storage, or external transmission is performed.
+- **`<all_urls>` host permission**: used by the Loupe feature to call `chrome.tabs.captureVisibleTab` against the active tab and display the visible region as a magnified JPEG image in a circular lens. The `activeTab` permission alone is sometimes revoked early after the popup closes or when SPA pages trigger internal navigations, which blocks the capture. The `<all_urls>` host permission ensures the Loupe runs reliably. Captured images are held as Blob URLs locally and released with `URL.revokeObjectURL` as soon as the lens DOM is removed. No external transmission or storage is performed. Note: this extension already injects content scripts on all http(s) sites for DOM/CSS-only operations, so adding the `<all_urls>` host permission does not change the effective access scope.
 
 ## Notable changes through v1.0.18 (already applied)
 

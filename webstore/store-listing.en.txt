@@ -19,7 +19,7 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
 
 · 🔄 Keep session alive (opt-in, default OFF)
   Mitigates idle-based session timeouts on sites such as SharePoint / Box.
-  On the current site you enabled, the top frame periodically dispatches synthetic mousemove / pointermove / scroll / focus events to reset the site's JS idle detection.
+  When the master toggle is ON, the top frame of every http(s) tab periodically dispatches synthetic mousemove / pointermove / scroll / focus events to reset the site's JS idle detection.
   Additionally, on SharePoint (*.sharepoint.{com,cn,de,us}) it tries a dedicated GET, and on other sites it tries a lightweight HEAD against the current URL / origin root from the top frame to help extend the server-side session.
   The popup slider lets you adjust the interval from 1 to 15 minutes (default 4 minutes).
   ※ Sites that reject HEAD or auth-proxy idle timeouts may not be helped by this feature.
@@ -152,11 +152,14 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   tabCapture:
   Used by the Volume Booster to capture tab audio and apply 0–300% normalization, compression, and amplification via AudioContext.
 
+  <all_urls> (host permission):
+  Used by the Loupe feature to call chrome.tabs.captureVisibleTab and display the active tab's visible region as a magnified JPEG image in a circular lens. The activeTab permission alone can be revoked early after popup close or SPA internal navigation, blocking the capture. Adding <all_urls> ensures the Loupe runs reliably. The effective access scope is unchanged because content_scripts already inject on all http(s) sites.
+
 ■ Host-permission justifications
 
   http://*/* and https://*/*:
   Required so that the keep-session-alive, Video Gamma, and Remove-video-black-bars content scripts can be injected on all http(s) sites.
-  (1) Keep session alive: the injected content script only starts the poller for origins the user explicitly enabled in the popup (keepAliveOrigins allowlist), and dispatches synthetic mousemove / pointermove / scroll / focus events. The HTTP ping is a separate sub-toggle (default OFF) and only fires same-origin HEAD / GET when ON.
+  (1) Keep session alive: the injected content script starts the poller on every http(s) tab when the master toggle is ON in the popup, and dispatches synthetic mousemove / pointermove / scroll / focus events. The HTTP ping is a separate sub-toggle (default OFF) and only fires same-origin HEAD / GET when ON.
   (2) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
   Neither feature reads, modifies, or transmits the page DOM (Video Gamma only attaches a filter to <video>; it does not read or save video data).
 

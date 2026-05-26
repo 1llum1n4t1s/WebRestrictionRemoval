@@ -20,7 +20,7 @@ WEB閲覧アシスト
 
 ・🔄 セッション維持（オプトイン・デフォルトOFF）
   SharePoint / Box 等でアイドル判定によるセッションタイムアウトを緩和します。
-  ポップアップで有効化した現在のサイトだけで合成 mousemove / pointermove / scroll / focus を定期発射し、JS 側のアイドル検知をリセット。
+  ポップアップで master トグルを ON にすると、すべての http(s) タブで合成 mousemove / pointermove / scroll / focus を定期発射し、JS 側のアイドル検知をリセット。
   さらに SharePoint（*.sharepoint.{com,cn,de,us}）では専用 GET、その他サイトでも現在 URL / origin root への軽量 HEAD を top frame から試行してサーバー側セッション延長を補助します。
   ポップアップのスライダーで 1〜15 分の範囲で間隔を調整可能（デフォルト 4 分）。
   ※ HEAD を受け付けないサイトや認証プロキシ側の idle timeout には効かない場合があります。
@@ -153,11 +153,14 @@ WEB閲覧アシスト
   tabCapture:
   音量ブースターでタブ音声を取得し、AudioContext で 0〜300% の音量補正・正規化・圧縮を行うため。
 
+  <all_urls> (host permission):
+  ルーペ機能で chrome.tabs.captureVisibleTab によりアクティブタブの可視領域を JPEG 静止画として取得し、円形レンズに拡大表示するため。activeTab 権限のみだと popup close 後や SPA 内 navigation で grant が早期失効するためルーペが動作しなくなる事例があり、確実な動作のため追加。content_scripts で既に全 http(s) に注入済みでアクセス可能範囲は実質変わらない。
+
 ■ ホスト権限の正当性
 
   http://*/* および https://*/*:
   セッション維持・動画ガンマ補正・動画の黒帯除去のため、全 http(s) サイトに content script を注入する必要がある。
-  (1) セッション維持: 注入された content script は、ユーザーが popup で許可した origin (keepAliveOrigins allowlist) でのみポーラーを起動し、合成 mousemove / pointermove / scroll / focus を dispatch する。HTTP ping は別サブトグル（デフォルト OFF）で、ON 時のみ同一オリジン HEAD / GET を発射する。
+  (1) セッション維持: 注入された content script は、ユーザーが popup で master トグルを ON にしたときのみ全 http(s) タブでポーラーを起動し、合成 mousemove / pointermove / scroll / focus を dispatch する。HTTP ping は別サブトグル（デフォルト OFF）で、ON 時のみ同一オリジン HEAD / GET を発射する。
   (2) 動画ガンマ補正: マスタートグル ON 時のみ <video> 要素に SVG filter (url(#__cpa-video-gamma)) を当てる CSS と SVG <feComponentTransfer type="gamma"> 定義を <body> に注入する。全タブ + 全フレーム (iframe 内 <video> 含む) に適用するため http://*/* + https://*/* + all_frames: true の content script として動作する。
   どちらもページ DOM の読み取り・書き換え・外部送信は一切行わない（ガンマ補正は <video> へのフィルタ適用のみで、動画データの読み取りや保存は行わない）。
 

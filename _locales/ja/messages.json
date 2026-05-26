@@ -93,17 +93,39 @@
   },
   "amazonRankingJumpButton": { "message": "この商品が所属するランキングへ移動" },
   "amazonRankingJumpAriaLabel": { "message": "この商品が所属するランキングへ移動" },
+  "amazonReleaseDateMaster": { "message": "取り扱い開始日表示" },
+  "amazonReleaseDateMasterDesc": {
+    "message": "商品ページ上部に取り扱い開始日と経過年月を表示",
+    "description": "Amazon 取り扱い開始日表示マスタートグルの説明"
+  },
+  "amazonReleaseDateTitle": { "message": "取り扱い開始" },
+  "amazonReleaseDateRelativeToday": { "message": "本日" },
+  "amazonReleaseDateRelativeFuture": { "message": "発売前" },
+  "amazonReleaseDateRelativeDays": {
+    "message": "$N$ 日前",
+    "placeholders": { "n": { "content": "$1", "example": "5" } }
+  },
+  "amazonReleaseDateRelativeMonths": {
+    "message": "$N$ ヶ月前",
+    "placeholders": { "n": { "content": "$1", "example": "8" } }
+  },
+  "amazonReleaseDateRelativeYears": {
+    "message": "約 $N$ 年前",
+    "placeholders": { "n": { "content": "$1", "example": "2" } }
+  },
+  "amazonReleaseDateRelativeYearsMonths": {
+    "message": "約 $Y$ 年 $M$ ヶ月前",
+    "placeholders": {
+      "y": { "content": "$1", "example": "2" },
+      "m": { "content": "$2", "example": "3" }
+    }
+  },
 
   "keepAliveMaster": { "message": "セッション維持" },
-  "keepAliveMasterDesc": { "message": "現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット" },
-  "keepAliveSitesCount": {
-    "message": "$N$ サイト保存中",
-    "description": "セッション維持で保存されているサイト数バッジ。サイト単位 ON 設計を可視化して「別サイトで popup を開いたら OFF 表示」誤認を防ぐ。",
-    "placeholders": { "n": { "content": "$1", "example": "3" } }
-  },
+  "keepAliveMasterDesc": { "message": "すべての http(s) サイトで合成イベント dispatch によりアイドル検知をリセット" },
   "keepAliveIntervalLabel": { "message": "ポーリング間隔" },
   "keepAliveHttpPingLabel": { "message": "サーバーへの軽量 ping を併発" },
-  "keepAliveHttpPingDesc": { "message": "このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨" },
+  "keepAliveHttpPingDesc": { "message": "各タブの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨" },
 
   "searchFixerMaster": { "message": "YouTube クリーナー" },
   "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 30 サブ機能を一括管理" },
@@ -216,6 +238,7 @@
   "applyOkSearchFixer": { "message": "YT クリーナー" },
   "applyOkAmazon": { "message": "Amazon" },
   "applyOkAmazonRanking": { "message": "ランキング移動" },
+  "applyOkAmazonReleaseDate": { "message": "取扱開始日" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
   "applyOkVideoGamma": { "message": "映像補正" },

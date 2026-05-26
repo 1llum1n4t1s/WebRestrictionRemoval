@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
   <meta name="color-scheme" content="light dark" />
+  <!-- woff2 を CSS パース完了より前に並列 fetch して FOUT 短縮 (Agent C2 #14 観測性改善) -->
+  <link rel="preload" href="fonts/IBMPlexSansJP-Regular.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/IBMPlexSansJP-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="fonts/IBMPlexSansJP-Bold.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
@@ -301,6 +305,18 @@
           <span class="switch-track" aria-hidden="true"></span>
         </span>
       </label>
+
+      <label class="toggle-row" id="amazonReleaseDateToggleRow">
+        <span class="tr-icon" aria-hidden="true">📅</span>
+        <span class="tr-text">
+          <span class="tr-name" data-i18n="amazonReleaseDateMaster">取り扱い開始日表示</span>
+          <span class="tr-desc" data-i18n="amazonReleaseDateMasterDesc">商品ページ上部に取り扱い開始日と経過年月を表示</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="amazonReleaseDateToggle" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
     </section>
 
     <!-- ===== Session ===== -->
@@ -312,11 +328,8 @@
           <span class="tr-text">
             <span class="tr-name">
               <span data-i18n="keepAliveMaster">セッション維持</span>
-              <!-- 落とし穴 A 修正: 保存済みサイト数バッジ。サイト単位 ON 設計を視覚化して
-                   「別サイトで popup を開いたら OFF 表示で消えたように見える」誤認を防ぐ。 -->
-              <span class="ka-sites-count hidden" id="keepAliveSitesCount"></span>
             </span>
-            <span class="tr-desc" data-i18n="keepAliveMasterDesc">現在のサイトだけで合成イベント dispatch によりアイドル検知をリセット</span>
+            <span class="tr-desc" data-i18n="keepAliveMasterDesc">すべての http(s) サイトで合成イベント dispatch によりアイドル検知をリセット</span>
           </span>
         <span class="switch">
           <input type="checkbox" id="keepAliveToggle" />

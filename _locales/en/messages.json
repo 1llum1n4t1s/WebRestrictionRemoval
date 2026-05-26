@@ -93,17 +93,39 @@
   },
   "amazonRankingJumpButton": { "message": "Go to this product's ranking" },
   "amazonRankingJumpAriaLabel": { "message": "Go to this product's ranking" },
+  "amazonReleaseDateMaster": { "message": "Date first available display" },
+  "amazonReleaseDateMasterDesc": {
+    "message": "Show the date first available with elapsed time at the top of product pages.",
+    "description": "Master toggle description for the Amazon date-first-available display"
+  },
+  "amazonReleaseDateTitle": { "message": "Available since" },
+  "amazonReleaseDateRelativeToday": { "message": "Today" },
+  "amazonReleaseDateRelativeFuture": { "message": "Not yet released" },
+  "amazonReleaseDateRelativeDays": {
+    "message": "$N$ day(s) ago",
+    "placeholders": { "n": { "content": "$1", "example": "5" } }
+  },
+  "amazonReleaseDateRelativeMonths": {
+    "message": "$N$ month(s) ago",
+    "placeholders": { "n": { "content": "$1", "example": "8" } }
+  },
+  "amazonReleaseDateRelativeYears": {
+    "message": "About $N$ year(s) ago",
+    "placeholders": { "n": { "content": "$1", "example": "2" } }
+  },
+  "amazonReleaseDateRelativeYearsMonths": {
+    "message": "About $Y$ year(s) $M$ month(s) ago",
+    "placeholders": {
+      "y": { "content": "$1", "example": "2" },
+      "m": { "content": "$2", "example": "3" }
+    }
+  },
 
   "keepAliveMaster": { "message": "Keep session alive" },
-  "keepAliveMasterDesc": { "message": "Reset idle detection on the current site by dispatching synthetic events." },
-  "keepAliveSitesCount": {
-    "message": "$N$ site(s) saved",
-    "description": "Badge showing the number of sites enabled for the keep-alive feature. Makes the per-site design visible so users don't misread it as 'turned off' when opening popup on another site.",
-    "placeholders": { "n": { "content": "$1", "example": "3" } }
-  },
+  "keepAliveMasterDesc": { "message": "Reset idle detection across all http(s) tabs by dispatching synthetic events." },
   "keepAliveIntervalLabel": { "message": "Polling interval" },
   "keepAliveHttpPingLabel": { "message": "Also send a lightweight server ping" },
-  "keepAliveHttpPingDesc": { "message": "HEAD/GET only against the top frame of this site. Disable behind auth proxies." },
+  "keepAliveHttpPingDesc": { "message": "HEAD/GET only against the top frame of each tab. Disable behind auth proxies." },
 
   "searchFixerMaster": { "message": "YouTube cleaner" },
   "searchFixerMasterDesc": { "message": "Manage 30 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
@@ -216,6 +238,7 @@
   "applyOkSearchFixer": { "message": "YT cleaner" },
   "applyOkAmazon": { "message": "Amazon" },
   "applyOkAmazonRanking": { "message": "Ranking jump" },
+  "applyOkAmazonReleaseDate": { "message": "First available" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
   "applyOkVideoGamma": { "message": "Video gamma" },

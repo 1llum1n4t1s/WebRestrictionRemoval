@@ -277,11 +277,10 @@ function shouldFireHttpPing() {
     return keeper;
   }
 
-  function applyState(enabled, intervalMs, httpPingEnabled, origins) {
+  function applyState(enabled, intervalMs, httpPingEnabled) {
     const ms = KeepAlive.clampIntervalMs(intervalMs);
     const ping = httpPingEnabled === true;
-    const siteEnabled = enabled === true && KeepAlive.isOriginAllowed(origins, location.origin);
-    if (siteEnabled) {
+    if (enabled === true) {
       ensureKeeper(ms, ping).start();
     } else if (keeper) {
       keeper.stop();
@@ -294,7 +293,6 @@ function shouldFireHttpPing() {
       StorageKeys.KEEP_ALIVE_ENABLED,
       StorageKeys.KEEP_ALIVE_INTERVAL_MS,
       StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-      StorageKeys.KEEP_ALIVE_ORIGINS,
     ])
     .then((stored) => {
       const enabled = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
@@ -302,8 +300,7 @@ function shouldFireHttpPing() {
         ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
         : KeepAlive.DEFAULT_INTERVAL_MS;
       const httpPing = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
-      const origins = KeepAlive.normalizeOrigins(stored[StorageKeys.KEEP_ALIVE_ORIGINS]);
-      applyState(enabled, ms, httpPing, origins);
+      applyState(enabled, ms, httpPing);
     })
     .catch(() => {});
 
@@ -316,8 +313,7 @@ function shouldFireHttpPing() {
       ? request.data.keepAliveIntervalMs
       : KeepAlive.DEFAULT_INTERVAL_MS;
     const httpPing = request.data?.keepAliveHttpPingEnabled === true;
-    const origins = KeepAlive.normalizeOrigins(request.data?.keepAliveOrigins);
-    applyState(enabled, ms, httpPing, origins);
+    applyState(enabled, ms, httpPing);
   });
 
   // 全タブ・全フレーム横断の同期 (onChanged は MV3 で全 frame に発火する)
@@ -326,18 +322,15 @@ function shouldFireHttpPing() {
     const enabledChange = changes[StorageKeys.KEEP_ALIVE_ENABLED];
     const intervalChange = changes[StorageKeys.KEEP_ALIVE_INTERVAL_MS];
     const httpPingChange = changes[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED];
-    const originsChange = changes[StorageKeys.KEEP_ALIVE_ORIGINS];
-    if (!enabledChange && !intervalChange && !httpPingChange && !originsChange) return;
+    if (!enabledChange && !intervalChange && !httpPingChange) return;
 
     // P3-#24: 変化したキーは newValue を即利用し、欠損キーのみ storage.get で補完する選択的補完方式。
-    // 旧実装は「3 キーすべて変化」のみ高速パス、それ以外は全 3 キーを get していた。
-    // この変更で「2 キー変化 / 1 キー変化」のエッジケースでも RTT を最小化できる
+    // これで「2 キー変化 / 1 キー変化」のエッジケースでも RTT を最小化できる
     // （全 http(s) フレーム × 全タブ分の節約効果）。
     const missingKeys = [];
     if (!enabledChange) missingKeys.push(StorageKeys.KEEP_ALIVE_ENABLED);
     if (!intervalChange) missingKeys.push(StorageKeys.KEEP_ALIVE_INTERVAL_MS);
     if (!httpPingChange) missingKeys.push(StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED);
-    if (!originsChange) missingKeys.push(StorageKeys.KEEP_ALIVE_ORIGINS);
 
     const apply = (filled) => {
       const enabled = enabledChange
@@ -352,10 +345,7 @@ function shouldFireHttpPing() {
       const httpPing = httpPingChange
         ? httpPingChange.newValue === true
         : filled[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
-      const origins = originsChange
-        ? KeepAlive.normalizeOrigins(originsChange.newValue)
-        : KeepAlive.normalizeOrigins(filled[StorageKeys.KEEP_ALIVE_ORIGINS]);
-      applyState(enabled, ms, httpPing, origins);
+      applyState(enabled, ms, httpPing);
     };
 
     if (missingKeys.length === 0) {

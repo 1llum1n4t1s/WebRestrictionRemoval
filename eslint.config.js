@@ -14,7 +14,7 @@
 const globals = require("globals");
 
 const ACTIONS_GLOBALS = {
-  // src/lib/actions.js が globalThis に公開する 20 個。
+  // src/lib/actions.js が globalThis に公開する 21 個。
   // 新規 globalThis 公開を追加したら本リストにも追加すること。
   SettingsSchema: "readonly",
   Actions: "readonly",
@@ -27,6 +27,7 @@ const ACTIONS_GLOBALS = {
   SearchFixer: "readonly",
   AmazonDeliveryTotal: "readonly",
   AmazonRankingJump: "readonly",
+  AmazonReleaseDate: "readonly",
   InstagramCleaner: "readonly",
   TikTokCleaner: "readonly",
   ImageDownloader: "readonly",

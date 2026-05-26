@@ -24,6 +24,8 @@ const Actions = Object.freeze({
   APPLY_AMAZON_DELIVERY_TOTAL_CS: "applyAmazonDeliveryTotalCS",
   /** background → Amazon ランキング移動 content script: 「ランキングへ移動」ボタンの有効/無効を反映 */
   APPLY_AMAZON_RANKING_JUMP_CS: "applyAmazonRankingJumpCS",
+  /** background → Amazon 取り扱い開始日 content script: 取り扱い開始日表示の有効/無効を反映 */
+  APPLY_AMAZON_RELEASE_DATE_CS: "applyAmazonReleaseDateCS",
   /** background → keepalive content script: セッション維持設定を反映 */
   APPLY_KEEP_ALIVE_CS: "applyKeepAliveCS",
   /** background → Instagram content script: Instagram クリーナー設定を反映 */
@@ -113,8 +115,6 @@ const StorageKeys = Object.freeze({
    *  master が ON でもこれが OFF のときは合成イベント dispatch のみ行い HTTP ping は出さない。
    *  認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発するのを避ける用途。 */
   KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
-  /** セッション維持を許可した origin 一覧（例: https://example.com）。サイト単位で効かせる。 */
-  KEEP_ALIVE_ORIGINS: "keepAliveOrigins",
   /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 30 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
@@ -125,6 +125,8 @@ const StorageKeys = Object.freeze({
   AMAZON_DELIVERY_TOTAL_ENABLED: "amazonDeliveryTotalEnabled",
   /** Amazon 商品ページに「この商品が所属するランキングへ移動」ボタンを表示するか（オプトイン・デフォルト OFF） */
   AMAZON_RANKING_JUMP_ENABLED: "amazonRankingJumpEnabled",
+  /** Amazon 商品ページに「取り扱い開始日 + 経過年月」表示を出すか（オプトイン・デフォルト OFF） */
+  AMAZON_RELEASE_DATE_ENABLED: "amazonReleaseDateEnabled",
   /** Instagram クリーナーマスタートグル */
   INSTAGRAM_CLEANER_ENABLED: "instagramCleanerEnabled",
   /** Instagram クリーナーの個別機能オン/オフ（オブジェクト） */
@@ -204,37 +206,6 @@ const KeepAlive = Object.freeze({
     if (ms < KeepAlive.MIN_INTERVAL_MS) return KeepAlive.MIN_INTERVAL_MS;
     if (ms > KeepAlive.MAX_INTERVAL_MS) return KeepAlive.MAX_INTERVAL_MS;
     return ms;
-  },
-  normalizeOrigin(value) {
-    if (typeof value !== "string") return null;
-    try {
-      const u = new URL(value);
-      if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-      return u.origin;
-    } catch {
-      return null;
-    }
-  },
-  normalizeOrigins(value) {
-    if (!Array.isArray(value)) return [];
-    const seen = new Set();
-    for (const raw of value) {
-      const origin = KeepAlive.normalizeOrigin(raw);
-      if (origin) seen.add(origin);
-      if (seen.size >= 100) break;
-    }
-    return Array.from(seen);
-  },
-  isOriginAllowed(origins, origin) {
-    const normalized = KeepAlive.normalizeOrigin(origin);
-    if (!normalized) return false;
-    if (!Array.isArray(origins)) return false;
-    // normalizeOrigins() を毎回呼んで Array→Set→Array 変換するコストを避けるため、
-    // 早期 return しつつ N 回 normalizeOrigin で比較する（hit 時に O(k), miss 時に O(N)）。
-    for (const raw of origins) {
-      if (KeepAlive.normalizeOrigin(raw) === normalized) return true;
-    }
-    return false;
   },
 });
 
@@ -536,6 +507,108 @@ const AmazonRankingJump = Object.freeze({
     const subs = hrefs.filter((h) => AmazonRankingJump.isSubcategoryHref(h));
     const pool = subs.length > 0 ? subs : hrefs;
     return pool[pool.length - 1] ?? null;
+  },
+});
+
+/**
+ * @readonly Amazon 商品ページ「取り扱い開始日」表示の定数と純粋関数（独自実装）。
+ *
+ * 商品詳細欄（`#detailBullets_feature_div` 等）の中にある「取り扱い開始日」項目を抽出し、
+ * 商品情報の最上部に「ランキングへ移動」ボタンの隣（後）に並べる情報表示パネル。
+ * クリック不可（`<span>` ベースで `<a>` ではない）の純粋な情報表示。
+ *
+ * 設計判断:
+ *   - master トグル `amazonReleaseDateEnabled` で制御（オプトイン・デフォルト OFF）
+ *   - 表示は「取り扱い開始: YYYY/MM/DD」+「約 N 年前 / N ヶ月前」の 2 段表示
+ *   - 日付パース・相対年月計算は純粋関数化（test/actions.test.js で境界値テスト）
+ */
+const AmazonReleaseDate = Object.freeze({
+  /** ボタンと装飾クラスの接頭辞 */
+  ROOT_CLASS: "__cpa-amzn-release-date",
+  /** 取り扱い開始日を探す商品詳細コンテナ群（AmazonRankingJump と同型、商品ページで自己ゲート） */
+  DETAIL_CONTAINER_SELECTORS: Object.freeze([
+    "#detailBulletsWrapper_feature_div",
+    "#detailBullets_feature_div",
+    "#productDetails_detailBullets_sections1",
+    "#prodDetails",
+  ]),
+  /**
+   * 取り扱い開始日項目のラベル候補。Amazon.co.jp は通常「取り扱い開始日」だが、
+   * UI を英語に切り替えると "Date First Available" になるので両方に対応。
+   * 検出時は `String.prototype.includes` で完全一致ではなく部分一致するため、
+   * `‏ : ‎` のような bidi 制御文字付きでもマッチする。
+   */
+  LABEL_KEYWORDS: Object.freeze(["取り扱い開始日", "Date First Available"]),
+  /**
+   * 日付テキスト中のセパレータ "‏" (U+200F) / "‎" (U+200E) / "：" / ":" / 全角空白等を
+   * 取り除くための前処理用正規表現。bidi マーク類は visible なら混乱の元なので削る。
+   */
+  STRIP_BIDI_RE: /[‎‏‪-‮⁦-⁩]/g,
+
+  /**
+   * 表示テキストから日付を Date に変換する純粋関数。
+   *   - "2023/1/15", "2023/01/15", "2023-1-15", "2023年1月15日" を全て受理
+   *   - 範囲外の年月日は null
+   *   - bidi 制御文字を含むテキストも前処理して受理
+   * @param {unknown} text
+   * @returns {Date|null}
+   */
+  parseReleaseDateText(text) {
+    if (typeof text !== "string") return null;
+    const cleaned = text.replace(AmazonReleaseDate.STRIP_BIDI_RE, "").trim();
+    if (cleaned.length === 0) return null;
+    const m = cleaned.match(/(\d{4})\s*[/\-.年]\s*(\d{1,2})\s*[/\-.月]\s*(\d{1,2})/);
+    if (!m) return null;
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10);
+    const d = parseInt(m[3], 10);
+    if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
+    if (y < 1900 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, mo - 1, d);
+    // 無効日付（例: 2024/2/30）を弾く
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return dt;
+  },
+
+  /**
+   * 表示用の "YYYY/MM/DD" 文字列を組み立てる純粋関数（locale 非依存・ゼロ詰めなし）。
+   * Amazon の bullet list 上の見た目に合わせる。
+   */
+  formatReleaseDate(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+  },
+
+  /**
+   * 経過時間を「年・月・日」の構造化 diff として返す純粋関数。
+   * content script 側で kind に応じた i18n メッセージキー (`amazonReleaseDateRelative*`) を
+   * 選択するために使う（i18n 文字列フォーマットを純粋関数の外に置く設計）。
+   *
+   * @param {Date} from 起点（取り扱い開始日、過去）
+   * @param {Date} now  現在（呼び出し側で `new Date()` を渡す）
+   * @returns {{kind: "future"|"today"|"days"|"months"|"years"|"yearsMonths", years: number, months: number, days: number}|null}
+   */
+  diffRelative(from, now) {
+    if (!(from instanceof Date) || Number.isNaN(from.getTime())) return null;
+    if (!(now instanceof Date) || Number.isNaN(now.getTime())) return null;
+    const diffMs = now.getTime() - from.getTime();
+    if (diffMs < 0) return Object.freeze({ kind: "future", years: 0, months: 0, days: 0 });
+
+    let years = now.getFullYear() - from.getFullYear();
+    let months = now.getMonth() - from.getMonth();
+    let days = now.getDate() - from.getDate();
+    if (days < 0) months -= 1;
+    if (months < 0) { years -= 1; months += 12; }
+
+    if (years >= 1) {
+      return months === 0
+        ? Object.freeze({ kind: "years", years, months: 0, days: 0 })
+        : Object.freeze({ kind: "yearsMonths", years, months, days: 0 });
+    }
+    if (months >= 1) return Object.freeze({ kind: "months", years: 0, months, days: 0 });
+    const dayCount = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    if (dayCount >= 1) return Object.freeze({ kind: "days", years: 0, months: 0, days: dayCount });
+    return Object.freeze({ kind: "today", years: 0, months: 0, days: 0 });
   },
 });
 
@@ -1542,12 +1615,12 @@ const PopupTabs = Object.freeze({
     Object.freeze({ field: "keepAliveEnabled", storageKey: StorageKeys.KEEP_ALIVE_ENABLED, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
     Object.freeze({ field: "keepAliveIntervalMs", storageKey: StorageKeys.KEEP_ALIVE_INTERVAL_MS, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
     Object.freeze({ field: "keepAliveHttpPingEnabled", storageKey: StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
-    Object.freeze({ field: "keepAliveOrigins", storageKey: StorageKeys.KEEP_ALIVE_ORIGINS, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
     Object.freeze({ field: "searchFixerEnabled", storageKey: StorageKeys.SEARCH_FIXER_ENABLED, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerFeatures", storageKey: StorageKeys.SEARCH_FIXER_FEATURES, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerGridItems", storageKey: StorageKeys.SEARCH_FIXER_GRID_ITEMS, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "amazonDeliveryTotalEnabled", storageKey: StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED, applyAction: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS }),
     Object.freeze({ field: "amazonRankingJumpEnabled", storageKey: StorageKeys.AMAZON_RANKING_JUMP_ENABLED, applyAction: Actions.APPLY_AMAZON_RANKING_JUMP_CS }),
+    Object.freeze({ field: "amazonReleaseDateEnabled", storageKey: StorageKeys.AMAZON_RELEASE_DATE_ENABLED, applyAction: Actions.APPLY_AMAZON_RELEASE_DATE_CS }),
     Object.freeze({ field: "instagramCleanerEnabled", storageKey: StorageKeys.INSTAGRAM_CLEANER_ENABLED, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "instagramCleanerFeatures", storageKey: StorageKeys.INSTAGRAM_CLEANER_FEATURES, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "tiktokCleanerEnabled", storageKey: StorageKeys.TIKTOK_CLEANER_ENABLED, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
@@ -1575,6 +1648,7 @@ const PopupTabs = Object.freeze({
   globalThis.SearchFixer = SearchFixer;
   globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
   globalThis.AmazonRankingJump = AmazonRankingJump;
+  globalThis.AmazonReleaseDate = AmazonReleaseDate;
   globalThis.InstagramCleaner = InstagramCleaner;
   globalThis.TikTokCleaner = TikTokCleaner;
   globalThis.ImageDownloader = ImageDownloader;

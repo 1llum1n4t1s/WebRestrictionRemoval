@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 12 機能を提供する：「セッション維持（現在のサイト単位）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）」「Amazon 定期おトク便 月別合計」「Amazon ランキングへ移動ボタン（商品詳細欄の売れ筋ランキングリンクを商品情報最上部の集約ボタンにまとめ、一番細かいサブカテゴリへ同タブ移動）」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「動画の黒帯除去（ウルトラワイド画面などで動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出・全タブ共通設定）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 12 機能のうち 11 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 13 機能を提供する：「セッション維持（全 http(s) タブ共通、master トグル ON 中はすべてのタブで合成イベント dispatch によりアイドル検知をリセット）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）」「Amazon 定期おトク便 月別合計」「Amazon ランキングへ移動ボタン（商品詳細欄の売れ筋ランキングリンクを商品情報最上部の集約ボタンにまとめ、一番細かいサブカテゴリへ同タブ移動）」「Amazon 取り扱い開始日表示（商品ページ上部にランキング移動ボタンと並べて「取り扱い開始: YYYY/M/D」と経過年月をクリック不可の情報パネルで表示）」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「動画の黒帯除去（ウルトラワイド画面などで動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出・全タブ共通設定）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 13 機能のうち 12 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 popup は **5 タブ構成** (`調整 / YouTube / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
 
@@ -19,7 +19,7 @@ npm run build                # アイコン + スクリーンショット一括�
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
 npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 18 globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-npm test                     # Node.js 標準 test runner、79 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + VolumeBooster.isEmeHost / isEmeUrl 境界値 を含む）
+npm test                     # Node.js 標準 test runner、82 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + VolumeBooster.isEmeHost / isEmeUrl 境界値 + AmazonReleaseDate.parseReleaseDateText/formatReleaseDate/diffRelative 境界値 を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -47,6 +47,7 @@ node --check src/lib/actions.js \
   && node --check src/content/keepalive.js \
   && node --check src/content/amazon-delivery-total.js \
   && node --check src/content/amazon-ranking-jump.js \
+  && node --check src/content/amazon-release-date.js \
   && node --check src/content/instagram-cleaner.js \
   && node --check src/content/tiktok-cleaner.js \
   && node --check src/content/video-gamma.js \
@@ -104,11 +105,11 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**9 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / RTX 動画強化 / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 30 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 380px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**9 マスタートグル**（セッション維持 / YouTube クリーナー / Amazon 合計 / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / ルーペ / RTX 動画強化 / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / 自動音量正規化 / ナイトモード）+ 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube クリーナー 30 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示は YouTube クリーナーのサブ機能（`removeShortsShelf` 等 / `hideComments`）として統合。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
 
 **クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
-**テーマ**: アクセントカラーは茜系（ライト `#C0605A` / ダーク `#df8983`）。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン + `@media (prefers-color-scheme: dark)` のダーク上書きの 2 層構造。色値はすべて CSS 変数経由でハードコードなし。CSP meta 明示。
+**テーマ**: ROG (Republic of Gamers) inspired hardware HUD。アクセントカラーは ROG クリムゾン（ライト `#a8081e` / ダーク `#b80828`、変数 `--rog-red`）+ ガンメタル基調背景（ライト `#f0f0f2` / ダーク `#0a0a0c`）。装飾は左右非対称 + 斜めスラッシュ + ヘキサゴンメッシュ SVG + カーボンファイバー風 repeating-linear-gradient + メタリックベベル（`--bevel-top` / `--bevel-bottom`）の 4 層構成。`clip-path: polygon()` で装甲パーツの角カット表現。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン + `@media (prefers-color-scheme: dark)` のダーク上書きの 2 層構造。派生色は `color-mix(in srgb, var(--rog-red) N%, ...)` で本体色から導出してテーマ追従可能化。CSP meta 明示。詳細な設計判断は popup.css 冒頭コメント L1-44 を参照。
 
 **音量ブースター親トグル**: `volumeBoosterEnabled` (boolean) で master 制御。v1.0.33 以降は **MES 経路がデフォルト** で、popup の `pushVolumeNow` は (1) 音量関連 6 キーを `chrome.storage.local.set` で書き込み (content script の `storage.onChanged` で全タブ MES 経路が反応)、(2) active tab が `VolumeBooster.isEmeUrl(tab.url)` で EME 多用サイト判定なら旧 `VOLUME_BOOSTER_SET_GAIN` 経路で background → tabCapture → offscreen の流れも併用、という 2 経路設計に変更。OFF で `chrome.storage.local.set` のみ（content script が解放 + background の `storage.onChanged` リスナーが `releaseAllVolumeBoosterTabs()` で旧経路の AudioContext も解放）。**OFF でも gain / サブトグル設定は storage に残す**（次回 ON 時に復元）。
 
@@ -181,7 +182,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 全 http(s) ページに `all_frames: true` で注入される content script。`videoGammaEnabled` (master) + `videoGammaValue` (数値 0.3〜3.0、初期 1.0) で管理。SVG `<feComponentTransfer type="gamma">` ベースの独自実装で、CSS `filter: url(#__cpa-video-gamma)` を `<video>` 要素に当てて全タブ共通のガンマ補正を適用する。スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たる。動画データの読み取りや保存は行わない（filter 適用のみ）。
 
 ### ルーペ (`src/content/loupe.js` + `src/content/loupe.css`)
-全 http(s) サイトの top frame に注入される独立機能。`loupeEnabled` (master) + `loupeZoom` (1.5/2.5/4.0、初期 2.5) + `loupeSize` (150〜1000px、step 10、初期 220) の **3 storage key** で管理。`chrome.tabs.captureVisibleTab({ format: "jpeg", quality: 70 })` で active tab の静止画を取得し、`position: fixed; clip-path: circle()` の円形レンズ DOM に `background-image` として貼り付け、`mousemove` から `background-position` を rAF コアレス 60fps で更新する。倍率は popup のセグメントコントロールから 3 段階で選択、レンズサイズは popup のスライダーで可変。動画 / iframe / canvas を含む描画ピクセルを captureVisibleTab で取得するため「動画を一時停止してから細部を確認」する用途に最適。**popup で master トグルを ON にすると popup が自動クローズする** (ON 状態だと popup 自体がレンズで拡大したい領域を隠す UX 問題を回避、`setTimeout(50)` で APPLY_SETTINGS message dispatch を完了させてから close)。
+全 http(s) サイトの top frame に注入される独立機能。`loupeEnabled` (master) + `loupeZoom` (1.5/2.5/4.0、初期 2.5) + `loupeSize` (150〜1000px、step 10、初期 220) の **3 storage key** で管理。`chrome.tabs.captureVisibleTab({ format: "jpeg", quality: 70 })` で active tab の静止画を取得し、`position: fixed; clip-path: circle()` の円形レンズ DOM に `background-image` として貼り付け、`mousemove` から `background-position` を rAF コアレス 60fps で更新する。倍率は popup のセグメントコントロールから 3 段階で選択、レンズサイズは popup のスライダーで可変。動画 / iframe / canvas を含む描画ピクセルを captureVisibleTab で取得するため「動画を一時停止してから細部を確認」する用途に最適。**popup で master トグルを ON にすると popup が自動クローズする** (ON 状態だと popup 自体がレンズで拡大したい領域を隠す UX 問題を回避、`setTimeout(50)` で APPLY_SETTINGS message dispatch を完了させてから close)。**v1.0.34 から `manifest.json` に `host_permissions: ["<all_urls>"]` を追加** している。理由: `activeTab` 権限のみだと popup auto-close 直後 + SPA ページ (Bing 検索等) の内部 navigation で `captureVisibleTab` が `Either '<all_urls>' or 'activeTab' permission is required` エラーで失敗する事例が Chrome / Edge 両方で発生したため。`<all_urls>` を host_permissions に明示することで activeTab grant 失効に依存せず常に capture 可能になる。アクセス可能範囲は content_scripts の `http://*/* + https://*/*` matches と実質同等。
 
 **処理フロー**:
 1. popup でマスタートグル ON → `APPLY_SETTINGS` → background → `notifyContentScripts` → `APPLY_LOUPE_CS` を top frame に送信
@@ -233,6 +234,18 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 **移動先選定**: `AmazonRankingJump.DETAIL_CONTAINER_SELECTORS`（`#detailBulletsWrapper_feature_div` 等の商品詳細コンテナ id 群）の中の `a[href*="bestsellers/"]` だけを走査する（カテゴリページ等の無関係なベストセラーリンクを拾わず**商品ページで自己ゲート**）。集めた href から `AmazonRankingJump.selectTargetHref` で「一番細かいサブカテゴリ」= ノード id を持つサブカテゴリリンク (`/bestsellers/<slug>/<digits>/`) のうち DOM 上で最後のものを選ぶ（Amazon は広い→細かいの順に並べるため）。サブカテゴリが無ければ最後のリンクにフォールバック。`isSubcategoryHref` / `selectTargetHref` は actions.js の純粋関数で、`test/actions.test.js` が境界値を検証する。
 
 **実装上の不変条件**: top frame 限定、`window.__cpaAmazonRankingJumpRunning` で二重実行防止。MutationObserver で遅延読み込みされる商品詳細欄に追従し、自分のボタン挿入 / href 更新による再発火は **rAF coalesce + disconnect → render → takeRecords → observe ガード**（定期おトク便と同型）で抑える。ボタンは差分更新（href / カテゴリ名が変化時のみ書き込み）+ `isConnected` チェックで Amazon の再 render による剥落時に再挿入。context invalidation guard で orphan 化時に observer disconnect + ボタン撤去。master OFF / 非商品ページ（ランキングリンク無し）でボタン撤去。
+
+### Amazon 取り扱い開始日表示 (`src/content/amazon-release-date.js` + `src/content/amazon-release-date.css`)
+`*://www.amazon.co.jp/*` 限定（top frame のみ）。`amazonReleaseDateEnabled` (boolean、デフォルト OFF オプトイン) 1 storage key で master 制御。商品詳細欄の「取り扱い開始日」項目から日付を抽出し、商品情報の最上部（**ランキングへ移動ボタンの直後**、`insertAdjacentElement("afterend", ...)` で隣接配置。ランキングボタンが無い場合は `#title_feature_div` の直前等 ranking と同じフォールバック順）に **クリック不可の情報パネル** (`<span role="img">`) を挿入する。表示は「📅 取り扱い開始: 2023/1/15 / 約 2 年前」の 2 段構成で、ランキングボタンと同じ Amazon オレンジ色のデザイン。外部送信ゼロ・純粋 DOM 操作。
+
+**日付パース・経過年月計算**: `AmazonReleaseDate.parseReleaseDateText` が `"2023/1/15"` / `"2023年1月15日"` / `"2023-1-15"` / bidi 制御文字混入テキストを全部 Date に変換（範囲外・無効日付は null）。`AmazonReleaseDate.diffRelative(from, now)` が `{kind: "future"|"today"|"days"|"months"|"years"|"yearsMonths", years, months, days}` の構造化 diff を返し、content script 側で kind に応じた i18n キー (`amazonReleaseDateRelative*`) を選んでフォーマット文字列を組む（i18n 文字列フォーマットを純粋関数の外に置く設計）。境界値テストは `test/actions.test.js`。
+
+**DOM 検出パターン**:
+1. **bullet list 形式** (`#detailBullets_feature_div`): `<span class="a-text-bold">取り扱い開始日 ‏ : ‎ </span><span>2023/1/15</span>` — `.a-text-bold` のテキストに `LABEL_KEYWORDS` (`"取り扱い開始日"` / `"Date First Available"`) が含まれるものを探し、`nextElementSibling` または同じ `a-list-item` 内の `span:not(.a-text-bold)` から値を取り出す
+2. **テーブル形式** (`#productDetails_detailBullets_sections1`): `<th>取り扱い開始日</th><td>2023/1/15</td>` — `<th>` で検出して同じ行の `<td>` から値を取り出す
+3. ラベル候補は `LABEL_KEYWORDS` 配列で日本語 + 英語 UI の両方をカバー
+
+**実装上の不変条件**: top frame 限定、`window.__cpaAmazonReleaseDateRunning` で二重実行防止。MutationObserver で遅延読み込みされる商品詳細欄に追従し、自分のパネル挿入による再発火は **rAF coalesce + disconnect → render → takeRecords → observe ガード**（ranking 移動 / 定期おトク便と同型）で抑える。パネルは差分更新（日付テキスト / 相対年月が変化時のみ書き込み）+ `isConnected` チェックで再挿入。context invalidation guard で orphan 化時に observer disconnect + パネル撤去。master OFF / 非商品ページ（取扱開始日項目無し）でパネル撤去。
 
 ### Instagram クリーナー (`src/content/instagram-cleaner.js` + `src/content/instagram-cleaner.css`)
 `*://*.instagram.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に `run_at: document_idle` で注入。`window.__cpaInstagramCleanerRunning` で二重実行防止。`instagramCleanerEnabled` (master) + `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理。11 機能の単一情報源は `actions.js` の `InstagramCleaner.FEATURES`。
@@ -311,8 +324,8 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 
 | File | Purpose |
 |------|---------|
-| `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` |
-| `src/lib/actions.js` | `Object.freeze` された 20 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster (`isEmeHost` / `isEmeUrl` 含む、15 ホストブラックリスト) / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
+| `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` + host_permissions: `<all_urls>` (ルーペ `captureVisibleTab` を popup close 後 / SPA navigation 後でも確実に動作させるため、v1.0.34 で追加。content_scripts で既に全 http(s) に注入済みなので実質アクセス範囲は同じ) |
+| `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonReleaseDate / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster (`isEmeHost` / `isEmeUrl` 含む、15 ホストブラックリスト) / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 (v1.0.33+ は EME fallback 専用、普通サイトは content script の MES 経路に移行) |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
@@ -325,6 +338,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/content/tiktok-early.js` | TikTok 用 `document_start` 注入の最小スクリプト。`tiktokCleanerEnabled` + `tiktokCleanerFeatures` を読んで `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` 同期付与 + inline `<style>` で主要セレクタ焼き込み（FOUC 防止、actions.js 非依存） |
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
 | `src/content/amazon-ranking-jump.{js,css}` | Amazon ランキングへ移動ボタン: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の売れ筋ランキングリンクから「一番細かいサブカテゴリ」を選んで商品情報最上部に集約ボタン (`<a href>`) を挿入、同じタブで移動。商品ページで自己ゲート、rAF coalesce + observer guard、外部送信ゼロ |
+| `src/content/amazon-release-date.{js,css}` | Amazon 取り扱い開始日表示: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の「取り扱い開始日」項目から日付を抽出し、「日付 + 経過年月」を商品情報最上部 (ランキングボタンの隣) に **クリック不可の情報パネル** (`<span>` ベース、ranking 移動と同色) で表示。`AmazonReleaseDate.parseReleaseDateText` / `diffRelative` / `formatReleaseDate` の純粋関数で境界値テスト可能化、商品ページで自己ゲート、rAF coalesce + observer guard + context invalidation guard、外部送信ゼロ |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/rtx-enhancer.js` | RTX 動画強化: 全 http(s) の top frame に注入、`<video>` を持つページに極小の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution など) の動画ページ検知を補助。`dataset.__cpaRtxAttached` マーカーで二重 inject 防止、MutationObserver で遅延 `<video>` 追従、master OFF/pagehide で `removeAllHints()` 撤去。外部送信ゼロ、ドライバ機能の有効化は GPU 側設定 (NVIDIA Control Panel 等) に依存 |
@@ -511,22 +525,26 @@ v1.0.33 以降は経路 A (MediaElementSource) がデフォルトになり、こ
 - **`aria-label` / `title` は両言語で書く** — YouTube は ja / en で `Shorts` ⇔ `ショート` のように label が変わる。CSS selector で要素を hide する場合、両言語版を併記しないと初期 flash が出る（JS による DOM 削除が走るまで素のまま見える）。
 
 ### マイグレーション
-- **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。注: `volumeBoosterEnabled` は過去に廃止→再導入されたキー。legacy 削除リストに含めないこと。
+- **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled` / `keepAliveOrigins`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。注: `volumeBoosterEnabled` は過去に廃止→再導入されたキー。legacy 削除リストに含めないこと。`keepAliveOrigins` は v1.0.34 でサイト単位設計→全タブ共通設計に変更時に削除、同時に `keepAliveEnabled` を強制 `false` リセット (UX 把握困難性の解消が目的のクリーンスタート方針、ゆろさん指示)。
 - **新規 storage key は `onInstalled` で必ず初期化** — `volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `searchFixerFeatures.hideComments` のような後追いキーは未設定時 `undefined` で UI 側に出るとトグルが表示されない・無効状態になるため、必ず `onInstalled` で `false` (boolean) / `VolumeBooster.DEFAULT` (数値) 初期化する。`normalizeSettings()` 側でも `=== true` 防御的判定を入れる（`!!value` だと storage の落ちた object 値で誤判定が出るため）。
 
 ### APPLY_SETTINGS 経路の partial payload 防御 (v1.0.31 で確立、「いつの間にか OFF」4 経路対策)
 
 ユーザーが「拡張機能の更新で設定がいつの間にか OFF になる」と感じる現象は **コードレベルの 4 つの落とし穴** が原因。各経路は独立しているため **複合防御** が必須。新規 master トグル / storage key 追加時は本セクションのチェックリストを必ず通すこと。
 
-**経路 A: サイト単位 ON 設計の不可視性 (UX)**
-セッション維持のように「現在のサイト単位」で ON/OFF する設計だと、別サイトで popup を開いた瞬間にトグルが OFF 表示される → 「消えた」と誤認される。
-- 対策: popup に「N サイト保存中」型のサマリバッジを必ず添える (`updateKeepAliveSitesCount()` パターン、i18n キーは `<feature>SitesCount` 形式)。サイト単位設計を採用する新機能でも同様に visualize する
+**経路 A: サイト単位 ON 設計の不可視性 (歴史的経緯・現在は廃止)**
+v1.0.x 系では「セッション維持」を `keepAliveOrigins` 配列で **サイト単位 ON/OFF** する設計にしていた。
+しかし「いま何サイトに保存されているか」がユーザーから把握困難で、別サイトで popup を開くと
+master トグルが OFF 表示になって「消えた」と誤認される UX 問題があった。`updateKeepAliveSitesCount()` で
+「N サイト保存中」バッジを添えて可視化していたが、根本的にはサイト単位設計が把握コスト高で、
+ゆろさん指示で **全タブ共通設計に統一** した (旧 `keepAliveOrigins` 関連コードは全削除済み)。
+- **新機能でサイト単位 ON/OFF を採用しない**: 個別タブ単位での適用が必須な機能は「全タブ共通 master + content script 側でホスト判定して早期 return」のパターンを使う (例: 音量ブースターの `VolumeBooster.isEmeHost`、Amazon 系の URL パターン制限)。これで master 1 個で全体把握が可能、かつタブごとの差別化も両立できる。
 
 **経路 B: popup 内変数の stale 化 race**
 popup の `apply()` が popup load 時のスナップショット変数を元に storage を書き戻すと、複数 popup 同時開きや別経路書き換えで race が起きて他 popup の追加分が wipe される。
 - 対策 1: popup の `apply()` 入口で対象キーを `chrome.storage.local.get(KEY)` で **再取得してからマージ**する。失敗時のみ popup 内変数フォールバック
 - 対策 2: popup の `chrome.storage.onChanged` リスナーで対象キーを監視 → popup 内変数 + UI を即同期 (二重防御)
-- 対策 3: 該当 syncing をヘルパー関数化 (`syncKeepAliveToggleFromState()` 等) して popup load 時の評価ロジックと共通化
+- 対策 3: 該当 syncing をヘルパー関数化 (`sync<Feature>ToggleFromState()` 命名規則) して popup load 時の評価ロジックと共通化。複合条件 (storage 値 × 現在タブ状態) を持つトグルで特に有効
 
 **経路 C: handleApplySettings の partial payload による上書き**
 `normalizeSettings(settings)` は `settings?.X === true` で正規化するため、popup が送らないキーは `undefined` → `false` に化けて全キー一括 storage 書き込みで既存 true が wipe される。

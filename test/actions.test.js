@@ -7,7 +7,7 @@
  *
  * 対象:
  *   - VolumeBooster: clampValue / percentToGain / gainToPercent / sliderPositionToPercent / percentToSliderPosition
- *   - KeepAlive: clampIntervalMs / normalizeOrigins / isOriginAllowed
+ *   - KeepAlive: clampIntervalMs
  *   - SearchFixer: clampGridItems / mergeFeatures
  *   - InstagramCleaner: mergeFeatures
  *   - ColorPicker: isValidFormat / normalizeFormat
@@ -384,19 +384,6 @@ test("KeepAlive.clampIntervalMs: 範囲内・範囲外・不正値の正規化",
   assert.equal(G.KeepAlive.clampIntervalMs(undefined), G.KeepAlive.DEFAULT_INTERVAL_MS);
 });
 
-test("KeepAlive origin helpers: http(s) origin のみ正規化して重複排除", () => {
-  const origins = G.KeepAlive.normalizeOrigins([
-    "https://example.com/path?q=1",
-    "https://example.com/other",
-    "http://example.com",
-    "chrome://extensions",
-    "not a url",
-  ]);
-
-  assert.deepEqual(origins, ["https://example.com", "http://example.com"]);
-  assert.equal(G.KeepAlive.isOriginAllowed(origins, "https://example.com/foo"), true);
-  assert.equal(G.KeepAlive.isOriginAllowed(origins, "https://other.example/foo"), false);
-});
 
 // ---------- SearchFixer ----------
 
@@ -660,8 +647,9 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 18 個の定数を公開する", () => {
+test("actions.js は globalThis に 21 個の定数を公開する", () => {
   const required = [
+    "SettingsSchema",
     "Actions",
     "ExtensionPaths",
     "SenderCheck",
@@ -671,6 +659,8 @@ test("actions.js は globalThis に 18 個の定数を公開する", () => {
     "YouTubeShorts",
     "SearchFixer",
     "AmazonDeliveryTotal",
+    "AmazonRankingJump",
+    "AmazonReleaseDate",
     "InstagramCleaner",
     "TikTokCleaner",
     "ImageDownloader",
@@ -970,6 +960,93 @@ test("AmazonRankingJump.selectTargetHref: 細かいサブカテゴリ優先で�
   // 空 / 非配列は null
   assert.equal(G.AmazonRankingJump.selectTargetHref([]), null);
   assert.equal(G.AmazonRankingJump.selectTargetHref(null), null);
+});
+
+// AmazonReleaseDate.parseReleaseDateText: 各種日付フォーマットと bidi 制御文字混入に耐える。
+test("AmazonReleaseDate.parseReleaseDateText: 日付フォーマット境界値", () => {
+  const P = G.AmazonReleaseDate.parseReleaseDateText;
+
+  // 標準形式 "YYYY/M/D" / "YYYY/MM/DD"
+  const d1 = P("2023/1/15");
+  assert.equal(d1.getFullYear(), 2023);
+  assert.equal(d1.getMonth(), 0);
+  assert.equal(d1.getDate(), 15);
+  const d2 = P("2024/12/31");
+  assert.equal(d2.getMonth(), 11);
+  assert.equal(d2.getDate(), 31);
+
+  // 日本語形式 "YYYY年M月D日"
+  const d3 = P("2020年3月5日");
+  assert.equal(d3.getFullYear(), 2020);
+  assert.equal(d3.getMonth(), 2);
+  assert.equal(d3.getDate(), 5);
+
+  // bidi 制御文字 (U+200E / U+200F) を含むテキストも受理
+  const d4 = P("取り扱い開始日 ‏ : ‎ 2023/5/10");
+  assert.equal(d4.getFullYear(), 2023);
+  assert.equal(d4.getMonth(), 4);
+  assert.equal(d4.getDate(), 10);
+
+  // ハイフン区切り "YYYY-M-D"
+  const d5 = P("2021-7-4");
+  assert.equal(d5.getFullYear(), 2021);
+
+  // 無効日付 (2024/2/30) は null
+  assert.equal(P("2024/2/30"), null);
+  // 範囲外 (年 / 月 / 日)
+  assert.equal(P("1800/1/1"), null);
+  assert.equal(P("2023/13/1"), null);
+  assert.equal(P("2023/1/32"), null);
+  // 不正型
+  assert.equal(P(null), null);
+  assert.equal(P(undefined), null);
+  assert.equal(P(""), null);
+  assert.equal(P(12345), null);
+  // 日付を含まないテキスト
+  assert.equal(P("発売前"), null);
+});
+
+// AmazonReleaseDate.formatReleaseDate: シンプルな YYYY/M/D 出力。
+test("AmazonReleaseDate.formatReleaseDate: ゼロ詰めなしの YYYY/M/D", () => {
+  const F = G.AmazonReleaseDate.formatReleaseDate;
+  assert.equal(F(new Date(2023, 0, 15)), "2023/1/15");
+  assert.equal(F(new Date(2024, 11, 31)), "2024/12/31");
+  // 不正引数は空文字
+  assert.equal(F(null), "");
+  assert.equal(F(new Date(NaN)), "");
+  assert.equal(F("2023/1/15"), "");
+});
+
+// AmazonReleaseDate.diffRelative: 各 kind の閾値を境界値でテストする。
+test("AmazonReleaseDate.diffRelative: 5 kind の境界判定", () => {
+  const D = G.AmazonReleaseDate.diffRelative;
+  // future
+  const fut = D(new Date(2030, 0, 1), new Date(2025, 0, 1));
+  assert.equal(fut.kind, "future");
+  // today
+  const same = new Date(2025, 5, 15);
+  assert.equal(D(same, same).kind, "today");
+  // days (1 日後)
+  const days = D(new Date(2025, 5, 10), new Date(2025, 5, 15));
+  assert.equal(days.kind, "days");
+  assert.equal(days.days, 5);
+  // months (1 ヶ月以上 1 年未満)
+  const months = D(new Date(2024, 9, 15), new Date(2025, 5, 15));
+  assert.equal(months.kind, "months");
+  assert.equal(months.months, 8);
+  // years (ちょうど N 年、月 0)
+  const years = D(new Date(2022, 5, 15), new Date(2025, 5, 15));
+  assert.equal(years.kind, "years");
+  assert.equal(years.years, 3);
+  // yearsMonths (N 年 M ヶ月)
+  const ym = D(new Date(2022, 1, 15), new Date(2025, 5, 20));
+  assert.equal(ym.kind, "yearsMonths");
+  assert.equal(ym.years, 3);
+  assert.equal(ym.months, 4);
+  // 不正型は null
+  assert.equal(D(null, new Date()), null);
+  assert.equal(D(new Date(), null), null);
+  assert.equal(D(new Date(NaN), new Date()), null);
 });
 
 // ALLOWED_HOSTS の fbcdn.net パターンが scontent- prefix 限定であることを検証する。
