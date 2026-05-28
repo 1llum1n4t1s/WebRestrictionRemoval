@@ -2799,12 +2799,25 @@
         //   - 通常 HD 動画 maxres: 200 / 50000-200000B+
         //   - 通常 Shorts 動画 hqdefault: 200 / 30000-50000B (縦長サムネ)
         //   - 30000B 閾値で削除済みプレースホルダーと valid Shorts を確実に分離できる
-        const [videosRes, streamsRes] = await Promise.allSettled([
-          fetch(`/${handle}/videos`, { credentials: "same-origin" }).then((r) => (r.ok ? r.text() : null)),
-          fetch(`/${handle}/streams`, { credentials: "same-origin" }).then((r) => (r.ok ? r.text() : null)),
-        ]);
-        const videosHtml = videosRes.status === "fulfilled" ? videosRes.value : null;
-        const streamsHtml = streamsRes.status === "fulfilled" ? streamsRes.value : null;
+        // /rere C2-Imp2 修正: /streams は LIVE 検出が `/videos` で fail したときのみ fetch する
+        // (lazy fallback)。LIVE 配信中チャンネル (LofiGirl 等) は /videos の最新動画に LIVE バッジが
+        // 既に現れることが大多数で、平時の登録チャンネルは LIVE 配信なし = /streams は使われない。
+        // 100ch ユーザーで平時 100% を 50% (LIVE 配信中チャンネルが少数) 程度に削減できる。
+        // /streams にしか出ない archived stream のみのチャンネル (LIVE 終了後アーカイブ) には
+        // /videos の通常動画候補が代わりに表示される (UX 影響ほぼなし)。
+        const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin" })
+          .then((r) => (r.ok ? r.text() : null))
+          .catch(() => null);
+        // 軽量 LIVE 検出: 1 マッチで早期判定 (matchAll の前段、lastIndex 進行を避けるため new RegExp)
+        const liveDetectedInVideos =
+          videosHtml != null &&
+          new RegExp('"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"').test(videosHtml);
+        let streamsHtml = null;
+        if (!liveDetectedInVideos) {
+          streamsHtml = await fetch(`/${handle}/streams`, { credentials: "same-origin" })
+            .then((r) => (r.ok ? r.text() : null))
+            .catch(() => null);
+        }
         if (!videosHtml && !streamsHtml) return;
 
         // channelId は /videos 優先、無ければ /streams から

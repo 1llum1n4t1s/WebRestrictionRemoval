@@ -306,6 +306,15 @@ async function createAudioState(tabId, streamId) {
       stream,
       lastSetPercent: VolumeBooster.UNITY,
     };
+    // /rere B1-002 修正: cleanupAllAudio (pagehide) が getUserMedia await 中に走った場合、
+    // 後発 resolve した state は audioStates に登録しても release 経路がない。
+    // cleanedUp flag をチェックして、立っていれば明示的に stream tracks stop + AudioContext close
+    // してから throw する (WebRTC spec: track.stop() 明示呼出が OS リソース解放に必須)。
+    if (cleanedUp) {
+      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+      try { ctx.close(); } catch {}
+      throw new Error("cleanup-during-init");
+    }
     audioStates.set(tabId, state);
     return state;
   } catch (err) {
@@ -371,7 +380,16 @@ function volumeQueryActive() {
 // ============================================================
 // ライフサイクル: offscreen 強制 close 時の cleanup
 // ============================================================
+// /rere B1-002 修正: cleanupAllAudio が呼ばれた後も createAudioState の getUserMedia が後発で
+// resolve するケース (tabCapture stream 完成 + AudioContext 構築完了) があり、resolve 経路で
+// audioStates.set(tabId, state) してしまうと、その後の release 経路がなく stream の OS リソース
+// (tabCapture セッション) がリークする。`cleanedUp` flag を立てて、createAudioState の resolve
+// 直前に flag をチェックして strict cleanup する。WebRTC spec で stream.getTracks().stop() の
+// 明示呼出は OS リソース解放に必須 (document teardown による GC は WebRTC track には保証なし)。
+let cleanedUp = false;
+
 function cleanupAllAudio() {
+  cleanedUp = true;
   for (const state of audioStates.values()) {
     try {
       stopLoudnessNormalizer(state);

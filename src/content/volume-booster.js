@@ -290,6 +290,11 @@
   /**
    * DOM 全体の `<video>` / `<audio>` を scan して attach/detach を適用。
    * iframe 内 (cross-origin) はこの content script の別インスタンスが処理するため触らない。
+   * /rere C2-Imp3 修正: master OFF / UNITY release のときは MutationObserver も disconnect する
+   * (rtx-enhancer.js の activate/deactivate パターンと整合)。旧実装は observer を常時起動して
+   * callback 入口で早期 return していたため、全非 EME http(s) サイトの全フレームで Chrome 内部の
+   * AddedNodes 計算コスト + callback dispatch が常時発生していた。デフォルト OFF 方針の精神と
+   * 整合させ、master OFF 時は完全無処理にする。
    */
   function scanAndApply() {
     const release = isUnityRelease(currentSettings);
@@ -298,8 +303,12 @@
       for (const media of document.querySelectorAll("video, audio")) {
         detachFromMedia(media);
       }
+      // /rere C2-Imp3 修正: master OFF / UNITY release で observer 停止
+      disconnectObserver();
       return;
     }
+    // /rere C2-Imp3 修正: active 時のみ observer 起動 (idempotent)
+    ensureObserver();
     for (const media of document.querySelectorAll("video, audio")) {
       if (!STATE.has(media)) {
         attachToMedia(media);
@@ -358,35 +367,50 @@
 
   // ============================================================
   // MutationObserver で動的 video/audio 追加に追従
+  // /rere C2-Imp3 修正: rtx-enhancer.js の activate/deactivate パターンに揃え、
+  // master OFF / UNITY release では observer を disconnect する。
+  // observer を nullable + ensureObserver/disconnectObserver で idempotent 化。
   // ============================================================
 
-  const observer = new MutationObserver((records) => {
-    if (!chrome.runtime?.id) {
-      observer.disconnect();
-      return;
-    }
-    if (!currentSettings.enabled || isUnityRelease(currentSettings)) return;
-    for (const r of records) {
-      for (const node of r.addedNodes) {
-        if (!(node instanceof Element)) continue;
-        if (node.matches?.("video, audio")) attachToMedia(node);
-        if (node.querySelectorAll) {
-          node.querySelectorAll("video, audio").forEach(attachToMedia);
+  let observer = null;
+
+  function ensureObserver() {
+    if (observer) return;
+    observer = new MutationObserver((records) => {
+      if (!chrome.runtime?.id) {
+        disconnectObserver();
+        return;
+      }
+      if (!currentSettings.enabled || isUnityRelease(currentSettings)) return;
+      for (const r of records) {
+        for (const node of r.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          if (node.matches?.("video, audio")) attachToMedia(node);
+          if (node.querySelectorAll) {
+            node.querySelectorAll("video, audio").forEach(attachToMedia);
+          }
         }
       }
+    });
+    observer.observe(document.documentElement || document, {
+      subtree: true,
+      childList: true,
+    });
+  }
+
+  function disconnectObserver() {
+    if (observer) {
+      observer.disconnect();
+      observer = null;
     }
-  });
-  observer.observe(document.documentElement || document, {
-    subtree: true,
-    childList: true,
-  });
+  }
 
   // ============================================================
   // 起動 + ライフサイクル
   // ============================================================
 
   window.addEventListener("pagehide", () => {
-    observer.disconnect();
+    disconnectObserver();
     for (const media of document.querySelectorAll("video, audio")) {
       detachFromMedia(media);
     }

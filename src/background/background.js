@@ -251,16 +251,30 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 // ---------- メッセージハンドラ ----------
+// /rere B1-001 修正: 旧実装は sender 検証 fail 時 `return;` (= undefined) で sendResponse channel を
+// 即廃棄していたため、popup 側で `await chrome.runtime.sendMessage` が **undefined で resolve** し、
+// `res?.ok` が falsy → applyError 誤発火という silent failure を起こしていた。
+// `sendResponse({ ok: false, error: "sender-rejected" }); return false;` に変更することで、
+// (1) popup 側に明示的な拒否理由が届く、(2) Chrome MV3 仕様上の sendResponse channel が
+// 同期的にクローズされる (return false = 同期応答完了)、の両立を実現する。
+// 未知 action 経路も最末尾で `return false;` を明示し、将来の handler 追加で `return true` 漏れの
+// 罠を物理的に避ける (現状の implicit `undefined` 返しでは同じ silent failure リスクが残る)。
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === Actions.APPLY_SETTINGS) {
-    if (!SenderCheck.isFromPopup(sender)) return;
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     handleApplySettings(request.data)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
     // popup が user gesture を持つので、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
-    if (!SenderCheck.isFromPopup(sender)) return;
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     if (!HAS_VOLUME_BOOSTER) {
       // Firefox 版では popup UI 自体を非表示にしているのでここに到達するのは想定外だが、
       // 防御深層として明示的に reject する (例外を吐かず popup の error 表示で安全に終わる)。
@@ -279,7 +293,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_RELEASE_TAB) {
-    if (!SenderCheck.isFromPopup(sender)) return;
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     if (!HAS_VOLUME_BOOSTER) {
       sendResponse({ ok: false, error: "volume-booster-unavailable" });
       return true;
@@ -291,7 +308,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === Actions.LOUPE_REQUEST_CAPTURE) {
     // ルーペ content script からの captureVisibleTab 要求。
     // sender 検証: content script 由来のみ受け付け（popup からは来ない設計）。
-    if (!SenderCheck.isFromContentScript(sender)) return;
+    if (!SenderCheck.isFromContentScript(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     const tabId = sender.tab?.id;
     const windowId = sender.tab?.windowId;
     if (!Number.isInteger(tabId) || !Number.isInteger(windowId)) {
@@ -342,6 +362,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((err) => safeRespond({ ok: false, error: String(err?.message ?? err) }));
     return true;
   }
+  // /rere B1-001 修正: 未知 action は明示的に return false で channel をクローズ。
+  // implicit undefined 返しだと将来の handler 追加時に sendResponse 漏れの罠を踏みやすい。
+  return false;
 });
 
 // ---------- タブクローズで音量ブーストを解放 ----------
@@ -1097,7 +1120,17 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
     });
     // P2-#19: 成功時のみローカルキャッシュに登録。失敗（offscreen エラー / no-response）の場合は
     // ブースト中状態にならないため Set には追加しない。
-    if (res?.ok) await markVolumeBoosterTabActive(tabId);
+    // /rere B1-006 修正: markVolumeBoosterTabActive が false (= getMediaStreamId 完了後に
+    // onRemoved がタブを閉じた race window で removedVolumeBoosterTabIds.has() がヒット →
+    // release 実行 + false 返却) の場合、caller の res に整合性結果を反映する。旧実装では
+    // markVolumeBoosterTabActive の戻り値を捨てて res をそのまま返していたため、popup 側で
+    // 「offscreen ok だがタブは既に閉じられている」という整合性破れの ok:true を受けていた。
+    if (res?.ok) {
+      const marked = await markVolumeBoosterTabActive(tabId);
+      if (!marked) {
+        return { ok: false, error: "tab-closed-during-init" };
+      }
+    }
     return res ?? { ok: false, error: "no-response" };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
