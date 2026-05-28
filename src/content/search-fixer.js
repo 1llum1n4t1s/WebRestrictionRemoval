@@ -2773,31 +2773,73 @@
       if (subsThumbFetchingHandles.has(handle)) return;
       subsThumbFetchingHandles.add(handle);
       try {
-        const res = await fetch(`/${handle}`, { credentials: "same-origin" });
-        if (!res.ok) return;
-        const html = await res.text();
-        const channelIdMatch = html.match(/"externalId":"(UC[\w-]{20,30})"/);
-        channelId = channelIdMatch?.[1] || null;
-        // 旧 v5 ロジックは HTML 内最初の `"videoId":"..."` を採用していたが、これは Featured 動画
-        // とは限らず「削除済み / 非公開動画」を引くことがあった。削除済み動画の maxresdefault.jpg は
-        // 404 + 1097B の灰色 + 三点リーダープレースホルダーが返り、視覚的に「サムネ取れてない」状態
-        // を引き起こす (2026-05-13 ユロさん指摘で発覚)。
+        // v7 (2026-05-28): `/${handle}` (チャンネルトップ) 1 fetch → `/${handle}/videos` +
+        // `/${handle}/streams` 2 fetch 並列に切替。ライブ配信中の動画 (LIVE) を最優先 + 配信
+        // 予定 (UPCOMING、雑談チャット用が混じることが多い) を除外できるようになった。
         //
-        // v6 の 2 段階篩い分け:
-        //   1. top 10 候補で maxresdefault.jpg HEAD 200 を並列検索 → 通常 HD 動画ヒットなら採用
-        //   2. それでも見つからない場合は hqdefault.jpg のサイズが 30KB 超を並列検索 → Shorts 等
-        //      maxres なしだが「灰色プレースホルダー (8-16KB)」よりは明らかに valid な動画を救う
-        //   3. それでもダメなら null (空白カード、灰色プレースホルダー画像は絶対表示しない)
+        // 取得元の使い分け:
+        //   - /videos tab: 通常動画 + アーカイブ済みライブ配信
+        //   - /streams tab: 配信中 (LIVE) + 配信予定 (UPCOMING) + 配信済み (アーカイブ)
         //
-        // 実測データ (2026-05-13 検証):
+        // バッジ判定 (HTML 内の thumbnailBadgeViewModel から正規表現抽出):
+        //   - LIVE 配信中: `"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"` (言語非依存) +
+        //     周辺の `animationActivationTargetId` が当該 videoId。**最優先採用**
+        //   - UPCOMING 配信予定: `badgeStyle` は `..._DEFAULT` で LIVE と区別できないため
+        //     `"text":"配信予定"` (ja) / `"Upcoming"` / `"Scheduled"` / `"Premieres"` (en
+        //     系) / `"首播"` (zh) 等の多言語パターンで判定。**候補から除外**
+        //   - 通常動画 / アーカイブ済みライブ: 上記いずれにも該当しない → 採用候補
+        //
+        // 候補順: LIVE (最優先) → /videos と /streams の HTML 出現順 (UPCOMING 除外、重複削除) 上位 10
+        //
+        // 採用ロジック (Stage 1 / 2) は v6 から維持: maxresdefault HEAD 200 → hqdefault 30KB 超 → null
+        //
+        // 実測データ (2026-05-13 検証、v6 から継承):
         //   - 削除済み動画 maxres: 404 / 1097B (灰色 + ... プレースホルダー)
         //   - 削除済み動画 hqdefault: 200 / 8000-16000B (同プレースホルダー)
         //   - 通常 HD 動画 maxres: 200 / 50000-200000B+
         //   - 通常 Shorts 動画 hqdefault: 200 / 30000-50000B (縦長サムネ)
         //   - 30000B 閾値で削除済みプレースホルダーと valid Shorts を確実に分離できる
-        const candidateIds = [...new Set(
-          [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)].map((m) => m[1])
-        )].slice(0, 10);
+        const [videosRes, streamsRes] = await Promise.allSettled([
+          fetch(`/${handle}/videos`, { credentials: "same-origin" }).then((r) => (r.ok ? r.text() : null)),
+          fetch(`/${handle}/streams`, { credentials: "same-origin" }).then((r) => (r.ok ? r.text() : null)),
+        ]);
+        const videosHtml = videosRes.status === "fulfilled" ? videosRes.value : null;
+        const streamsHtml = streamsRes.status === "fulfilled" ? streamsRes.value : null;
+        if (!videosHtml && !streamsHtml) return;
+
+        // channelId は /videos 優先、無ければ /streams から
+        const channelIdSource = videosHtml || streamsHtml;
+        channelId = channelIdSource.match(/"externalId":"(UC[\w-]{20,30})"/)?.[1] || null;
+
+        // バッジ抽出正規表現 (v7)
+        //   - LIVE: badgeStyle が SOMETHING_LIVE の 400 文字以内に animationActivationTargetId
+        //   - UPCOMING (除外): text が UPCOMING 多言語パターンの 400 文字以内に animationActivationTargetId
+        //     (multilang: 日本語「配信予定」+ 英語「Upcoming」「Scheduled」「Premieres」+ 中国語「首播」をカバー)
+        const LIVE_BADGE_RE = /"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"[\s\S]{0,400}?"animationActivationTargetId":"([a-zA-Z0-9_-]{11})"/g;
+        const UPCOMING_TEXT_RE = /"text":"(?:配信予定|Upcoming|Scheduled|Premieres|首播)[^"]*"[\s\S]{0,400}?"animationActivationTargetId":"([a-zA-Z0-9_-]{11})"/g;
+        const VIDEO_ID_RE = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+
+        const liveSet = new Set();
+        const upcomingSet = new Set();
+        const orderedVideos = [];
+        const seen = new Set();
+
+        for (const html of [videosHtml, streamsHtml]) {
+          if (!html) continue;
+          for (const m of html.matchAll(LIVE_BADGE_RE)) liveSet.add(m[1]);
+          for (const m of html.matchAll(UPCOMING_TEXT_RE)) upcomingSet.add(m[1]);
+          for (const m of html.matchAll(VIDEO_ID_RE)) {
+            if (seen.has(m[1])) continue;
+            seen.add(m[1]);
+            orderedVideos.push(m[1]);
+          }
+        }
+
+        // 候補リスト構築: LIVE → 通常 (UPCOMING を除外した HTML 出現順) → 上位 10
+        const candidateIds = [
+          ...liveSet,
+          ...orderedVideos.filter((v) => !liveSet.has(v) && !upcomingSet.has(v)),
+        ].slice(0, 10);
         // Stage 1: maxresdefault HEAD で 200 を探す (HD 動画優先)
         const maxresChecks = await Promise.allSettled(
           candidateIds.map((vid) =>
