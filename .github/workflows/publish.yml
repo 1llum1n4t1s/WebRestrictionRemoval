@@ -359,14 +359,26 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # セルフレビュー 3 巡目修正: CWS pre-flight と対称に `|| fallback` を付ける。
+          # 初回 AMO 登録 (add-on 未作成 → HTTP 404) や AMO 一時障害 (5xx / 429 / DNS) で
+          # curl -fsS が非ゼロ終了したとき、inherit_errexit 下で step ごと hard fail すると
+          # publish-firefox job が前 step fail で連鎖 skip され、submit step の version conflict
+          # 救済 fallback (timeout exceeded と同経路) にすら到達しなくなる。空文字に倒して
+          # warning + skip=false で publish step (= web-ext sign) に判定を委ねる。
           versions_response=$(curl -fsS \
             -H "Accept: application/json" \
             -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-            "https://addons.mozilla.org/api/v5/addons/addon/${AMO_SLUG}/versions/")
+            "https://addons.mozilla.org/api/v5/addons/addon/${AMO_SLUG}/versions/") || versions_response=""
+          if [ -z "$versions_response" ]; then
+            echo "::warning::AMO pre-flight: versions list 取得失敗 (初回登録 / 一時障害) → publish step に判定を委ねる"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # MANIFEST_VERSION は環境変数経由で渡す (heredoc を使うと stdin 二重 redirect になり、
-          # JSON response との衝突で構文エラーになるため)。
-          exists=$(MANIFEST_VERSION="$MANIFEST_VERSION" python3 -c 'import json,sys,os; target=os.environ["MANIFEST_VERSION"]; data=json.load(sys.stdin); print("1" if any(v.get("version")==target for v in data.get("results",[])) else "0")' <<< "$versions_response")
-          echo "📊 AMO versions check: target=${MANIFEST_VERSION} / exists=${exists}"
+          # JSON response との衝突で構文エラーになるため)。python が非 JSON で exit 1 しても
+          # inherit_errexit で step ごと落ちないよう `|| echo ""` でフォールバック (CWS 側と対称)。
+          exists=$(MANIFEST_VERSION="$MANIFEST_VERSION" python3 -c 'import json,sys,os; target=os.environ["MANIFEST_VERSION"]; data=json.load(sys.stdin); print("1" if any(v.get("version")==target for v in data.get("results",[])) else "0")' 2>/dev/null <<< "$versions_response" || echo "")
+          echo "📊 AMO versions check: target=${MANIFEST_VERSION} / exists=${exists:-(parse失敗)}"
           if [ "$exists" = "1" ]; then
             echo "::notice::AMO に既に v${MANIFEST_VERSION} の submission が存在するため AMO publish step を skip (同 version 重複 submission 防止)"
             echo "skip=true" >> "$GITHUB_OUTPUT"

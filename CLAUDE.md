@@ -18,7 +18,7 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 18 globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
+npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 23 globalThis 定数列挙 (actions.js 21 + ScanRunner + AudioPipeline、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
 npm test                     # Node.js 標準 test runner、82 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + VolumeBooster.isEmeHost / isEmeUrl 境界値 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
@@ -339,6 +339,8 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` + host_permissions: `<all_urls>` (ルーペ `captureVisibleTab` を popup close 後 / SPA navigation 後でも確実に動作させるため、v1.0.34 で追加。content_scripts で既に全 http(s) に注入済みなので実質アクセス範囲は同じ) |
 | `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster (`isEmeHost` / `isEmeUrl` 含む、15 ホストブラックリスト) / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
+| `src/lib/scan-runner.js` | content script 共通実行ランタイム (`/rere` B1-007/B2-I002/D-002 で抽出)。rAF coalesce + MutationObserver `disconnect → render → takeRecords → observe` ガード + Extension context invalidation guard を `ScanRunner.create({ render, cleanup })` に集約し `globalThis.ScanRunner` 公開。Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が利用 (image-downloader / youtube-shorts は別バッチで移行予定)。cleanup は idempotent 必須 |
+| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア共有モジュール (`/rere` B1-004/B2-I001/D-001 で抽出)。dbToGain / clampNormalizerGain / scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer / stopLoudnessNormalizer / updateLoudnessNormalizer / applyCompressorPreset の 8 関数を `globalThis.AudioPipeline` 公開。MES 経路 (volume-booster.js) と EME fallback 経路 (offscreen.js) が共有し、物理コピー drift を解消。caller は stop/update/applyCompressorPreset の 3 関数を直接呼ぶ (残り 5 は内部相互呼び出し)。値定数は actions.js の VolumeBooster 経由 |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 (v1.0.33+ は EME fallback 専用、普通サイトは content script の MES 経路に移行) |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
