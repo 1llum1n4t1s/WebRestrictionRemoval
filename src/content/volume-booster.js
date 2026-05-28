@@ -61,93 +61,15 @@
   };
 
   // ============================================================
-  // 自動音量正規化ロジック (offscreen.js から移植)
+  // DSP コア関数: AudioPipeline (src/lib/audio-pipeline.js) から取得
+  // /rere B1-004/B2-I001/D-001 修正: 旧実装は offscreen.js と同 8 関数を物理コピーで持ち、
+  // 「片方を更新したら必ず他方も同期する」を人間運用に依存していた。drift 既発のため、
+  // src/lib/audio-pipeline.js に集約して 1 ソースから両 caller (MES 経路 / EME fallback 経路) に
+  // 配布する。値定数は actions.js の VolumeBooster (既存集約場所) を経由。
   // ============================================================
-
-  function dbToGain(db) {
-    return Math.pow(10, db / 20);
-  }
-
-  function clampNormalizerGain(gain) {
-    const minGain = dbToGain(VolumeBooster.NORMALIZE_MIN_GAIN_DB);
-    const maxGain = dbToGain(VolumeBooster.NORMALIZE_MAX_GAIN_DB);
-    if (!Number.isFinite(gain)) return 1;
-    return Math.min(maxGain, Math.max(minGain, gain));
-  }
-
-  function scheduleNormalizerGain(state, targetGain, options) {
-    const clamped = clampNormalizerGain(targetGain);
-    const now = state.ctx.currentTime;
-    const previousTarget = Number.isFinite(state.normalizerTargetGain)
-      ? state.normalizerTargetGain
-      : 1;
-    if (options?.force !== true && previousTarget > 0 && clamped > 0) {
-      const deltaDb = Math.abs(20 * Math.log10(clamped / previousTarget));
-      if (deltaDb < VolumeBooster.NORMALIZE_DEAD_ZONE_DB) return;
-    }
-    if (clamped === previousTarget) return;
-    const timeConstant = clamped < previousTarget
-      ? VolumeBooster.NORMALIZE_GAIN_DOWN_TIME_CONSTANT
-      : VolumeBooster.NORMALIZE_GAIN_UP_TIME_CONSTANT;
-    state.normalizerGainNode.gain.cancelScheduledValues(now);
-    state.normalizerGainNode.gain.setValueAtTime(state.normalizerGainNode.gain.value, now);
-    state.normalizerGainNode.gain.setTargetAtTime(clamped, now, timeConstant);
-    state.normalizerTargetGain = clamped;
-  }
-
-  function tickLoudnessNormalizer(state) {
-    if (!state.normalizeEnabled) return;
-    const buffer = state.normalizerBuffer;
-    state.normalizerAnalyzer.getFloatTimeDomainData(buffer);
-
-    let sum = 0;
-    for (let i = 0; i < buffer.length; i += 1) {
-      sum += buffer[i] * buffer[i];
-    }
-    const rms = Math.sqrt(sum / buffer.length);
-    const silenceGate = dbToGain(VolumeBooster.NORMALIZE_SILENCE_GATE_DB);
-    if (!Number.isFinite(rms)) return;
-    if (rms < silenceGate) {
-      scheduleNormalizerGain(state, 1, { force: true });
-      return;
-    }
-    const targetRms = dbToGain(VolumeBooster.NORMALIZE_TARGET_RMS_DB);
-    scheduleNormalizerGain(state, targetRms / rms);
-  }
-
-  function startLoudnessNormalizer(state) {
-    if (state.normalizerTimer !== null) return;
-    tickLoudnessNormalizer(state);
-    state.normalizerTimer = setInterval(
-      () => tickLoudnessNormalizer(state),
-      VolumeBooster.NORMALIZE_UPDATE_MS,
-    );
-  }
-
-  function stopLoudnessNormalizer(state) {
-    if (state.normalizerTimer !== null) {
-      clearInterval(state.normalizerTimer);
-      state.normalizerTimer = null;
-    }
-  }
-
-  function updateLoudnessNormalizer(state, enabled) {
-    state.normalizeEnabled = enabled === true;
-    if (state.normalizeEnabled) {
-      startLoudnessNormalizer(state);
-    } else {
-      stopLoudnessNormalizer(state);
-      scheduleNormalizerGain(state, 1, { force: true });
-    }
-  }
-
-  function applyCompressorPreset(node, preset) {
-    node.threshold.value = preset.threshold;
-    node.knee.value = preset.knee;
-    node.ratio.value = preset.ratio;
-    node.attack.value = preset.attack;
-    node.release.value = preset.release;
-  }
+  const { dbToGain, scheduleNormalizerGain, tickLoudnessNormalizer,
+          startLoudnessNormalizer, stopLoudnessNormalizer,
+          updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
 
   // ============================================================
   // AudioContext + 6 ノードチェーン構築

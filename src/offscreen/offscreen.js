@@ -38,111 +38,13 @@ const audioInitPromises = new Map();
  * DynamicsCompressorNode に preset を適用する。
  * 機能 OFF 時は VolumeBooster.COMPRESSOR_BYPASS（ratio:1）を渡してパススルー化する。
  */
-function applyCompressorPreset(node, preset) {
-  node.threshold.value = preset.threshold;
-  node.knee.value = preset.knee;
-  node.ratio.value = preset.ratio;
-  node.attack.value = preset.attack;
-  node.release.value = preset.release;
-}
-
-function dbToGain(db) {
-  return Math.pow(10, db / 20);
-}
-
-function clampNormalizerGain(gain) {
-  const minGain = dbToGain(VolumeBooster.NORMALIZE_MIN_GAIN_DB);
-  const maxGain = dbToGain(VolumeBooster.NORMALIZE_MAX_GAIN_DB);
-  if (!Number.isFinite(gain)) return 1;
-  return Math.min(maxGain, Math.max(minGain, gain));
-}
-
-/**
- * @param {object} state
- * @param {number} targetGain 目標ゲイン倍率（clamp 前）
- * @param {{force?: boolean}} [options] force=true で dead zone を無視して必ず更新する。
- *   機能 OFF 時の 1.0x 強制復帰など、ユーザー操作起点の即時反映で使う。
- */
-function scheduleNormalizerGain(state, targetGain, options) {
-  const clamped = clampNormalizerGain(targetGain);
-  const now = state.ctx.currentTime;
-  const previousTarget = Number.isFinite(state.normalizerTargetGain)
-    ? state.normalizerTargetGain
-    : 1;
-  // Dead zone: 通常 tick 経由ではターゲットの差が NORMALIZE_DEAD_ZONE_DB 未満なら更新をスキップ。
-  // これで RMS の細かい揺れによる ±数 dB のポンピングを止め、BGM のうねりを耳から消す。
-  // force=true (機能 OFF 時の 1.0x 復帰など) のときは dead zone を無視して必ず適用する。
-  if (options?.force !== true && previousTarget > 0 && clamped > 0) {
-    const deltaDb = Math.abs(20 * Math.log10(clamped / previousTarget));
-    if (deltaDb < VolumeBooster.NORMALIZE_DEAD_ZONE_DB) return;
-  }
-  // 同じ target への再 schedule はスキップ。silence-gate 経路は 400ms 毎に force=true で
-  // unity (1) を要求してくるが、既に target=1 で ramp 中の状態で再度 setTargetAtTime すると、
-  // direction 判定が `clamped < previousTarget` で false になって UP_TIME_CONSTANT (8s) に
-  // 切り替わり、せっかくの fast DOWN ramp が遅い ramp に上書きされて silence/noise が長時間
-  // boosted のままになる事故を起こす (Codex P2 指摘 2026-05-08)。
-  if (clamped === previousTarget) return;
-  const timeConstant = clamped < previousTarget
-    ? VolumeBooster.NORMALIZE_GAIN_DOWN_TIME_CONSTANT
-    : VolumeBooster.NORMALIZE_GAIN_UP_TIME_CONSTANT;
-  state.normalizerGainNode.gain.cancelScheduledValues(now);
-  state.normalizerGainNode.gain.setValueAtTime(state.normalizerGainNode.gain.value, now);
-  state.normalizerGainNode.gain.setTargetAtTime(clamped, now, timeConstant);
-  state.normalizerTargetGain = clamped;
-}
-
-function tickLoudnessNormalizer(state) {
-  if (!state.normalizeEnabled) return;
-  const buffer = state.normalizerBuffer;
-  state.normalizerAnalyzer.getFloatTimeDomainData(buffer);
-
-  let sum = 0;
-  for (let i = 0; i < buffer.length; i += 1) {
-    sum += buffer[i] * buffer[i];
-  }
-  const rms = Math.sqrt(sum / buffer.length);
-  const silenceGate = dbToGain(VolumeBooster.NORMALIZE_SILENCE_GATE_DB);
-  if (!Number.isFinite(rms)) return;
-  if (rms < silenceGate) {
-    // 静寂/ノイズ区間: 必ず UNITY (1.0x) に戻す。dead zone を無視するため force=true。
-    // dead zone 経由だと「直前の正規化が +1.58 dB 未満の boost で settled」のときに
-    // unity 復帰 (1.0 vs 1.2 の差 ~1.58 dB) が dead zone 内で skip されて、ノイズ区間が
-    // 古い gain で増幅されたままになる罠を回避する（Codex P2 指摘）。
-    scheduleNormalizerGain(state, 1, { force: true });
-    return;
-  }
-
-  const targetRms = dbToGain(VolumeBooster.NORMALIZE_TARGET_RMS_DB);
-  scheduleNormalizerGain(state, targetRms / rms);
-}
-
-function startLoudnessNormalizer(state) {
-  if (state.normalizerTimer !== null) return;
-  tickLoudnessNormalizer(state);
-  state.normalizerTimer = setInterval(
-    () => tickLoudnessNormalizer(state),
-    VolumeBooster.NORMALIZE_UPDATE_MS
-  );
-}
-
-function stopLoudnessNormalizer(state) {
-  if (state.normalizerTimer !== null) {
-    clearInterval(state.normalizerTimer);
-    state.normalizerTimer = null;
-  }
-}
-
-function updateLoudnessNormalizer(state, enabled) {
-  state.normalizeEnabled = enabled === true;
-  if (state.normalizeEnabled) {
-    startLoudnessNormalizer(state);
-  } else {
-    stopLoudnessNormalizer(state);
-    // 機能 OFF 時は dead zone を無視して即時 1.0x へ。dead zone が効いてしまうと
-    // OFF 後も僅かなブースト/減衰が残り、ユーザーが意図したスルー状態にならない。
-    scheduleNormalizerGain(state, 1, { force: true });
-  }
-}
+// /rere B1-004/B2-I001/D-001 修正: DSP コア 8 関数を src/lib/audio-pipeline.js に集約。
+// 旧実装は volume-booster.js (MES 経路) と同一の 8 関数を物理コピーで持ち、「片方を更新したら
+// 必ず他方も同期する」を人間運用に依存していたため drift 既発。値定数は actions.js の
+// VolumeBooster (既存集約場所) を経由、フロー制御ロジックのみを audio-pipeline.js に集約する。
+const { dbToGain, scheduleNormalizerGain, tickLoudnessNormalizer,
+        startLoudnessNormalizer, stopLoudnessNormalizer,
+        updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
 
 /**
  * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。
