@@ -43,8 +43,17 @@ function loadCwsId() {
 const CWS_ID = loadCwsId();
 const AMO_SLUG = process.env.AMO_SLUG || "web-viewing-assist";
 const args = process.argv.slice(2);
+// 実行対象決定 (CodeRabbit #3317269094 指摘修正):
+//   - フラグなし → 両方実行 (default)
+//   - --cws のみ → CWS のみ
+//   - --amo のみ → AMO のみ
+//   - --cws --amo 両指定 → 両方実行 (= フラグなしと同じ、サイレント no-op を防ぐ)
+// 旧設計: `if (!ONLY_AMO) await checkCws(); if (!ONLY_CWS) await checkAmo();` だと
+// 両指定時に両方 skip される bug があった。
 const ONLY_CWS = args.includes("--cws");
 const ONLY_AMO = args.includes("--amo");
+const RUN_CWS = ONLY_CWS || !ONLY_AMO;
+const RUN_AMO = ONLY_AMO || !ONLY_CWS;
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -221,8 +230,8 @@ async function checkAmo() {
 async function main() {
   console.log("🔍 ストア掲載 listing drift チェッカー");
 
-  if (!ONLY_AMO) await checkCws();
-  if (!ONLY_CWS) await checkAmo();
+  if (RUN_CWS) await checkCws();
+  if (RUN_AMO) await checkAmo();
 
   console.log("\n✨ 完了");
 }
