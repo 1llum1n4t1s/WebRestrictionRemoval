@@ -42,9 +42,11 @@ const audioInitPromises = new Map();
 // 旧実装は volume-booster.js (MES 経路) と同一の 8 関数を物理コピーで持ち、「片方を更新したら
 // 必ず他方も同期する」を人間運用に依存していたため drift 既発。値定数は actions.js の
 // VolumeBooster (既存集約場所) を経由、フロー制御ロジックのみを audio-pipeline.js に集約する。
-const { dbToGain, scheduleNormalizerGain, tickLoudnessNormalizer,
-        startLoudnessNormalizer, stopLoudnessNormalizer,
-        updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
+// caller (この offscreen) が直接呼ぶのは 3 関数のみ。dbToGain / clampNormalizerGain /
+// scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer は audio-pipeline.js の
+// 内部で相互に呼ばれるだけ (updateLoudnessNormalizer / stopLoudnessNormalizer 経由) なので
+// destructure しない (ESLint no-unused-vars 回避、セルフレビュー 2 巡目)。
+const { stopLoudnessNormalizer, updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
 
 /**
  * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。

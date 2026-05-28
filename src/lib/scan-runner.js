@@ -35,8 +35,11 @@
    *   実際の DOM 書き込み・更新ロジック。idempotent (差分更新) 必須。
    *   `observer.disconnect()` 後に呼ばれるので、内部で MO 自己発火を心配する必要はない。
    * @property {() => void} [cleanup]
-   *   master OFF / orphan 化時に呼ばれる DOM 撤去ロジック。chrome API 非依存を推奨
-   *   (orphan 化後も安全に呼べるよう)。
+   *   master OFF / orphan 化時に呼ばれる DOM 撤去ロジック。**idempotent (複数回呼んでも安全)
+   *   であること** が必須 — `stop()` と `checkContextInvalidated()` の両経路から呼ばれ得るため
+   *   (構造上は二重呼び出しを防いでいるが、契約として冪等性に依存する)。また chrome API 非依存を
+   *   推奨 (orphan 化後も安全に呼べるよう)。実装例: `querySelectorAll(...).forEach(el => el.remove())`
+   *   は何度呼んでも安全。
    * @property {MutationObserverInit} [observeOptions]
    *   MutationObserver の observe オプション。デフォルト `{ childList: true, subtree: true }`。
    * @property {() => (Element | null)} [observeTarget]

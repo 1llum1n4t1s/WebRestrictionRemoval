@@ -125,8 +125,8 @@ jobs:
           name: web-viewing-assist-zip
           path: .
 
-      - name: バージョン pre-flight check (CWS / 既 draft と同 version なら skip)
-        # /rere F-002 修正 + セルフレビュー #1 修正: 同 version 再 push は CWS API が
+      - name: バージョン pre-flight check (CWS / 既存 version と一致なら skip)
+        # /rere F-002 修正 + セルフレビュー 2 巡目修正: 同 version 再 push は CWS API が
         # INVALID_ARGUMENT 等で拒否するため、Items.get API で **draft の crxVersion** を取得して
         # manifest version と一致したら publish を skip する。
         #
@@ -134,6 +134,17 @@ jobs:
         # `"version\":\"X.Y.Z\""` 形式で埋め込まれ、しかも別の埋め込み JSON (API/ranking 等) も
         # version キーを持っているため、HTML scraping では**他拡張機能の version を誤検出**して
         # 常時 skip 化 (silent failure) するリスクがあった (実機検証で 2 件の無関係 version を確認)。
+        #
+        # ⚠️ `crxVersion` は CWS Items API の公式ドキュメントには記載がない **未文書フィールド**だが、
+        # 実機検証 (`?projection=DRAFT`) で `{kind,id,publicKey,uploadState,crxVersion}` が返ることを
+        # 確認済み (PlasmoHQ 等の publish ツールでも事実上の標準として使われている)。将来 API 変更で
+        # 消えたら draft_version が空になり skip=false 側 (publish 実行) に倒れるので安全。
+        #
+        # ⚠️ uploadState の判定: 実機検証で publish 済み clean draft は `uploadState: "NOT_FOUND"`
+        # (= 保留中アップロード操作なし) を返すことを確認。旧実装の `= "SUCCESS"` 限定だと、まさに
+        # 「既に同 version が公開済み」のケースで skip に到達せず pre-flight が機能しなかった。
+        # uploadState は SUCCESS / NOT_FOUND / IN_PROGRESS / FAILURE を取り、FAILURE のときのみ
+        # 「直近アップロード失敗 → 再 upload したい」ので skip しない。それ以外は crxVersion 一致で skip。
         #
         # OAuth refresh は publish step と独立に実行 (token は use-and-forget)、secrets 露出経路は
         # publish step と同等。
@@ -154,7 +165,9 @@ jobs:
             --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
             --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
             --data-urlencode "grant_type=refresh_token")
-          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response")
+          # python が非 JSON で exit 1 しても inherit_errexit で step ごと落ちないよう `|| echo ""`
+          # でフォールバックさせ、直後の空チェック分岐で warning 降格させる (セルフレビュー 2 巡目 #3)。
+          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response" || echo "")
           if [ -z "${access_token:-}" ]; then
             echo "::warning::CWS pre-flight: OAuth token 取得失敗 → publish step に判定を委ねる"
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -163,8 +176,6 @@ jobs:
           echo "::add-mask::${token_response}"
           echo "::add-mask::${access_token}"
           # Items.get で draft の crxVersion + uploadState を取得
-          # projection=DRAFT で draft (= 次回 publish で公開される予定の version) を取る。
-          # uploadState=SUCCESS かつ crxVersion=manifest version なら同 version 重複と判定。
           draft_response=$(curl -fsS \
             -H "Authorization: Bearer ${access_token}" \
             -H "x-goog-api-version: 2" \
@@ -177,8 +188,8 @@ jobs:
           draft_version=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("crxVersion",""))' 2>/dev/null <<< "$draft_response" || echo "")
           draft_state=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("uploadState",""))' 2>/dev/null <<< "$draft_response" || echo "")
           echo "📊 CWS draft: version=${draft_version:-(unknown)} state=${draft_state:-(unknown)} / manifest: ${MANIFEST_VERSION}"
-          if [ "$draft_state" = "SUCCESS" ] && [ -n "$draft_version" ] && [ "$draft_version" = "$MANIFEST_VERSION" ]; then
-            echo "::notice::CWS draft は既に v${MANIFEST_VERSION} (uploadState=SUCCESS)。CWS publish step を skip (同 version 重複 push 防止)"
+          if [ -n "$draft_version" ] && [ "$draft_version" = "$MANIFEST_VERSION" ] && [ "$draft_state" != "FAILURE" ]; then
+            echo "::notice::CWS は既に v${MANIFEST_VERSION} を保持 (crxVersion 一致, uploadState=${draft_state})。CWS publish step を skip (同 version 重複 push 防止)"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -211,7 +222,13 @@ jobs:
           # GitHub Actions の自動マスキングは「シークレット文字列がそのまま出力された場合」のみ働くため、
           # CLI が OAuth Bearer Token をエラーメッセージに混ぜてくると平文でログ残存しうる。
           # 直接ストリームすれば Actions ランナー側のマスキングが各シークレットを `***` に置換できる。
+          # 注意: `set -e` だけだと `var=$(cmd)` 形式での内部コマンド失敗が errexit されない bash 仕様
+          # があるため、access_token が空文字化した状態で curl が "Authorization: Bearer " を送って
+          # 401 で失敗 → 「upload エラー」として現れる紛らわしい状況になる。`inherit_errexit` を
+          # `set -euo pipefail` の直後 (= 後続の全 command substitution の前) に有効化して、token 取得
+          # curl も保護対象に含める (セルフレビュー 2 巡目 #4: shopt 配置を curl より前に移動)。
           set -euo pipefail
+          shopt -s inherit_errexit
           # ⚠️ このブロックでは `set -x` を絶対に有効化しない。set -x がトークン取得行を
           # 展開すると CWS_REFRESH_TOKEN / token_response / access_token のいずれかが
           # add-mask 登録前に平文ログに出る可能性がある (/rere レビュー A2-S-1 防御)。
@@ -223,12 +240,9 @@ jobs:
             --data-urlencode "grant_type=refresh_token")
           # Python 例外メッセージは標準で token 本体を含まないが、防御深層として stderr を抑制し、
           # KeyError / JSONDecodeError 時のスタックトレースから付帯情報の漏洩可能性をゼロ化する。
-          # 注意: `set -e` だけだと `var=$(cmd)` 形式での内部コマンド失敗が errexit されない bash 仕様
-          # があるため、 access_token が空文字化した状態で curl が "Authorization: Bearer " を送って
-          # 401 で失敗 → 「upload エラー」として現れる紛らわしい状況になる。`inherit_errexit` を有効化
-          # した上で、空チェックを明示する二重防御 (セルフレビュー #3 修正)。
-          shopt -s inherit_errexit
-          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response")
+          # `|| echo ""` で python 非ゼロ終了を空文字に変換し、inherit_errexit で step が落ちる前に
+          # 直後の空チェック分岐 (hard fail) に到達させる (セルフレビュー 2 巡目 #3)。
+          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response" || echo "")
           if [ -z "${access_token:-}" ]; then
             echo "::error::access_token のパースに失敗しました (OAuth refresh response が想定形式でない可能性)"
             exit 1

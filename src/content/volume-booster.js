@@ -67,9 +67,11 @@
   // src/lib/audio-pipeline.js に集約して 1 ソースから両 caller (MES 経路 / EME fallback 経路) に
   // 配布する。値定数は actions.js の VolumeBooster (既存集約場所) を経由。
   // ============================================================
-  const { dbToGain, scheduleNormalizerGain, tickLoudnessNormalizer,
-          startLoudnessNormalizer, stopLoudnessNormalizer,
-          updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
+  // caller (この content script) が直接呼ぶのは 3 関数のみ。dbToGain / clampNormalizerGain /
+  // scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer は audio-pipeline.js の
+  // 内部で相互に呼ばれるだけ (updateLoudnessNormalizer / stopLoudnessNormalizer 経由) なので
+  // destructure しない (ESLint no-unused-vars 回避、セルフレビュー 2 巡目)。
+  const { stopLoudnessNormalizer, updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
 
   // ============================================================
   // AudioContext + 6 ノードチェーン構築
@@ -105,7 +107,7 @@
     try {
       ctx = new AudioContext();
       source = ctx.createMediaElementSource(media);
-    } catch (err) {
+    } catch {
       // MediaElementSource 失敗 = 既に他の AudioContext に attach 済み or EME
       // 同じ video 要素に MES は 1 度だけしか attach できないため、サイト側 player が
       // 自前で MES を使っている場合 (まれ) もここに来る。EME と区別できないので

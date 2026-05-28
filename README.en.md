@@ -16,15 +16,16 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 | 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
-| 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. (**11 sub-features**) |
-| 🎵 **TikTok cleaner** | Hide comments / suggested accounts (**3 sub-features**) |
-| 📥 **Image download** | Overlays a download button on hover for Instagram / TikTok content images and video thumbnails |
+| 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + image download (**11 sub-features**) |
+| 🎵 **TikTok cleaner** | Hide comments / suggested accounts + image download (**3 sub-features**) |
 | 🔊 **Volume Booster** | Amplify tab audio 0–300%. Distortion guard / auto-normalization / night mode / mute |
 | 🎞️ **Video Gamma** | Adjust `<video>` brightness via slider (center 1.0 = no correction, left for darker, right for brighter) |
 | 🖥️ **Remove video black bars** | Removes letterbox/pillarbox bars on ultrawide screens (zoom or stretch mode) |
 | 🔍 **Loupe** | Cursor-following circular magnifier — perfect for pausing a video and inspecting fine details |
 | 🎨 **Color Picker** | Pick a color from the screen and copy as HEX / RGB / HSL, with up to 20 history entries |
 | 🎮 **RTX Video Enhancement** | Helps GPU driver-side video enhancement (e.g. NVIDIA RTX Super Resolution) detect video pages |
+
+> 📥 **Image download** is provided as a sub-feature of the Instagram / TikTok cleaners (overlays a download button on hover for post photos and video thumbnails). Not available on YouTube.
 
 ---
 
