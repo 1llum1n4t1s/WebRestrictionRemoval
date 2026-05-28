@@ -368,6 +368,14 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // `chrome.storage.onChanged` で invalidate する方式にする (/rere C 2-A)。
 // 注: SW 再起動でこの変数は消えるため、初回呼び出し時の null フォールバックは必須。
 let cachedVolumeSettings = null;
+// /rere F-003 race protection: cachedVolumeSettings の fetch 中に onChanged が invalidate しても、
+// await 完了時に stale な fetch 結果で cache が上書きされる race を seqId で検出する。
+// fetch 前と fetch 後で cacheSeqId が変わっていたら、その fetch 結果は stale なので破棄して再帰 fetch。
+// 旧実装: ① autoApplyVolumeBooster の await 中に popup が storage.set →
+//          ② onChanged listener が `cachedVolumeSettings = null` (cache 無効化)
+//          ③ ①の await 完了 → 古い storage 値を `cachedVolumeSettings` に代入 (上書き)
+//          ④ 古い値が以降のタブ切替で適用され、UI と挙動の乖離が発生
+let cacheSeqId = 0;
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効
@@ -380,7 +388,8 @@ async function autoApplyVolumeBooster(tabId) {
   // 未 boost タブへの初回適用は popup 表示時の pushVolumeNow (user gesture あり) が担う。
   if (!boostedTabIds.has(tabId)) return;
   if (cachedVolumeSettings === null) {
-    cachedVolumeSettings = await chrome.storage.local.get([
+    const seqAtFetch = cacheSeqId;
+    const fetched = await chrome.storage.local.get([
       StorageKeys.VOLUME_BOOSTER_ENABLED,
       StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
       StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
@@ -388,6 +397,12 @@ async function autoApplyVolumeBooster(tabId) {
       StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
       StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     ]);
+    // fetch 中に onChanged が cache を invalidate していたら、この fetch 結果は stale。
+    // cache 代入をスキップし、再帰呼び出しで fresh fetch を試みる (cacheSeqId は invalidate 側で進む)。
+    if (seqAtFetch !== cacheSeqId) {
+      return autoApplyVolumeBooster(tabId);
+    }
+    cachedVolumeSettings = fetched;
   }
   const stored = cachedVolumeSettings;
   if (stored[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) return;
@@ -412,6 +427,9 @@ chrome.storage.onChanged.addListener((changes) => {
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes
   ) {
     cachedVolumeSettings = null;
+    // /rere F-003: 進行中の autoApplyVolumeBooster の await が stale な fetch 結果で
+    // cache を上書きする race を防ぐため seqId を進める (await 復帰時 seqId 不一致で破棄判定)
+    cacheSeqId++;
   }
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes &&

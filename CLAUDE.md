@@ -51,6 +51,7 @@ node --check src/lib/actions.js \
   && node --check src/content/instagram-cleaner.js \
   && node --check src/content/tiktok-cleaner.js \
   && node --check src/content/video-gamma.js \
+  && node --check src/content/video-fill.js \
   && node --check src/content/loupe.js \
   && node --check src/content/rtx-enhancer.js \
   && node --check src/content/image-downloader.js \
@@ -180,6 +181,18 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 ### 動画ガンマ補正 (`src/content/video-gamma.js`)
 全 http(s) ページに `all_frames: true` で注入される content script。`videoGammaEnabled` (master) + `videoGammaValue` (数値 0.3〜3.0、初期 1.0) で管理。SVG `<feComponentTransfer type="gamma">` ベースの独自実装で、CSS `filter: url(#__cpa-video-gamma)` を `<video>` 要素に当てて全タブ共通のガンマ補正を適用する。スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たる。動画データの読み取りや保存は行わない（filter 適用のみ）。
+
+### 動画の黒帯除去 (`src/content/video-fill.js`)
+全 http(s) ページに `all_frames: true` で注入される content script (video-gamma と同 manifest エントリ)。`videoFillEnabled` (master) + `videoFillMode` (`zoom` / `stretch`、初期 `zoom`) + `videoFillTarget` (モニター aspect preset id、初期 `21:9`) の **3 storage key** で管理。ウルトラワイド画面など、モニター縦横比とコンテンツ縦横比が違うときに動画の上下/左右に出るレターボックス黒帯を除去する。**設定はモニター側の縦横比のみ**で、動画側の縦横比は `<video>` 要素ごとに `videoWidth` / `videoHeight` から自動検出して `VideoFill.computeTransform` で適切な拡大率を毎回算出する (16:9 / 21:9 / 4:3 等が混在しても破綻しない設計)。`zoom` モードは均一拡大で画面いっぱい (4 辺はみ出し許容)、`stretch` モードは縦横比を歪めて完全フィット。CSS `transform` を `!important` inline で当て、サイト stylesheet の `!important` にも cascade 優先度で勝つ。元の inline transform は WeakMap に退避し、撤去時に復元。
+
+**実装上の不変条件**:
+- `loadedmetadata` を待ってから適用 (videoWidth=0 段階では計算不能)
+- `__cpaVfMetaAttached` マーカーで loadedmetadata listener の二重登録防止
+- MutationObserver `subtree: true` で SPA / 遅延追加 video に追従
+- iframe 内 `<video>` (YouTube 埋め込み等) も all_frames:true で対象
+- 焼き込み黒帯 (動画フレーム内に最初から入っている上下帯) は videoWidth/videoHeight に現れないため検出不能 (どの video player でも同じ原理的限界)
+- 拡張リロード後の orphan は `chrome.runtime?.id` 検知で observer 切断 + `revertAll()` で全 transform 復元 (Extension context invalidation guard PATTERN SYNC 準拠)
+- `window.__cpaVideoFillRunning` で同一フレーム内の二重実行防止
 
 ### ルーペ (`src/content/loupe.js` + `src/content/loupe.css`)
 全 http(s) サイトの top frame に注入される独立機能。`loupeEnabled` (master) + `loupeZoom` (1.5/2.5/4.0、初期 2.5) + `loupeSize` (150〜1000px、step 10、初期 220) の **3 storage key** で管理。`chrome.tabs.captureVisibleTab({ format: "jpeg", quality: 70 })` で active tab の静止画を取得し、`position: fixed; clip-path: circle()` の円形レンズ DOM に `background-image` として貼り付け、`mousemove` から `background-position` を rAF コアレス 60fps で更新する。倍率は popup のセグメントコントロールから 3 段階で選択、レンズサイズは popup のスライダーで可変。動画 / iframe / canvas を含む描画ピクセルを captureVisibleTab で取得するため「動画を一時停止してから細部を確認」する用途に最適。**popup で master トグルを ON にすると popup が自動クローズする** (ON 状態だと popup 自体がレンズで拡大したい領域を隠す UX 問題を回避、`setTimeout(50)` で APPLY_SETTINGS message dispatch を完了させてから close)。**v1.0.34 から `manifest.json` に `host_permissions: ["<all_urls>"]` を追加** している。理由: `activeTab` 権限のみだと popup auto-close 直後 + SPA ページ (Bing 検索等) の内部 navigation で `captureVisibleTab` が `Either '<all_urls>' or 'activeTab' permission is required` エラーで失敗する事例が Chrome / Edge 両方で発生したため。`<all_urls>` を host_permissions に明示することで activeTab grant 失効に依存せず常に capture 可能になる。アクセス可能範囲は content_scripts の `http://*/* + https://*/*` matches と実質同等。
@@ -340,6 +353,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/content/amazon-ranking-jump.{js,css}` | Amazon ランキングへ移動ボタン: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の売れ筋ランキングリンクから「一番細かいサブカテゴリ」を選んで商品情報最上部に集約ボタン (`<a href>`) を挿入、同じタブで移動。商品ページで自己ゲート、rAF coalesce + observer guard、外部送信ゼロ |
 | `src/content/amazon-merchant-info.{js,css}` | Amazon 販売元・出荷元バッジ: `*://www.amazon.co.jp/*` の top frame に注入、隠し div (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) から販売元・出荷元を抽出し、「📦 販売: XXX / 出荷: YYY」を商品情報最上部 (ランキングボタンの隣) に **クリック不可の情報バッジ** (`<span>` ベース) で表示。**Amazon 直販 = 緑 / マーケット出品 = オレンジ警告** で視覚区別 (`data-variant` 属性で CSS 切替)。直販判定は `AmazonMerchantInfo.parseIsInternal` で script 埋め込み JSON の `isInternal` フラグを最優先、欠落時は `isAmazonOwnedName` の販売元名フォールバック (両純粋関数とも境界値テスト可能化)。商品ページで自己ゲート、rAF coalesce + observer guard + context invalidation guard、外部送信ゼロ |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
+| `src/content/video-fill.js` | 動画の黒帯除去 (ワイド表示): 全 http(s) + iframe に注入 (video-gamma と同 manifest エントリ)。`videoFillEnabled` (master) + `videoFillMode` (`zoom`/`stretch`) + `videoFillTarget` (モニター aspect preset) の 3 storage key。設定はモニター aspect のみ、動画側 aspect は `videoWidth`/`videoHeight` から要素ごとに自動検出して `VideoFill.computeTransform` で拡大率算出。`!important` inline transform で site stylesheet にも勝つ。`loadedmetadata` 待機 + MutationObserver(subtree) で遅延 video 追従 + Extension context invalidation guard で orphan 化対応。元 inline transform は WeakMap に退避し撤去時復元 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/rtx-enhancer.js` | RTX 動画強化: 全 http(s) の top frame に注入、`<video>` を持つページに極小の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution など) の動画ページ検知を補助。`dataset.__cpaRtxAttached` マーカーで二重 inject 防止、MutationObserver で遅延 `<video>` 追従、master OFF/pagehide で `removeAllHints()` 撤去。外部送信ゼロ、ドライバ機能の有効化は GPU 側設定 (NVIDIA Control Panel 等) に依存 |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得 / URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
@@ -410,7 +424,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**v1.0.33 以降は音量
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
 - **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
 - **early script は共通フレームワーク経由** — `src/content/early-framework.js` が `<style>` 注入・pre クラス同期付与・`chrome.storage.local.get`・`storage.onChanged` 購読のボイラープレートを集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、各 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) が config を渡して setup を呼ぶ。新サイトの early script を追加する場合もこのパターンに乗せる。サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す (差異が大きすぎて framework に押し込むと config 肥大化する)。
-- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaLoupeRunning` / `window.__cpaRtxEnhancerRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
+- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaVideoFillRunning` / `window.__cpaLoupeRunning` / `window.__cpaRtxEnhancerRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
 - **iframe 多重対策** — keepalive は `shouldFireHttpPing()` でトップフレーム or クロスオリジン iframe のみ ping を発射。同一オリジン iframe はトップに任せる。
 
 ### MutationObserver 取り扱い
@@ -420,7 +434,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**v1.0.33 以降は音量
 ### Extension context invalidation guard PATTERN SYNC (/rere v1.0.28+ 確立)
 拡張機能リロード / 自動更新後、既存タブの content script は **orphan 化** する。`chrome.runtime.id` が `undefined` になり、`chrome.i18n.getMessage` / `chrome.runtime.sendMessage` 等が "Extension context invalidated" で throw する。MutationObserver / setInterval は orphan でも止まらないため、自前で停止する必要がある。
 
-**実装済みファイル (10 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
+**実装済みファイル (11 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `video-fill.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
 
 **実装パターン** (PATTERN SYNC):
 - 主要 timer / observer callback / 高頻度発火関数の入口で `if (!chrome.runtime?.id)` チェック

@@ -12,6 +12,11 @@ jobs:
   package:
     name: ZIP パッケージ作成
     runs-on: ubuntu-latest
+    outputs:
+      # version を後続 job (publish / publish-firefox) の pre-flight check に渡す。
+      # 同 version が既に CWS / AMO に存在する場合、publish step を skip して
+      # 「同 version 重複 push 拒否」エラーを未然に防ぐ (/rere F-002 修正)。
+      version: ${{ steps.version.outputs.version }}
     steps:
       # サプライチェーン攻撃対策で SHA ピン留め (#6)。タグは指すコミットを書き換え可能なため
       # 信頼境界として弱い。Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の
@@ -120,7 +125,36 @@ jobs:
           name: web-viewing-assist-zip
           path: .
 
+      - name: バージョン pre-flight check (CWS / 既公開 version なら skip)
+        # /rere F-002 修正: 同 version 再 push は CWS API が INVALID_ARGUMENT 等で拒否するため、
+        # 公開ストアページから現在の version を抽出して manifest version と一致したら publish を skip。
+        # 公開 store HTML は anonymous fetch 可能 (scripts/check-store-listing.mjs と同じ手法、JWT 不要)。
+        # SPA HTML の "version":"X.Y.Z" inline JSON から正規表現抽出。
+        # ⚠️ Submission 中 (レビュー待ち) の draft は公開 listing には反映されないため、
+        # 「同 version が leak 申請されているが review pending」状態の重複 push 防止は本 check では不可。
+        # その場合は CWS API 側で INVALID_ARGUMENT が返って upload_state チェックで止まる二重防御。
+        id: cws-preflight
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          MANIFEST_VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          page=$(curl -fsS \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            -H "Accept-Language: en-US,en;q=0.9" \
+            "https://chromewebstore.google.com/detail/${CWS_EXTENSION_ID}?hl=en")
+          # CWS の SSR HTML は "version":"1.0.34" 形式の inline JSON を含む。複数マッチした場合は先頭。
+          published_version=$(printf '%s' "$page" | grep -oE '"version"[[:space:]]*:[[:space:]]*"[0-9]+(\.[0-9]+)*"' | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' || echo "")
+          echo "📊 CWS published: ${published_version:-(取得失敗)} / manifest: ${MANIFEST_VERSION}"
+          if [ -n "$published_version" ] && [ "$published_version" = "$MANIFEST_VERSION" ]; then
+            echo "::notice::CWS は既に v${MANIFEST_VERSION} を公開中のため CWS publish step を skip (同 version 重複 push 防止)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Chrome Web Store にアップロード + Publish API で Submit for review
+        if: ${{ steps.cws-preflight.outputs.skip != 'true' }}
         env:
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -245,7 +279,34 @@ jobs:
           PUPPETEER_SKIP_DOWNLOAD: "1"
         run: npm ci
 
+      - name: バージョン pre-flight check (AMO / 既 submission 済み version なら skip)
+        # /rere F-002 修正: 同 version 重複 submission は AMO が "Version already exists" で拒否するため、
+        # AMO API v5 versions list (anonymous GET 可) で manifest version の存在を確認して skip。
+        # check-store-listing.mjs と同じ API パターン (JWT 不要)。
+        # filter なしでは public listed のみ返る (それで十分: submission 済み version は listed に入る)。
+        id: amo-preflight
+        env:
+          AMO_SLUG: web-viewing-assist
+          MANIFEST_VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          versions_response=$(curl -fsS \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            "https://addons.mozilla.org/api/v5/addons/addon/${AMO_SLUG}/versions/")
+          # MANIFEST_VERSION は環境変数経由で渡す (heredoc を使うと stdin 二重 redirect になり、
+          # JSON response との衝突で構文エラーになるため)。
+          exists=$(MANIFEST_VERSION="$MANIFEST_VERSION" python3 -c 'import json,sys,os; target=os.environ["MANIFEST_VERSION"]; data=json.load(sys.stdin); print("1" if any(v.get("version")==target for v in data.get("results",[])) else "0")' <<< "$versions_response")
+          echo "📊 AMO versions check: target=${MANIFEST_VERSION} / exists=${exists}"
+          if [ "$exists" = "1" ]; then
+            echo "::notice::AMO に既に v${MANIFEST_VERSION} の submission が存在するため AMO publish step を skip (同 version 重複 submission 防止)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Firefox AMO に submit (web-ext sign --channel=listed)
+        if: ${{ steps.amo-preflight.outputs.skip != 'true' }}
         # web-ext 10+ では submission API がデフォルト動作 (`--use-submission-api` フラグは廃止)。
         # `--channel=listed` で AMO 公開 (人間レビュー入り)、submission 受付完了で job 成功扱い。
         # 実際のストア反映はレビュー通過後 (通常 1〜数日)、メール通知あり。

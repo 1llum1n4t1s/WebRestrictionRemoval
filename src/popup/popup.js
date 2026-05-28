@@ -23,6 +23,33 @@
  */
 
 /**
+ * /rere F-001 silent failure 可視化ヘルパー (Category A / B):
+ *   - `logStorageError(context)`: `chrome.storage.local.set/.remove` の reject 時に console.warn
+ *     で診断情報を出す。silent skip だと quota exceeded / browser policy で書き込み拒否時に
+ *     ユーザー設定が永久損失するので、最低限の可視化を提供する。
+ *   - `logVolumeError(context)`: `pushVolumeNow` reject 時に console.warn。SW dead / offscreen 失敗
+ *     / EME ホスト判定ミス等で「音量が変わらない」現象が完全 silent になるのを防ぐ。
+ * どちらも呼び出し側が context (どのトグル / どのスライダー由来か) を渡すので原因追跡可能。
+ * `console.debug` ではなく `console.warn` を使う理由: ユーザーが devtools で開いたとき
+ * 必ず見える優先度にしておく (storage 書き込み失敗は実害が大きいため)。
+ * 例外オブジェクトに message 属性が無い (string で throw 等) ケースでも安全に出力できるよう
+ * 三項分岐で表示する。
+ */
+function logStorageError(context) {
+  return (err) => {
+    const msg = err && err.message ? err.message : String(err);
+    console.warn(`[WebViewingAssist popup] storage write failed (${context}): ${msg}`);
+  };
+}
+
+function logVolumeError(context) {
+  return (err) => {
+    const msg = err && err.message ? err.message : String(err);
+    console.warn(`[WebViewingAssist popup] volume apply failed (${context}): ${msg}`);
+  };
+}
+
+/**
  * `chrome.i18n.getMessage(key, substitutions)` の薄いラッパ。
  * - test 環境（Node）等で chrome global が無いケースでも throw しない
  * - キーが messages.json に無いと空文字を返すので、呼び出し側で fallback を持っても良い
@@ -263,7 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
     chrome.storage.local
       .set({ [StorageKeys.INSTALL_SENTINEL]: 1 })
-      .catch(() => {});
+      .catch(logStorageError("install-sentinel"));
   }
 
   // セッション維持: 全タブ共通設計に変更したため、現在タブの origin チェックは廃止。
@@ -327,7 +354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateVolumeBoosterDimState();
   // マスター ON 時は active tab にも保存設定を即適用（タブ切替で漏れた場合の保証）
   if ($volumeBoosterToggle.checked) {
-    pushVolumeNow(savedGain).catch(() => {});
+    pushVolumeNow(savedGain).catch(logVolumeError("popup-init"));
   }
 
   const storedIntervalMs = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
@@ -480,7 +507,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (persist) {
       chrome.storage.local
         .set({ [StorageKeys.POPUP_LAST_TAB]: target })
-        .catch(() => {});
+        .catch(logStorageError("popup-last-tab"));
     }
   }
 
@@ -595,7 +622,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!btn || !$loupeZoomSegment.contains(btn)) return;
     const zoom = Loupe.validateZoom(btn.dataset.zoom);
     updateLoupeZoomSegment(zoom);
-    chrome.storage.local.set({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(() => {});
+    chrome.storage.local.set({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(logStorageError("loupe-zoom"));
     // zoom 変更は storage.onChanged 経由で content script に届くので apply() は不要。
   });
 
@@ -607,17 +634,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const size = Loupe.clampSize(Number($loupeSizeSlider.value));
     $loupeSizeSlider.value = String(size);
     updateLoupeSizeLabel(size);
-    chrome.storage.local.set({ [StorageKeys.LOUPE_SIZE]: size }).catch(() => {});
+    chrome.storage.local.set({ [StorageKeys.LOUPE_SIZE]: size }).catch(logStorageError("loupe-size"));
   });
 
   // 音量ブースター: マスタートグル
   $volumeBoosterToggle.addEventListener("change", () => {
     const on = $volumeBoosterToggle.checked;
-    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(() => {});
+    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(logStorageError("volume-master"));
     updateVolumeBoosterDimState();
     if (on) {
       const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-      pushVolumeNow(v).catch(() => {});
+      pushVolumeNow(v).catch(logVolumeError("master-on"));
     }
   });
 
@@ -630,7 +657,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeSlider.addEventListener("change", () => {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     cancelVolumePush();
-    pushVolumeNow(v).catch(() => {});
+    pushVolumeNow(v).catch(logVolumeError("slider-change"));
   });
 
   $volumeResetBtn.addEventListener("click", async () => {
@@ -649,7 +676,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function bindVolumeSubToggle(toggleEl, storageKey) {
     toggleEl.addEventListener("change", () => {
       cancelVolumePush();
-      chrome.storage.local.set({ [storageKey]: toggleEl.checked }).catch(() => {});
+      chrome.storage.local.set({ [storageKey]: toggleEl.checked }).catch(logStorageError(`volume-sub-${storageKey}`));
       applyCompressorTogglePush();
     });
   }
@@ -667,9 +694,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateMuteBtnVisual();
     chrome.storage.local.set({
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
-    }).catch(() => {});
+    }).catch(logStorageError("volume-mute"));
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-    pushVolumeNow(v).catch(() => {});
+    pushVolumeNow(v).catch(logVolumeError("mute-toggle"));
   });
 
   /**
@@ -680,7 +707,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   async function applyCompressorTogglePush() {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-    await pushVolumeNow(v).catch(() => {});
+    await pushVolumeNow(v).catch(logVolumeError("compressor-toggle"));
   }
 
   $intervalSlider.addEventListener("input", () => {
@@ -1275,7 +1302,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (volumePushTimer) clearTimeout(volumePushTimer);
     volumePushTimer = setTimeout(() => {
       volumePushTimer = null;
-      pushVolumeNow(value).catch(() => {});
+      pushVolumeNow(value).catch(logVolumeError("slider-debounced"));
     }, 120);
   }
 
@@ -1314,7 +1341,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       [StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]: $volumeNormalizeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
-    }).catch(() => {});
+    }).catch(logStorageError("volume-pushVolumeNow"));
 
     // EME ホスト判定: active tab が EME 多用サイトなら旧 tabCapture 経路で boost する。
     // MES 経路は volume-booster.js 冒頭の isEmeHost guard で skip されている。
