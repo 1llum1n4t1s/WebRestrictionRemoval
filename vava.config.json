@@ -1,0 +1,36 @@
+{
+  "$schema": "https://example.com/vava-config-schema.json",
+  "_comment": "/vava スキル (~/.claude/skills/vava/) のスクリプトに渡すプロジェクト固有設定。スキル側スクリプトは CWD の本ファイルから設定を読み込む。",
+  "amo": {
+    "slug": "web-viewing-assist",
+    "categories": ["other"],
+    "homepage": "https://github.com/1llum1n4t1s/WebRestrictionRemoval",
+    "supportUrl": "https://github.com/1llum1n4t1s/WebRestrictionRemoval/issues",
+    "defaultName": {
+      "ja": "WEB閲覧アシスト",
+      "en-US": "Web Viewing Assist"
+    },
+    "listingFiles": {
+      "ja": "webstore/store-listing.firefox.ja.txt",
+      "en-US": "webstore/store-listing.firefox.en.txt"
+    },
+    "privacyFiles": {
+      "ja": "docs/privacy-policy.md",
+      "en-US": "docs/privacy-policy.en.md"
+    }
+  },
+  "cws": {
+    "extensionIdFile": ".cws-id"
+  },
+  "driftKeywords": {
+    "_comment": "check-store-listing.mjs の drift 判定キーワード。listing が「主要新キーワードを含む」か確認する。未設定 (null) なら drift チェックを skip。",
+    "cws": {
+      "ja": ["WEB閲覧アシスト", "ローカル"],
+      "en": ["Web Viewing Assist", "local"]
+    },
+    "amo": {
+      "ja": ["12 カテゴリ", "Amazon 販売元", "MediaElementSource", "Firefox 142"],
+      "en": ["12 categories", "Amazon seller", "MediaElementSource", "Firefox 142"]
+    }
+  }
+}
