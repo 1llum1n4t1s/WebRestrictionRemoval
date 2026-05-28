@@ -1,6 +1,5 @@
 {
-  "$schema": "https://example.com/vava-config-schema.json",
-  "_comment": "/vava スキル (~/.claude/skills/vava/) のスクリプトに渡すプロジェクト固有設定。スキル側スクリプトは CWD の本ファイルから設定を読み込む。",
+  "_comment": "/vava スキル (~/.claude/skills/vava/) のスクリプトに渡すプロジェクト固有設定。スキル側スクリプトは CWD の本ファイルから設定を読み込む。スキーマは ~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs のヘッダコメントを参照。",
   "amo": {
     "slug": "web-viewing-assist",
     "categories": ["other"],
