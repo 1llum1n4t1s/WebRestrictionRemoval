@@ -621,3 +621,61 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 - 該当箇所の `.catch(() => {})` は silent skip が正解
 - 一括 `console.debug` 化は spam ログを生むので NG（毎回のタブ切替で大量出力）
 - 将来の観測性改善は「URL pattern マッチが先に確定している経路（例: `isYouTubeUrl(tab.url) === true` のあと）でのみ詳細ログ」の **expected/unexpected 分離設計** が前提
+
+### /rere レビュー TODO 集約 (議題化のみ・実装は次バッチ判断)
+
+ここは /rere レビューで信頼度 medium 以下に降格した、または arch-judgment として議題化のみと判定された項目を集約する。新しい /rere レビューを実行する前に必ず読み返し、まだ有効な議題は更新、解決済みは削除する。
+
+#### 1. `scheduleOffscreenClose` の N 個並列発射 (B1-003 / V2 downgrade)
+- 場所: `src/background/background.js` の `releaseVolumeBoosterTab` finally
+- 状態: `scheduleOffscreenClose` 自体は `clearTimeout + setTimeout` で idempotent、機能破壊ゼロ。code smell + 最大 30 秒 close 遅延のみ
+- 議題: 「`releaseAllVolumeBoosterTabs` の Promise.all の後で 1 回だけ呼ぶ」設計に変更すべきか、現状の冪等性に任せるか
+
+#### 2. `chrome.runtime.lastError` 読み取り不統一 (B1-008 / V2 downgrade)
+- 場所: `src/background/background.js` の sendMessage 経路 (`getMediaStreamId` のみ callback で lastError 読み取り、他は Promise API で .catch)
+- 状態: Promise API は Chrome 88+ で lastError を reject に自動変換するため実害ゼロ
+- 議題: `safeSendMessage` ヘルパに統一するか、現状の dual style を残すか
+
+#### 3. `isVolumeBoosterActive` 永久 cycle リスク (F-OPS-3 / D-006 / V2 downgrade)
+- 場所: `src/background/background.js:940-979, 858-908`
+- 状態: SW 再起動直後の通信失敗で safe-side true → 30 秒 cycle 永続化リスクあるが、自己修復構造 (次回 sendMessage 成功で false に転じる) + 30 秒間隔で CPU 影響観測不能
+- 議題: `chrome.offscreen.hasDocument` (Chrome 116+) や `chrome.runtime.getContexts` で物理確認して同期するべきか
+
+#### 4. F-003 seqId race protection の再帰呼び出し (D-005 / V2 downgrade)
+- 場所: `src/background/background.js:385-415`
+- 状態: 再帰経路は構造的に終端 (新規 seqId 発行で旧 seq invalidate、最大 1 階層) + popup ドラッグと onActivated 同時発火確率は実測ゼロに近い
+- 議題: 完全 Promise-based reconciliation に置き換えるか、現状の再帰で十分か
+
+#### 5. リリース失敗時の能動通知経路 (F-OPS-4 / V2 downgrade)
+- 場所: `.github/workflows/publish.yml`
+- 状態: GitHub Actions の default email 通知で OAuth rotation 失敗等は検知可能
+- 議題: `gh issue create` の `if: failure()` step を追加するか、現状の default 通知に任せるか
+
+#### 6. sendMessage に相関 ID なし (F-OPS-5 / V2 downgrade)
+- 場所: 全 sendMessage 経路
+- 状態: `captureVisibleTab` は windowId 単位で 1 callable な API のため、複数 window 同時 capture でも sender 経由でタブ ID 区別可能
+- 議題: 複数タブ同時利用時の障害切り分け用途で `requestId: crypto.randomUUID()` を入れるか、必要になってから追加するか
+
+#### 7. `applySubsGridFilter` 2 重走査 (C1-002 / V2 downgrade)
+- 場所: `src/content/search-fixer.js:2955-2997`
+- 状態: 5000 ch 登録 + 高速 typing で 100ms hitch のみ (debounce 80ms で吸収)、現実的ユーザー稀
+- 議題: 5000ch ユーザーが実機報告されたら shelf → cards グルーピング Map で最適化
+
+#### 8. `:is()` セレクタ最適化コメント (C1-001 / V2 downgrade)
+- 場所: `src/content/image-downloader.js:600-617`
+- 状態: 「10-30ms 削減」コメントの実測根拠なし。Chrome バージョン依存
+- 議題: 性能測定で実測してコメント修正、または属性 selector を別 QSA に分離
+
+#### 9. Firefox MV3 catch-up で `__FIREFOX_STRIP_BEGIN__` マーカー方式が負債化 (D-007 / arch-judgment)
+- 場所: `src/background/background.js` の strip マーカー 3 箇所 + `zip.{ps1,sh}` + `.github/workflows/publish.yml` の perl 削除処理
+- 状態: 現状 3 マーカーで AMO warning 0 件達成、安定運用中
+- 議題: Firefox が `chrome.offscreen` 対応した日 / 機能差異が線形に増加した日に「環境抽象層 `src/lib/env/{chrome,firefox}.js`」への移行を再評価
+- 次の Firefox/Chrome 差異拡大ポイント (例: Chrome Side Panel API 採用 / Firefox declarativeNetRequest 差異対応) で再評価する
+
+#### 10. `globalThis` 21 generic 名前 (D-004 / V2 drop)
+- drop 判定だが将来仕様変更耐性のため記録: MV3 で isolated world の realm 分割が来た場合の全機能死亡リスクは theoretical のみ。`__cpa` namespace への一段降格は cost 高 vs benefit 低の trade-off で現状維持
+
+#### 11. captureVisibleTab 2fps 制限 (D-008 / V2 downgrade)
+- 場所: ルーペ動画拡大時の視覚的遅延
+- 状態: CLAUDE.md で「動画一時停止用途」と明示的設計選択
+- 議題: 将来「リアルタイム動画拡大」UX を追加するなら HTMLVideoElement.captureStream + canvas drawImage への hybrid 設計を検討

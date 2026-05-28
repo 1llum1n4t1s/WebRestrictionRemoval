@@ -543,6 +543,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.KEEP_ALIVE_ENABLED]) {
       $keepAliveToggle.checked = changes[StorageKeys.KEEP_ALIVE_ENABLED].newValue === true;
     }
+    // /rere B1-005 修正: popup 直書き経路の主要キーを同期。
+    // 別 popup 同時開き / DevTools 操作 / background の onInstalled マイグレーション等で
+    // storage が変わったときに UI が古いままになる問題を防ぐ。すべて master トグル / 数値スライダー
+    // 系で、APPLY_SETTINGS 経路の handleApplySettings の merge 防御 (経路 C) で wipe は防御済みだが、
+    // popup 内変数と DOM 表示の stale 化が残るため二重防御として追加。
+    if (changes[StorageKeys.VOLUME_BOOSTER_ENABLED]) {
+      $volumeBoosterToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_ENABLED].newValue === true;
+      updateVolumeBoosterDimState?.();
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]) {
+      $volumeAntiClipToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]) {
+      $volumeNormalizeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]) {
+      $volumeNightModeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
+      volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
+      updateMuteBtnVisual?.();
+    }
+    if (changes[StorageKeys.RTX_ENHANCER_ENABLED]) {
+      $rtxEnhancerToggle.checked = changes[StorageKeys.RTX_ENHANCER_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.LOUPE_ENABLED]) {
+      $loupeToggle.checked = changes[StorageKeys.LOUPE_ENABLED].newValue === true;
+      // ルーペサブ UI (zoom/size) の表示切替も追従
+      updateLoupeRowVisibility?.();
+    }
   });
 
   // ----- イベントバインド -----

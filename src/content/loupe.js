@@ -249,7 +249,15 @@
     try {
       const m = dataUrl.match(/^data:([^;,]+)(;base64)?,(.*)$/);
       if (m) {
-        const mime = m[1] || "application/octet-stream";
+        // /rere B1-009 修正 (defensive coding): background の captureVisibleTab は JPEG 固定で
+        // 信頼ソースだが、将来の使途拡大 (background DataURL 経路の追加 / format オプション変更等)
+        // で MIME が text/html / application/javascript に化けると、Blob URL 経路が <iframe src=...>
+        // / <object> 等で XSS 経路化する可能性がある。最低限のホワイトリスト validation で
+        // 「画像 MIME のみ許可」を強制し、将来の構造変更耐性を確保する (実害現状ゼロ、保険的)。
+        let mime = m[1] || "application/octet-stream";
+        if (!/^image\/(jpeg|png|webp|gif)$/.test(mime)) {
+          mime = "application/octet-stream";
+        }
         const isBase64 = !!m[2];
         const payload = m[3];
         let bytes;
