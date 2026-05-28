@@ -506,28 +506,11 @@ async function getActiveTab() {
 // storage 既存値で補完してから normalizeSettings へ渡すことで、partial payload が
 // 来ても他キーが「正規化で false 化」されて消える事故 (= keepAliveEnabled が
 // いつの間にか OFF になる) を防ぐ二重防御。
-const APPLY_SETTINGS_KEYS = Object.freeze([
-  StorageKeys.KEEP_ALIVE_ENABLED,
-  StorageKeys.KEEP_ALIVE_INTERVAL_MS,
-  StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-  StorageKeys.SEARCH_FIXER_ENABLED,
-  StorageKeys.SEARCH_FIXER_FEATURES,
-  StorageKeys.SEARCH_FIXER_GRID_ITEMS,
-  StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
-  StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-  StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
-  StorageKeys.INSTAGRAM_CLEANER_ENABLED,
-  StorageKeys.INSTAGRAM_CLEANER_FEATURES,
-  StorageKeys.TIKTOK_CLEANER_ENABLED,
-  StorageKeys.TIKTOK_CLEANER_FEATURES,
-  StorageKeys.VIDEO_GAMMA_ENABLED,
-  StorageKeys.VIDEO_GAMMA_VALUE,
-  StorageKeys.VIDEO_FILL_ENABLED,
-  StorageKeys.VIDEO_FILL_MODE,
-  StorageKeys.VIDEO_FILL_TARGET,
-  StorageKeys.LOUPE_ENABLED,
-  StorageKeys.RTX_ENHANCER_ENABLED,
-]);
+// /rere B2-I003/D-003 修正: SettingsSchema の storageKey から導出して手書き列挙を廃止。
+// 新 master トグル / 設定キー追加時の「APPLY_SETTINGS_KEYS への追加忘れ」事故を構造的に防止。
+// 旧実装は SettingsSchema と APPLY_SETTINGS_KEYS と normalizeSettings と toStorageRecord の
+// 4 箇所で同じキー集合を手書きしていたため、4 箇所同期失敗 = drift = 永久 OFF バグの温床。
+const APPLY_SETTINGS_KEYS = Object.freeze(SettingsSchema.map((entry) => entry.storageKey));
 
 async function handleApplySettings(settings) {
   // 既存 storage 値で補完してから normalize: settings に含まれないキーがあっても
@@ -586,30 +569,16 @@ function normalizeSettings(settings) {
   };
 }
 
-/** 正規化済み settings から chrome.storage.local.set 用のレコードを構築。 */
+/** 正規化済み settings から chrome.storage.local.set 用のレコードを構築。
+ *  /rere B2-I003/D-003 修正: SettingsSchema から導出して手書き列挙を廃止。
+ *  新 master トグル追加時の「toStorageRecord への追加忘れ」事故 (drift) を構造的に防止。
+ *  各 entry は `{ field, storageKey }` を持ち、normalizeSettings の戻り値から storageKey 経由で
+ *  storage レコードを generate する。normalizeSettings の戻り値キー (= field 名) と SettingsSchema
+ *  の field が一致することは test/actions.test.js の "SettingsSchema" テストで保証されている。 */
 function toStorageRecord(s) {
-  return {
-    [StorageKeys.KEEP_ALIVE_ENABLED]: s.keepAliveEnabled,
-    [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: s.keepAliveIntervalMs,
-    [StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED]: s.keepAliveHttpPingEnabled,
-    [StorageKeys.SEARCH_FIXER_ENABLED]: s.searchFixerEnabled,
-    [StorageKeys.SEARCH_FIXER_FEATURES]: s.searchFixerFeatures,
-    [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: s.searchFixerGridItems,
-    [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
-    [StorageKeys.AMAZON_RANKING_JUMP_ENABLED]: s.amazonRankingJumpEnabled,
-    [StorageKeys.AMAZON_MERCHANT_INFO_ENABLED]: s.amazonMerchantInfoEnabled,
-    [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
-    [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
-    [StorageKeys.TIKTOK_CLEANER_ENABLED]: s.tiktokCleanerEnabled,
-    [StorageKeys.TIKTOK_CLEANER_FEATURES]: s.tiktokCleanerFeatures,
-    [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
-    [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
-    [StorageKeys.VIDEO_FILL_ENABLED]: s.videoFillEnabled,
-    [StorageKeys.VIDEO_FILL_MODE]: s.videoFillMode,
-    [StorageKeys.VIDEO_FILL_TARGET]: s.videoFillTarget,
-    [StorageKeys.LOUPE_ENABLED]: s.loupeEnabled,
-    [StorageKeys.RTX_ENHANCER_ENABLED]: s.rtxEnhancerEnabled,
-  };
+  return Object.fromEntries(
+    SettingsSchema.map(({ field, storageKey }) => [storageKey, s[field]])
+  );
 }
 
 /**

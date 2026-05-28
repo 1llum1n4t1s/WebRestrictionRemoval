@@ -888,6 +888,37 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
   }
 });
 
+// /rere B2-I003/D-003 修正: background.js の APPLY_SETTINGS_KEYS と toStorageRecord が
+// SettingsSchema から generate されていることを CI 検知する。
+// 旧実装は手書き列挙 (3 関数 = SettingsSchema/APPLY_SETTINGS_KEYS/toStorageRecord) で
+// 同じキー集合を 4 箇所同期する必要があり、drift = 永久 OFF バグの温床だった。
+// generated 化により background.js 側のリストは SettingsSchema の単一情報源から導出され、
+// 新 master トグル追加時の「3 関数同期忘れ」事故が構造的に消える。
+// 本テストでは background.js を fs.readFileSync で読み、APPLY_SETTINGS_KEYS / toStorageRecord
+// 定義に直接 StorageKeys.<XXX> 列挙が残っていないことを assert (= SettingsSchema 駆動化を保証)。
+test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema 駆動 (B2-I003/D-003)", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const bgPath = path.resolve(__dirname, "..", "src", "background", "background.js");
+  const bgSrc = fs.readFileSync(bgPath, "utf8");
+
+  // APPLY_SETTINGS_KEYS 定義行を抽出。SettingsSchema.map() で derive されていることを確認。
+  const applyKeysMatch = bgSrc.match(/const APPLY_SETTINGS_KEYS\s*=\s*([^;]+);/);
+  assert.ok(applyKeysMatch, "background.js に APPLY_SETTINGS_KEYS の定義が見つからない");
+  assert.ok(
+    /SettingsSchema/.test(applyKeysMatch[1]),
+    "APPLY_SETTINGS_KEYS は SettingsSchema 駆動 (例: SettingsSchema.map(e => e.storageKey)) で定義されている必要がある (手書き列挙は drift 温床)"
+  );
+
+  // toStorageRecord 定義を抽出。SettingsSchema.map() ベースであることを確認。
+  const toStorageMatch = bgSrc.match(/function toStorageRecord\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/);
+  assert.ok(toStorageMatch, "background.js に toStorageRecord 関数定義が見つからない");
+  assert.ok(
+    /SettingsSchema/.test(toStorageMatch[1]),
+    "toStorageRecord は SettingsSchema 駆動 (例: SettingsSchema.map(({field, storageKey}) => ...)) で実装されている必要がある (手書き列挙は drift 温床)"
+  );
+});
+
 // /rere F-OPS-2 修正: popup.js の `stored = await chrome.storage.local.get([...])` リストに
 // SettingsSchema の全 storageKey が含まれることを CI 検知する。経路 D (popup stored リスト欠落)
 // は v1.0.29 で RTX_ENHANCER_ENABLED の追加忘れにより永久 OFF 化バグを引き起こした実例があり、
