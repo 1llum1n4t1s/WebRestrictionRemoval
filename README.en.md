@@ -1,6 +1,6 @@
 # 📖 Web Viewing Assist
 
-A Chrome extension that consolidates 13 features for comfortable browsing into a single popup: **Keep session alive (all tabs)** / **YouTube cleaner (30 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Amazon jump-to-ranking button** / **Amazon Date First Available display** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster (MediaElementSource + tabCapture dual-path)** / **Video Gamma** / **Remove video black bars** / **Loupe** / **RTX Video Enhancer** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
+A Chrome extension that consolidates 13 features for comfortable browsing into a single popup: **Keep session alive (all tabs)** / **YouTube cleaner (30 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements)** / **Amazon Subscribe & Save monthly total** / **Amazon jump-to-ranking button** / **Amazon seller / shipper badge** / **Instagram cleaner (11 sub-features)** / **TikTok cleaner (3 sub-features)** / **Volume Booster (MediaElementSource + tabCapture dual-path)** / **Video Gamma** / **Remove video black bars** / **Loupe** / **RTX Video Enhancer** / **Color Picker**. An **image download button (Instagram / TikTok)** is also available as a sub-feature of each cleaner.
 
 > **Notable changes through v1.0.18**: The "restriction removal" features (right-click / selection / force paste & copy) have been fully removed; the Extension is now focused exclusively on web viewing assistance. The Extension was also renamed from "Web Restriction Removal Helper" to "Web Viewing Assist". Version numbers are finalized via the `/vava` skill at release time.
 
@@ -45,9 +45,9 @@ Shows a per-month total on `https://www.amazon.co.jp/auto-deliveries`. The Mutat
 
 The "Amazon Bestsellers Rank" links in a product's detail section appear in different positions on every product page, making them hard to find. This feature consolidates a single "Go to this product's ranking" button at the top of the product info. Clicking it navigates (in the same tab) to the **most specific subcategory** ranking. It only scans `a[href*="bestsellers/"]` inside the product-detail containers and picks the target (the last subcategory link that carries a node id), so the button only appears on product pages that have a ranking link. It is pure DOM manipulation with zero data collection or external transmission.
 
-### 📅 Amazon Date First Available display (opt-in, default OFF)
+### 📦 Amazon seller / shipper badge (opt-in, default OFF)
 
-Extracts the "Date First Available" entry from the Amazon product-detail section and shows it as a **non-clickable info panel** ("📅 Date First Available: YYYY/M/D / about N years ago") at the top of the product info, right next to the jump-to-ranking button. This lets you see at a glance how old a product is — useful for deciding whether to upgrade to a newer model. Same Amazon orange color as the ranking-jump button placed inline. Supports both `bullet list` and `table` DOM structures, and detects both the Japanese label ("取り扱い開始日") and the English label ("Date First Available"). Pure DOM manipulation with zero external transmission.
+Extracts the seller and shipper from Amazon's hidden divs (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) and shows them as a **non-clickable info badge** ("📦 Sold: XXX / Ships: YYY") at the top of the product info, right next to the jump-to-ranking button. This makes it easy to spot suspicious marketplace listings and confirm Amazon-fulfilled products at a glance. **Amazon-fulfilled and marketplace listings are visually distinguished** (Amazon-fulfilled = green badge / marketplace = orange warning badge). The detection uses Amazon's own `isInternal` flag (embedded JSON in the `<script>` inside `#merchantInfoFeature_feature_div`) as the primary signal, with the seller name as a fallback. Pure DOM manipulation with zero external transmission.
 
 ### 📷 Instagram cleaner (opt-in, default OFF)
 
@@ -119,7 +119,7 @@ The "Color Picker" tab in the popup uses the `EyeDropper` API to pick a color fr
 3. For Volume Booster, drag the slider to set the amplification ratio.
 4. For Color Picker, switch to the "Color Picker" tab and trigger `EyeDropper`.
 
-Settings are stored in `chrome.storage.local` and persist across sessions. **All master toggles default to OFF on first install** (Keep session alive OFF / YouTube cleaner OFF / Amazon total OFF / Amazon ranking jump OFF / Amazon Date First Available OFF / Instagram cleaner OFF / TikTok cleaner OFF / Volume Booster OFF / Video Gamma OFF / Remove video black bars OFF / Loupe OFF / RTX Video Enhancer OFF). The Extension does not modify any site behavior unless the user opts in. The Volume Booster releases its AudioContext when the master toggle is OFF, or when the master is ON but the slider is at 100% with all sub-toggles and the mute toggle OFF.
+Settings are stored in `chrome.storage.local` and persist across sessions. **All master toggles default to OFF on first install** (Keep session alive OFF / YouTube cleaner OFF / Amazon total OFF / Amazon ranking jump OFF / Amazon seller badge OFF / Instagram cleaner OFF / TikTok cleaner OFF / Volume Booster OFF / Video Gamma OFF / Remove video black bars OFF / Loupe OFF / RTX Video Enhancer OFF). The Extension does not modify any site behavior unless the user opts in. The Volume Booster releases its AudioContext when the master toggle is OFF, or when the master is ON but the slider is at 100% with all sub-toggles and the mute toggle OFF.
 
 ## Install
 
@@ -200,7 +200,7 @@ Popup (src/popup/popup.{html,js,css})
   ──APPLY_SETTINGS──▶ Background (src/background/background.js)
                         │ storage update +
                         ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS
-                          / APPLY_AMAZON_RANKING_JUMP_CS / APPLY_AMAZON_RELEASE_DATE_CS
+                          / APPLY_AMAZON_RANKING_JUMP_CS / APPLY_AMAZON_MERCHANT_INFO_CS
                           / APPLY_INSTAGRAM_CLEANER_CS / APPLY_TIKTOK_CLEANER_CS
                           / APPLY_VIDEO_GAMMA_CS / APPLY_VIDEO_FILL_CS
                           / APPLY_LOUPE_CS / APPLY_RTX_ENHANCER_CS

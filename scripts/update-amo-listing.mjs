@@ -184,13 +184,27 @@ async function main() {
   const nameJa = cleanName(ja.name) || "WEB閲覧アシスト";
   const nameEn = cleanName(en.name) || "Web Viewing Assist";
 
-  // summary は AMO 上限 250 chars
+  // summary は AMO 上限 250 chars。実機で 250 ぴったりだと HTTP 400
+  // "Ensure this field has no more than 250 characters." が出るため、安全側に 249 で truncate する。
+  // (AMO validation は厳密 max=250 を「以下 OR 未満」のどちらで解釈するかバージョン揺れがあった経緯)
   const truncate = (s, max) => {
     if (!s) return s;
     return s.length <= max ? s : s.slice(0, max - 1) + "…";
   };
-  const summaryJa = truncate(ja.summary, 250);
-  const summaryEn = truncate(en.summary, 250);
+  const summaryJa = truncate(ja.summary, 249);
+  const summaryEn = truncate(en.summary, 249);
+
+  // description / privacy_policy 内の HTML タグ風文字列 (<video> / <feComponentTransfer> 等の技術ラベル)
+  // を AMO の HTML allowlist が拒否して HTTP 406 を返すため、< > を HTML entity に pre-escape する。
+  // AMO は plain text 扱いで保存し、Dashboard 表示時に再デコードして見せるので、最終的な見た目は元通り。
+  const escapeHtmlTagLike = (s) => {
+    if (!s) return s;
+    return s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  };
+  const descJa = escapeHtmlTagLike(ja.description);
+  const descEn = escapeHtmlTagLike(en.description);
+  const privacyJaEsc = escapeHtmlTagLike(privacyJa);
+  const privacyEnEsc = escapeHtmlTagLike(privacyEn);
 
   console.log("📝 抽出した metadata:");
   console.log(`   name.ja      : ${nameJa} (${nameJa.length} chars)`);
@@ -210,7 +224,7 @@ async function main() {
   const listingBody = {
     name: { ja: nameJa, "en-US": nameEn },
     summary: { ja: summaryJa, "en-US": summaryEn },
-    description: { ja: ja.description, "en-US": en.description },
+    description: { ja: descJa, "en-US": descEn },
     homepage: { ja: HOMEPAGE, "en-US": HOMEPAGE },
     support_url: { ja: SUPPORT_URL, "en-US": SUPPORT_URL },
     categories: { firefox: ["other"] },
@@ -223,7 +237,7 @@ async function main() {
   // 4. PATCH privacy_policy (別 PATCH で送ったほうが confilict 発生時に切り分けやすい)
   console.log("📤 PATCH privacy_policy...");
   const privacyBody = {
-    privacy_policy: { ja: privacyJa, "en-US": privacyEn },
+    privacy_policy: { ja: privacyJaEsc, "en-US": privacyEnEsc },
   };
   await request("PATCH", `/addons/addon/${SLUG}/`, privacyBody);
   console.log("  ✅ privacy_policy updated\n");

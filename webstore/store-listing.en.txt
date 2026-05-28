@@ -12,7 +12,7 @@ Web Viewing Assist
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 12 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
+An extension that consolidates 13 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
 (In v1.0.18 the former "restriction removal" features were retired; the Extension is now focused exclusively on web viewing assistance.)
 
 ■ Main features
@@ -35,6 +35,10 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
   The "Amazon Bestsellers Rank" links in a product's detail section appear in different positions on every page, making them hard to find. This consolidates a single "Go to this product's ranking" button at the top of the product info; clicking it navigates (same tab) to the most specific subcategory ranking. It only scans the bestsellers links inside the product-detail containers, so the button appears only on product pages that have a ranking link.
   ※ Pure DOM manipulation; no price/history reading or external transmission.
 
+· 📦 Amazon seller / shipper badge (opt-in, default OFF)
+  Extracts the seller and shipper from Amazon's hidden divs (#merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div) and shows them as a non-clickable info badge ("📦 Sold: XXX / Ships: YYY") at the top of the product info, right next to the jump-to-ranking button. **Amazon-fulfilled and marketplace listings are visually distinguished** (Amazon-fulfilled = green badge / marketplace = orange warning badge), making it easy to spot suspicious marketplace listings at a glance. The detection uses Amazon's own isInternal flag (embedded JSON in the <script> inside #merchantInfoFeature_feature_div) as the primary signal, with the seller name as a fallback.
+  ※ Pure DOM manipulation; no price/history reading or external transmission.
+
 · 📷 Instagram cleaner (opt-in, default OFF)
   Hides Instagram's redundant UI through 11 sub-features.
   Main: Remove Reels (with URL redirect) / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion
@@ -48,8 +52,8 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
   ※ Client-side DOM and CSS only; nothing is transmitted externally.
 
 · 🔊 Volume Booster (opt-in, default OFF)
-  Amplifies the active tab's volume from 0% to 300%. Turn the master toggle ON to enable the slider; the settings (gain value, sub-toggles, mute) are persisted globally. The Extension obtains tab audio via chrome.tabCapture and processes it in the offscreen document's AudioContext through a 6-node chain — "Auto Volume Normalization (short-window RMS via AnalyserNode + auto GainNode) → Night-Mode compression (DynamicsCompressor) → manual GainNode for amplification → Auto Distortion Guard / limiter (DynamicsCompressor)" — which is the standard mastering layout (loudness correction → compression → make-up gain → limiter). The three sub-toggles (Auto Distortion Guard / Auto Volume Normalization / Night Mode) all default to OFF.
-  The slider uses a logarithmic mapping over the 100..300% range so equal distance equals equal dB; gain changes are smoothed with a 45 ms ramp to suppress clicks. A mute 🔊/🔇 button sits at the left edge of the slider so you can silence the tab with one click while preserving the slider value and sub-toggle settings, and restore the original volume instantly with another click (this is an independent layer from Chrome's native tab mute). Even at 100%, if any of Auto Volume Normalization / Auto Distortion Guard / Night Mode / mute is ON, the AudioContext is preserved so use cases like "leave the volume alone but tame sudden peaks", "even out podcast voice levels", "tame loud night-time scenes", or "instant silence at 100%" still work. On tab switch, only tabs already being boosted are auto-reapplied; new tabs are applied once you open the popup and operate it.
+  Amplifies the active tab's volume from 0% to 300%. Turn the master toggle ON to enable the slider; the settings (gain value, sub-toggles, mute) are persisted globally. Since v1.0.33 the Volume Booster uses a MediaElementSource + tabCapture dual-path design: ordinary video sites (YouTube / X / Twitch / TikTok / Instagram / niconico, etc.) are boosted via the content script's MES path — **no user gesture required; the boost applies automatically without ever opening the popup** — while EME (DRM) heavy sites (Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Abema / U-NEXT / TVer / Spotify, etc. — 15 hosts) are excluded from MES via a hostname blacklist and instead boosted through chrome.tabCapture + the offscreen document path triggered when the popup is opened (user gesture required). Both paths use the same 6-node chain — "Auto Volume Normalization (short-window RMS via AnalyserNode + auto GainNode) → Night-Mode compression (DynamicsCompressor) → manual GainNode for amplification → Auto Distortion Guard / limiter (DynamicsCompressor)" — which is the standard mastering layout (loudness correction → compression → make-up gain → limiter). The three sub-toggles (Auto Distortion Guard / Auto Volume Normalization / Night Mode) all default to OFF.
+  The slider uses a logarithmic mapping over the 100..300% range so equal distance equals equal dB; gain changes are smoothed with a 45 ms ramp to suppress clicks. A mute 🔊/🔇 button sits at the left edge of the slider so you can silence the tab with one click while preserving the slider value and sub-toggle settings, and restore the original volume instantly with another click (this is an independent layer from Chrome's native tab mute). Even at 100%, if any of Auto Volume Normalization / Auto Distortion Guard / Night Mode / mute is ON, the AudioContext is preserved so use cases like "leave the volume alone but tame sudden peaks", "even out podcast voice levels", "tame loud night-time scenes", or "instant silence at 100%" still work. On tab switch, MES-path tabs are auto-applied; for the tabCapture path only tabs already being boosted are auto-reapplied and new tabs are applied once you open the popup and operate it.
   ※ Master OFF / slider 100% with all sub-toggles and mute OFF / tab closed / Extension disabled — any of these instantly releases the AudioContext and frees resources.
   ※ No recording, storage, or external transmission whatsoever.
 
@@ -147,10 +151,10 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   Used to persist feature toggles, slider settings, and color-picker history on the device (chrome.storage.local).
 
   offscreen:
-  Used to maintain the Volume Booster's AudioContext / GainNode / DynamicsCompressor chain outside the Service Worker.
+  Used to maintain the Volume Booster's AudioContext / GainNode / DynamicsCompressor chain outside the Service Worker. Since v1.0.33 this is primarily used as the fallback path for EME (DRM) heavy sites (ordinary sites use the content script's MediaElementSource path).
 
   tabCapture:
-  Used by the Volume Booster to capture tab audio and apply 0–300% normalization, compression, and amplification via AudioContext.
+  Used by the Volume Booster to capture tab audio and apply 0–300% normalization, compression, and amplification via AudioContext. Since v1.0.33 this is primarily used as the fallback path for EME (DRM) heavy sites listed in a hostname blacklist (Netflix / Prime Video / DAZN, etc. — 15 hosts). Ordinary sites use the content script's MediaElementSource path which applies automatically without requiring a user gesture.
 
   <all_urls> (host permission):
   Used by the Loupe feature to call chrome.tabs.captureVisibleTab and display the active tab's visible region as a magnified JPEG image in a circular lens. The activeTab permission alone can be revoked early after popup close or SPA internal navigation, blocking the capture. Adding <all_urls> ensures the Loupe runs reliably. The effective access scope is unchanged because content_scripts already inject on all http(s) sites.
@@ -170,7 +174,10 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   Required to show a per-month total on the Amazon recurring-delivery page. The script reads `subscription-price` per month and inserts the computed total into the same page. Nothing read is transmitted off-device.
 
   *://www.amazon.co.jp/*:
-  Required for the Amazon jump-to-ranking button. The script scans only the "Amazon Bestsellers Rank" links (a[href*="bestsellers/"]) inside the product-detail containers and inserts a consolidated button at the top of the product info that links to the most specific subcategory. It self-gates to product pages and performs no price/history reading or external transmission.
+  Required for the Amazon jump-to-ranking button + Amazon seller / shipper badge.
+  (1) Jump-to-ranking button: scans only the "Amazon Bestsellers Rank" links (a[href*="bestsellers/"]) inside the product-detail containers and inserts a consolidated button at the top of the product info that links to the most specific subcategory. Self-gates to product pages.
+  (2) Seller / shipper badge: extracts the seller and shipper from #merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div hidden divs and shows them as a badge at the top of the product info (Amazon-fulfilled = green badge / marketplace = orange warning badge). The Amazon-fulfilled detection uses Amazon's own isInternal flag (embedded JSON in the <script> inside #merchantInfoFeature_feature_div) as the primary signal, with the seller name as a fallback.
+  Neither feature reads price/history nor transmits anything externally; nothing read is transmitted off-device.
 
   *://*.instagram.com/*:
   Required for the Instagram cleaner (11 sub-features). Hides / adds Reels / Explore / Stories tray / Threads promotion / vanity counts / video playback / comment list / Notes / message counters / image download button using semantic selectors based on aria-label / href / role / data-pagelet / SVG path data. URL redirects (e.g. /reels/, /explore/) are also opt-in. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.cdninstagram.com / scontent-*.fna.fbcdn.net), with credentials:omit + redirect:manual blocking third-party transmission. Nothing read is transmitted off-device.

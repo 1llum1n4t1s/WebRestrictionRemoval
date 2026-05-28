@@ -27,7 +27,7 @@ const ACTIONS_GLOBALS = {
   SearchFixer: "readonly",
   AmazonDeliveryTotal: "readonly",
   AmazonRankingJump: "readonly",
-  AmazonReleaseDate: "readonly",
+  AmazonMerchantInfo: "readonly",
   InstagramCleaner: "readonly",
   TikTokCleaner: "readonly",
   ImageDownloader: "readonly",

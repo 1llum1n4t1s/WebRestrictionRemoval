@@ -57,8 +57,8 @@
     },
     {
       "matches": ["*://www.amazon.co.jp/*"],
-      "js": ["src/lib/actions.js", "src/content/amazon-release-date.js"],
-      "css": ["src/content/amazon-release-date.css"],
+      "js": ["src/lib/actions.js", "src/content/amazon-merchant-info.js"],
+      "css": ["src/content/amazon-merchant-info.css"],
       "run_at": "document_idle",
       "all_frames": false
     },

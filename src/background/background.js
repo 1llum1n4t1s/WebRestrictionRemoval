@@ -107,7 +107,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-    StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
+    StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -156,8 +156,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.AMAZON_RANKING_JUMP_ENABLED in stored)) {
     defaults[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] = false;
   }
-  if (!(StorageKeys.AMAZON_RELEASE_DATE_ENABLED in stored)) {
-    defaults[StorageKeys.AMAZON_RELEASE_DATE_ENABLED] = false;
+  if (!(StorageKeys.AMAZON_MERCHANT_INFO_ENABLED in stored)) {
+    defaults[StorageKeys.AMAZON_MERCHANT_INFO_ENABLED] = false;
   }
   if (!(StorageKeys.INSTAGRAM_CLEANER_ENABLED in stored)) {
     defaults[StorageKeys.INSTAGRAM_CLEANER_ENABLED] = false;
@@ -474,7 +474,7 @@ const APPLY_SETTINGS_KEYS = Object.freeze([
   StorageKeys.SEARCH_FIXER_GRID_ITEMS,
   StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
   StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-  StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
+  StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
   StorageKeys.INSTAGRAM_CLEANER_ENABLED,
   StorageKeys.INSTAGRAM_CLEANER_FEATURES,
   StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -528,7 +528,7 @@ function normalizeSettings(settings) {
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
     amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
     amazonRankingJumpEnabled: settings?.amazonRankingJumpEnabled === true,
-    amazonReleaseDateEnabled: settings?.amazonReleaseDateEnabled === true,
+    amazonMerchantInfoEnabled: settings?.amazonMerchantInfoEnabled === true,
     instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
     tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
@@ -556,7 +556,7 @@ function toStorageRecord(s) {
     [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: s.searchFixerGridItems,
     [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
     [StorageKeys.AMAZON_RANKING_JUMP_ENABLED]: s.amazonRankingJumpEnabled,
-    [StorageKeys.AMAZON_RELEASE_DATE_ENABLED]: s.amazonReleaseDateEnabled,
+    [StorageKeys.AMAZON_MERCHANT_INFO_ENABLED]: s.amazonMerchantInfoEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
     [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
     [StorageKeys.TIKTOK_CLEANER_ENABLED]: s.tiktokCleanerEnabled,
@@ -638,9 +638,9 @@ async function notifyContentScripts(s) {
     messages.push([{ action: Actions.APPLY_AMAZON_RANKING_JUMP_CS, data: {
       enabled: s.amazonRankingJumpEnabled,
     } }, TOP_FRAME]);
-    // 取り扱い開始日表示も ranking と同じく Amazon ドメイン全体で配信し、商品ページで自己ゲート。
-    messages.push([{ action: Actions.APPLY_AMAZON_RELEASE_DATE_CS, data: {
-      enabled: s.amazonReleaseDateEnabled,
+    // 販売元・出荷元バッジも ranking と同じく Amazon ドメイン全体で配信し、商品ページで自己ゲート。
+    messages.push([{ action: Actions.APPLY_AMAZON_MERCHANT_INFO_CS, data: {
+      enabled: s.amazonMerchantInfoEnabled,
     } }, TOP_FRAME]);
   }
   if (isInstagramUrl(url)) {

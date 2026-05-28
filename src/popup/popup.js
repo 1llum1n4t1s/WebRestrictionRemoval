@@ -137,7 +137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
   const $amazonRankingJumpToggle = document.getElementById("amazonRankingJumpToggle");
-  const $amazonReleaseDateToggle = document.getElementById("amazonReleaseDateToggle");
+  const $amazonMerchantInfoToggle = document.getElementById("amazonMerchantInfoToggle");
   const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
   const $volumeRow = document.getElementById("volumeRow");
   const $volumeSlider = document.getElementById("volumeSlider");
@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-    StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
+    StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -273,7 +273,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $amazonRankingJumpToggle.checked = stored[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] === true;
-  $amazonReleaseDateToggle.checked = stored[StorageKeys.AMAZON_RELEASE_DATE_ENABLED] === true;
+  $amazonMerchantInfoToggle.checked = stored[StorageKeys.AMAZON_MERCHANT_INFO_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
   $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
@@ -532,7 +532,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   $amazonDeliveryToggle.addEventListener("change", apply);
   $amazonRankingJumpToggle.addEventListener("change", apply);
-  $amazonReleaseDateToggle.addEventListener("change", apply);
+  $amazonMerchantInfoToggle.addEventListener("change", apply);
 
   $instagramCleanerToggle.addEventListener("change", () => {
     updateIgCleanerDimState();
@@ -1073,7 +1073,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
     const amazonRankingJumpEnabled = $amazonRankingJumpToggle.checked;
-    const amazonReleaseDateEnabled = $amazonReleaseDateToggle.checked;
+    const amazonMerchantInfoEnabled = $amazonMerchantInfoToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
     const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
@@ -1102,7 +1102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           searchFixerGridItems,
           amazonDeliveryTotalEnabled,
           amazonRankingJumpEnabled,
-          amazonReleaseDateEnabled,
+          amazonMerchantInfoEnabled,
           instagramCleanerEnabled,
           instagramCleanerFeatures,
           tiktokCleanerEnabled,
@@ -1124,7 +1124,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
             amazonRankingJumpEnabled,
-            amazonReleaseDateEnabled,
+            amazonMerchantInfoEnabled,
             instagramCleanerEnabled,
             tiktokCleanerEnabled,
             videoGammaEnabled,
@@ -1157,7 +1157,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
     amazonRankingJumpEnabled,
-    amazonReleaseDateEnabled,
+    amazonMerchantInfoEnabled,
     instagramCleanerEnabled,
     tiktokCleanerEnabled,
     videoGammaEnabled,
@@ -1169,7 +1169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
     if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
     if (amazonRankingJumpEnabled) parts.push(i18n("applyOkAmazonRanking"));
-    if (amazonReleaseDateEnabled) parts.push(i18n("applyOkAmazonReleaseDate"));
+    if (amazonMerchantInfoEnabled) parts.push(i18n("applyOkAmazonMerchantInfo"));
     if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
     if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
     if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));

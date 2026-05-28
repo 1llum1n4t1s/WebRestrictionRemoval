@@ -93,33 +93,15 @@
   },
   "amazonRankingJumpButton": { "message": "この商品が所属するランキングへ移動" },
   "amazonRankingJumpAriaLabel": { "message": "この商品が所属するランキングへ移動" },
-  "amazonReleaseDateMaster": { "message": "取り扱い開始日表示" },
-  "amazonReleaseDateMasterDesc": {
-    "message": "商品ページ上部に取り扱い開始日と経過年月を表示",
-    "description": "Amazon 取り扱い開始日表示マスタートグルの説明"
+  "amazonMerchantInfoMaster": { "message": "販売元・出荷元バッジ" },
+  "amazonMerchantInfoMasterDesc": {
+    "message": "商品ページ上部に販売元・出荷元バッジを表示 (Amazon 直販=緑 / マーケット=オレンジ警告)",
+    "description": "Amazon 販売元・出荷元バッジマスタートグルの説明"
   },
-  "amazonReleaseDateTitle": { "message": "取り扱い開始" },
-  "amazonReleaseDateRelativeToday": { "message": "本日" },
-  "amazonReleaseDateRelativeFuture": { "message": "発売前" },
-  "amazonReleaseDateRelativeDays": {
-    "message": "$N$ 日前",
-    "placeholders": { "n": { "content": "$1", "example": "5" } }
-  },
-  "amazonReleaseDateRelativeMonths": {
-    "message": "$N$ ヶ月前",
-    "placeholders": { "n": { "content": "$1", "example": "8" } }
-  },
-  "amazonReleaseDateRelativeYears": {
-    "message": "約 $N$ 年前",
-    "placeholders": { "n": { "content": "$1", "example": "2" } }
-  },
-  "amazonReleaseDateRelativeYearsMonths": {
-    "message": "約 $Y$ 年 $M$ ヶ月前",
-    "placeholders": {
-      "y": { "content": "$1", "example": "2" },
-      "m": { "content": "$2", "example": "3" }
-    }
-  },
+  "amazonMerchantInfoSoldBy": { "message": "販売" },
+  "amazonMerchantInfoShipsFrom": { "message": "出荷" },
+  "amazonMerchantInfoAriaAmazon": { "message": "Amazon 直販" },
+  "amazonMerchantInfoAriaMarketplace": { "message": "マーケット出品" },
 
   "keepAliveMaster": { "message": "セッション維持" },
   "keepAliveMasterDesc": { "message": "すべての http(s) サイトで合成イベント dispatch によりアイドル検知をリセット" },
@@ -238,7 +220,7 @@
   "applyOkSearchFixer": { "message": "YT クリーナー" },
   "applyOkAmazon": { "message": "Amazon" },
   "applyOkAmazonRanking": { "message": "ランキング移動" },
-  "applyOkAmazonReleaseDate": { "message": "取扱開始日" },
+  "applyOkAmazonMerchantInfo": { "message": "販売元バッジ" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
   "applyOkVideoGamma": { "message": "映像補正" },

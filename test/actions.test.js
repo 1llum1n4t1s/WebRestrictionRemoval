@@ -660,7 +660,7 @@ test("actions.js は globalThis に 21 個の定数を公開する", () => {
     "SearchFixer",
     "AmazonDeliveryTotal",
     "AmazonRankingJump",
-    "AmazonReleaseDate",
+    "AmazonMerchantInfo",
     "InstagramCleaner",
     "TikTokCleaner",
     "ImageDownloader",
@@ -876,6 +876,7 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
     "searchFixerEnabled",
     "amazonDeliveryTotalEnabled",
     "amazonRankingJumpEnabled",
+    "amazonMerchantInfoEnabled",
     "instagramCleanerEnabled",
     "tiktokCleanerEnabled",
     "videoGammaEnabled",
@@ -962,91 +963,59 @@ test("AmazonRankingJump.selectTargetHref: 細かいサブカテゴリ優先で�
   assert.equal(G.AmazonRankingJump.selectTargetHref(null), null);
 });
 
-// AmazonReleaseDate.parseReleaseDateText: 各種日付フォーマットと bidi 制御文字混入に耐える。
-test("AmazonReleaseDate.parseReleaseDateText: 日付フォーマット境界値", () => {
-  const P = G.AmazonReleaseDate.parseReleaseDateText;
-
-  // 標準形式 "YYYY/M/D" / "YYYY/MM/DD"
-  const d1 = P("2023/1/15");
-  assert.equal(d1.getFullYear(), 2023);
-  assert.equal(d1.getMonth(), 0);
-  assert.equal(d1.getDate(), 15);
-  const d2 = P("2024/12/31");
-  assert.equal(d2.getMonth(), 11);
-  assert.equal(d2.getDate(), 31);
-
-  // 日本語形式 "YYYY年M月D日"
-  const d3 = P("2020年3月5日");
-  assert.equal(d3.getFullYear(), 2020);
-  assert.equal(d3.getMonth(), 2);
-  assert.equal(d3.getDate(), 5);
-
-  // bidi 制御文字 (U+200E / U+200F) を含むテキストも受理
-  const d4 = P("取り扱い開始日 ‏ : ‎ 2023/5/10");
-  assert.equal(d4.getFullYear(), 2023);
-  assert.equal(d4.getMonth(), 4);
-  assert.equal(d4.getDate(), 10);
-
-  // ハイフン区切り "YYYY-M-D"
-  const d5 = P("2021-7-4");
-  assert.equal(d5.getFullYear(), 2021);
-
-  // 無効日付 (2024/2/30) は null
-  assert.equal(P("2024/2/30"), null);
-  // 範囲外 (年 / 月 / 日)
-  assert.equal(P("1800/1/1"), null);
-  assert.equal(P("2023/13/1"), null);
-  assert.equal(P("2023/1/32"), null);
-  // 不正型
+// AmazonMerchantInfo.parseIsInternal: Amazon が出す JSON フラグから boolean を抽出する純粋関数。
+// 信頼できる Amazon 直販判定の最優先 source なので、境界値で防御する。
+test("AmazonMerchantInfo.parseIsInternal: 各種 JSON 入力で boolean を返す", () => {
+  const P = G.AmazonMerchantInfo.parseIsInternal;
+  // 直販 (isInternal: true)
+  assert.equal(P('{"isInternal":true,"merchantId":"ATVPDKIKX0DER"}'), true);
+  // マーケット (isInternal: false)
+  assert.equal(P('{"marketplaceId":"A1VC38T7YXB528","isInternal":false,"isRobot":false,"merchantId":"AJ1V7VPA9HQOB","asin":"B0DV9BRV2P"}'), false);
+  // 順序が違っても OK
+  assert.equal(P('{"a":1,"isInternal":true}'), true);
+  // 前後に空白
+  assert.equal(P('  {"isInternal":false}  '), false);
+  // isInternal が boolean でない (非対応) → null
+  assert.equal(P('{"isInternal":"true"}'), null);
+  assert.equal(P('{"isInternal":1}'), null);
+  assert.equal(P('{"isInternal":null}'), null);
+  // isInternal フィールドなし → null
+  assert.equal(P('{"merchantId":"ATVPDKIKX0DER"}'), null);
+  // 不正 JSON → null
+  assert.equal(P('not json'), null);
+  assert.equal(P('{broken'), null);
+  // 先頭が { でない (script なし) → null (try/catch 前で早期 return)
+  assert.equal(P('var x = {"isInternal":true}'), null);
+  // 不正型 → null
   assert.equal(P(null), null);
   assert.equal(P(undefined), null);
   assert.equal(P(""), null);
-  assert.equal(P(12345), null);
-  // 日付を含まないテキスト
-  assert.equal(P("発売前"), null);
+  assert.equal(P(123), null);
+  assert.equal(P({}), null);
 });
 
-// AmazonReleaseDate.formatReleaseDate: シンプルな YYYY/M/D 出力。
-test("AmazonReleaseDate.formatReleaseDate: ゼロ詰めなしの YYYY/M/D", () => {
-  const F = G.AmazonReleaseDate.formatReleaseDate;
-  assert.equal(F(new Date(2023, 0, 15)), "2023/1/15");
-  assert.equal(F(new Date(2024, 11, 31)), "2024/12/31");
-  // 不正引数は空文字
-  assert.equal(F(null), "");
-  assert.equal(F(new Date(NaN)), "");
-  assert.equal(F("2023/1/15"), "");
-});
-
-// AmazonReleaseDate.diffRelative: 各 kind の閾値を境界値でテストする。
-test("AmazonReleaseDate.diffRelative: 5 kind の境界判定", () => {
-  const D = G.AmazonReleaseDate.diffRelative;
-  // future
-  const fut = D(new Date(2030, 0, 1), new Date(2025, 0, 1));
-  assert.equal(fut.kind, "future");
-  // today
-  const same = new Date(2025, 5, 15);
-  assert.equal(D(same, same).kind, "today");
-  // days (1 日後)
-  const days = D(new Date(2025, 5, 10), new Date(2025, 5, 15));
-  assert.equal(days.kind, "days");
-  assert.equal(days.days, 5);
-  // months (1 ヶ月以上 1 年未満)
-  const months = D(new Date(2024, 9, 15), new Date(2025, 5, 15));
-  assert.equal(months.kind, "months");
-  assert.equal(months.months, 8);
-  // years (ちょうど N 年、月 0)
-  const years = D(new Date(2022, 5, 15), new Date(2025, 5, 15));
-  assert.equal(years.kind, "years");
-  assert.equal(years.years, 3);
-  // yearsMonths (N 年 M ヶ月)
-  const ym = D(new Date(2022, 1, 15), new Date(2025, 5, 20));
-  assert.equal(ym.kind, "yearsMonths");
-  assert.equal(ym.years, 3);
-  assert.equal(ym.months, 4);
-  // 不正型は null
-  assert.equal(D(null, new Date()), null);
-  assert.equal(D(new Date(), null), null);
-  assert.equal(D(new Date(NaN), new Date()), null);
+// AmazonMerchantInfo.isAmazonOwnedName: 販売元名から Amazon 直販を推定する fallback 判定。
+// isInternal フラグが取れないとき (script 欠落 / DOM 変化) の保険として使われる。
+test("AmazonMerchantInfo.isAmazonOwnedName: Amazon 名で部分一致判定", () => {
+  const N = G.AmazonMerchantInfo.isAmazonOwnedName;
+  // 直販判定 true
+  assert.equal(N("Amazon.co.jp"), true);
+  assert.equal(N("Amazon.com"), true);
+  assert.equal(N("Amazon"), true);
+  // 前後に空白あり
+  assert.equal(N("  Amazon.co.jp  "), true);
+  // マーケット出品名 (false 判定)
+  assert.equal(N("HOGXIA（ホグシア）公式ストア"), false);
+  assert.equal(N("Logicool G 公式ストア"), false);
+  assert.equal(N("Anker Direct"), false);
+  // 偽陽性は許容範囲: 「Amazon」を含むマーケット名は true 化する（実害は extension の色分けが緑寄りになる程度）
+  assert.equal(N("Amazon Renewed Hub"), true);
+  // 空文字 / 不正型 → false
+  assert.equal(N(""), false);
+  assert.equal(N("   "), false);
+  assert.equal(N(null), false);
+  assert.equal(N(undefined), false);
+  assert.equal(N(123), false);
 });
 
 // ALLOWED_HOSTS の fbcdn.net パターンが scontent- prefix 限定であることを検証する。

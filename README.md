@@ -2,7 +2,7 @@
 
 > [English version](README.en.md) is also available.
 
-Web ブラウジングを快適にする 13 機能（**セッション維持（全タブ共通）** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Amazon ランキングへ移動ボタン** / **Amazon 取り扱い開始日表示** / **Instagram クリーナー（11 サブ機能）** / **TikTok クリーナー（3 サブ機能）** / **音量ブースター（MediaElementSource + tabCapture 2 経路）** / **動画ガンマ補正** / **動画の黒帯除去** / **ルーペ** / **RTX 動画強化** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。**画像ダウンロードボタン（Instagram / TikTok 共通）** も各クリーナーのサブ機能として利用できます。
+Web ブラウジングを快適にする 13 機能（**セッション維持（全タブ共通）** / **YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）** / **Amazon 定期おトク便 月別合計** / **Amazon ランキングへ移動ボタン** / **Amazon 販売元・出荷元バッジ** / **Instagram クリーナー（11 サブ機能）** / **TikTok クリーナー（3 サブ機能）** / **音量ブースター（MediaElementSource + tabCapture 2 経路）** / **動画ガンマ補正** / **動画の黒帯除去** / **ルーペ** / **RTX 動画強化** / **カラーピッカー**）を 1 つのポップアップに統合した Chrome 拡張機能です。**画像ダウンロードボタン（Instagram / TikTok 共通）** も各クリーナーのサブ機能として利用できます。
 
 > **v1.0.18 までの主な変更点**: 「制限解除（右クリック / 選択 / 強制ペースト・コピー）」機能を全面廃止し、Web 閲覧支援機能のみに特化しました。あわせて拡張機能名を「**WEB制限解除サポート**」から「**WEB閲覧アシスト**」に変更しています。バージョン番号は `/vava` スキル経由でリリース時に確定します。
 
@@ -47,9 +47,9 @@ YouTube の検索結果・動画ページ・ホームグリッドのクリーン
 
 Amazon 商品ページの商品詳細欄にある「Amazon 売れ筋ランキング」リンクは商品ごとに出現位置がバラバラで探しにくいので、商品情報の最上部に「この商品が所属するランキングへ移動」ボタンを集約表示します。クリックで**一番細かいサブカテゴリ**のランキングへ同じタブで移動します。商品詳細コンテナ内の `a[href*="bestsellers/"]` だけを走査して移動先（ノード id を持つサブカテゴリのうち DOM 上で最後のもの）を選ぶため、ランキングリンクを持つ商品ページでのみボタンが出ます。純粋 DOM 操作のみで価格・履歴の取得や外部送信は一切行いません。
 
-### 📅 Amazon 取り扱い開始日表示（オプトイン、デフォルト OFF）
+### 📦 Amazon 販売元・出荷元バッジ（オプトイン、デフォルト OFF）
 
-Amazon 商品ページの商品詳細欄にある「取り扱い開始日」項目から日付を抽出し、商品情報の最上部（ランキングへ移動ボタンの隣）に **クリック不可の情報パネル** として「📅 取り扱い開始: YYYY/M/D / 約 N 年前」を表示します。商品の経過年月（古さ）が一目で分かるので、最新モデルへの買い替え判断などに使えます。ランキング移動ボタンと同じ Amazon オレンジ色で隣接配置、`bullet list` 形式と `テーブル` 形式の両方の DOM 構造に対応、日本語 UI（「取り扱い開始日」）と英語 UI（"Date First Available"）の両ラベルを検出します。純粋 DOM 操作のみで外部送信は一切行いません。
+Amazon 商品ページの隠し div (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) から販売元と出荷元を抽出し、商品情報の最上部（ランキングへ移動ボタンの隣）に **クリック不可の情報バッジ** として「📦 販売: XXX / 出荷: YYY」を表示します。詐欺マーケットプレイス出品の回避や Amazon 直販の確認が一目でできます。**Amazon 直販と マーケット出品 を視覚的に区別**（直販 = 緑バッジ / マーケット = オレンジ警告バッジ）。判定は Amazon 自身が出す `isInternal` フラグ（`#merchantInfoFeature_feature_div` 内の `<script>` 埋め込み JSON）を最優先とし、欠落時は販売元名で推定します。純粋 DOM 操作のみで外部送信は一切行いません。
 
 ### 📷 Instagram クリーナー（オプトイン、デフォルト OFF）
 
@@ -121,7 +121,7 @@ v1.0.33 から **MediaElementSource + tabCapture の 2 経路設計** に進化�
 3. 音量ブースターはスライダーで増幅率を直接調整
 4. カラーピッカーは「カラーピッカー」タブで `EyeDropper` を起動
 
-設定は `chrome.storage.local` に保存され、次回以降も維持されます。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Amazon ランキング移動 OFF / Amazon 取り扱い開始日 OFF / Instagram クリーナー OFF / TikTok クリーナー OFF / 音量ブースター OFF / 動画ガンマ補正 OFF / 動画の黒帯除去 OFF / ルーペ OFF / RTX 動画強化 OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはマスター OFF または「マスター ON かつスライダー 100% かつ全サブトグル OFF かつミュート OFF」の状態で AudioContext を解放しリソースを返却します。
+設定は `chrome.storage.local` に保存され、次回以降も維持されます。**初回インストール時のデフォルトはマスタートグル全て OFF**（セッション維持 OFF / YouTube クリーナー OFF / Amazon 合計 OFF / Amazon ランキング移動 OFF / Amazon 販売元バッジ OFF / Instagram クリーナー OFF / TikTok クリーナー OFF / 音量ブースター OFF / 動画ガンマ補正 OFF / 動画の黒帯除去 OFF / ルーペ OFF / RTX 動画強化 OFF）。インストール直後にサイト挙動を勝手に書き換えないオプトイン方針です。音量ブースターはマスター OFF または「マスター ON かつスライダー 100% かつ全サブトグル OFF かつミュート OFF」の状態で AudioContext を解放しリソースを返却します。
 
 ## インストール
 
@@ -204,7 +204,7 @@ Popup (src/popup/popup.{html,js,css})
   ──APPLY_SETTINGS──▶ Background (src/background/background.js)
                         │ storage 更新 +
                         ──APPLY_KEEP_ALIVE_CS / APPLY_SEARCH_FIXER_CS / APPLY_AMAZON_DELIVERY_TOTAL_CS
-                          / APPLY_AMAZON_RANKING_JUMP_CS / APPLY_AMAZON_RELEASE_DATE_CS
+                          / APPLY_AMAZON_RANKING_JUMP_CS / APPLY_AMAZON_MERCHANT_INFO_CS
                           / APPLY_INSTAGRAM_CLEANER_CS / APPLY_TIKTOK_CLEANER_CS
                           / APPLY_VIDEO_GAMMA_CS / APPLY_VIDEO_FILL_CS
                           / APPLY_LOUPE_CS / APPLY_RTX_ENHANCER_CS
