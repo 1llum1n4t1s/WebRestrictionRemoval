@@ -434,7 +434,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**v1.0.33 以降は音量
 ### Extension context invalidation guard PATTERN SYNC (/rere v1.0.28+ 確立)
 拡張機能リロード / 自動更新後、既存タブの content script は **orphan 化** する。`chrome.runtime.id` が `undefined` になり、`chrome.i18n.getMessage` / `chrome.runtime.sendMessage` 等が "Extension context invalidated" で throw する。MutationObserver / setInterval は orphan でも止まらないため、自前で停止する必要がある。
 
-**実装済みファイル (11 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `video-fill.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
+**実装済みファイル (14 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `amazon-ranking-jump.js` / `amazon-merchant-info.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `video-fill.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` / `volume-booster.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン、early-framework 内で chrome.runtime?.id チェック済み)
 
 **実装パターン** (PATTERN SYNC):
 - 主要 timer / observer callback / 高頻度発火関数の入口で `if (!chrome.runtime?.id)` チェック

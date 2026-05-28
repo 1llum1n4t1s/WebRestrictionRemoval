@@ -888,6 +888,57 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
   }
 });
 
+// /rere F-OPS-2 修正: popup.js の `stored = await chrome.storage.local.get([...])` リストに
+// SettingsSchema の全 storageKey が含まれることを CI 検知する。経路 D (popup stored リスト欠落)
+// は v1.0.29 で RTX_ENHANCER_ENABLED の追加忘れにより永久 OFF 化バグを引き起こした実例があり、
+// 6 ポイントチェックリストの人間運用に依存していた最後の防御層を機械化する。
+// 検証方法: popup.js を fs.readFileSync で読み、`StorageKeys.<XXX>` パターンを正規表現抽出して
+// SettingsSchema の storageKey と field 名から導出した期待集合と比較する。
+test("popup.js の chrome.storage.local.get リストに SettingsSchema の全 storageKey が含まれる (F-OPS-2)", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const popupPath = path.resolve(__dirname, "..", "src", "popup", "popup.js");
+  const popupSrc = fs.readFileSync(popupPath, "utf8");
+
+  // popup.js の DOMContentLoaded 内で行われる `chrome.storage.local.get([...])` の
+  // 引数配列を抽出する。複数 get があり得るが、master トグルの初期化を担う最大の
+  // get 呼び出し (キー数 > 10) を対象に判定する (popup 内で 30+ キーを一括 get する設計)。
+  const getCalls = [...popupSrc.matchAll(/chrome\.storage\.local\.get\(\s*\[([\s\S]*?)\]/g)];
+  assert.ok(getCalls.length > 0, "popup.js に chrome.storage.local.get([...]) 呼び出しが見つからない");
+  const mainGetCall = getCalls
+    .map((m) => m[1])
+    .filter((body) => (body.match(/StorageKeys\./g) || []).length >= 10)
+    .sort((a, b) => (b.match(/StorageKeys\./g) || []).length - (a.match(/StorageKeys\./g) || []).length)[0];
+  assert.ok(mainGetCall, "popup.js のメイン storage.local.get (10+ キー) が見つからない");
+
+  // mainGetCall 内で参照されている StorageKeys.<XXX> の集合を抽出
+  const referencedKeys = new Set();
+  for (const m of mainGetCall.matchAll(/StorageKeys\.([A-Z_][A-Z0-9_]*)/g)) {
+    referencedKeys.add(m[1]);
+  }
+
+  // SettingsSchema の各 entry の storageKey 値 → StorageKeys のキー名に逆引きする
+  const storageKeyValueToName = new Map();
+  for (const [name, value] of Object.entries(G.StorageKeys)) {
+    storageKeyValueToName.set(value, name);
+  }
+
+  // SettingsSchema の各 storageKey に対応する StorageKeys 名が popup の get リストに含まれるか
+  const missing = [];
+  for (const entry of G.SettingsSchema) {
+    const keyName = storageKeyValueToName.get(entry.storageKey);
+    if (!keyName) continue; // 既存テストで storageKey 整合は別途検証済み
+    if (!referencedKeys.has(keyName)) {
+      missing.push(`StorageKeys.${keyName} (SettingsSchema field: ${entry.field})`);
+    }
+  }
+  assert.equal(
+    missing.length,
+    0,
+    `popup.js の chrome.storage.local.get リストに以下の StorageKeys が含まれていない (経路 D drift / v1.0.29 RTX バグ再発防止):\n  - ${missing.join("\n  - ")}`
+  );
+});
+
 // /rere レビュー A2-002 修正: cdninstagram.com の 1 段サブドメインを `scontent-` prefix 限定に
 // 絞り込んだことを検証する。`tracking.cdninstagram.com` / `auth.cdninstagram.com` 等の
 // 任意サブドメインへの代理 fetch が遮断されることを保証する（fbcdn / tiktok と対称防御）。

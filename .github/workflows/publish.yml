@@ -260,6 +260,11 @@ jobs:
       - name: リポジトリをチェックアウト
         # web-ext は devDependencies なので package.json + lockfile が必要 (npm ci で取得)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        # /rere F-OPS-1 修正: package job と防御深層の整合性確保。本 job では git push を
+        # 行わないが、persist-credentials: false で GITHUB_TOKEN を .git/config の extraheader に
+        # 残さない (script injection 経由の token 漏洩経路を完全に閉じる)
+        with:
+          persist-credentials: false
 
       - name: Firefox source artifact を取得
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
