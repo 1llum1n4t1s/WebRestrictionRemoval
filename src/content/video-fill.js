@@ -35,14 +35,13 @@
   let mode = VideoFill.DEFAULT_MODE;
   let targetAspect = VideoFill.targetAspect(VideoFill.DEFAULT_TARGET);
 
-  /** transform を当てた video 要素の集合（撤去時に走査するため WeakMap ではなく Set）。
-   *  /rere C2-Critical1 修正: SPA で video element が DOM detach されても Set 内 strong ref が
-   *  残ると element + 関連 stream の GC が阻害されるため、Set ではなく WeakSet を使う。
-   *  ただし WeakSet は iterate 不可なので、revertAll() は modified を走査する代わりに
-   *  `document.querySelectorAll("video")` で DOM 上の全 video を対象に revertVideo を呼ぶ
-   *  (deactivate 時にしか呼ばれず、対象要素数は少ないので走査コストは無視できる)。 */
-  const modified = new WeakSet();
-  /** el → 退避した元の inline transform / transform-origin（撤去時に復元）。 */
+  /** el → 退避した元の inline transform / transform-origin（撤去時に復元）。
+   *  /rere C2-Critical1 + CodeRabbit/Codex 4 巡目修正: 旧実装は別途 `modified` を Set で持って
+   *  revertAll で iterate していたが、(1) detach された video の strong ref が残って GC を妨げる
+   *  リーク、(2) WeakSet 化すると iterate 不可になり detach 済み video を revert できない退行、の
+   *  二律背反があった。解決策として「detach を MutationObserver の removedNodes で検知して即
+   *  revertVideo する」方式に変更し、tracker は original (WeakMap) 1 本に集約。detach 検知時に
+   *  original から外れるので strong ref を持たず、revertAll() は DOM 上の video だけ走査すれば十分。 */
   const original = new WeakMap();
   let observer = null;
   let orphaned = false;
@@ -72,7 +71,6 @@
     }
     v.style.setProperty("transform", t, "important");
     v.style.setProperty("transform-origin", "center center", "important");
-    modified.add(v);
   }
 
   function revertVideo(v) {
@@ -83,13 +81,11 @@
     if (o.origin) v.style.setProperty("transform-origin", o.origin, o.originPriority);
     else v.style.removeProperty("transform-origin");
     original.delete(v);
-    modified.delete(v);
   }
 
   function revertAll() {
-    // /rere C2-Critical1 修正: WeakSet は iterate 不可のため DOM 全 video を走査して revertVideo。
-    // 既に DOM detach された video は対象外だが、`original` (WeakMap) もそれと同時に GC されるため
-    // メモリリークは発生しない。残った style ゴミは要素自体が GC されるので問題なし。
+    // DOM 上の video を走査して revert する。detach 済み video は observer の removedNodes 検知時に
+    // 既に revertVideo 済みなので、ここで取りこぼしても OFF 後に transform が残ることはない。
     const vids = document.getElementsByTagName("video");
     for (let i = 0; i < vids.length; i++) revertVideo(vids[i]);
     // loadedmetadata listener を一括 abort + マーカークリアで再 attach 可能化
@@ -125,12 +121,32 @@
 
   function ensureObserver() {
     if (observer) return;
-    observer = new MutationObserver(() => {
+    observer = new MutationObserver((records) => {
       if (!chrome.runtime?.id) {
         teardownOrphan();
         return;
       }
-      if (isActive()) scanAndApply();
+      if (!isActive()) return;
+      // Codex 4 巡目 P2 + リーク対策: DOM から外れた transform 済み video を即 revert する。
+      // SPA が video を detach → ユーザーが機能 OFF → 同 video を再挿入、の順だと revertAll() は
+      // DOM 上の video しか戻せず、detach 済み video に ON 時代の transform が残る (OFF なのに拡大表示
+      // のまま再表示)。検出時点で revertVideo すれば再挿入時も素の状態に戻り、original WeakMap からも
+      // 外れて element の GC を妨げない (旧 Set 方式の strong-ref リーク再発も防ぐ)。reparent (同一
+      // バッチで再挿入された video) は isConnected===true で除外し、後続の scanAndApply で再適用する。
+      for (const rec of records) {
+        for (const node of rec.removedNodes) {
+          if (node.nodeType !== 1) continue;
+          if (node.tagName === "VIDEO") {
+            if (!node.isConnected) revertVideo(node);
+          } else if (typeof node.querySelectorAll === "function") {
+            const inner = node.querySelectorAll("video");
+            for (let i = 0; i < inner.length; i++) {
+              if (!inner[i].isConnected) revertVideo(inner[i]);
+            }
+          }
+        }
+      }
+      scanAndApply();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }

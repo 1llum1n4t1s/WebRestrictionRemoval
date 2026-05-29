@@ -1204,7 +1204,15 @@
     // 列数を 4/5/6 に明示指定したときは従来どおりグリッド化（非破壊）。さらに `homeGrid` トグル
     // ON のときは列数『自動』(gridItems=0) でもグリッド化する（列数は YouTube 標準列数 = var）。
     const fixedCols = gridItems === 4 || gridItems === 5 || gridItems === 6;
-    const valid = active && (fixedCols || f("homeGrid"));
+    // ページゲート (isFeedPage): この機能は「ホーム/フィードのグリッド整列」が目的なので
+    // ホーム (`/`) + `/feed/*` に限定する。ゲート無しだと注入 <style> が全ページに残り、
+    // チャンネルページ (`/@handle` 等) の「動画」タブの `ytd-rich-grid-renderer` にも当たる。
+    // すると初回ロード中にグリッド強制でレイアウト高さが変化 → YouTube のスクロール連動バナー
+    // ヘッダー (tp-yt-app-header) が collapse/expand を一度誤判定 →「チャンネルバナーが点滅」する
+    // 不具合が出ていた (実機確認・ゆろさん報告)。隣の applySearchGridStyle() が isResultsPage() で
+    // ゲートしているのと同じ流儀に揃える。/feed/channels は isFeedPath 対象外 (subsChannelsGrid が
+    // 別途担当) なので、ここで grid CSS が二重適用されることもない。
+    const valid = active && isFeedPage() && (fixedCols || f("homeGrid"));
     if (!valid) {
       if (existing) existing.remove();
       return;

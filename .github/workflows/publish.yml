@@ -353,9 +353,14 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s inherit_errexit
-          AMO_SLUG=$(jq -r '.amo.slug // empty' vava.config.json)
+          # CodeRabbit 4 巡目: curl 側 (line 371 `|| versions_response=""`) と対称に、jq が
+          # vava.config.json 不在 / パース失敗で非ゼロ終了しても inherit_errexit で step ごと
+          # hard fail させず、空文字 → 直後の警告 + skip=false 分岐に倒す (publish step が
+          # web-ext の gecko id ベース slug 検出で救済できる)。vava.config.json はコミット済みなので
+          # 通常は存在するが、fork / 部分 checkout 等での graceful degradation を確保する。
+          AMO_SLUG=$(jq -r '.amo.slug // empty' vava.config.json 2>/dev/null || echo "")
           if [ -z "${AMO_SLUG:-}" ]; then
-            echo "::warning::vava.config.json の amo.slug が未設定のため AMO pre-flight を skip (publish step に委ねる)"
+            echo "::warning::vava.config.json の amo.slug が取得できないため AMO pre-flight を skip (publish step に委ねる)"
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
