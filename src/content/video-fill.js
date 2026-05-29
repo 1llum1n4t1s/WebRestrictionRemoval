@@ -44,6 +44,12 @@
    *  original から外れるので strong ref を持たず、revertAll() は DOM 上の video だけ走査すれば十分。 */
   const original = new WeakMap();
   let observer = null;
+  /** observer コールバックの全 video 再走査を rAF で coalesce するためのハンドル (0 = 未予約)。
+   *  CodeRabbit 4 巡目: all_frames:true + YouTube 等の高頻度 DOM 変更で mutation バッチごとに
+   *  scanAndApply() を同期実行すると冗長なフル走査が積み重なる。detach の即時 revert は同期のまま、
+   *  再適用だけ 1 フレームに 1 回へ間引く。observer は childList のみ監視で自前の style 書き込みは
+   *  observe 対象外なので、disconnect→render→takeRecords→observe ガードは不要 (無限ループしない)。 */
+  let scanRaf = 0;
   let orphaned = false;
   /** /rere C2-Critical1 修正: loadedmetadata listener の一括 abort 用 AbortController。
    *  revertAll() 時に abort して全 listener を解除、新たな AbortController に差し替えて再受付。 */
@@ -129,6 +135,17 @@
     }
   }
 
+  // observer からの再走査を rAF で 1 フレーム 1 回に間引く (detach の即時 revert は呼び出し側で
+  // 同期実行されるので、ここでは再適用だけを遅延させる)。orphan / OFF は rAF 内で再チェックする。
+  function scheduleScan() {
+    if (scanRaf !== 0) return;
+    scanRaf = requestAnimationFrame(() => {
+      scanRaf = 0;
+      if (!chrome.runtime?.id) { teardownOrphan(); return; }
+      if (isActive()) scanAndApply();
+    });
+  }
+
   function ensureObserver() {
     if (observer) return;
     observer = new MutationObserver((records) => {
@@ -156,7 +173,7 @@
           }
         }
       }
-      scanAndApply();
+      scheduleScan();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
@@ -165,6 +182,11 @@
     if (observer) {
       observer.disconnect();
       observer = null;
+    }
+    // 予約済みの再走査 rAF も取り消す (disconnect 後に scanAndApply が走らないように)。
+    if (scanRaf !== 0) {
+      cancelAnimationFrame(scanRaf);
+      scanRaf = 0;
     }
   }
 
@@ -227,6 +249,17 @@
       changes[StorageKeys.VIDEO_FILL_TARGET] !== undefined;
     if (!changed) return;
     readSettingsAndApply();
+  });
+
+  // CodeRabbit 4 巡目 (Major): ページ遷移時のリソース解放。orphan 検知 (chrome.runtime?.id) は
+  // 拡張アンロードにしか反応しないため、ページライフサイクル側の後始末を補う。
+  // bfcache 凍結 (persisted=true) では observer も一緒に凍結されて CPU を消費しない上、復帰時に
+  // そのまま動き続けられるので温存し、実際にドキュメントが破棄される遷移 (persisted=false) でだけ
+  // observer disconnect + loadedmetadata listener abort して browser cleanup を補助する。
+  window.addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    disconnectObserver();
+    metaListenerCtrl.abort();
   });
 
   readSettingsAndApply();
