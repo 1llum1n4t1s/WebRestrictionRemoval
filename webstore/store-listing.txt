@@ -13,7 +13,7 @@ WEB閲覧アシスト
 閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Chrome 拡張機能。
 
 ■ 説明（16,000文字以内）
-日々の Web 閲覧を快適にする 12 カテゴリの補助機能 + 共通サブ機能（Instagram / TikTok の画像ダウンロードボタン）を 1 つのポップアップに統合した拡張機能です。
+日々の Web 閲覧を快適にする 13 カテゴリの補助機能 + 共通サブ機能（Instagram / TikTok の画像ダウンロードボタン）を 1 つのポップアップに統合した拡張機能です。
 （v1.0.18 でかつての「制限解除」機能は廃止し、Web 閲覧支援機能のみに特化しました）
 
 ■ 主な機能
@@ -36,6 +36,10 @@ WEB閲覧アシスト
   Amazon 商品ページの商品詳細欄にある「Amazon 売れ筋ランキング」リンクは商品ごとに位置がバラバラで探しにくいので、商品情報の最上部に「この商品が所属するランキングへ移動」ボタンを集約表示します。クリックで一番細かいサブカテゴリのランキングへ同じタブで移動します。商品詳細コンテナ内の売れ筋ランキングリンクのみを走査するため、ランキングを持つ商品ページでのみボタンが出ます。
   ※ 純粋な DOM 操作のみで、価格・履歴の取得や外部送信は一切行いません。
 
+・📦 Amazon 販売元・出荷元バッジ（オプトイン・デフォルトOFF）
+  Amazon 商品ページの隠し div (#merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div) から販売元と出荷元を抽出し、商品情報の最上部 (ランキング移動ボタンの隣) に「📦 販売: XXX / 出荷: YYY」のクリック不可の情報バッジを表示します。Amazon 直販と マーケット出品 を視覚的に区別（Amazon 直販 = 緑バッジ / マーケット出品 = オレンジ警告バッジ）。詐欺マーケットプレイス出品の回避や Amazon 直販の確認が一目でできます。直販判定は Amazon 自身が出す isInternal フラグ（#merchantInfoFeature_feature_div 内 <script> 埋め込み JSON）を最優先とし、欠落時は販売元名で推定します。
+  ※ 純粋な DOM 操作のみで、価格・履歴の取得や外部送信は一切行いません。
+
 ・📷 Instagram クリーナー（オプトイン・デフォルトOFF）
   Instagram の冗長 UI を一括非表示にする 11 個のサブ機能を提供します。
   主要機能: Reels 削除（URL リダイレクト含む）/ Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示
@@ -49,8 +53,8 @@ WEB閲覧アシスト
   ※ クライアント側の DOM 操作・CSS 適用のみで、外部送信は一切行いません。
 
 ・🔊 音量ブースター（オプトイン・デフォルトOFF）
-  アクティブタブの音量を 0〜300% で増幅。マスタートグルを ON にするとスライダーが有効化され、設定（gain 値・サブトグル・ミュート）はグローバル永続化されます。chrome.tabCapture でタブ音声を取得し、オフスクリーン ドキュメント内の AudioContext で「自動音量正規化（AnalyserNode による短時間 RMS 測定 + 自動 GainNode）→ ナイトモード圧縮（DynamicsCompressor）→ 手動 GainNode で増幅 → 自動歪み防止 / リミッタ（DynamicsCompressor）」の 6 ノードチェーンで処理して再出力します（マスタリング定石のラウドネス補正 → コンプ → メイクアップゲイン → リミッタ配置）。自動歪み防止 / 自動音量正規化 / ナイトモードのサブトグル 3 種はいずれもデフォルト OFF。
-  スライダーは 100..300% 区間で等距離 = 等 dB ステップの対数マッピングを採用、gain 変更は 45ms ramp で滑らかに反映してプチノイズを抑えます。スライダーの左端にミュート 🔊/🔇 ボタンを配置し、スライダー値・サブトグル設定を保持したまま 1 クリックで完全消音 → 再クリックで元の音量に高速復帰できます（Chrome 標準のタブミュートとは独立レイヤとして動作）。スライダー 100% でも自動音量正規化 / 自動歪み防止 / ナイトモード / ミュートのいずれかが ON なら AudioContext を維持し、「音量を変えずに突発音だけ抑える」「ポッドキャストの声量差を均す」「夜間に大音量シーンを抑える」「100% のまま即消音」用途にも対応。タブ切替時は既に boost 中のタブのみ自動再適用され、新規タブは popup を開いて操作した時点で適用されます。
+  アクティブタブの音量を 0〜300% で増幅。マスタートグルを ON にするとスライダーが有効化され、設定（gain 値・サブトグル・ミュート）はグローバル永続化されます。v1.0.33 以降は MediaElementSource + tabCapture の 2 経路設計で、普通の動画サイト（YouTube / X / Twitch / TikTok / Instagram / niconico 等）は content script が <video> / <audio> 要素に直接 attach する MES 経路で **popup を一度も開かずに自動適用**、EME (DRM) 多用サイト（Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Abema / U-NEXT / TVer / Spotify 等の 15 サイト）はホスト名ブラックリストで MES を skip し、popup を開いたタイミングで chrome.tabCapture + オフスクリーン ドキュメント経路で boost します（user gesture 必須）。両経路とも同一の 6 ノードチェーン「自動音量正規化（AnalyserNode による短時間 RMS 測定 + 自動 GainNode）→ ナイトモード圧縮（DynamicsCompressor）→ 手動 GainNode で増幅 → 自動歪み防止 / リミッタ（DynamicsCompressor）」で処理して再出力します（マスタリング定石のラウドネス補正 → コンプ → メイクアップゲイン → リミッタ配置）。自動歪み防止 / 自動音量正規化 / ナイトモードのサブトグル 3 種はいずれもデフォルト OFF。
+  スライダーは 100..300% 区間で等距離 = 等 dB ステップの対数マッピングを採用、gain 変更は 45ms ramp で滑らかに反映してプチノイズを抑えます。スライダーの左端にミュート 🔊/🔇 ボタンを配置し、スライダー値・サブトグル設定を保持したまま 1 クリックで完全消音 → 再クリックで元の音量に高速復帰できます（Chrome 標準のタブミュートとは独立レイヤとして動作）。スライダー 100% でも自動音量正規化 / 自動歪み防止 / ナイトモード / ミュートのいずれかが ON なら AudioContext を維持し、「音量を変えずに突発音だけ抑える」「ポッドキャストの声量差を均す」「夜間に大音量シーンを抑える」「100% のまま即消音」用途にも対応。タブ切替時は既に boost 中のタブのみ自動再適用され、新規タブは MES 経路では自動・tabCapture 経路では popup を開いて操作した時点で適用されます。
   ※ マスタートグル OFF / スライダー 100% かつ全サブトグル OFF かつミュート OFF / タブを閉じる / 拡張機能を無効化 のいずれかで AudioContext を即座に解放してリソースを返却します。
   ※ 録音・保存・外部送信は一切行いません。
 
@@ -148,10 +152,10 @@ WEB閲覧アシスト
   機能トグル・スライダー設定・カラーピッカー履歴を端末内 (chrome.storage.local) に保存するため。
 
   offscreen:
-  音量ブースターの AudioContext / GainNode / DynamicsCompressor チェーンを Service Worker 外で維持するため。
+  音量ブースターの AudioContext / GainNode / DynamicsCompressor チェーンを Service Worker 外で維持するため。v1.0.33 以降は EME (DRM) 多用サイト向けの tabCapture fallback 経路用として主に使われます（普通サイトは content script の MediaElementSource 経路で動作）。
 
   tabCapture:
-  音量ブースターでタブ音声を取得し、AudioContext で 0〜300% の音量補正・正規化・圧縮を行うため。
+  音量ブースターでタブ音声を取得し、AudioContext で 0〜300% の音量補正・正規化・圧縮を行うため。v1.0.33 以降はホスト名ブラックリストに登録された EME (DRM) 多用サイト（Netflix / Prime Video / DAZN 等の 15 サイト）向けの fallback 経路として主に使われます。普通サイトは content script の MediaElementSource 経路で user gesture 不要に自動適用されます。
 
   <all_urls> (host permission):
   ルーペ機能で chrome.tabs.captureVisibleTab によりアクティブタブの可視領域を JPEG 静止画として取得し、円形レンズに拡大表示するため。activeTab 権限のみだと popup close 後や SPA 内 navigation で grant が早期失効するためルーペが動作しなくなる事例があり、確実な動作のため追加。content_scripts で既に全 http(s) に注入済みでアクセス可能範囲は実質変わらない。
@@ -171,7 +175,10 @@ WEB閲覧アシスト
   Amazon 定期おトク便の月別合計表示のため。配送月ごとの subscription-price を読み取って合計値を計算し、同ページに挿入する。読み取り情報は端末外へ送信しない。
 
   *://www.amazon.co.jp/*:
-  Amazon ランキングへ移動ボタンのため。商品詳細コンテナ内の「Amazon 売れ筋ランキング」リンク (a[href*="bestsellers/"]) のみを走査し、一番細かいサブカテゴリへのリンクを商品情報最上部の集約ボタンとして挿入する。商品ページでのみボタンが出る自己ゲート方式で、価格・履歴の取得や外部送信は一切行わない。
+  Amazon ランキングへ移動ボタン + Amazon 販売元・出荷元バッジのため。
+  (1) ランキング移動ボタン: 商品詳細コンテナ内の「Amazon 売れ筋ランキング」リンク (a[href*="bestsellers/"]) のみを走査し、一番細かいサブカテゴリへのリンクを商品情報最上部の集約ボタンとして挿入する。商品ページでのみボタンが出る自己ゲート方式。
+  (2) 販売元・出荷元バッジ: 商品ページの #merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div 隠し div から販売元・出荷元を抽出して、商品情報最上部にバッジ表示する（Amazon 直販 = 緑バッジ / マーケット出品 = オレンジ警告バッジ）。Amazon 直販判定は #merchantInfoFeature_feature_div 内 <script> 埋め込み JSON の isInternal フラグを最優先とし、欠落時は販売元名で推定。
+  どちらも価格・履歴の取得や外部送信は一切行わず、読み取り情報は端末外へ送信しない。
 
   *://*.instagram.com/*:
   Instagram クリーナー（11 サブ機能）のため。Reels / Explore / ストーリー段 / Threads 誘導 / いいね数・フォロワー数 / 動画再生 / コメント欄 / Notes / メッセージカウンター / 画像ダウンロードボタンの非表示・追加を、aria-label / href / role / data-pagelet / SVG path data ベースの意味論的セレクタで実装。/reels/ / /explore/ 等の URL リダイレクトもオプトイン。画像ダウンロードはユーザーがクリックした瞬間に正規 CDN（*.cdninstagram.com / scontent-*.fna.fbcdn.net）への画像 GET のみ発行し、credentials:omit + redirect:manual で第三者送信を遮断。読み取り情報は端末外へ送信しない。

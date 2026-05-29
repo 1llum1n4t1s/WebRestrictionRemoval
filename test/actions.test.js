@@ -660,7 +660,7 @@ test("actions.js は globalThis に 21 個の定数を公開する", () => {
     "SearchFixer",
     "AmazonDeliveryTotal",
     "AmazonRankingJump",
-    "AmazonReleaseDate",
+    "AmazonMerchantInfo",
     "InstagramCleaner",
     "TikTokCleaner",
     "ImageDownloader",
@@ -876,6 +876,7 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
     "searchFixerEnabled",
     "amazonDeliveryTotalEnabled",
     "amazonRankingJumpEnabled",
+    "amazonMerchantInfoEnabled",
     "instagramCleanerEnabled",
     "tiktokCleanerEnabled",
     "videoGammaEnabled",
@@ -885,6 +886,88 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
   ]) {
     assert.ok(fields.has(required), `SettingsSchema に "${required}" field が存在する必要がある`);
   }
+});
+
+// /rere B2-I003/D-003 修正: background.js の APPLY_SETTINGS_KEYS と toStorageRecord が
+// SettingsSchema から generate されていることを CI 検知する。
+// 旧実装は手書き列挙 (3 関数 = SettingsSchema/APPLY_SETTINGS_KEYS/toStorageRecord) で
+// 同じキー集合を 4 箇所同期する必要があり、drift = 永久 OFF バグの温床だった。
+// generated 化により background.js 側のリストは SettingsSchema の単一情報源から導出され、
+// 新 master トグル追加時の「3 関数同期忘れ」事故が構造的に消える。
+// 本テストでは background.js を fs.readFileSync で読み、APPLY_SETTINGS_KEYS / toStorageRecord
+// 定義に直接 StorageKeys.<XXX> 列挙が残っていないことを assert (= SettingsSchema 駆動化を保証)。
+test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema 駆動 (B2-I003/D-003)", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const bgPath = path.resolve(__dirname, "..", "src", "background", "background.js");
+  const bgSrc = fs.readFileSync(bgPath, "utf8");
+
+  // APPLY_SETTINGS_KEYS 定義行を抽出。SettingsSchema.map() で derive されていることを確認。
+  const applyKeysMatch = bgSrc.match(/const APPLY_SETTINGS_KEYS\s*=\s*([^;]+);/);
+  assert.ok(applyKeysMatch, "background.js に APPLY_SETTINGS_KEYS の定義が見つからない");
+  assert.ok(
+    /SettingsSchema/.test(applyKeysMatch[1]),
+    "APPLY_SETTINGS_KEYS は SettingsSchema 駆動 (例: SettingsSchema.map(e => e.storageKey)) で定義されている必要がある (手書き列挙は drift 温床)"
+  );
+
+  // toStorageRecord 定義を抽出。SettingsSchema.map() ベースであることを確認。
+  const toStorageMatch = bgSrc.match(/function toStorageRecord\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/);
+  assert.ok(toStorageMatch, "background.js に toStorageRecord 関数定義が見つからない");
+  assert.ok(
+    /SettingsSchema/.test(toStorageMatch[1]),
+    "toStorageRecord は SettingsSchema 駆動 (例: SettingsSchema.map(({field, storageKey}) => ...)) で実装されている必要がある (手書き列挙は drift 温床)"
+  );
+});
+
+// /rere F-OPS-2 修正: popup.js の `stored = await chrome.storage.local.get([...])` リストに
+// SettingsSchema の全 storageKey が含まれることを CI 検知する。経路 D (popup stored リスト欠落)
+// は v1.0.29 で RTX_ENHANCER_ENABLED の追加忘れにより永久 OFF 化バグを引き起こした実例があり、
+// 6 ポイントチェックリストの人間運用に依存していた最後の防御層を機械化する。
+// 検証方法: popup.js を fs.readFileSync で読み、`StorageKeys.<XXX>` パターンを正規表現抽出して
+// SettingsSchema の storageKey と field 名から導出した期待集合と比較する。
+test("popup.js の chrome.storage.local.get リストに SettingsSchema の全 storageKey が含まれる (F-OPS-2)", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const popupPath = path.resolve(__dirname, "..", "src", "popup", "popup.js");
+  const popupSrc = fs.readFileSync(popupPath, "utf8");
+
+  // popup.js の DOMContentLoaded 内で行われる `chrome.storage.local.get([...])` の
+  // 引数配列を抽出する。複数 get があり得るが、master トグルの初期化を担う最大の
+  // get 呼び出し (キー数 > 10) を対象に判定する (popup 内で 30+ キーを一括 get する設計)。
+  const getCalls = [...popupSrc.matchAll(/chrome\.storage\.local\.get\(\s*\[([\s\S]*?)\]/g)];
+  assert.ok(getCalls.length > 0, "popup.js に chrome.storage.local.get([...]) 呼び出しが見つからない");
+  const mainGetCall = getCalls
+    .map((m) => m[1])
+    .filter((body) => (body.match(/StorageKeys\./g) || []).length >= 10)
+    .sort((a, b) => (b.match(/StorageKeys\./g) || []).length - (a.match(/StorageKeys\./g) || []).length)[0];
+  assert.ok(mainGetCall, "popup.js のメイン storage.local.get (10+ キー) が見つからない");
+
+  // mainGetCall 内で参照されている StorageKeys.<XXX> の集合を抽出
+  const referencedKeys = new Set();
+  for (const m of mainGetCall.matchAll(/StorageKeys\.([A-Z_][A-Z0-9_]*)/g)) {
+    referencedKeys.add(m[1]);
+  }
+
+  // SettingsSchema の各 entry の storageKey 値 → StorageKeys のキー名に逆引きする
+  const storageKeyValueToName = new Map();
+  for (const [name, value] of Object.entries(G.StorageKeys)) {
+    storageKeyValueToName.set(value, name);
+  }
+
+  // SettingsSchema の各 storageKey に対応する StorageKeys 名が popup の get リストに含まれるか
+  const missing = [];
+  for (const entry of G.SettingsSchema) {
+    const keyName = storageKeyValueToName.get(entry.storageKey);
+    if (!keyName) continue; // 既存テストで storageKey 整合は別途検証済み
+    if (!referencedKeys.has(keyName)) {
+      missing.push(`StorageKeys.${keyName} (SettingsSchema field: ${entry.field})`);
+    }
+  }
+  assert.equal(
+    missing.length,
+    0,
+    `popup.js の chrome.storage.local.get リストに以下の StorageKeys が含まれていない (経路 D drift / v1.0.29 RTX バグ再発防止):\n  - ${missing.join("\n  - ")}`
+  );
 });
 
 // /rere レビュー A2-002 修正: cdninstagram.com の 1 段サブドメインを `scontent-` prefix 限定に
@@ -962,91 +1045,59 @@ test("AmazonRankingJump.selectTargetHref: 細かいサブカテゴリ優先で�
   assert.equal(G.AmazonRankingJump.selectTargetHref(null), null);
 });
 
-// AmazonReleaseDate.parseReleaseDateText: 各種日付フォーマットと bidi 制御文字混入に耐える。
-test("AmazonReleaseDate.parseReleaseDateText: 日付フォーマット境界値", () => {
-  const P = G.AmazonReleaseDate.parseReleaseDateText;
-
-  // 標準形式 "YYYY/M/D" / "YYYY/MM/DD"
-  const d1 = P("2023/1/15");
-  assert.equal(d1.getFullYear(), 2023);
-  assert.equal(d1.getMonth(), 0);
-  assert.equal(d1.getDate(), 15);
-  const d2 = P("2024/12/31");
-  assert.equal(d2.getMonth(), 11);
-  assert.equal(d2.getDate(), 31);
-
-  // 日本語形式 "YYYY年M月D日"
-  const d3 = P("2020年3月5日");
-  assert.equal(d3.getFullYear(), 2020);
-  assert.equal(d3.getMonth(), 2);
-  assert.equal(d3.getDate(), 5);
-
-  // bidi 制御文字 (U+200E / U+200F) を含むテキストも受理
-  const d4 = P("取り扱い開始日 ‏ : ‎ 2023/5/10");
-  assert.equal(d4.getFullYear(), 2023);
-  assert.equal(d4.getMonth(), 4);
-  assert.equal(d4.getDate(), 10);
-
-  // ハイフン区切り "YYYY-M-D"
-  const d5 = P("2021-7-4");
-  assert.equal(d5.getFullYear(), 2021);
-
-  // 無効日付 (2024/2/30) は null
-  assert.equal(P("2024/2/30"), null);
-  // 範囲外 (年 / 月 / 日)
-  assert.equal(P("1800/1/1"), null);
-  assert.equal(P("2023/13/1"), null);
-  assert.equal(P("2023/1/32"), null);
-  // 不正型
+// AmazonMerchantInfo.parseIsInternal: Amazon が出す JSON フラグから boolean を抽出する純粋関数。
+// 信頼できる Amazon 直販判定の最優先 source なので、境界値で防御する。
+test("AmazonMerchantInfo.parseIsInternal: 各種 JSON 入力で boolean を返す", () => {
+  const P = G.AmazonMerchantInfo.parseIsInternal;
+  // 直販 (isInternal: true)
+  assert.equal(P('{"isInternal":true,"merchantId":"ATVPDKIKX0DER"}'), true);
+  // マーケット (isInternal: false)
+  assert.equal(P('{"marketplaceId":"A1VC38T7YXB528","isInternal":false,"isRobot":false,"merchantId":"AJ1V7VPA9HQOB","asin":"B0DV9BRV2P"}'), false);
+  // 順序が違っても OK
+  assert.equal(P('{"a":1,"isInternal":true}'), true);
+  // 前後に空白
+  assert.equal(P('  {"isInternal":false}  '), false);
+  // isInternal が boolean でない (非対応) → null
+  assert.equal(P('{"isInternal":"true"}'), null);
+  assert.equal(P('{"isInternal":1}'), null);
+  assert.equal(P('{"isInternal":null}'), null);
+  // isInternal フィールドなし → null
+  assert.equal(P('{"merchantId":"ATVPDKIKX0DER"}'), null);
+  // 不正 JSON → null
+  assert.equal(P('not json'), null);
+  assert.equal(P('{broken'), null);
+  // 先頭が { でない (script なし) → null (try/catch 前で早期 return)
+  assert.equal(P('var x = {"isInternal":true}'), null);
+  // 不正型 → null
   assert.equal(P(null), null);
   assert.equal(P(undefined), null);
   assert.equal(P(""), null);
-  assert.equal(P(12345), null);
-  // 日付を含まないテキスト
-  assert.equal(P("発売前"), null);
+  assert.equal(P(123), null);
+  assert.equal(P({}), null);
 });
 
-// AmazonReleaseDate.formatReleaseDate: シンプルな YYYY/M/D 出力。
-test("AmazonReleaseDate.formatReleaseDate: ゼロ詰めなしの YYYY/M/D", () => {
-  const F = G.AmazonReleaseDate.formatReleaseDate;
-  assert.equal(F(new Date(2023, 0, 15)), "2023/1/15");
-  assert.equal(F(new Date(2024, 11, 31)), "2024/12/31");
-  // 不正引数は空文字
-  assert.equal(F(null), "");
-  assert.equal(F(new Date(NaN)), "");
-  assert.equal(F("2023/1/15"), "");
-});
-
-// AmazonReleaseDate.diffRelative: 各 kind の閾値を境界値でテストする。
-test("AmazonReleaseDate.diffRelative: 5 kind の境界判定", () => {
-  const D = G.AmazonReleaseDate.diffRelative;
-  // future
-  const fut = D(new Date(2030, 0, 1), new Date(2025, 0, 1));
-  assert.equal(fut.kind, "future");
-  // today
-  const same = new Date(2025, 5, 15);
-  assert.equal(D(same, same).kind, "today");
-  // days (1 日後)
-  const days = D(new Date(2025, 5, 10), new Date(2025, 5, 15));
-  assert.equal(days.kind, "days");
-  assert.equal(days.days, 5);
-  // months (1 ヶ月以上 1 年未満)
-  const months = D(new Date(2024, 9, 15), new Date(2025, 5, 15));
-  assert.equal(months.kind, "months");
-  assert.equal(months.months, 8);
-  // years (ちょうど N 年、月 0)
-  const years = D(new Date(2022, 5, 15), new Date(2025, 5, 15));
-  assert.equal(years.kind, "years");
-  assert.equal(years.years, 3);
-  // yearsMonths (N 年 M ヶ月)
-  const ym = D(new Date(2022, 1, 15), new Date(2025, 5, 20));
-  assert.equal(ym.kind, "yearsMonths");
-  assert.equal(ym.years, 3);
-  assert.equal(ym.months, 4);
-  // 不正型は null
-  assert.equal(D(null, new Date()), null);
-  assert.equal(D(new Date(), null), null);
-  assert.equal(D(new Date(NaN), new Date()), null);
+// AmazonMerchantInfo.isAmazonOwnedName: 販売元名から Amazon 直販を推定する fallback 判定。
+// isInternal フラグが取れないとき (script 欠落 / DOM 変化) の保険として使われる。
+test("AmazonMerchantInfo.isAmazonOwnedName: Amazon 名で部分一致判定", () => {
+  const N = G.AmazonMerchantInfo.isAmazonOwnedName;
+  // 直販判定 true
+  assert.equal(N("Amazon.co.jp"), true);
+  assert.equal(N("Amazon.com"), true);
+  assert.equal(N("Amazon"), true);
+  // 前後に空白あり
+  assert.equal(N("  Amazon.co.jp  "), true);
+  // マーケット出品名 (false 判定)
+  assert.equal(N("HOGXIA（ホグシア）公式ストア"), false);
+  assert.equal(N("Logicool G 公式ストア"), false);
+  assert.equal(N("Anker Direct"), false);
+  // 偽陽性は許容範囲: 「Amazon」を含むマーケット名は true 化する（実害は extension の色分けが緑寄りになる程度）
+  assert.equal(N("Amazon Renewed Hub"), true);
+  // 空文字 / 不正型 → false
+  assert.equal(N(""), false);
+  assert.equal(N("   "), false);
+  assert.equal(N(null), false);
+  assert.equal(N(undefined), false);
+  assert.equal(N(123), false);
 });
 
 // ALLOWED_HOSTS の fbcdn.net パターンが scontent- prefix 限定であることを検証する。

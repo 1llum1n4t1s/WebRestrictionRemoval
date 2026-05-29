@@ -25,42 +25,17 @@
   window.__cpaAmazonRankingJumpRunning = true;
   if (window !== window.top) return;
 
-  /** @type {boolean} 機能 ON/OFF */
-  let active = false;
-  /** @type {MutationObserver|null} */
-  let observer = null;
-  /** rAF 連続抑制用フラグ */
-  let scanScheduled = false;
-  /** rAF id（cancel 用） */
-  let rafHandle = 0;
   /** 注入したボタン要素（差分更新で再利用） */
   let buttonEl = null;
-  /** 拡張機能 reload 後の orphan content script 検出フラグ */
-  let contextInvalidated = false;
 
-  const OBSERVE_OPTIONS = { childList: true, subtree: true };
   const ROOT = AmazonRankingJump.ROOT_CLASS;
 
-  /**
-   * 拡張機能リロード後、古い content script は DOM に残るが `chrome.runtime.id` が
-   * undefined になり、chrome API 呼び出しが "Extension context invalidated" で throw する。
-   * MutationObserver は orphan でも止まらないため、検知時に observer disconnect + rAF cancel +
-   * ボタン撤去を 1 度だけ実行し、以後を no-op 化する（定期おトク便 / image-downloader と同型）。
-   */
-  function checkContextInvalidated() {
-    if (contextInvalidated) return true;
-    try {
-      if (!chrome.runtime || !chrome.runtime.id) contextInvalidated = true;
-    } catch {
-      contextInvalidated = true;
-    }
-    if (contextInvalidated) {
-      stopObserver();
-      active = false;
-      try { removeButton(); } catch {}
-    }
-    return contextInvalidated;
-  }
+  // /rere B1-007/B2-I002/D-002 修正: rAF coalesce + observer guard + context invalidation guard を
+  // ScanRunner (src/lib/scan-runner.js) に集約。本ファイルは render / cleanup のみ残す。
+  const runner = ScanRunner.create({
+    render: scanAndRender,
+    cleanup: removeButton,
+  });
 
   // ---------- 状態購読 ----------
   chrome.storage.local
@@ -84,65 +59,8 @@
   });
 
   function apply(enabled) {
-    if (enabled === active) return;
-    active = enabled;
-    if (enabled) {
-      startObserver();
-      scheduleScan();
-    } else {
-      stopObserver();
-      removeButton();
-    }
-  }
-
-  function startObserver() {
-    if (observer) return;
-    observer = new MutationObserver(scheduleScan);
-    observer.observe(document.body || document.documentElement, OBSERVE_OPTIONS);
-  }
-
-  function stopObserver() {
-    if (observer) {
-      try { observer.disconnect(); } catch {}
-      observer = null;
-    }
-    if (rafHandle) {
-      try { cancelAnimationFrame(rafHandle); } catch {}
-      rafHandle = 0;
-    }
-    scanScheduled = false;
-  }
-
-  function scheduleScan() {
-    if (scanScheduled) return;
-    if (checkContextInvalidated()) return;
-    scanScheduled = true;
-    rafHandle = requestAnimationFrame(() => {
-      scanScheduled = false;
-      rafHandle = 0;
-      if (!active) return;
-      if (checkContextInvalidated()) return;
-      runScanInsideObserverGuard();
-    });
-  }
-
-  /**
-   * observer を一時 disconnect → scan/render → takeRecords で蓄積破棄 → observe 再開。
-   * 自分のボタン挿入 / href 更新が MutationRecord に積まれて scheduleScan を連鎖発火させる
-   * 無限ループを断ち切る（定期おトク便で確立したガード）。
-   */
-  function runScanInsideObserverGuard() {
-    if (!observer) {
-      scanAndRender();
-      return;
-    }
-    observer.disconnect();
-    try {
-      scanAndRender();
-    } finally {
-      observer.takeRecords();
-      observer.observe(document.body || document.documentElement, OBSERVE_OPTIONS);
-    }
+    if (enabled) runner.start();
+    else runner.stop();
   }
 
   // ---------- 検出 ----------

@@ -1,0 +1,42 @@
+{
+  "_comment": "/vava スキル (~/.claude/skills/vava/) のスクリプトに渡すプロジェクト固有設定。スキル側スクリプトは CWD の本ファイルから設定を読み込む。スキーマは ~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs のヘッダコメントを参照。",
+  "amo": {
+    "slug": "web-viewing-assist",
+    "categories": ["other"],
+    "homepage": "https://github.com/1llum1n4t1s/WebRestrictionRemoval",
+    "supportUrl": "https://github.com/1llum1n4t1s/WebRestrictionRemoval/issues",
+    "defaultName": {
+      "ja": "WEB閲覧アシスト",
+      "en-US": "Web Viewing Assist"
+    },
+    "listingFiles": {
+      "ja": "webstore/store-listing.firefox.ja.txt",
+      "en-US": "webstore/store-listing.firefox.en.txt"
+    },
+    "privacyFiles": {
+      "ja": "docs/privacy-policy.md",
+      "en-US": "docs/privacy-policy.en.md"
+    }
+  },
+  "cws": {
+    "extensionIdFile": ".cws-id"
+  },
+  "driftKeywords": {
+    "_comment": "check-store-listing.mjs の drift 判定キーワード。listing が「主要新キーワードを含む」か確認する。未設定 (null) なら drift チェックを skip。summary (短い概要) と description (長い説明) で実在するキーワードが違うため、それぞれ別セットで判定する (summary に MediaElementSource / Firefox 142 は載らない)。",
+    "cws": {
+      "_comment": "CWS は meta description しか取得できない (Full Description は SPA で <meta> 非抽出) ため、meta に確実に載る名前ベースの語のみで判定する。",
+      "ja": ["WEB閲覧アシスト"],
+      "en": ["Web Viewing Assist"]
+    },
+    "amo": {
+      "summary": {
+        "ja": ["12 カテゴリ", "Amazon 販売元"],
+        "en": ["12 categories", "Amazon seller"]
+      },
+      "description": {
+        "ja": ["12 カテゴリ", "Amazon 販売元", "MediaElementSource", "Firefox 142"],
+        "en": ["12 categories", "Amazon seller", "MediaElementSource", "Firefox 142"]
+      }
+    }
+  }
+}

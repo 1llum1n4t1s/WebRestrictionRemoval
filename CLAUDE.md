@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 13 機能を提供する：「セッション維持（全 http(s) タブ共通、master トグル ON 中はすべてのタブで合成イベント dispatch によりアイドル検知をリセット）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）」「Amazon 定期おトク便 月別合計」「Amazon ランキングへ移動ボタン（商品詳細欄の売れ筋ランキングリンクを商品情報最上部の集約ボタンにまとめ、一番細かいサブカテゴリへ同タブ移動）」「Amazon 取り扱い開始日表示（商品ページ上部にランキング移動ボタンと並べて「取り扱い開始: YYYY/M/D」と経過年月をクリック不可の情報パネルで表示）」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「動画の黒帯除去（ウルトラワイド画面などで動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出・全タブ共通設定）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 13 機能のうち 12 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
+WEB閲覧アシスト (Web Viewing Assist) は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 13 機能を提供する：「セッション維持（全 http(s) タブ共通、master トグル ON 中はすべてのタブで合成イベント dispatch によりアイドル検知をリセット）」「YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能）」「Amazon 定期おトク便 月別合計」「Amazon ランキングへ移動ボタン（商品詳細欄の売れ筋ランキングリンクを商品情報最上部の集約ボタンにまとめ、一番細かいサブカテゴリへ同タブ移動）」「Amazon 販売元・出荷元バッジ（商品ページ上部にランキング移動ボタンと並べて販売元・出荷元を表示、Amazon 直販=緑バッジ / マーケット出品=オレンジ警告バッジで視覚区別。判定は Amazon の `isInternal` JSON フラグを最優先）」「Instagram クリーナー（11 サブ機能）」「TikTok クリーナー（3 サブ機能：コメント欄非表示・おすすめのアカウント非表示・画像ダウンロードボタン）」「音量ブースター（マスタートグル付き・自動歪み防止 / 自動音量正規化 / ナイトモード サブトグル付き・ミュートトグル付き・設定グローバル永続化・タブ切替で自動適用）」「動画ガンマ補正（全タブ共通スライダー、SVG `<feComponentTransfer type="gamma">` 独自実装）」「動画の黒帯除去（ウルトラワイド画面などで動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出・全タブ共通設定）」「ルーペ（マウス追従の円形拡大鏡、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / レンズサイズ可変）」「RTX 動画強化（`<video>` 要素のあるページに 1×1 透明 hint 要素を inject して GPU ドライバ側映像補正の動画ページ検知を補助）」「カラーピッカー（EyeDropper API ベース・popup 内完結）」。全 13 機能のうち 12 機能がマスタートグル付きオプトイン（**全てデフォルト OFF**）、カラーピッカーは popup タブとして常時利用可。画像ダウンロード機能は Instagram / TikTok の各クリーナーのサブ機能として共通実装（YouTube では未提供）。カラーピッカー履歴は最大 20 件、`chrome.storage.local` 内のみで外部送信ゼロ。すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、外部送信ゼロ。
 
 popup は **5 タブ構成** (`調整 / YouTube / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
 
@@ -18,8 +18,8 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 18 globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-npm test                     # Node.js 標準 test runner、82 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + VolumeBooster.isEmeHost / isEmeUrl 境界値 + AmazonReleaseDate.parseReleaseDateText/formatReleaseDate/diffRelative 境界値 を含む）
+npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 23 globalThis 定数列挙 (actions.js 21 + ScanRunner + AudioPipeline、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
+npm test                     # Node.js 標準 test runner、82 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + VolumeBooster.isEmeHost / isEmeUrl 境界値 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -47,10 +47,11 @@ node --check src/lib/actions.js \
   && node --check src/content/keepalive.js \
   && node --check src/content/amazon-delivery-total.js \
   && node --check src/content/amazon-ranking-jump.js \
-  && node --check src/content/amazon-release-date.js \
+  && node --check src/content/amazon-merchant-info.js \
   && node --check src/content/instagram-cleaner.js \
   && node --check src/content/tiktok-cleaner.js \
   && node --check src/content/video-gamma.js \
+  && node --check src/content/video-fill.js \
   && node --check src/content/loupe.js \
   && node --check src/content/rtx-enhancer.js \
   && node --check src/content/image-downloader.js \
@@ -172,7 +173,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 **復活禁止の失敗パターン**: 詳細列挙は本ドキュメント末尾の Important Patterns「hideLiveChat（YouTube ライブチャット非表示）」を参照。要約すると `display:none` / `height:0` / `setAttribute("collapsed")` / `#chat-container:has(...){display:none}` / 独自クラスでの frame 全体非表示はすべて NG（SPA panel state を破壊して player 副作用 / 「パネルを開く」消失 / 再展開不能になる）。`visibility:hidden` は layout のみへの影響で Polymer state に介入しないため安全。
 
 **登録チャンネル拡張（v1.0.27 で完成）**: 3 機能セットで構成される。
-1. **`subsChannelsGrid`**: `/feed/channels` をレスポンシブグリッドに変形 + 検索ボックス。各カードは IntersectionObserver で viewport 進入時 lazy fetch でチャンネルページ HTML から最初の `"videoId":"..."` (Featured 動画) を抽出して `https://i.ytimg.com/vi/{videoId}/maxresdefault.jpg` (16:9, 1280x720) を表示。404 で `mqdefault.jpg` (320x180, 16:9) フォールバック。`sessionStorage` に handle 単位 24h cache (prefix `__cpa_subs_thumb_v5::`)。**サムネ取得は YouTube が `/feeds/videos.xml` を 404 化したため HTML 内 videoId 抽出方式に切替済（v1.0.27）**。
+1. **`subsChannelsGrid`**: `/feed/channels` をレスポンシブグリッドに変形 + 検索ボックス。各カードは IntersectionObserver で viewport 進入時 lazy fetch で **チャンネルの `/videos` + `/streams` を並列取得** (v7、2026-05-28 から)、HTML 内の thumbnailBadgeViewModel から **LIVE 配信中の videoId を最優先**（`"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"` + `animationActivationTargetId`、言語非依存）、**配信予定 (UPCOMING) の videoId は除外**（`"text":"配信予定"` (ja) / `"Upcoming"` / `"Scheduled"` / `"Premieres"` / `"首播"` 多言語パターンマッチ、雑談チャット用枠の混入を防ぐ）。残り候補は HTML 出現順上位 10 件で maxresdefault HEAD 200 確認 → 全 404 なら hqdefault 30KB 超で Shorts 救済 (v6 から継承)。`sessionStorage` に handle 単位 24h cache (prefix `__cpa_subs_thumb_v5::`)。**サムネ取得は YouTube が `/feeds/videos.xml` を 404 化したため HTML 内 videoId 抽出方式に切替済 (v1.0.27)、その後 v6 で削除済み動画プレースホルダー除外、v7 で LIVE 優先 + UPCOMING 除外**。
 2. **`subsLeftnavInjectAll`**: YouTube が表示上限で隠す登録チャンネルも全件 leftnav に inline 注入。`/feed/channels` から同一オリジン取得、24h cache。`#items` の中（Polymer dom-repeat 配下）に `<a>` を直接 inject する安全パターン。
 3. **`subsAllShortcut`**: `/feed/channels` への 1 クリックエントリを「登録チャンネル」section の `#items` 内、最初のチャンネル entry の直前に entry エントリ風（高さ 40px / icon 24px / text 72px 位置）で挿入し、公式メニューの一部に見せる。
 
@@ -180,6 +181,19 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 ### 動画ガンマ補正 (`src/content/video-gamma.js`)
 全 http(s) ページに `all_frames: true` で注入される content script。`videoGammaEnabled` (master) + `videoGammaValue` (数値 0.3〜3.0、初期 1.0) で管理。SVG `<feComponentTransfer type="gamma">` ベースの独自実装で、CSS `filter: url(#__cpa-video-gamma)` を `<video>` 要素に当てて全タブ共通のガンマ補正を適用する。スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たる。動画データの読み取りや保存は行わない（filter 適用のみ）。
+
+### 動画の黒帯除去 (`src/content/video-fill.js`)
+全 http(s) ページに `all_frames: true` で注入される content script (video-gamma と同 manifest エントリ)。`videoFillEnabled` (master) + `videoFillMode` (`zoom` / `stretch`、初期 `zoom`) + `videoFillTarget` (モニター aspect preset id、初期 `21:9`) の **3 storage key** で管理。ウルトラワイド画面など、モニター縦横比とコンテンツ縦横比が違うときに動画の上下/左右に出るレターボックス黒帯を除去する。**設定はモニター側の縦横比のみ**で、動画側の縦横比は `<video>` 要素ごとに `videoWidth` / `videoHeight` から自動検出して `VideoFill.computeTransform` で適切な拡大率を毎回算出する (16:9 / 21:9 / 4:3 等が混在しても破綻しない設計)。`zoom` モードは均一拡大で画面いっぱい (4 辺はみ出し許容)、`stretch` モードは縦横比を歪めて完全フィット。CSS `transform` を `!important` inline で当て、サイト stylesheet の `!important` にも cascade 優先度で勝つ。元の inline transform は WeakMap に退避し、撤去時に復元。
+
+**実装上の不変条件**:
+- `loadedmetadata` を待ってから適用 (videoWidth=0 段階では計算不能)
+- `metaAttached` WeakSet で loadedmetadata listener の二重登録防止 (revertAll() の AbortController abort 時に `new WeakSet()` へ差し替えて detach 済み video 含め一括リセット。旧 DOM マーカー `__cpaVfMetaAttached` は detach 済みを取り残し reinsert+再 ON 時に listener 貼り直し不能になる Codex P2 があり廃止)
+- MutationObserver `subtree: true` で SPA / 遅延追加 video に追従。**detach された video は同期で即 `revertVideo`（element の GC を妨げない）、再適用（`scanAndApply`）は `requestAnimationFrame` で 1 フレーム 1 回に coalesce**（all_frames:true + 高頻度 DOM 変更でのフル走査積み上がりを平準化）。observer は `childList` のみ監視で自前の inline style 書き込みは observe 対象外のため、disconnect→render→takeRecords→observe ガードは不要（無限ループしない）
+- iframe 内 `<video>` (YouTube 埋め込み等) も all_frames:true で対象
+- `pagehide`（`persisted=false` = 実際にドキュメント破棄される遷移のみ）で `disconnectObserver()` + `revertAll()`（= transform 復元 + `metaListenerCtrl.abort()`、teardownOrphan と同じ後始末）。bfcache 凍結（`persisted=true`）は observer も凍結され CPU 消費ゼロ + 復帰でそのまま継続できるので温存する（disconnect すると pageshow 再初期化が無いぶん復帰後に効かなくなるため）
+- 焼き込み黒帯 (動画フレーム内に最初から入っている上下帯) は videoWidth/videoHeight に現れないため検出不能 (どの video player でも同じ原理的限界)
+- 拡張リロード後の orphan は `chrome.runtime?.id` 検知で observer 切断 + `revertAll()` で全 transform 復元 (Extension context invalidation guard PATTERN SYNC 準拠)
+- `window.__cpaVideoFillRunning` で同一フレーム内の二重実行防止
 
 ### ルーペ (`src/content/loupe.js` + `src/content/loupe.css`)
 全 http(s) サイトの top frame に注入される独立機能。`loupeEnabled` (master) + `loupeZoom` (1.5/2.5/4.0、初期 2.5) + `loupeSize` (150〜1000px、step 10、初期 220) の **3 storage key** で管理。`chrome.tabs.captureVisibleTab({ format: "jpeg", quality: 70 })` で active tab の静止画を取得し、`position: fixed; clip-path: circle()` の円形レンズ DOM に `background-image` として貼り付け、`mousemove` から `background-position` を rAF コアレス 60fps で更新する。倍率は popup のセグメントコントロールから 3 段階で選択、レンズサイズは popup のスライダーで可変。動画 / iframe / canvas を含む描画ピクセルを captureVisibleTab で取得するため「動画を一時停止してから細部を確認」する用途に最適。**popup で master トグルを ON にすると popup が自動クローズする** (ON 状態だと popup 自体がレンズで拡大したい領域を隠す UX 問題を回避、`setTimeout(50)` で APPLY_SETTINGS message dispatch を完了させてから close)。**v1.0.34 から `manifest.json` に `host_permissions: ["<all_urls>"]` を追加** している。理由: `activeTab` 権限のみだと popup auto-close 直後 + SPA ページ (Bing 検索等) の内部 navigation で `captureVisibleTab` が `Either '<all_urls>' or 'activeTab' permission is required` エラーで失敗する事例が Chrome / Edge 両方で発生したため。`<all_urls>` を host_permissions に明示することで activeTab grant 失効に依存せず常に capture 可能になる。アクセス可能範囲は content_scripts の `http://*/* + https://*/*` matches と実質同等。
@@ -235,17 +249,17 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 **実装上の不変条件**: top frame 限定、`window.__cpaAmazonRankingJumpRunning` で二重実行防止。MutationObserver で遅延読み込みされる商品詳細欄に追従し、自分のボタン挿入 / href 更新による再発火は **rAF coalesce + disconnect → render → takeRecords → observe ガード**（定期おトク便と同型）で抑える。ボタンは差分更新（href / カテゴリ名が変化時のみ書き込み）+ `isConnected` チェックで Amazon の再 render による剥落時に再挿入。context invalidation guard で orphan 化時に observer disconnect + ボタン撤去。master OFF / 非商品ページ（ランキングリンク無し）でボタン撤去。
 
-### Amazon 取り扱い開始日表示 (`src/content/amazon-release-date.js` + `src/content/amazon-release-date.css`)
-`*://www.amazon.co.jp/*` 限定（top frame のみ）。`amazonReleaseDateEnabled` (boolean、デフォルト OFF オプトイン) 1 storage key で master 制御。商品詳細欄の「取り扱い開始日」項目から日付を抽出し、商品情報の最上部（**ランキングへ移動ボタンの直後**、`insertAdjacentElement("afterend", ...)` で隣接配置。ランキングボタンが無い場合は `#title_feature_div` の直前等 ranking と同じフォールバック順）に **クリック不可の情報パネル** (`<span role="img">`) を挿入する。表示は「📅 取り扱い開始: 2023/1/15 / 約 2 年前」の 2 段構成で、ランキングボタンと同じ Amazon オレンジ色のデザイン。外部送信ゼロ・純粋 DOM 操作。
+### Amazon 販売元・出荷元バッジ (`src/content/amazon-merchant-info.js` + `src/content/amazon-merchant-info.css`)
+`*://www.amazon.co.jp/*` 限定（top frame のみ）。`amazonMerchantInfoEnabled` (boolean、デフォルト OFF オプトイン) 1 storage key で master 制御。Amazon の隠し div (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) から販売元と出荷元を抽出し、商品情報の最上部（**ランキングへ移動ボタンの直後**、`insertAdjacentElement("afterend", ...)` で隣接配置。ランキングボタンが無い場合は `#title_feature_div` の直前等 ranking と同じフォールバック順）に **クリック不可の情報バッジ** (`<span role="img">`) を挿入する。表示は「📦 販売: XXX / 出荷: YYY」の 2 段構成で、**Amazon 直販 = 緑バッジ（落ち着いた信頼色）/ マーケット出品 = オレンジ警告バッジ** で詐欺マーケットプレイス回避の視覚シグナルになる。外部送信ゼロ・純粋 DOM 操作。
 
-**日付パース・経過年月計算**: `AmazonReleaseDate.parseReleaseDateText` が `"2023/1/15"` / `"2023年1月15日"` / `"2023-1-15"` / bidi 制御文字混入テキストを全部 Date に変換（範囲外・無効日付は null）。`AmazonReleaseDate.diffRelative(from, now)` が `{kind: "future"|"today"|"days"|"months"|"years"|"yearsMonths", years, months, days}` の構造化 diff を返し、content script 側で kind に応じた i18n キー (`amazonReleaseDateRelative*`) を選んでフォーマット文字列を組む（i18n 文字列フォーマットを純粋関数の外に置く設計）。境界値テストは `test/actions.test.js`。
+**Amazon 直販判定**: `AmazonMerchantInfo.parseIsInternal(scriptText)` が `#merchantInfoFeature_feature_div` 内 `<script>` 埋め込み JSON (`{"marketplaceId":"...","isInternal":true|false,"merchantId":"..."}`) から `isInternal` フラグを抽出する。これは Amazon 自身が出す信頼できるフラグ。script が欠落していた場合は `AmazonMerchantInfo.isAmazonOwnedName(name)` で販売元名に "Amazon" / "Amazon.co.jp" / "Amazon.com" が含まれるかの保険判定にフォールバック。両純粋関数とも `test/actions.test.js` で境界値テスト。
 
-**DOM 検出パターン**:
-1. **bullet list 形式** (`#detailBullets_feature_div`): `<span class="a-text-bold">取り扱い開始日 ‏ : ‎ </span><span>2023/1/15</span>` — `.a-text-bold` のテキストに `LABEL_KEYWORDS` (`"取り扱い開始日"` / `"Date First Available"`) が含まれるものを探し、`nextElementSibling` または同じ `a-list-item` 内の `span:not(.a-text-bold)` から値を取り出す
-2. **テーブル形式** (`#productDetails_detailBullets_sections1`): `<th>取り扱い開始日</th><td>2023/1/15</td>` — `<th>` で検出して同じ行の `<td>` から値を取り出す
-3. ラベル候補は `LABEL_KEYWORDS` 配列で日本語 + 英語 UI の両方をカバー
+**DOM データ source**:
+1. **販売元名**: `#merchantInfoFeature_feature_div span.offer-display-feature-text-message` の最初の textContent（マーケット商品でも `visible: false` の隠し div として値は埋まっている）
+2. **出荷元名**: `#fulfillerInfoFeature_feature_div span.offer-display-feature-text-message` の最初の textContent。取れなければ「販売元 = 出荷元」と推定（Amazon 直販で fulfillerInfo が省略されているケースに対応、Amazon が 1 値集約表示している UI と整合）
+3. **isInternal フラグ**: `#merchantInfoFeature_feature_div script` を全部走査、`parseIsInternal` で boolean が取れた最初の値を採用
 
-**実装上の不変条件**: top frame 限定、`window.__cpaAmazonReleaseDateRunning` で二重実行防止。MutationObserver で遅延読み込みされる商品詳細欄に追従し、自分のパネル挿入による再発火は **rAF coalesce + disconnect → render → takeRecords → observe ガード**（ranking 移動 / 定期おトク便と同型）で抑える。パネルは差分更新（日付テキスト / 相対年月が変化時のみ書き込み）+ `isConnected` チェックで再挿入。context invalidation guard で orphan 化時に observer disconnect + パネル撤去。master OFF / 非商品ページ（取扱開始日項目無し）でパネル撤去。
+**実装上の不変条件**: top frame 限定、`window.__cpaAmazonMerchantInfoRunning` で二重実行防止。MutationObserver で遅延読み込みされる商品詳細欄に追従し、自分のバッジ挿入による再発火は **rAF coalesce + disconnect → render → takeRecords → observe ガード**（ranking 移動 / 定期おトク便と同型）で抑える。バッジは差分更新（販売元・出荷元・variant が変化時のみ書き込み）+ `isConnected` チェックで再挿入。context invalidation guard で orphan 化時に observer disconnect + バッジ撤去。master OFF / 非商品ページ（merchantInfoFeature_feature_div 内の span 値が無い）でバッジ撤去。CSS の `data-variant="amazon"` / `data-variant="marketplace"` 属性で色切替（緑系 / オレンジ系）、light / dark テーマ両対応。
 
 ### Instagram クリーナー (`src/content/instagram-cleaner.js` + `src/content/instagram-cleaner.css`)
 `*://*.instagram.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に `run_at: document_idle` で注入。`window.__cpaInstagramCleanerRunning` で二重実行防止。`instagramCleanerEnabled` (master) + `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理。11 機能の単一情報源は `actions.js` の `InstagramCleaner.FEATURES`。
@@ -325,7 +339,9 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` + host_permissions: `<all_urls>` (ルーペ `captureVisibleTab` を popup close 後 / SPA navigation 後でも確実に動作させるため、v1.0.34 で追加。content_scripts で既に全 http(s) に注入済みなので実質アクセス範囲は同じ) |
-| `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonReleaseDate / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster (`isEmeHost` / `isEmeUrl` 含む、15 ホストブラックリスト) / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
+| `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster (`isEmeHost` / `isEmeUrl` 含む、15 ホストブラックリスト) / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
+| `src/lib/scan-runner.js` | content script 共通実行ランタイム (`/rere` B1-007/B2-I002/D-002 で抽出)。rAF coalesce + MutationObserver `disconnect → render → takeRecords → observe` ガード + Extension context invalidation guard を `ScanRunner.create({ render, cleanup })` に集約し `globalThis.ScanRunner` 公開。Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が利用 (image-downloader / youtube-shorts は別バッチで移行予定)。cleanup は idempotent 必須 |
+| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア共有モジュール (`/rere` B1-004/B2-I001/D-001 で抽出)。dbToGain / clampNormalizerGain / scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer / stopLoudnessNormalizer / updateLoudnessNormalizer / applyCompressorPreset の 8 関数を `globalThis.AudioPipeline` 公開。MES 経路 (volume-booster.js) と EME fallback 経路 (offscreen.js) が共有し、物理コピー drift を解消。caller は stop/update/applyCompressorPreset の 3 関数を直接呼ぶ (残り 5 は内部相互呼び出し)。値定数は actions.js の VolumeBooster 経由 |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 (v1.0.33+ は EME fallback 専用、普通サイトは content script の MES 経路に移行) |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
@@ -338,8 +354,9 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/content/tiktok-early.js` | TikTok 用 `document_start` 注入の最小スクリプト。`tiktokCleanerEnabled` + `tiktokCleanerFeatures` を読んで `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` 同期付与 + inline `<style>` で主要セレクタ焼き込み（FOUC 防止、actions.js 非依存） |
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
 | `src/content/amazon-ranking-jump.{js,css}` | Amazon ランキングへ移動ボタン: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の売れ筋ランキングリンクから「一番細かいサブカテゴリ」を選んで商品情報最上部に集約ボタン (`<a href>`) を挿入、同じタブで移動。商品ページで自己ゲート、rAF coalesce + observer guard、外部送信ゼロ |
-| `src/content/amazon-release-date.{js,css}` | Amazon 取り扱い開始日表示: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の「取り扱い開始日」項目から日付を抽出し、「日付 + 経過年月」を商品情報最上部 (ランキングボタンの隣) に **クリック不可の情報パネル** (`<span>` ベース、ranking 移動と同色) で表示。`AmazonReleaseDate.parseReleaseDateText` / `diffRelative` / `formatReleaseDate` の純粋関数で境界値テスト可能化、商品ページで自己ゲート、rAF coalesce + observer guard + context invalidation guard、外部送信ゼロ |
+| `src/content/amazon-merchant-info.{js,css}` | Amazon 販売元・出荷元バッジ: `*://www.amazon.co.jp/*` の top frame に注入、隠し div (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) から販売元・出荷元を抽出し、「📦 販売: XXX / 出荷: YYY」を商品情報最上部 (ランキングボタンの隣) に **クリック不可の情報バッジ** (`<span>` ベース) で表示。**Amazon 直販 = 緑 / マーケット出品 = オレンジ警告** で視覚区別 (`data-variant` 属性で CSS 切替)。直販判定は `AmazonMerchantInfo.parseIsInternal` で script 埋め込み JSON の `isInternal` フラグを最優先、欠落時は `isAmazonOwnedName` の販売元名フォールバック (両純粋関数とも境界値テスト可能化)。商品ページで自己ゲート、rAF coalesce + observer guard + context invalidation guard、外部送信ゼロ |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
+| `src/content/video-fill.js` | 動画の黒帯除去 (ワイド表示): 全 http(s) + iframe に注入 (video-gamma と同 manifest エントリ)。`videoFillEnabled` (master) + `videoFillMode` (`zoom`/`stretch`) + `videoFillTarget` (モニター aspect preset) の 3 storage key。設定はモニター aspect のみ、動画側 aspect は `videoWidth`/`videoHeight` から要素ごとに自動検出して `VideoFill.computeTransform` で拡大率算出。`!important` inline transform で site stylesheet にも勝つ。`loadedmetadata` 待機 + MutationObserver(subtree) で遅延 video 追従 + Extension context invalidation guard で orphan 化対応。元 inline transform は WeakMap に退避し撤去時復元 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/rtx-enhancer.js` | RTX 動画強化: 全 http(s) の top frame に注入、`<video>` を持つページに極小の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution など) の動画ページ検知を補助。`dataset.__cpaRtxAttached` マーカーで二重 inject 防止、MutationObserver で遅延 `<video>` 追従、master OFF/pagehide で `removeAllHints()` 撤去。外部送信ゼロ、ドライバ機能の有効化は GPU 側設定 (NVIDIA Control Panel 等) に依存 |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得 / URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
@@ -354,8 +371,12 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト 79 件: globalThis 18 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 30 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合** / **VolumeBooster.isEmeHost / isEmeUrl 境界値 (suffix attack 防御含む 5 件、v1.0.33)** 等。件数 drift を CI で検知できる単一情報源 |
-| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**listing (説明文 / スクリーンショット / カテゴリ) 変更時は CWS / AMO ともに API 更新エンドポイントが弱いため Dashboard で先行手動更新が必要**。 |
+| `test/actions.test.js` | 純粋関数テスト 82 件: globalThis 21 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 30 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** / **VolumeBooster.isEmeHost / isEmeUrl 境界値 (suffix attack 防御含む 5 件、v1.0.33)** 等。件数 drift を CI で検知できる単一情報源 |
+| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.claude/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
+| `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要。`/vava` Step 8.7-B (CWS drift check) からも自動参照される |
+| `vava.config.json` | `/vava` スキル (`~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |
+| `~/.claude/skills/vava/scripts/check-store-listing.mjs` | ストア掲載 listing drift チェッカー (汎用版、スキル側集約)。CWS は公開ページ (`chromewebstore.google.com/detail/<id>`) を fetch して `<meta>` から name / description / version を抽出、AMO は API v5 `GET /addons/addon/{slug}/?lang=all` で取得。drift 判定キーワードは CWD の `vava.config.json` の `driftKeywords.{cws,amo}.{ja,en}` から取得 (未設定なら drift チェックをスキップ)。`--cws` / `--amo` で対象選択可。`/vava` Step 8.7-B から自動実行 |
+| `~/.claude/skills/vava/scripts/update-amo-listing.mjs` | Firefox AMO listing 自動 push (汎用版、スキル側集約、API v5 `PATCH /addons/addon/{slug}/`)。name / summary / description / homepage / support_url / categories / privacy_policy を CWD の `vava.config.json` で指定された listing / privacy ファイルから構築して送信。**summary は 250 chars 拒否されるため 249 に truncate / description と privacy_policy は `<` `>` を `&lt;` `&gt;` に pre-escape する (AMO の HTML allowlist に `<video>` `<feComponentTransfer>` 等の技術タグが無く HTTP 406 で silent reject されるため、ReplaceFontSelect 知見ベース)**。screenshots は API 不対応で Dashboard 手動。`~/.amo_token` 2 行構成 (ISSUER / SECRET) から JWT HS256 生成。`/vava` Step 8.7-A から自動実行 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
 ## Important Patterns
@@ -407,7 +428,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**v1.0.33 以降は音量
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
 - **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
 - **early script は共通フレームワーク経由** — `src/content/early-framework.js` が `<style>` 注入・pre クラス同期付与・`chrome.storage.local.get`・`storage.onChanged` 購読のボイラープレートを集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、各 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) が config を渡して setup を呼ぶ。新サイトの early script を追加する場合もこのパターンに乗せる。サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す (差異が大きすぎて framework に押し込むと config 肥大化する)。
-- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaLoupeRunning` / `window.__cpaRtxEnhancerRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
+- **二重実行防止** — `window.__cpaKeepAliveRunning` / `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__cpaAmazonRankingJumpRunning` / `window.__cpaAmazonMerchantInfoRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaVideoFillRunning` / `window.__cpaLoupeRunning` / `window.__cpaRtxEnhancerRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
 - **iframe 多重対策** — keepalive は `shouldFireHttpPing()` でトップフレーム or クロスオリジン iframe のみ ping を発射。同一オリジン iframe はトップに任せる。
 
 ### MutationObserver 取り扱い
@@ -417,7 +438,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**v1.0.33 以降は音量
 ### Extension context invalidation guard PATTERN SYNC (/rere v1.0.28+ 確立)
 拡張機能リロード / 自動更新後、既存タブの content script は **orphan 化** する。`chrome.runtime.id` が `undefined` になり、`chrome.i18n.getMessage` / `chrome.runtime.sendMessage` 等が "Extension context invalidated" で throw する。MutationObserver / setInterval は orphan でも止まらないため、自前で停止する必要がある。
 
-**実装済みファイル (10 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン)
+**実装済みファイル (14 ファイル + early 3 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `amazon-ranking-jump.js` / `amazon-merchant-info.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `keepalive.js` / `video-gamma.js` / `video-fill.js` / `loupe.js` / `rtx-enhancer.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` / `volume-booster.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン、early-framework 内で chrome.runtime?.id チェック済み)
 
 **実装パターン** (PATTERN SYNC):
 - 主要 timer / observer callback / 高頻度発火関数の入口で `if (!chrome.runtime?.id)` チェック
@@ -604,3 +625,61 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 - 該当箇所の `.catch(() => {})` は silent skip が正解
 - 一括 `console.debug` 化は spam ログを生むので NG（毎回のタブ切替で大量出力）
 - 将来の観測性改善は「URL pattern マッチが先に確定している経路（例: `isYouTubeUrl(tab.url) === true` のあと）でのみ詳細ログ」の **expected/unexpected 分離設計** が前提
+
+### /rere レビュー TODO 集約 (議題化のみ・実装は次バッチ判断)
+
+ここは /rere レビューで信頼度 medium 以下に降格した、または arch-judgment として議題化のみと判定された項目を集約する。新しい /rere レビューを実行する前に必ず読み返し、まだ有効な議題は更新、解決済みは削除する。
+
+#### 1. `scheduleOffscreenClose` の N 個並列発射 (B1-003 / V2 downgrade)
+- 場所: `src/background/background.js` の `releaseVolumeBoosterTab` finally
+- 状態: `scheduleOffscreenClose` 自体は `clearTimeout + setTimeout` で idempotent、機能破壊ゼロ。code smell + 最大 30 秒 close 遅延のみ
+- 議題: 「`releaseAllVolumeBoosterTabs` の Promise.all の後で 1 回だけ呼ぶ」設計に変更すべきか、現状の冪等性に任せるか
+
+#### 2. `chrome.runtime.lastError` 読み取り不統一 (B1-008 / V2 downgrade)
+- 場所: `src/background/background.js` の sendMessage 経路 (`getMediaStreamId` のみ callback で lastError 読み取り、他は Promise API で .catch)
+- 状態: Promise API は Chrome 88+ で lastError を reject に自動変換するため実害ゼロ
+- 議題: `safeSendMessage` ヘルパに統一するか、現状の dual style を残すか
+
+#### 3. `isVolumeBoosterActive` 永久 cycle リスク (F-OPS-3 / D-006 / V2 downgrade)
+- 場所: `src/background/background.js:940-979, 858-908`
+- 状態: SW 再起動直後の通信失敗で safe-side true → 30 秒 cycle 永続化リスクあるが、自己修復構造 (次回 sendMessage 成功で false に転じる) + 30 秒間隔で CPU 影響観測不能
+- 議題: `chrome.offscreen.hasDocument` (Chrome 116+) や `chrome.runtime.getContexts` で物理確認して同期するべきか
+
+#### 4. F-003 seqId race protection の再帰呼び出し (D-005 / V2 downgrade)
+- 場所: `src/background/background.js:385-415`
+- 状態: 再帰経路は構造的に終端 (新規 seqId 発行で旧 seq invalidate、最大 1 階層) + popup ドラッグと onActivated 同時発火確率は実測ゼロに近い
+- 議題: 完全 Promise-based reconciliation に置き換えるか、現状の再帰で十分か
+
+#### 5. リリース失敗時の能動通知経路 (F-OPS-4 / V2 downgrade)
+- 場所: `.github/workflows/publish.yml`
+- 状態: GitHub Actions の default email 通知で OAuth rotation 失敗等は検知可能
+- 議題: `gh issue create` の `if: failure()` step を追加するか、現状の default 通知に任せるか
+
+#### 6. sendMessage に相関 ID なし (F-OPS-5 / V2 downgrade)
+- 場所: 全 sendMessage 経路
+- 状態: `captureVisibleTab` は windowId 単位で 1 callable な API のため、複数 window 同時 capture でも sender 経由でタブ ID 区別可能
+- 議題: 複数タブ同時利用時の障害切り分け用途で `requestId: crypto.randomUUID()` を入れるか、必要になってから追加するか
+
+#### 7. `applySubsGridFilter` 2 重走査 (C1-002 / V2 downgrade)
+- 場所: `src/content/search-fixer.js:2955-2997`
+- 状態: 5000 ch 登録 + 高速 typing で 100ms hitch のみ (debounce 80ms で吸収)、現実的ユーザー稀
+- 議題: 5000ch ユーザーが実機報告されたら shelf → cards グルーピング Map で最適化
+
+#### 8. `:is()` セレクタ最適化コメント (C1-001 / V2 downgrade)
+- 場所: `src/content/image-downloader.js:600-617`
+- 状態: 「10-30ms 削減」コメントの実測根拠なし。Chrome バージョン依存
+- 議題: 性能測定で実測してコメント修正、または属性 selector を別 QSA に分離
+
+#### 9. Firefox MV3 catch-up で `__FIREFOX_STRIP_BEGIN__` マーカー方式が負債化 (D-007 / arch-judgment)
+- 場所: `src/background/background.js` の strip マーカー 3 箇所 + `zip.{ps1,sh}` + `.github/workflows/publish.yml` の perl 削除処理
+- 状態: 現状 3 マーカーで AMO warning 0 件達成、安定運用中
+- 議題: Firefox が `chrome.offscreen` 対応した日 / 機能差異が線形に増加した日に「環境抽象層 `src/lib/env/{chrome,firefox}.js`」への移行を再評価
+- 次の Firefox/Chrome 差異拡大ポイント (例: Chrome Side Panel API 採用 / Firefox declarativeNetRequest 差異対応) で再評価する
+
+#### 10. `globalThis` 21 generic 名前 (D-004 / V2 drop)
+- drop 判定だが将来仕様変更耐性のため記録: MV3 で isolated world の realm 分割が来た場合の全機能死亡リスクは theoretical のみ。`__cpa` namespace への一段降格は cost 高 vs benefit 低の trade-off で現状維持
+
+#### 11. captureVisibleTab 2fps 制限 (D-008 / V2 downgrade)
+- 場所: ルーペ動画拡大時の視覚的遅延
+- 状態: CLAUDE.md で「動画一時停止用途」と明示的設計選択
+- 議題: 将来「リアルタイム動画拡大」UX を追加するなら HTMLVideoElement.captureStream + canvas drawImage への hybrid 設計を検討

@@ -35,12 +35,34 @@
   let mode = VideoFill.DEFAULT_MODE;
   let targetAspect = VideoFill.targetAspect(VideoFill.DEFAULT_TARGET);
 
-  /** transform を当てた video 要素の集合（撤去時に走査するため WeakMap ではなく Set）。 */
-  const modified = new Set();
-  /** el → 退避した元の inline transform / transform-origin（撤去時に復元）。 */
+  /** el → 退避した元の inline transform / transform-origin（撤去時に復元）。
+   *  /rere C2-Critical1 + CodeRabbit/Codex 4 巡目修正: 旧実装は別途 `modified` を Set で持って
+   *  revertAll で iterate していたが、(1) detach された video の strong ref が残って GC を妨げる
+   *  リーク、(2) WeakSet 化すると iterate 不可になり detach 済み video を revert できない退行、の
+   *  二律背反があった。解決策として「detach を MutationObserver の removedNodes で検知して即
+   *  revertVideo する」方式に変更し、tracker は original (WeakMap) 1 本に集約。detach 検知時に
+   *  original から外れるので strong ref を持たず、revertAll() は DOM 上の video だけ走査すれば十分。 */
   const original = new WeakMap();
   let observer = null;
+  /** observer コールバックの全 video 再走査を rAF で coalesce するためのハンドル (0 = 未予約)。
+   *  CodeRabbit 4 巡目: all_frames:true + YouTube 等の高頻度 DOM 変更で mutation バッチごとに
+   *  scanAndApply() を同期実行すると冗長なフル走査が積み重なる。detach の即時 revert は同期のまま、
+   *  再適用だけ 1 フレームに 1 回へ間引く。observer は childList のみ監視で自前の style 書き込みは
+   *  observe 対象外なので、disconnect→render→takeRecords→observe ガードは不要 (無限ループしない)。 */
+  let scanRaf = 0;
   let orphaned = false;
+  /** /rere C2-Critical1 修正: loadedmetadata listener の一括 abort 用 AbortController。
+   *  revertAll() 時に abort して全 listener を解除、新たな AbortController に差し替えて再受付。 */
+  let metaListenerCtrl = new AbortController();
+  /** loadedmetadata listener を attach 済みの video 集合 (二重登録防止)。
+   *  Codex 4 巡目 P2 修正: 旧実装は DOM プロパティ `__cpaVfMetaAttached` で追跡していたが、
+   *  revertAll() の abort で listener を全解除しても、detach 済み video のマーカーは
+   *  `document.getElementsByTagName("video")` の走査外で取り残された。すると SPA がその video を
+   *  reinsert + ユーザーが再 ON したとき、stale マーカーで ensureMetaListener が早期 return し、
+   *  metadata 未ロードなら transform が永久に当たらなかった。WeakSet にして abort 時に
+   *  `new WeakSet()` へ差し替えれば、detach 済みも含めた全 video の追跡を O(1) で一括リセットでき、
+   *  iterate 不可ゆえの取り残しが構造的に起きない (DOM プロパティ汚染も解消)。 */
+  let metaAttached = new WeakSet();
 
   function isActive() {
     return enabled === true;
@@ -63,7 +85,6 @@
     }
     v.style.setProperty("transform", t, "important");
     v.style.setProperty("transform-origin", "center center", "important");
-    modified.add(v);
   }
 
   function revertVideo(v) {
@@ -74,21 +95,36 @@
     if (o.origin) v.style.setProperty("transform-origin", o.origin, o.originPriority);
     else v.style.removeProperty("transform-origin");
     original.delete(v);
-    modified.delete(v);
   }
 
   function revertAll() {
-    for (const v of Array.from(modified)) revertVideo(v);
-    modified.clear();
+    // DOM 上の video を走査して revert する。detach 済み video は observer の removedNodes 検知時に
+    // 既に revertVideo 済みなので、ここで取りこぼしても OFF 後に transform が残ることはない。
+    const vids = document.getElementsByTagName("video");
+    for (let i = 0; i < vids.length; i++) revertVideo(vids[i]);
+    // loadedmetadata listener を一括 abort し、attach 追跡 WeakSet も新品に差し替えて
+    // 全 video 分 (detach 済み含む) を O(1) でリセットする。これで reinsert + 再 ON 時に
+    // ensureMetaListener が確実に listener を貼り直せる (Codex 4 巡目 P2)。
+    metaListenerCtrl.abort();
+    metaListenerCtrl = new AbortController();
+    metaAttached = new WeakSet();
   }
 
   // intrinsic サイズが確定する loadedmetadata で再適用（videoWidth=0 の段階を取りこぼさない）。
+  // /rere C2-Critical1 修正: AbortSignal を渡して revertAll 時の一括解除を可能にする。
+  // 旧実装は listener を永久 attach + DOM マーカーで再 attach も防いでいたため、
+  // master OFF 後も video element に listener が残り続け、closure 経由で module scope の
+  // enabled/mode/targetAspect を chain capture して GC を妨げる潜在的リークがあった。
   function ensureMetaListener(v) {
-    if (v.__cpaVfMetaAttached) return;
-    v.__cpaVfMetaAttached = true;
-    v.addEventListener("loadedmetadata", () => {
-      if (isActive()) applyToVideo(v);
-    });
+    if (metaAttached.has(v)) return;
+    metaAttached.add(v);
+    v.addEventListener(
+      "loadedmetadata",
+      () => {
+        if (isActive()) applyToVideo(v);
+      },
+      { signal: metaListenerCtrl.signal }
+    );
   }
 
   function scanAndApply() {
@@ -99,14 +135,45 @@
     }
   }
 
+  // observer からの再走査を rAF で 1 フレーム 1 回に間引く (detach の即時 revert は呼び出し側で
+  // 同期実行されるので、ここでは再適用だけを遅延させる)。orphan / OFF は rAF 内で再チェックする。
+  function scheduleScan() {
+    if (scanRaf !== 0) return;
+    scanRaf = requestAnimationFrame(() => {
+      scanRaf = 0;
+      if (!chrome.runtime?.id) { teardownOrphan(); return; }
+      if (isActive()) scanAndApply();
+    });
+  }
+
   function ensureObserver() {
     if (observer) return;
-    observer = new MutationObserver(() => {
+    observer = new MutationObserver((records) => {
       if (!chrome.runtime?.id) {
         teardownOrphan();
         return;
       }
-      if (isActive()) scanAndApply();
+      if (!isActive()) return;
+      // Codex 4 巡目 P2 + リーク対策: DOM から外れた transform 済み video を即 revert する。
+      // SPA が video を detach → ユーザーが機能 OFF → 同 video を再挿入、の順だと revertAll() は
+      // DOM 上の video しか戻せず、detach 済み video に ON 時代の transform が残る (OFF なのに拡大表示
+      // のまま再表示)。検出時点で revertVideo すれば再挿入時も素の状態に戻り、original WeakMap からも
+      // 外れて element の GC を妨げない (旧 Set 方式の strong-ref リーク再発も防ぐ)。reparent (同一
+      // バッチで再挿入された video) は isConnected===true で除外し、後続の scanAndApply で再適用する。
+      for (const rec of records) {
+        for (const node of rec.removedNodes) {
+          if (node.nodeType !== 1) continue;
+          if (node.tagName === "VIDEO") {
+            if (!node.isConnected) revertVideo(node);
+          } else if (typeof node.querySelectorAll === "function") {
+            const inner = node.querySelectorAll("video");
+            for (let i = 0; i < inner.length; i++) {
+              if (!inner[i].isConnected) revertVideo(inner[i]);
+            }
+          }
+        }
+      }
+      scheduleScan();
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
   }
@@ -115,6 +182,11 @@
     if (observer) {
       observer.disconnect();
       observer = null;
+    }
+    // 予約済みの再走査 rAF も取り消す (disconnect 後に scanAndApply が走らないように)。
+    if (scanRaf !== 0) {
+      cancelAnimationFrame(scanRaf);
+      scanRaf = 0;
     }
   }
 
@@ -177,6 +249,20 @@
       changes[StorageKeys.VIDEO_FILL_TARGET] !== undefined;
     if (!changed) return;
     readSettingsAndApply();
+  });
+
+  // CodeRabbit 4 巡目 (Major): ページ遷移時のリソース解放。orphan 検知 (chrome.runtime?.id) は
+  // 拡張アンロードにしか反応しないため、ページライフサイクル側の後始末を補う。
+  // bfcache 凍結 (persisted=true) では observer も一緒に凍結されて CPU を消費しない上、復帰時に
+  // そのまま動き続けられるので温存し、実際にドキュメントが破棄される遷移 (persisted=false) でだけ
+  // disconnectObserver() + revertAll() で teardownOrphan と同じ後始末をする。revertAll() は内部で
+  // transform 復元 (WeakMap original) + metaListenerCtrl.abort() の両方を行う (CodeRabbit 後続指摘:
+  // listener abort だけだと inline transform が復元されない。破棄遷移では見た目に影響しないが、
+  // teardownOrphan とパターンを揃えて「pagehide = 完全な後始末」の不変条件を保つ)。
+  window.addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    disconnectObserver();
+    revertAll();
   });
 
   readSettingsAndApply();

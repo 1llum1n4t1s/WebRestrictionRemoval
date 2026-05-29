@@ -61,93 +61,17 @@
   };
 
   // ============================================================
-  // 自動音量正規化ロジック (offscreen.js から移植)
+  // DSP コア関数: AudioPipeline (src/lib/audio-pipeline.js) から取得
+  // /rere B1-004/B2-I001/D-001 修正: 旧実装は offscreen.js と同 8 関数を物理コピーで持ち、
+  // 「片方を更新したら必ず他方も同期する」を人間運用に依存していた。drift 既発のため、
+  // src/lib/audio-pipeline.js に集約して 1 ソースから両 caller (MES 経路 / EME fallback 経路) に
+  // 配布する。値定数は actions.js の VolumeBooster (既存集約場所) を経由。
   // ============================================================
-
-  function dbToGain(db) {
-    return Math.pow(10, db / 20);
-  }
-
-  function clampNormalizerGain(gain) {
-    const minGain = dbToGain(VolumeBooster.NORMALIZE_MIN_GAIN_DB);
-    const maxGain = dbToGain(VolumeBooster.NORMALIZE_MAX_GAIN_DB);
-    if (!Number.isFinite(gain)) return 1;
-    return Math.min(maxGain, Math.max(minGain, gain));
-  }
-
-  function scheduleNormalizerGain(state, targetGain, options) {
-    const clamped = clampNormalizerGain(targetGain);
-    const now = state.ctx.currentTime;
-    const previousTarget = Number.isFinite(state.normalizerTargetGain)
-      ? state.normalizerTargetGain
-      : 1;
-    if (options?.force !== true && previousTarget > 0 && clamped > 0) {
-      const deltaDb = Math.abs(20 * Math.log10(clamped / previousTarget));
-      if (deltaDb < VolumeBooster.NORMALIZE_DEAD_ZONE_DB) return;
-    }
-    if (clamped === previousTarget) return;
-    const timeConstant = clamped < previousTarget
-      ? VolumeBooster.NORMALIZE_GAIN_DOWN_TIME_CONSTANT
-      : VolumeBooster.NORMALIZE_GAIN_UP_TIME_CONSTANT;
-    state.normalizerGainNode.gain.cancelScheduledValues(now);
-    state.normalizerGainNode.gain.setValueAtTime(state.normalizerGainNode.gain.value, now);
-    state.normalizerGainNode.gain.setTargetAtTime(clamped, now, timeConstant);
-    state.normalizerTargetGain = clamped;
-  }
-
-  function tickLoudnessNormalizer(state) {
-    if (!state.normalizeEnabled) return;
-    const buffer = state.normalizerBuffer;
-    state.normalizerAnalyzer.getFloatTimeDomainData(buffer);
-
-    let sum = 0;
-    for (let i = 0; i < buffer.length; i += 1) {
-      sum += buffer[i] * buffer[i];
-    }
-    const rms = Math.sqrt(sum / buffer.length);
-    const silenceGate = dbToGain(VolumeBooster.NORMALIZE_SILENCE_GATE_DB);
-    if (!Number.isFinite(rms)) return;
-    if (rms < silenceGate) {
-      scheduleNormalizerGain(state, 1, { force: true });
-      return;
-    }
-    const targetRms = dbToGain(VolumeBooster.NORMALIZE_TARGET_RMS_DB);
-    scheduleNormalizerGain(state, targetRms / rms);
-  }
-
-  function startLoudnessNormalizer(state) {
-    if (state.normalizerTimer !== null) return;
-    tickLoudnessNormalizer(state);
-    state.normalizerTimer = setInterval(
-      () => tickLoudnessNormalizer(state),
-      VolumeBooster.NORMALIZE_UPDATE_MS,
-    );
-  }
-
-  function stopLoudnessNormalizer(state) {
-    if (state.normalizerTimer !== null) {
-      clearInterval(state.normalizerTimer);
-      state.normalizerTimer = null;
-    }
-  }
-
-  function updateLoudnessNormalizer(state, enabled) {
-    state.normalizeEnabled = enabled === true;
-    if (state.normalizeEnabled) {
-      startLoudnessNormalizer(state);
-    } else {
-      stopLoudnessNormalizer(state);
-      scheduleNormalizerGain(state, 1, { force: true });
-    }
-  }
-
-  function applyCompressorPreset(node, preset) {
-    node.threshold.value = preset.threshold;
-    node.knee.value = preset.knee;
-    node.ratio.value = preset.ratio;
-    node.attack.value = preset.attack;
-    node.release.value = preset.release;
-  }
+  // caller (この content script) が直接呼ぶのは 3 関数のみ。dbToGain / clampNormalizerGain /
+  // scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer は audio-pipeline.js の
+  // 内部で相互に呼ばれるだけ (updateLoudnessNormalizer / stopLoudnessNormalizer 経由) なので
+  // destructure しない (ESLint no-unused-vars 回避、セルフレビュー 2 巡目)。
+  const { stopLoudnessNormalizer, updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
 
   // ============================================================
   // AudioContext + 6 ノードチェーン構築
@@ -183,7 +107,7 @@
     try {
       ctx = new AudioContext();
       source = ctx.createMediaElementSource(media);
-    } catch (err) {
+    } catch {
       // MediaElementSource 失敗 = 既に他の AudioContext に attach 済み or EME
       // 同じ video 要素に MES は 1 度だけしか attach できないため、サイト側 player が
       // 自前で MES を使っている場合 (まれ) もここに来る。EME と区別できないので
@@ -290,6 +214,11 @@
   /**
    * DOM 全体の `<video>` / `<audio>` を scan して attach/detach を適用。
    * iframe 内 (cross-origin) はこの content script の別インスタンスが処理するため触らない。
+   * /rere C2-Imp3 修正: master OFF / UNITY release のときは MutationObserver も disconnect する
+   * (rtx-enhancer.js の activate/deactivate パターンと整合)。旧実装は observer を常時起動して
+   * callback 入口で早期 return していたため、全非 EME http(s) サイトの全フレームで Chrome 内部の
+   * AddedNodes 計算コスト + callback dispatch が常時発生していた。デフォルト OFF 方針の精神と
+   * 整合させ、master OFF 時は完全無処理にする。
    */
   function scanAndApply() {
     const release = isUnityRelease(currentSettings);
@@ -298,8 +227,12 @@
       for (const media of document.querySelectorAll("video, audio")) {
         detachFromMedia(media);
       }
+      // /rere C2-Imp3 修正: master OFF / UNITY release で observer 停止
+      disconnectObserver();
       return;
     }
+    // /rere C2-Imp3 修正: active 時のみ observer 起動 (idempotent)
+    ensureObserver();
     for (const media of document.querySelectorAll("video, audio")) {
       if (!STATE.has(media)) {
         attachToMedia(media);
@@ -358,35 +291,50 @@
 
   // ============================================================
   // MutationObserver で動的 video/audio 追加に追従
+  // /rere C2-Imp3 修正: rtx-enhancer.js の activate/deactivate パターンに揃え、
+  // master OFF / UNITY release では observer を disconnect する。
+  // observer を nullable + ensureObserver/disconnectObserver で idempotent 化。
   // ============================================================
 
-  const observer = new MutationObserver((records) => {
-    if (!chrome.runtime?.id) {
-      observer.disconnect();
-      return;
-    }
-    if (!currentSettings.enabled || isUnityRelease(currentSettings)) return;
-    for (const r of records) {
-      for (const node of r.addedNodes) {
-        if (!(node instanceof Element)) continue;
-        if (node.matches?.("video, audio")) attachToMedia(node);
-        if (node.querySelectorAll) {
-          node.querySelectorAll("video, audio").forEach(attachToMedia);
+  let observer = null;
+
+  function ensureObserver() {
+    if (observer) return;
+    observer = new MutationObserver((records) => {
+      if (!chrome.runtime?.id) {
+        disconnectObserver();
+        return;
+      }
+      if (!currentSettings.enabled || isUnityRelease(currentSettings)) return;
+      for (const r of records) {
+        for (const node of r.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          if (node.matches?.("video, audio")) attachToMedia(node);
+          if (node.querySelectorAll) {
+            node.querySelectorAll("video, audio").forEach(attachToMedia);
+          }
         }
       }
+    });
+    observer.observe(document.documentElement || document, {
+      subtree: true,
+      childList: true,
+    });
+  }
+
+  function disconnectObserver() {
+    if (observer) {
+      observer.disconnect();
+      observer = null;
     }
-  });
-  observer.observe(document.documentElement || document, {
-    subtree: true,
-    childList: true,
-  });
+  }
 
   // ============================================================
   // 起動 + ライフサイクル
   // ============================================================
 
   window.addEventListener("pagehide", () => {
-    observer.disconnect();
+    disconnectObserver();
     for (const media of document.querySelectorAll("video, audio")) {
       detachFromMedia(media);
     }

@@ -23,6 +23,33 @@
  */
 
 /**
+ * /rere F-001 silent failure 可視化ヘルパー (Category A / B):
+ *   - `logStorageError(context)`: `chrome.storage.local.set/.remove` の reject 時に console.warn
+ *     で診断情報を出す。silent skip だと quota exceeded / browser policy で書き込み拒否時に
+ *     ユーザー設定が永久損失するので、最低限の可視化を提供する。
+ *   - `logVolumeError(context)`: `pushVolumeNow` reject 時に console.warn。SW dead / offscreen 失敗
+ *     / EME ホスト判定ミス等で「音量が変わらない」現象が完全 silent になるのを防ぐ。
+ * どちらも呼び出し側が context (どのトグル / どのスライダー由来か) を渡すので原因追跡可能。
+ * `console.debug` ではなく `console.warn` を使う理由: ユーザーが devtools で開いたとき
+ * 必ず見える優先度にしておく (storage 書き込み失敗は実害が大きいため)。
+ * 例外オブジェクトに message 属性が無い (string で throw 等) ケースでも安全に出力できるよう
+ * 三項分岐で表示する。
+ */
+function logStorageError(context) {
+  return (err) => {
+    const msg = err && err.message ? err.message : String(err);
+    console.warn(`[WebViewingAssist popup] storage write failed (${context}): ${msg}`);
+  };
+}
+
+function logVolumeError(context) {
+  return (err) => {
+    const msg = err && err.message ? err.message : String(err);
+    console.warn(`[WebViewingAssist popup] volume apply failed (${context}): ${msg}`);
+  };
+}
+
+/**
  * `chrome.i18n.getMessage(key, substitutions)` の薄いラッパ。
  * - test 環境（Node）等で chrome global が無いケースでも throw しない
  * - キーが messages.json に無いと空文字を返すので、呼び出し側で fallback を持っても良い
@@ -137,7 +164,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
   const $amazonRankingJumpToggle = document.getElementById("amazonRankingJumpToggle");
-  const $amazonReleaseDateToggle = document.getElementById("amazonReleaseDateToggle");
+  const $amazonMerchantInfoToggle = document.getElementById("amazonMerchantInfoToggle");
   const $volumeBoosterToggle = document.getElementById("volumeBoosterToggle");
   const $volumeRow = document.getElementById("volumeRow");
   const $volumeSlider = document.getElementById("volumeSlider");
@@ -222,7 +249,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-    StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
+    StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -263,7 +290,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
     chrome.storage.local
       .set({ [StorageKeys.INSTALL_SENTINEL]: 1 })
-      .catch(() => {});
+      .catch(logStorageError("install-sentinel"));
   }
 
   // セッション維持: 全タブ共通設計に変更したため、現在タブの origin チェックは廃止。
@@ -273,7 +300,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $amazonRankingJumpToggle.checked = stored[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] === true;
-  $amazonReleaseDateToggle.checked = stored[StorageKeys.AMAZON_RELEASE_DATE_ENABLED] === true;
+  $amazonMerchantInfoToggle.checked = stored[StorageKeys.AMAZON_MERCHANT_INFO_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
   $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
@@ -327,7 +354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateVolumeBoosterDimState();
   // マスター ON 時は active tab にも保存設定を即適用（タブ切替で漏れた場合の保証）
   if ($volumeBoosterToggle.checked) {
-    pushVolumeNow(savedGain).catch(() => {});
+    pushVolumeNow(savedGain).catch(logVolumeError("popup-init"));
   }
 
   const storedIntervalMs = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
@@ -480,7 +507,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (persist) {
       chrome.storage.local
         .set({ [StorageKeys.POPUP_LAST_TAB]: target })
-        .catch(() => {});
+        .catch(logStorageError("popup-last-tab"));
     }
   }
 
@@ -516,6 +543,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.KEEP_ALIVE_ENABLED]) {
       $keepAliveToggle.checked = changes[StorageKeys.KEEP_ALIVE_ENABLED].newValue === true;
     }
+    // /rere B1-005 修正: popup 直書き経路の主要キーを同期。
+    // 別 popup 同時開き / DevTools 操作 / background の onInstalled マイグレーション等で
+    // storage が変わったときに UI が古いままになる問題を防ぐ。すべて master トグル / 数値スライダー
+    // 系で、APPLY_SETTINGS 経路の handleApplySettings の merge 防御 (経路 C) で wipe は防御済みだが、
+    // popup 内変数と DOM 表示の stale 化が残るため二重防御として追加。
+    if (changes[StorageKeys.VOLUME_BOOSTER_ENABLED]) {
+      $volumeBoosterToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_ENABLED].newValue === true;
+      updateVolumeBoosterDimState?.();
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]) {
+      $volumeAntiClipToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]) {
+      $volumeNormalizeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]) {
+      $volumeNightModeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
+      volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
+      updateMuteBtnVisual?.();
+    }
+    if (changes[StorageKeys.RTX_ENHANCER_ENABLED]) {
+      $rtxEnhancerToggle.checked = changes[StorageKeys.RTX_ENHANCER_ENABLED].newValue === true;
+    }
+    if (changes[StorageKeys.LOUPE_ENABLED]) {
+      $loupeToggle.checked = changes[StorageKeys.LOUPE_ENABLED].newValue === true;
+      // ルーペサブ UI (zoom/size) の表示切替も追従
+      updateLoupeRowVisibility?.();
+    }
   });
 
   // ----- イベントバインド -----
@@ -532,7 +589,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   $amazonDeliveryToggle.addEventListener("change", apply);
   $amazonRankingJumpToggle.addEventListener("change", apply);
-  $amazonReleaseDateToggle.addEventListener("change", apply);
+  $amazonMerchantInfoToggle.addEventListener("change", apply);
 
   $instagramCleanerToggle.addEventListener("change", () => {
     updateIgCleanerDimState();
@@ -595,7 +652,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!btn || !$loupeZoomSegment.contains(btn)) return;
     const zoom = Loupe.validateZoom(btn.dataset.zoom);
     updateLoupeZoomSegment(zoom);
-    chrome.storage.local.set({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(() => {});
+    chrome.storage.local.set({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(logStorageError("loupe-zoom"));
     // zoom 変更は storage.onChanged 経由で content script に届くので apply() は不要。
   });
 
@@ -607,17 +664,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const size = Loupe.clampSize(Number($loupeSizeSlider.value));
     $loupeSizeSlider.value = String(size);
     updateLoupeSizeLabel(size);
-    chrome.storage.local.set({ [StorageKeys.LOUPE_SIZE]: size }).catch(() => {});
+    chrome.storage.local.set({ [StorageKeys.LOUPE_SIZE]: size }).catch(logStorageError("loupe-size"));
   });
 
   // 音量ブースター: マスタートグル
   $volumeBoosterToggle.addEventListener("change", () => {
     const on = $volumeBoosterToggle.checked;
-    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(() => {});
+    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(logStorageError("volume-master"));
     updateVolumeBoosterDimState();
     if (on) {
       const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-      pushVolumeNow(v).catch(() => {});
+      pushVolumeNow(v).catch(logVolumeError("master-on"));
     }
   });
 
@@ -630,7 +687,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeSlider.addEventListener("change", () => {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     cancelVolumePush();
-    pushVolumeNow(v).catch(() => {});
+    pushVolumeNow(v).catch(logVolumeError("slider-change"));
   });
 
   $volumeResetBtn.addEventListener("click", async () => {
@@ -649,7 +706,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function bindVolumeSubToggle(toggleEl, storageKey) {
     toggleEl.addEventListener("change", () => {
       cancelVolumePush();
-      chrome.storage.local.set({ [storageKey]: toggleEl.checked }).catch(() => {});
+      chrome.storage.local.set({ [storageKey]: toggleEl.checked }).catch(logStorageError(`volume-sub-${storageKey}`));
       applyCompressorTogglePush();
     });
   }
@@ -667,9 +724,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateMuteBtnVisual();
     chrome.storage.local.set({
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
-    }).catch(() => {});
+    }).catch(logStorageError("volume-mute"));
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-    pushVolumeNow(v).catch(() => {});
+    pushVolumeNow(v).catch(logVolumeError("mute-toggle"));
   });
 
   /**
@@ -680,7 +737,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   async function applyCompressorTogglePush() {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-    await pushVolumeNow(v).catch(() => {});
+    await pushVolumeNow(v).catch(logVolumeError("compressor-toggle"));
   }
 
   $intervalSlider.addEventListener("input", () => {
@@ -1073,7 +1130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
     const amazonRankingJumpEnabled = $amazonRankingJumpToggle.checked;
-    const amazonReleaseDateEnabled = $amazonReleaseDateToggle.checked;
+    const amazonMerchantInfoEnabled = $amazonMerchantInfoToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
     const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
@@ -1102,7 +1159,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           searchFixerGridItems,
           amazonDeliveryTotalEnabled,
           amazonRankingJumpEnabled,
-          amazonReleaseDateEnabled,
+          amazonMerchantInfoEnabled,
           instagramCleanerEnabled,
           instagramCleanerFeatures,
           tiktokCleanerEnabled,
@@ -1124,7 +1181,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
             amazonRankingJumpEnabled,
-            amazonReleaseDateEnabled,
+            amazonMerchantInfoEnabled,
             instagramCleanerEnabled,
             tiktokCleanerEnabled,
             videoGammaEnabled,
@@ -1157,7 +1214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
     amazonRankingJumpEnabled,
-    amazonReleaseDateEnabled,
+    amazonMerchantInfoEnabled,
     instagramCleanerEnabled,
     tiktokCleanerEnabled,
     videoGammaEnabled,
@@ -1169,7 +1226,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
     if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
     if (amazonRankingJumpEnabled) parts.push(i18n("applyOkAmazonRanking"));
-    if (amazonReleaseDateEnabled) parts.push(i18n("applyOkAmazonReleaseDate"));
+    if (amazonMerchantInfoEnabled) parts.push(i18n("applyOkAmazonMerchantInfo"));
     if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
     if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
     if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
@@ -1275,7 +1332,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (volumePushTimer) clearTimeout(volumePushTimer);
     volumePushTimer = setTimeout(() => {
       volumePushTimer = null;
-      pushVolumeNow(value).catch(() => {});
+      pushVolumeNow(value).catch(logVolumeError("slider-debounced"));
     }, 120);
   }
 
@@ -1314,7 +1371,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       [StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]: $volumeNormalizeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
-    }).catch(() => {});
+    }).catch(logStorageError("volume-pushVolumeNow"));
 
     // EME ホスト判定: active tab が EME 多用サイトなら旧 tabCapture 経路で boost する。
     // MES 経路は volume-booster.js 冒頭の isEmeHost guard で skip されている。

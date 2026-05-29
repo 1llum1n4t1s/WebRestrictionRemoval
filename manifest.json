@@ -43,22 +43,22 @@
     },
     {
       "matches": ["*://www.amazon.co.jp/auto-deliveries*"],
-      "js": ["src/lib/actions.js", "src/content/amazon-delivery-total.js"],
+      "js": ["src/lib/actions.js", "src/lib/scan-runner.js", "src/content/amazon-delivery-total.js"],
       "css": ["src/content/amazon-delivery-total.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://www.amazon.co.jp/*"],
-      "js": ["src/lib/actions.js", "src/content/amazon-ranking-jump.js"],
+      "js": ["src/lib/actions.js", "src/lib/scan-runner.js", "src/content/amazon-ranking-jump.js"],
       "css": ["src/content/amazon-ranking-jump.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://www.amazon.co.jp/*"],
-      "js": ["src/lib/actions.js", "src/content/amazon-release-date.js"],
-      "css": ["src/content/amazon-release-date.css"],
+      "js": ["src/lib/actions.js", "src/lib/scan-runner.js", "src/content/amazon-merchant-info.js"],
+      "css": ["src/content/amazon-merchant-info.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -96,7 +96,7 @@
     },
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/volume-booster.js"],
+      "js": ["src/lib/actions.js", "src/lib/audio-pipeline.js", "src/content/volume-booster.js"],
       "run_at": "document_idle",
       "all_frames": true
     },

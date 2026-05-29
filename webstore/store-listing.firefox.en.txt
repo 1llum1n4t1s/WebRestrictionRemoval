@@ -2,17 +2,17 @@
 Firefox AMO Listing (English)
 ※ For Chrome Web Store, see webstore/store-listing.en.txt
 ※ For Japanese, see webstore/store-listing.firefox.ja.txt
-※ Firefox edition excludes Volume Booster (offscreen / tabCapture not supported on Firefox MV3)
+※ Firefox edition partially supports Volume Booster (ordinary sites only, EME-heavy sites unsupported)
 ============================================================
 
 ■ Name
 Web Viewing Assist (Firefox)
 
 ■ Summary (250 chars max)
-Firefox extension that locally tunes the readability and continuity of the page you are viewing. 11 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker). All default OFF (opt-in). Zero external network calls.
+Firefox extension that locally tunes the readability and continuity of the page you are viewing. 12 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker) + partially supported Volume Booster (ordinary sites). All default OFF (opt-in). Zero external network calls.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 11 categories of features into a single popup.
+A productivity helper that bundles 12 categories of features + partially supported Volume Booster into a single popup.
 
 ■ Features available on Firefox
 
@@ -27,6 +27,9 @@ On amazon.co.jp/auto-deliveries, computes per-month delivery totals and inserts 
 
 🔹 Amazon jump-to-ranking button
 The bestseller-rank links in a product's detail section appear in different positions on every page and are hard to find, so this consolidates a "Go to this product's ranking" button at the top of the product info. Clicking it navigates (same tab) to the most specific subcategory ranking. Pure DOM manipulation, zero external transmission.
+
+🔹 Amazon seller / shipper badge
+Extracts the seller and shipper from the product page's hidden divs (#merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div) and shows them as a "📦 Sold: XXX / Ships: YYY" badge at the top of the product info (right next to the jump-to-ranking button). **Amazon-fulfilled and marketplace listings are visually distinguished** (Amazon-fulfilled = green badge / marketplace = orange warning badge), making it easy to spot suspicious marketplace listings at a glance. The detection uses Amazon's own isInternal flag (embedded JSON in the <script> inside #merchantInfoFeature_feature_div) as the primary signal, with the seller name as a fallback. Pure DOM manipulation, zero external transmission.
 
 🔹 Instagram Cleaner (11 sub-features)
 Hides Reels / Explore / Stories / Threads / like counts / videos / comments / Notes / message counters, and similar verbose UI. Uses only semantic selectors (aria-label / role / data-pagelet); no dependency on obfuscated class names.
@@ -49,11 +52,12 @@ Injects a 1×1 px invisible hint element on pages containing `<video>` elements 
 🔹 Color Picker (popup tab)
 EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).
 
-■ Differences from the Chrome edition
-The Chrome edition adds a Volume Booster (tab audio amplifier with auto gain, normalizer, night mode, etc.). Volume Booster depends on `chrome.offscreen` and `chrome.tabCapture`, neither of which is supported by Firefox MV3, so it is excluded from the Firefox build. We plan to port it once Firefox implements these APIs.
+🔹 Volume Booster (partial support — ordinary sites only)
+Since v1.0.33, the Volume Booster is partially supported on Firefox. Ordinary video sites (YouTube / X / Twitch / TikTok / Instagram / niconico, etc.) are boosted via the content script's MediaElementSource path — the content script attaches directly to `<video>` / `<audio>` elements and applies automatically without ever opening the popup. Supports 0–300% amplification, auto distortion guard, auto volume normalization, night mode, and mute (master toggle + 3 sub-toggles + mute, all default OFF).
+However, EME (DRM) heavy sites (Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Spotify, etc. — 15 hosts) are **unsupported on the Firefox edition**. The Chrome edition can boost these sites via the `chrome.tabCapture` fallback path, but `tabCapture` is not supported by Firefox MV3. We plan to migrate to full support once Firefox implements the API.
 
 ■ Privacy
 Fully local execution; zero external network calls. Only `browser.storage.local` is used (no sync / no cloud). See docs/privacy-policy.md for details.
 
 ■ Requirements
-Firefox 140 or later.
+Firefox 142 or later.

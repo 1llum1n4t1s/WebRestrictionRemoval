@@ -24,8 +24,8 @@ const Actions = Object.freeze({
   APPLY_AMAZON_DELIVERY_TOTAL_CS: "applyAmazonDeliveryTotalCS",
   /** background → Amazon ランキング移動 content script: 「ランキングへ移動」ボタンの有効/無効を反映 */
   APPLY_AMAZON_RANKING_JUMP_CS: "applyAmazonRankingJumpCS",
-  /** background → Amazon 取り扱い開始日 content script: 取り扱い開始日表示の有効/無効を反映 */
-  APPLY_AMAZON_RELEASE_DATE_CS: "applyAmazonReleaseDateCS",
+  /** background → Amazon 販売元・出荷元バッジ content script: バッジ表示の有効/無効を反映 */
+  APPLY_AMAZON_MERCHANT_INFO_CS: "applyAmazonMerchantInfoCS",
   /** background → keepalive content script: セッション維持設定を反映 */
   APPLY_KEEP_ALIVE_CS: "applyKeepAliveCS",
   /** background → Instagram content script: Instagram クリーナー設定を反映 */
@@ -125,8 +125,9 @@ const StorageKeys = Object.freeze({
   AMAZON_DELIVERY_TOTAL_ENABLED: "amazonDeliveryTotalEnabled",
   /** Amazon 商品ページに「この商品が所属するランキングへ移動」ボタンを表示するか（オプトイン・デフォルト OFF） */
   AMAZON_RANKING_JUMP_ENABLED: "amazonRankingJumpEnabled",
-  /** Amazon 商品ページに「取り扱い開始日 + 経過年月」表示を出すか（オプトイン・デフォルト OFF） */
-  AMAZON_RELEASE_DATE_ENABLED: "amazonReleaseDateEnabled",
+  /** Amazon 商品ページに販売元・出荷元バッジを表示するか（オプトイン・デフォルト OFF）。
+   *  Amazon 直販と マーケット出品 を視覚的に区別する（直販=緑 / マーケット=オレンジ警告色）。 */
+  AMAZON_MERCHANT_INFO_ENABLED: "amazonMerchantInfoEnabled",
   /** Instagram クリーナーマスタートグル */
   INSTAGRAM_CLEANER_ENABLED: "instagramCleanerEnabled",
   /** Instagram クリーナーの個別機能オン/オフ（オブジェクト） */
@@ -511,104 +512,68 @@ const AmazonRankingJump = Object.freeze({
 });
 
 /**
- * @readonly Amazon 商品ページ「取り扱い開始日」表示の定数と純粋関数（独自実装）。
+ * @readonly Amazon 商品ページ「販売元・出荷元バッジ」表示の定数と純粋関数（独自実装）。
  *
- * 商品詳細欄（`#detailBullets_feature_div` 等）の中にある「取り扱い開始日」項目を抽出し、
- * 商品情報の最上部に「ランキングへ移動」ボタンの隣（後）に並べる情報表示パネル。
- * クリック不可（`<span>` ベースで `<a>` ではない）の純粋な情報表示。
+ * Amazon は商品ページに `#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`
+ * という 2 つの隠し div で販売元・出荷元の値を保持している（実表示は別レンダリング先で fragile だが、
+ * これらの隠し div はマーケット商品でも値が入っており、データ source として安定）。これを集約して
+ * ランキングボタンの隣に「販売: XXX / 出荷: YYY」バッジで表示する。
  *
  * 設計判断:
- *   - master トグル `amazonReleaseDateEnabled` で制御（オプトイン・デフォルト OFF）
- *   - 表示は「取り扱い開始: YYYY/MM/DD」+「約 N 年前 / N ヶ月前」の 2 段表示
- *   - 日付パース・相対年月計算は純粋関数化（test/actions.test.js で境界値テスト）
+ *   - master トグル `amazonMerchantInfoEnabled` で制御（オプトイン・デフォルト OFF）
+ *   - Amazon 直販と マーケット出品 を視覚的に区別する（直販=緑 / マーケット=オレンジ警告色）
+ *   - Amazon 直販判定は `#merchantInfoFeature_feature_div` 内 `<script>` の JSON フラグ
+ *     `isInternal` を最優先（Amazon 自身が出す信頼できるフラグ）。script 欠落時は販売元名で推定
+ *   - クリック不可（`<span>` ベース、`<a>` ではない）の情報パネル
+ *   - 純粋関数 `parseIsInternal` / `isAmazonOwnedName` で境界値テスト可能化
  */
-const AmazonReleaseDate = Object.freeze({
-  /** ボタンと装飾クラスの接頭辞 */
-  ROOT_CLASS: "__cpa-amzn-release-date",
-  /** 取り扱い開始日を探す商品詳細コンテナ群（AmazonRankingJump と同型、商品ページで自己ゲート） */
-  DETAIL_CONTAINER_SELECTORS: Object.freeze([
-    "#detailBulletsWrapper_feature_div",
-    "#detailBullets_feature_div",
-    "#productDetails_detailBullets_sections1",
-    "#prodDetails",
-  ]),
-  /**
-   * 取り扱い開始日項目のラベル候補。Amazon.co.jp は通常「取り扱い開始日」だが、
-   * UI を英語に切り替えると "Date First Available" になるので両方に対応。
-   * 検出時は `String.prototype.includes` で完全一致ではなく部分一致するため、
-   * `‏ : ‎` のような bidi 制御文字付きでもマッチする。
-   */
-  LABEL_KEYWORDS: Object.freeze(["取り扱い開始日", "Date First Available"]),
-  /**
-   * 日付テキスト中のセパレータ "‏" (U+200F) / "‎" (U+200E) / "：" / ":" / 全角空白等を
-   * 取り除くための前処理用正規表現。bidi マーク類は visible なら混乱の元なので削る。
-   */
-  STRIP_BIDI_RE: /[‎‏‪-‮⁦-⁩]/g,
+const AmazonMerchantInfo = Object.freeze({
+  /** バッジと装飾クラスの接頭辞 */
+  ROOT_CLASS: "__cpa-amzn-merchant-info",
+  /** 販売元情報を持つ Amazon 隠し div の id（マーケット商品でも visible:false で値は入っている） */
+  MERCHANT_DIV_ID: "merchantInfoFeature_feature_div",
+  /** 出荷元情報を持つ Amazon 隠し div の id */
+  FULFILLER_DIV_ID: "fulfillerInfoFeature_feature_div",
+  /** 値テキストを持つ安定マーカー span（Amazon の build を跨いで残る class） */
+  VALUE_SELECTOR: "span.offer-display-feature-text-message",
+  /** Amazon 自身を示す販売元名のパターン（部分一致）。Amazon 直販と推定するときの fallback 用 */
+  AMAZON_OWNED_NAMES: Object.freeze(["Amazon.co.jp", "Amazon.com", "Amazon"]),
 
   /**
-   * 表示テキストから日付を Date に変換する純粋関数。
-   *   - "2023/1/15", "2023/01/15", "2023-1-15", "2023年1月15日" を全て受理
-   *   - 範囲外の年月日は null
-   *   - bidi 制御文字を含むテキストも前処理して受理
-   * @param {unknown} text
-   * @returns {Date|null}
-   */
-  parseReleaseDateText(text) {
-    if (typeof text !== "string") return null;
-    const cleaned = text.replace(AmazonReleaseDate.STRIP_BIDI_RE, "").trim();
-    if (cleaned.length === 0) return null;
-    const m = cleaned.match(/(\d{4})\s*[/\-.年]\s*(\d{1,2})\s*[/\-.月]\s*(\d{1,2})/);
-    if (!m) return null;
-    const y = parseInt(m[1], 10);
-    const mo = parseInt(m[2], 10);
-    const d = parseInt(m[3], 10);
-    if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return null;
-    if (y < 1900 || y > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-    const dt = new Date(y, mo - 1, d);
-    // 無効日付（例: 2024/2/30）を弾く
-    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-    return dt;
-  },
-
-  /**
-   * 表示用の "YYYY/MM/DD" 文字列を組み立てる純粋関数（locale 非依存・ゼロ詰めなし）。
-   * Amazon の bullet list 上の見た目に合わせる。
-   */
-  formatReleaseDate(date) {
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-  },
-
-  /**
-   * 経過時間を「年・月・日」の構造化 diff として返す純粋関数。
-   * content script 側で kind に応じた i18n メッセージキー (`amazonReleaseDateRelative*`) を
-   * 選択するために使う（i18n 文字列フォーマットを純粋関数の外に置く設計）。
+   * merchantInfoFeature 内の `<script>` テキストから isInternal フラグを抽出する純粋関数。
+   * Amazon は merchant-stats-pagestate-holder-0 等の div 内に
+   *   {"marketplaceId":"...","isInternal":true|false,"isRobot":false,"merchantId":"...","asin":"..."}
+   * 形式の JSON を埋めている。これは Amazon 自身が出すフラグで Amazon 直販判定の最も信頼できる source。
    *
-   * @param {Date} from 起点（取り扱い開始日、過去）
-   * @param {Date} now  現在（呼び出し側で `new Date()` を渡す）
-   * @returns {{kind: "future"|"today"|"days"|"months"|"years"|"yearsMonths", years: number, months: number, days: number}|null}
+   * @param {unknown} text JSON 文字列（先頭が "{" であることを期待）
+   * @returns {boolean|null} true=Amazon 直販, false=マーケット, null=parse 失敗
    */
-  diffRelative(from, now) {
-    if (!(from instanceof Date) || Number.isNaN(from.getTime())) return null;
-    if (!(now instanceof Date) || Number.isNaN(now.getTime())) return null;
-    const diffMs = now.getTime() - from.getTime();
-    if (diffMs < 0) return Object.freeze({ kind: "future", years: 0, months: 0, days: 0 });
-
-    let years = now.getFullYear() - from.getFullYear();
-    let months = now.getMonth() - from.getMonth();
-    let days = now.getDate() - from.getDate();
-    if (days < 0) months -= 1;
-    if (months < 0) { years -= 1; months += 12; }
-
-    if (years >= 1) {
-      return months === 0
-        ? Object.freeze({ kind: "years", years, months: 0, days: 0 })
-        : Object.freeze({ kind: "yearsMonths", years, months, days: 0 });
+  parseIsInternal(text) {
+    if (typeof text !== "string") return null;
+    const trimmed = text.trim();
+    if (trimmed.length === 0 || trimmed[0] !== "{") return null;
+    try {
+      const obj = JSON.parse(trimmed);
+      if (typeof obj?.isInternal === "boolean") return obj.isInternal;
+      return null;
+    } catch {
+      return null;
     }
-    if (months >= 1) return Object.freeze({ kind: "months", years: 0, months, days: 0 });
-    const dayCount = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-    if (dayCount >= 1) return Object.freeze({ kind: "days", years: 0, months: 0, days: dayCount });
-    return Object.freeze({ kind: "today", years: 0, months: 0, days: 0 });
+  },
+
+  /**
+   * 販売元名から Amazon 直販っぽさを推定する純粋関数。isInternal が取れないとき (script 欠落) の保険判定。
+   * 「Amazon.co.jp」「Amazon.com」「Amazon」のいずれかを部分一致で含むなら true。
+   * マーケット出品名（例: "Amazon Renewed Hub", "By Amazon ..." 等）の偽陽性は許容範囲。
+   *
+   * @param {unknown} name 販売元名
+   * @returns {boolean}
+   */
+  isAmazonOwnedName(name) {
+    if (typeof name !== "string") return false;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return false;
+    return AmazonMerchantInfo.AMAZON_OWNED_NAMES.some((n) => trimmed.includes(n));
   },
 });
 
@@ -1620,7 +1585,7 @@ const PopupTabs = Object.freeze({
     Object.freeze({ field: "searchFixerGridItems", storageKey: StorageKeys.SEARCH_FIXER_GRID_ITEMS, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "amazonDeliveryTotalEnabled", storageKey: StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED, applyAction: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS }),
     Object.freeze({ field: "amazonRankingJumpEnabled", storageKey: StorageKeys.AMAZON_RANKING_JUMP_ENABLED, applyAction: Actions.APPLY_AMAZON_RANKING_JUMP_CS }),
-    Object.freeze({ field: "amazonReleaseDateEnabled", storageKey: StorageKeys.AMAZON_RELEASE_DATE_ENABLED, applyAction: Actions.APPLY_AMAZON_RELEASE_DATE_CS }),
+    Object.freeze({ field: "amazonMerchantInfoEnabled", storageKey: StorageKeys.AMAZON_MERCHANT_INFO_ENABLED, applyAction: Actions.APPLY_AMAZON_MERCHANT_INFO_CS }),
     Object.freeze({ field: "instagramCleanerEnabled", storageKey: StorageKeys.INSTAGRAM_CLEANER_ENABLED, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "instagramCleanerFeatures", storageKey: StorageKeys.INSTAGRAM_CLEANER_FEATURES, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "tiktokCleanerEnabled", storageKey: StorageKeys.TIKTOK_CLEANER_ENABLED, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
@@ -1648,7 +1613,7 @@ const PopupTabs = Object.freeze({
   globalThis.SearchFixer = SearchFixer;
   globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
   globalThis.AmazonRankingJump = AmazonRankingJump;
-  globalThis.AmazonReleaseDate = AmazonReleaseDate;
+  globalThis.AmazonMerchantInfo = AmazonMerchantInfo;
   globalThis.InstagramCleaner = InstagramCleaner;
   globalThis.TikTokCleaner = TikTokCleaner;
   globalThis.ImageDownloader = ImageDownloader;

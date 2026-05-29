@@ -107,7 +107,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-    StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
+    StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_ENABLED,
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
@@ -156,8 +156,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.AMAZON_RANKING_JUMP_ENABLED in stored)) {
     defaults[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] = false;
   }
-  if (!(StorageKeys.AMAZON_RELEASE_DATE_ENABLED in stored)) {
-    defaults[StorageKeys.AMAZON_RELEASE_DATE_ENABLED] = false;
+  if (!(StorageKeys.AMAZON_MERCHANT_INFO_ENABLED in stored)) {
+    defaults[StorageKeys.AMAZON_MERCHANT_INFO_ENABLED] = false;
   }
   if (!(StorageKeys.INSTAGRAM_CLEANER_ENABLED in stored)) {
     defaults[StorageKeys.INSTAGRAM_CLEANER_ENABLED] = false;
@@ -251,16 +251,30 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 // ---------- メッセージハンドラ ----------
+// /rere B1-001 修正: 旧実装は sender 検証 fail 時 `return;` (= undefined) で sendResponse channel を
+// 即廃棄していたため、popup 側で `await chrome.runtime.sendMessage` が **undefined で resolve** し、
+// `res?.ok` が falsy → applyError 誤発火という silent failure を起こしていた。
+// `sendResponse({ ok: false, error: "sender-rejected" }); return false;` に変更することで、
+// (1) popup 側に明示的な拒否理由が届く、(2) Chrome MV3 仕様上の sendResponse channel が
+// 同期的にクローズされる (return false = 同期応答完了)、の両立を実現する。
+// 未知 action 経路も最末尾で `return false;` を明示し、将来の handler 追加で `return true` 漏れの
+// 罠を物理的に避ける (現状の implicit `undefined` 返しでは同じ silent failure リスクが残る)。
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === Actions.APPLY_SETTINGS) {
-    if (!SenderCheck.isFromPopup(sender)) return;
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     handleApplySettings(request.data)
       .then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false }));
     return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
     // popup が user gesture を持つので、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
-    if (!SenderCheck.isFromPopup(sender)) return;
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     if (!HAS_VOLUME_BOOSTER) {
       // Firefox 版では popup UI 自体を非表示にしているのでここに到達するのは想定外だが、
       // 防御深層として明示的に reject する (例外を吐かず popup の error 表示で安全に終わる)。
@@ -279,7 +293,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
     return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_RELEASE_TAB) {
-    if (!SenderCheck.isFromPopup(sender)) return;
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     if (!HAS_VOLUME_BOOSTER) {
       sendResponse({ ok: false, error: "volume-booster-unavailable" });
       return true;
@@ -291,7 +308,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === Actions.LOUPE_REQUEST_CAPTURE) {
     // ルーペ content script からの captureVisibleTab 要求。
     // sender 検証: content script 由来のみ受け付け（popup からは来ない設計）。
-    if (!SenderCheck.isFromContentScript(sender)) return;
+    if (!SenderCheck.isFromContentScript(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
     const tabId = sender.tab?.id;
     const windowId = sender.tab?.windowId;
     if (!Number.isInteger(tabId) || !Number.isInteger(windowId)) {
@@ -342,6 +362,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((err) => safeRespond({ ok: false, error: String(err?.message ?? err) }));
     return true;
   }
+  // /rere B1-001 修正: 未知 action は明示的に return false で channel をクローズ。
+  // implicit undefined 返しだと将来の handler 追加時に sendResponse 漏れの罠を踏みやすい。
+  return false;
 });
 
 // ---------- タブクローズで音量ブーストを解放 ----------
@@ -368,6 +391,14 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // `chrome.storage.onChanged` で invalidate する方式にする (/rere C 2-A)。
 // 注: SW 再起動でこの変数は消えるため、初回呼び出し時の null フォールバックは必須。
 let cachedVolumeSettings = null;
+// /rere F-003 race protection: cachedVolumeSettings の fetch 中に onChanged が invalidate しても、
+// await 完了時に stale な fetch 結果で cache が上書きされる race を seqId で検出する。
+// fetch 前と fetch 後で cacheSeqId が変わっていたら、その fetch 結果は stale なので破棄して再帰 fetch。
+// 旧実装: ① autoApplyVolumeBooster の await 中に popup が storage.set →
+//          ② onChanged listener が `cachedVolumeSettings = null` (cache 無効化)
+//          ③ ①の await 完了 → 古い storage 値を `cachedVolumeSettings` に代入 (上書き)
+//          ④ 古い値が以降のタブ切替で適用され、UI と挙動の乖離が発生
+let cacheSeqId = 0;
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効
@@ -380,7 +411,8 @@ async function autoApplyVolumeBooster(tabId) {
   // 未 boost タブへの初回適用は popup 表示時の pushVolumeNow (user gesture あり) が担う。
   if (!boostedTabIds.has(tabId)) return;
   if (cachedVolumeSettings === null) {
-    cachedVolumeSettings = await chrome.storage.local.get([
+    const seqAtFetch = cacheSeqId;
+    const fetched = await chrome.storage.local.get([
       StorageKeys.VOLUME_BOOSTER_ENABLED,
       StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
       StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
@@ -388,6 +420,12 @@ async function autoApplyVolumeBooster(tabId) {
       StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
       StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     ]);
+    // fetch 中に onChanged が cache を invalidate していたら、この fetch 結果は stale。
+    // cache 代入をスキップし、再帰呼び出しで fresh fetch を試みる (cacheSeqId は invalidate 側で進む)。
+    if (seqAtFetch !== cacheSeqId) {
+      return autoApplyVolumeBooster(tabId);
+    }
+    cachedVolumeSettings = fetched;
   }
   const stored = cachedVolumeSettings;
   if (stored[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) return;
@@ -412,6 +450,9 @@ chrome.storage.onChanged.addListener((changes) => {
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes
   ) {
     cachedVolumeSettings = null;
+    // /rere F-003: 進行中の autoApplyVolumeBooster の await が stale な fetch 結果で
+    // cache を上書きする race を防ぐため seqId を進める (await 復帰時 seqId 不一致で破棄判定)
+    cacheSeqId++;
   }
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes &&
@@ -465,28 +506,11 @@ async function getActiveTab() {
 // storage 既存値で補完してから normalizeSettings へ渡すことで、partial payload が
 // 来ても他キーが「正規化で false 化」されて消える事故 (= keepAliveEnabled が
 // いつの間にか OFF になる) を防ぐ二重防御。
-const APPLY_SETTINGS_KEYS = Object.freeze([
-  StorageKeys.KEEP_ALIVE_ENABLED,
-  StorageKeys.KEEP_ALIVE_INTERVAL_MS,
-  StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
-  StorageKeys.SEARCH_FIXER_ENABLED,
-  StorageKeys.SEARCH_FIXER_FEATURES,
-  StorageKeys.SEARCH_FIXER_GRID_ITEMS,
-  StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
-  StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-  StorageKeys.AMAZON_RELEASE_DATE_ENABLED,
-  StorageKeys.INSTAGRAM_CLEANER_ENABLED,
-  StorageKeys.INSTAGRAM_CLEANER_FEATURES,
-  StorageKeys.TIKTOK_CLEANER_ENABLED,
-  StorageKeys.TIKTOK_CLEANER_FEATURES,
-  StorageKeys.VIDEO_GAMMA_ENABLED,
-  StorageKeys.VIDEO_GAMMA_VALUE,
-  StorageKeys.VIDEO_FILL_ENABLED,
-  StorageKeys.VIDEO_FILL_MODE,
-  StorageKeys.VIDEO_FILL_TARGET,
-  StorageKeys.LOUPE_ENABLED,
-  StorageKeys.RTX_ENHANCER_ENABLED,
-]);
+// /rere B2-I003/D-003 修正: SettingsSchema の storageKey から導出して手書き列挙を廃止。
+// 新 master トグル / 設定キー追加時の「APPLY_SETTINGS_KEYS への追加忘れ」事故を構造的に防止。
+// 旧実装は SettingsSchema と APPLY_SETTINGS_KEYS と normalizeSettings と toStorageRecord の
+// 4 箇所で同じキー集合を手書きしていたため、4 箇所同期失敗 = drift = 永久 OFF バグの温床。
+const APPLY_SETTINGS_KEYS = Object.freeze(SettingsSchema.map((entry) => entry.storageKey));
 
 async function handleApplySettings(settings) {
   // 既存 storage 値で補完してから normalize: settings に含まれないキーがあっても
@@ -528,7 +552,7 @@ function normalizeSettings(settings) {
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
     amazonDeliveryTotalEnabled: settings?.amazonDeliveryTotalEnabled === true,
     amazonRankingJumpEnabled: settings?.amazonRankingJumpEnabled === true,
-    amazonReleaseDateEnabled: settings?.amazonReleaseDateEnabled === true,
+    amazonMerchantInfoEnabled: settings?.amazonMerchantInfoEnabled === true,
     instagramCleanerEnabled: settings?.instagramCleanerEnabled === true,
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
     tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
@@ -545,30 +569,16 @@ function normalizeSettings(settings) {
   };
 }
 
-/** 正規化済み settings から chrome.storage.local.set 用のレコードを構築。 */
+/** 正規化済み settings から chrome.storage.local.set 用のレコードを構築。
+ *  /rere B2-I003/D-003 修正: SettingsSchema から導出して手書き列挙を廃止。
+ *  新 master トグル追加時の「toStorageRecord への追加忘れ」事故 (drift) を構造的に防止。
+ *  各 entry は `{ field, storageKey }` を持ち、normalizeSettings の戻り値から storageKey 経由で
+ *  storage レコードを generate する。normalizeSettings の戻り値キー (= field 名) と SettingsSchema
+ *  の field が一致することは test/actions.test.js の "SettingsSchema" テストで保証されている。 */
 function toStorageRecord(s) {
-  return {
-    [StorageKeys.KEEP_ALIVE_ENABLED]: s.keepAliveEnabled,
-    [StorageKeys.KEEP_ALIVE_INTERVAL_MS]: s.keepAliveIntervalMs,
-    [StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED]: s.keepAliveHttpPingEnabled,
-    [StorageKeys.SEARCH_FIXER_ENABLED]: s.searchFixerEnabled,
-    [StorageKeys.SEARCH_FIXER_FEATURES]: s.searchFixerFeatures,
-    [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: s.searchFixerGridItems,
-    [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: s.amazonDeliveryTotalEnabled,
-    [StorageKeys.AMAZON_RANKING_JUMP_ENABLED]: s.amazonRankingJumpEnabled,
-    [StorageKeys.AMAZON_RELEASE_DATE_ENABLED]: s.amazonReleaseDateEnabled,
-    [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: s.instagramCleanerEnabled,
-    [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: s.instagramCleanerFeatures,
-    [StorageKeys.TIKTOK_CLEANER_ENABLED]: s.tiktokCleanerEnabled,
-    [StorageKeys.TIKTOK_CLEANER_FEATURES]: s.tiktokCleanerFeatures,
-    [StorageKeys.VIDEO_GAMMA_ENABLED]: s.videoGammaEnabled,
-    [StorageKeys.VIDEO_GAMMA_VALUE]: s.videoGammaValue,
-    [StorageKeys.VIDEO_FILL_ENABLED]: s.videoFillEnabled,
-    [StorageKeys.VIDEO_FILL_MODE]: s.videoFillMode,
-    [StorageKeys.VIDEO_FILL_TARGET]: s.videoFillTarget,
-    [StorageKeys.LOUPE_ENABLED]: s.loupeEnabled,
-    [StorageKeys.RTX_ENHANCER_ENABLED]: s.rtxEnhancerEnabled,
-  };
+  return Object.fromEntries(
+    SettingsSchema.map(({ field, storageKey }) => [storageKey, s[field]])
+  );
 }
 
 /**
@@ -638,9 +648,9 @@ async function notifyContentScripts(s) {
     messages.push([{ action: Actions.APPLY_AMAZON_RANKING_JUMP_CS, data: {
       enabled: s.amazonRankingJumpEnabled,
     } }, TOP_FRAME]);
-    // 取り扱い開始日表示も ranking と同じく Amazon ドメイン全体で配信し、商品ページで自己ゲート。
-    messages.push([{ action: Actions.APPLY_AMAZON_RELEASE_DATE_CS, data: {
-      enabled: s.amazonReleaseDateEnabled,
+    // 販売元・出荷元バッジも ranking と同じく Amazon ドメイン全体で配信し、商品ページで自己ゲート。
+    messages.push([{ action: Actions.APPLY_AMAZON_MERCHANT_INFO_CS, data: {
+      enabled: s.amazonMerchantInfoEnabled,
     } }, TOP_FRAME]);
   }
   if (isInstagramUrl(url)) {
@@ -1079,7 +1089,17 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
     });
     // P2-#19: 成功時のみローカルキャッシュに登録。失敗（offscreen エラー / no-response）の場合は
     // ブースト中状態にならないため Set には追加しない。
-    if (res?.ok) await markVolumeBoosterTabActive(tabId);
+    // /rere B1-006 修正: markVolumeBoosterTabActive が false (= getMediaStreamId 完了後に
+    // onRemoved がタブを閉じた race window で removedVolumeBoosterTabIds.has() がヒット →
+    // release 実行 + false 返却) の場合、caller の res に整合性結果を反映する。旧実装では
+    // markVolumeBoosterTabActive の戻り値を捨てて res をそのまま返していたため、popup 側で
+    // 「offscreen ok だがタブは既に閉じられている」という整合性破れの ok:true を受けていた。
+    if (res?.ok) {
+      const marked = await markVolumeBoosterTabActive(tabId);
+      if (!marked) {
+        return { ok: false, error: "tab-closed-during-init" };
+      }
+    }
     return res ?? { ok: false, error: "no-response" };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };

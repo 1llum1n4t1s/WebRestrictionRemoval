@@ -1,0 +1,74 @@
+/*
+ * Amazon「販売元・出荷元バッジ」のスタイル。
+ *
+ * 固定クラス名（`__cpa-amzn-merchant-info` prefix）で構成。AmazonRankingJump ボタンと
+ * 同じピル型形状を共有しつつ、クリック不可（`<span>`）であることを `cursor: default` で表現。
+ * `data-variant` 属性で 2 色切替:
+ *   - `data-variant="amazon"`     : Amazon 直販。緑系。信頼感ある安定色。
+ *   - `data-variant="marketplace"`: マーケット出品。オレンジ警告色。詐欺マーケットプレイス回避の視覚シグナル。
+ * 両機能 ON（ランキング移動ボタン + 販売元バッジ）のときは横並び。
+ */
+
+.__cpa-amzn-merchant-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: 10px 8px 14px 0;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial,
+    "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  cursor: default;
+  user-select: text;
+  box-shadow: 0 2px 6px rgba(15, 17, 17, 0.18);
+  vertical-align: middle;
+}
+
+/* Amazon 直販: 緑系（落ち着いた信頼感、Amazon 公式ロゴの「a」アクセントカラーに寄せず独自配色） */
+.__cpa-amzn-merchant-info[data-variant="amazon"] {
+  background: linear-gradient(180deg, #a8e6a3 0%, #2e8b3d 100%);
+  border: 1px solid #1f6b2a;
+  color: #0a2a10;
+}
+
+/* マーケット出品: オレンジ警告色（注意喚起。赤すぎず、Amazon オレンジとも別ニュアンスの琥珀系） */
+.__cpa-amzn-merchant-info[data-variant="marketplace"] {
+  background: linear-gradient(180deg, #ffc46b 0%, #d76a00 100%);
+  border: 1px solid #a04e00;
+  color: #2a1500;
+}
+
+.__cpa-amzn-merchant-info__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.__cpa-amzn-merchant-info__text {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.__cpa-amzn-merchant-info__seller {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.__cpa-amzn-merchant-info__shipper {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}

@@ -12,6 +12,11 @@ jobs:
   package:
     name: ZIP パッケージ作成
     runs-on: ubuntu-latest
+    outputs:
+      # version を後続 job (publish / publish-firefox) の pre-flight check に渡す。
+      # 同 version が既に CWS / AMO に存在する場合、publish step を skip して
+      # 「同 version 重複 push 拒否」エラーを未然に防ぐ (/rere F-002 修正)。
+      version: ${{ steps.version.outputs.version }}
     steps:
       # サプライチェーン攻撃対策で SHA ピン留め (#6)。タグは指すコミットを書き換え可能なため
       # 信頼境界として弱い。Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の
@@ -120,7 +125,78 @@ jobs:
           name: web-viewing-assist-zip
           path: .
 
+      - name: バージョン pre-flight check (CWS / 既存 version と一致なら skip)
+        # /rere F-002 修正 + セルフレビュー 2 巡目修正: 同 version 再 push は CWS API が
+        # INVALID_ARGUMENT 等で拒否するため、Items.get API で **draft の crxVersion** を取得して
+        # manifest version と一致したら publish を skip する。
+        #
+        # 旧実装は公開 store HTML を grep していたが、CWS の SSR HTML は JSON が二重エスケープされた
+        # `"version\":\"X.Y.Z\""` 形式で埋め込まれ、しかも別の埋め込み JSON (API/ranking 等) も
+        # version キーを持っているため、HTML scraping では**他拡張機能の version を誤検出**して
+        # 常時 skip 化 (silent failure) するリスクがあった (実機検証で 2 件の無関係 version を確認)。
+        #
+        # ⚠️ `crxVersion` は CWS Items API の公式ドキュメントには記載がない **未文書フィールド**だが、
+        # 実機検証 (`?projection=DRAFT`) で `{kind,id,publicKey,uploadState,crxVersion}` が返ることを
+        # 確認済み (PlasmoHQ 等の publish ツールでも事実上の標準として使われている)。将来 API 変更で
+        # 消えたら draft_version が空になり skip=false 側 (publish 実行) に倒れるので安全。
+        #
+        # ⚠️ uploadState の判定: 実機検証で publish 済み clean draft は `uploadState: "NOT_FOUND"`
+        # (= 保留中アップロード操作なし) を返すことを確認。旧実装の `= "SUCCESS"` 限定だと、まさに
+        # 「既に同 version が公開済み」のケースで skip に到達せず pre-flight が機能しなかった。
+        # uploadState は SUCCESS / NOT_FOUND / IN_PROGRESS / FAILURE を取り、FAILURE のときのみ
+        # 「直近アップロード失敗 → 再 upload したい」ので skip しない。それ以外は crxVersion 一致で skip。
+        #
+        # OAuth refresh は publish step と独立に実行 (token は use-and-forget)、secrets 露出経路は
+        # publish step と同等。
+        id: cws-preflight
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          MANIFEST_VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s inherit_errexit
+          # OAuth refresh (publish step と同じ流れ、token はマスク登録)
+          token_response=$(curl -fsS \
+            -X POST "https://oauth2.googleapis.com/token" \
+            --data-urlencode "client_id=${CWS_CLIENT_ID}" \
+            --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
+            --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
+            --data-urlencode "grant_type=refresh_token")
+          # python が非 JSON で exit 1 しても inherit_errexit で step ごと落ちないよう `|| echo ""`
+          # でフォールバックさせ、直後の空チェック分岐で warning 降格させる (セルフレビュー 2 巡目 #3)。
+          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response" || echo "")
+          if [ -z "${access_token:-}" ]; then
+            echo "::warning::CWS pre-flight: OAuth token 取得失敗 → publish step に判定を委ねる"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::add-mask::${token_response}"
+          echo "::add-mask::${access_token}"
+          # Items.get で draft の crxVersion + uploadState を取得
+          draft_response=$(curl -fsS \
+            -H "Authorization: Bearer ${access_token}" \
+            -H "x-goog-api-version: 2" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}?projection=DRAFT") || draft_response=""
+          if [ -z "$draft_response" ]; then
+            echo "::warning::CWS pre-flight: Items.get 失敗 → publish step に判定を委ねる"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          draft_version=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("crxVersion",""))' 2>/dev/null <<< "$draft_response" || echo "")
+          draft_state=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("uploadState",""))' 2>/dev/null <<< "$draft_response" || echo "")
+          echo "📊 CWS draft: version=${draft_version:-(unknown)} state=${draft_state:-(unknown)} / manifest: ${MANIFEST_VERSION}"
+          if [ -n "$draft_version" ] && [ "$draft_version" = "$MANIFEST_VERSION" ] && [ "$draft_state" != "FAILURE" ]; then
+            echo "::notice::CWS は既に v${MANIFEST_VERSION} を保持 (crxVersion 一致, uploadState=${draft_state})。CWS publish step を skip (同 version 重複 push 防止)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Chrome Web Store にアップロード + Publish API で Submit for review
+        if: ${{ steps.cws-preflight.outputs.skip != 'true' }}
         env:
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
@@ -146,7 +222,13 @@ jobs:
           # GitHub Actions の自動マスキングは「シークレット文字列がそのまま出力された場合」のみ働くため、
           # CLI が OAuth Bearer Token をエラーメッセージに混ぜてくると平文でログ残存しうる。
           # 直接ストリームすれば Actions ランナー側のマスキングが各シークレットを `***` に置換できる。
+          # 注意: `set -e` だけだと `var=$(cmd)` 形式での内部コマンド失敗が errexit されない bash 仕様
+          # があるため、access_token が空文字化した状態で curl が "Authorization: Bearer " を送って
+          # 401 で失敗 → 「upload エラー」として現れる紛らわしい状況になる。`inherit_errexit` を
+          # `set -euo pipefail` の直後 (= 後続の全 command substitution の前) に有効化して、token 取得
+          # curl も保護対象に含める (セルフレビュー 2 巡目 #4: shopt 配置を curl より前に移動)。
           set -euo pipefail
+          shopt -s inherit_errexit
           # ⚠️ このブロックでは `set -x` を絶対に有効化しない。set -x がトークン取得行を
           # 展開すると CWS_REFRESH_TOKEN / token_response / access_token のいずれかが
           # add-mask 登録前に平文ログに出る可能性がある (/rere レビュー A2-S-1 防御)。
@@ -158,8 +240,13 @@ jobs:
             --data-urlencode "grant_type=refresh_token")
           # Python 例外メッセージは標準で token 本体を含まないが、防御深層として stderr を抑制し、
           # KeyError / JSONDecodeError 時のスタックトレースから付帯情報の漏洩可能性をゼロ化する。
-          # パース失敗時は `set -euo pipefail` により非ゼロ終了で job が即 abort する。
-          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response")
+          # `|| echo ""` で python 非ゼロ終了を空文字に変換し、inherit_errexit で step が落ちる前に
+          # 直後の空チェック分岐 (hard fail) に到達させる (セルフレビュー 2 巡目 #3)。
+          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response" || echo "")
+          if [ -z "${access_token:-}" ]; then
+            echo "::error::access_token のパースに失敗しました (OAuth refresh response が想定形式でない可能性)"
+            exit 1
+          fi
           # 動的取得した access_token は GitHub Actions の自動マスキング対象外のため、
           # add-mask で明示的にマスク登録して以降のログ出力でも漏洩しないようにする。
           # token_response は access_token を含む JSON 全体。`set -x` や将来の
@@ -226,6 +313,11 @@ jobs:
       - name: リポジトリをチェックアウト
         # web-ext は devDependencies なので package.json + lockfile が必要 (npm ci で取得)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        # /rere F-OPS-1 修正: package job と防御深層の整合性確保。本 job では git push を
+        # 行わないが、persist-credentials: false で GITHUB_TOKEN を .git/config の extraheader に
+        # 残さない (script injection 経由の token 漏洩経路を完全に閉じる)
+        with:
+          persist-credentials: false
 
       - name: Firefox source artifact を取得
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -245,7 +337,62 @@ jobs:
           PUPPETEER_SKIP_DOWNLOAD: "1"
         run: npm ci
 
+      - name: バージョン pre-flight check (AMO / 既 submission 済み version なら skip)
+        # /rere F-002 修正 + セルフレビュー #2/#4 修正:
+        # 同 version 重複 submission は AMO が "Version already exists" で拒否するため、
+        # AMO API v5 versions list (anonymous GET 可) で manifest version の存在を確認して skip。
+        # 注意: `/versions/` は public listed (= 承認済み) のみ返し、pending / awaiting_review な
+        # submission は検知できない。pre-flight pass → web-ext sign 失敗のケースは、submit step
+        # 側で "version already exists" を warning 化する fallback 経路で救済する。
+        #
+        # AMO_SLUG はワークフロー側ハードコードを避け、`vava.config.json` から jq で抽出して SSOT 化
+        # (セルフレビュー #4 修正)。これで slug 変更時の更新漏れを防ぐ。
+        id: amo-preflight
+        env:
+          MANIFEST_VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s inherit_errexit
+          # CodeRabbit 4 巡目: curl 側 (line 371 `|| versions_response=""`) と対称に、jq が
+          # vava.config.json 不在 / パース失敗で非ゼロ終了しても inherit_errexit で step ごと
+          # hard fail させず、空文字 → 直後の警告 + skip=false 分岐に倒す (publish step が
+          # web-ext の gecko id ベース slug 検出で救済できる)。vava.config.json はコミット済みなので
+          # 通常は存在するが、fork / 部分 checkout 等での graceful degradation を確保する。
+          AMO_SLUG=$(jq -r '.amo.slug // empty' vava.config.json 2>/dev/null || echo "")
+          if [ -z "${AMO_SLUG:-}" ]; then
+            echo "::warning::vava.config.json の amo.slug が取得できないため AMO pre-flight を skip (publish step に委ねる)"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # セルフレビュー 3 巡目修正: CWS pre-flight と対称に `|| fallback` を付ける。
+          # 初回 AMO 登録 (add-on 未作成 → HTTP 404) や AMO 一時障害 (5xx / 429 / DNS) で
+          # curl -fsS が非ゼロ終了したとき、inherit_errexit 下で step ごと hard fail すると
+          # publish-firefox job が前 step fail で連鎖 skip され、submit step の version conflict
+          # 救済 fallback (timeout exceeded と同経路) にすら到達しなくなる。空文字に倒して
+          # warning + skip=false で publish step (= web-ext sign) に判定を委ねる。
+          versions_response=$(curl -fsS \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            "https://addons.mozilla.org/api/v5/addons/addon/${AMO_SLUG}/versions/") || versions_response=""
+          if [ -z "$versions_response" ]; then
+            echo "::warning::AMO pre-flight: versions list 取得失敗 (初回登録 / 一時障害) → publish step に判定を委ねる"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # MANIFEST_VERSION は環境変数経由で渡す (heredoc を使うと stdin 二重 redirect になり、
+          # JSON response との衝突で構文エラーになるため)。python が非 JSON で exit 1 しても
+          # inherit_errexit で step ごと落ちないよう `|| echo ""` でフォールバック (CWS 側と対称)。
+          exists=$(MANIFEST_VERSION="$MANIFEST_VERSION" python3 -c 'import json,sys,os; target=os.environ["MANIFEST_VERSION"]; data=json.load(sys.stdin); print("1" if any(v.get("version")==target for v in data.get("results",[])) else "0")' 2>/dev/null <<< "$versions_response" || echo "")
+          echo "📊 AMO versions check: target=${MANIFEST_VERSION} / exists=${exists:-(parse失敗)}"
+          if [ "$exists" = "1" ]; then
+            echo "::notice::AMO に既に v${MANIFEST_VERSION} の submission が存在するため AMO publish step を skip (同 version 重複 submission 防止)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Firefox AMO に submit (web-ext sign --channel=listed)
+        if: ${{ steps.amo-preflight.outputs.skip != 'true' }}
         # web-ext 10+ では submission API がデフォルト動作 (`--use-submission-api` フラグは廃止)。
         # `--channel=listed` で AMO 公開 (人間レビュー入り)、submission 受付完了で job 成功扱い。
         # 実際のストア反映はレビュー通過後 (通常 1〜数日)、メール通知あり。
@@ -283,8 +430,15 @@ jobs:
           if [ "$rc" -ne 0 ]; then
             if grep -q "Approval: timeout exceeded" /tmp/web-ext.log; then
               echo "::warning::web-ext sign が timeout exceeded で exit 1 を返したが submission は AMO に受理済み (CLAUDE.md「Firefox AMO 対応 #9」既知挙動)。CI green 化のため exit 0 扱いに変換します"
+            elif grep -qiE "version (already exists|conflict)" /tmp/web-ext.log; then
+              # セルフレビュー #2 修正: AMO pre-flight は `/versions/` (listed のみ) を参照するため、
+              # pending / awaiting_review な submission を検知できない。release ブランチを force-push
+              # 後に再度 push したケースで「pre-flight pass → web-ext sign 失敗」になりうるため、
+              # version 重複エラーを timeout exceeded と同じく warning に降格する (pre-flight の
+              # 取りこぼし救済)。
+              echo "::warning::AMO に既に同 version が存在するため web-ext sign が version conflict で fail (pre-flight が pending submission を検知できないケース)。CI green 化のため exit 0 扱いに変換します"
             else
-              echo "::error::web-ext sign が timeout exceeded 以外の理由で失敗しました (rc=$rc)。ログ確認要"
+              echo "::error::web-ext sign が timeout exceeded / version conflict 以外の理由で失敗しました (rc=$rc)。ログ確認要"
               exit "$rc"
             fi
           fi
