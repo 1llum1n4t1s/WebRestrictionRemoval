@@ -46,9 +46,17 @@
   let observer = null;
   let orphaned = false;
   /** /rere C2-Critical1 修正: loadedmetadata listener の一括 abort 用 AbortController。
-   *  revertAll() 時に abort して全 listener を解除、新たな AbortController に差し替えて再受付。
-   *  __cpaVfMetaAttached マーカーは abort 後に再 attach 可能化のため要削除。 */
+   *  revertAll() 時に abort して全 listener を解除、新たな AbortController に差し替えて再受付。 */
   let metaListenerCtrl = new AbortController();
+  /** loadedmetadata listener を attach 済みの video 集合 (二重登録防止)。
+   *  Codex 4 巡目 P2 修正: 旧実装は DOM プロパティ `__cpaVfMetaAttached` で追跡していたが、
+   *  revertAll() の abort で listener を全解除しても、detach 済み video のマーカーは
+   *  `document.getElementsByTagName("video")` の走査外で取り残された。すると SPA がその video を
+   *  reinsert + ユーザーが再 ON したとき、stale マーカーで ensureMetaListener が早期 return し、
+   *  metadata 未ロードなら transform が永久に当たらなかった。WeakSet にして abort 時に
+   *  `new WeakSet()` へ差し替えれば、detach 済みも含めた全 video の追跡を O(1) で一括リセットでき、
+   *  iterate 不可ゆえの取り残しが構造的に起きない (DOM プロパティ汚染も解消)。 */
+  let metaAttached = new WeakSet();
 
   function isActive() {
     return enabled === true;
@@ -88,20 +96,22 @@
     // 既に revertVideo 済みなので、ここで取りこぼしても OFF 後に transform が残ることはない。
     const vids = document.getElementsByTagName("video");
     for (let i = 0; i < vids.length; i++) revertVideo(vids[i]);
-    // loadedmetadata listener を一括 abort + マーカークリアで再 attach 可能化
+    // loadedmetadata listener を一括 abort し、attach 追跡 WeakSet も新品に差し替えて
+    // 全 video 分 (detach 済み含む) を O(1) でリセットする。これで reinsert + 再 ON 時に
+    // ensureMetaListener が確実に listener を貼り直せる (Codex 4 巡目 P2)。
     metaListenerCtrl.abort();
     metaListenerCtrl = new AbortController();
-    for (let i = 0; i < vids.length; i++) delete vids[i].__cpaVfMetaAttached;
+    metaAttached = new WeakSet();
   }
 
   // intrinsic サイズが確定する loadedmetadata で再適用（videoWidth=0 の段階を取りこぼさない）。
   // /rere C2-Critical1 修正: AbortSignal を渡して revertAll 時の一括解除を可能にする。
-  // 旧実装は listener を永久 attach + __cpaVfMetaAttached マーカーで再 attach も防いでいたため、
+  // 旧実装は listener を永久 attach + DOM マーカーで再 attach も防いでいたため、
   // master OFF 後も video element に listener が残り続け、closure 経由で module scope の
   // enabled/mode/targetAspect を chain capture して GC を妨げる潜在的リークがあった。
   function ensureMetaListener(v) {
-    if (v.__cpaVfMetaAttached) return;
-    v.__cpaVfMetaAttached = true;
+    if (metaAttached.has(v)) return;
+    metaAttached.add(v);
     v.addEventListener(
       "loadedmetadata",
       () => {

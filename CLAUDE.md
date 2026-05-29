@@ -187,7 +187,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 
 **実装上の不変条件**:
 - `loadedmetadata` を待ってから適用 (videoWidth=0 段階では計算不能)
-- `__cpaVfMetaAttached` マーカーで loadedmetadata listener の二重登録防止
+- `metaAttached` WeakSet で loadedmetadata listener の二重登録防止 (revertAll() の AbortController abort 時に `new WeakSet()` へ差し替えて detach 済み video 含め一括リセット。旧 DOM マーカー `__cpaVfMetaAttached` は detach 済みを取り残し reinsert+再 ON 時に listener 貼り直し不能になる Codex P2 があり廃止)
 - MutationObserver `subtree: true` で SPA / 遅延追加 video に追従
 - iframe 内 `<video>` (YouTube 埋め込み等) も all_frames:true で対象
 - 焼き込み黒帯 (動画フレーム内に最初から入っている上下帯) は videoWidth/videoHeight に現れないため検出不能 (どの video player でも同じ原理的限界)
