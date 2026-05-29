@@ -255,11 +255,14 @@
   // 拡張アンロードにしか反応しないため、ページライフサイクル側の後始末を補う。
   // bfcache 凍結 (persisted=true) では observer も一緒に凍結されて CPU を消費しない上、復帰時に
   // そのまま動き続けられるので温存し、実際にドキュメントが破棄される遷移 (persisted=false) でだけ
-  // observer disconnect + loadedmetadata listener abort して browser cleanup を補助する。
+  // disconnectObserver() + revertAll() で teardownOrphan と同じ後始末をする。revertAll() は内部で
+  // transform 復元 (WeakMap original) + metaListenerCtrl.abort() の両方を行う (CodeRabbit 後続指摘:
+  // listener abort だけだと inline transform が復元されない。破棄遷移では見た目に影響しないが、
+  // teardownOrphan とパターンを揃えて「pagehide = 完全な後始末」の不変条件を保つ)。
   window.addEventListener("pagehide", (e) => {
     if (e.persisted) return;
     disconnectObserver();
-    metaListenerCtrl.abort();
+    revertAll();
   });
 
   readSettingsAndApply();

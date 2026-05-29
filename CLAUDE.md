@@ -190,7 +190,7 @@ HTTP ping は **`keepAliveHttpPingEnabled` storage key で別途オプトイン*
 - `metaAttached` WeakSet で loadedmetadata listener の二重登録防止 (revertAll() の AbortController abort 時に `new WeakSet()` へ差し替えて detach 済み video 含め一括リセット。旧 DOM マーカー `__cpaVfMetaAttached` は detach 済みを取り残し reinsert+再 ON 時に listener 貼り直し不能になる Codex P2 があり廃止)
 - MutationObserver `subtree: true` で SPA / 遅延追加 video に追従。**detach された video は同期で即 `revertVideo`（element の GC を妨げない）、再適用（`scanAndApply`）は `requestAnimationFrame` で 1 フレーム 1 回に coalesce**（all_frames:true + 高頻度 DOM 変更でのフル走査積み上がりを平準化）。observer は `childList` のみ監視で自前の inline style 書き込みは observe 対象外のため、disconnect→render→takeRecords→observe ガードは不要（無限ループしない）
 - iframe 内 `<video>` (YouTube 埋め込み等) も all_frames:true で対象
-- `pagehide`（`persisted=false` = 実際にドキュメント破棄される遷移のみ）で observer disconnect + `metaListenerCtrl.abort()`。bfcache 凍結（`persisted=true`）は observer も凍結され CPU 消費ゼロ + 復帰でそのまま継続できるので温存する（disconnect すると pageshow 再初期化が無いぶん復帰後に効かなくなるため）
+- `pagehide`（`persisted=false` = 実際にドキュメント破棄される遷移のみ）で `disconnectObserver()` + `revertAll()`（= transform 復元 + `metaListenerCtrl.abort()`、teardownOrphan と同じ後始末）。bfcache 凍結（`persisted=true`）は observer も凍結され CPU 消費ゼロ + 復帰でそのまま継続できるので温存する（disconnect すると pageshow 再初期化が無いぶん復帰後に効かなくなるため）
 - 焼き込み黒帯 (動画フレーム内に最初から入っている上下帯) は videoWidth/videoHeight に現れないため検出不能 (どの video player でも同じ原理的限界)
 - 拡張リロード後の orphan は `chrome.runtime?.id` 検知で observer 切断 + `revertAll()` で全 transform 復元 (Extension context invalidation guard PATTERN SYNC 準拠)
 - `window.__cpaVideoFillRunning` で同一フレーム内の二重実行防止
