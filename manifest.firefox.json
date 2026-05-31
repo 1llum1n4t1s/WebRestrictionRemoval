@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "browser_specific_settings": {
     "gecko": {
       "id": "{8b2f6c4e-9a1d-4e8f-b3a7-1c5d9e7f2a4b}",
@@ -103,12 +103,6 @@
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": ["src/lib/actions.js", "src/content/video-gamma.js", "src/content/video-fill.js"],
-      "run_at": "document_idle",
-      "all_frames": true
-    },
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/lib/audio-pipeline.js", "src/content/volume-booster.js"],
       "run_at": "document_idle",
       "all_frames": true
     },

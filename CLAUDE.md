@@ -19,7 +19,7 @@ npm run build                # アイコン + スクリーンショット一括�
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
 npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 23 globalThis 定数列挙 (actions.js 21 + ScanRunner + AudioPipeline、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-npm test                     # Node.js 標準 test runner、82 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + VolumeBooster.isEmeHost / isEmeUrl 境界値 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 を含む）
+npm test                     # Node.js 標準 test runner、77 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -80,24 +80,17 @@ Popup (src/popup/popup.{html,js,css})
                           / APPLY_INSTAGRAM_CLEANER_CS / APPLY_TIKTOK_CLEANER_CS / APPLY_VIDEO_GAMMA_CS
                           / APPLY_LOUPE_CS / APPLY_IMAGE_DOWNLOADER_CS──▶ 各 Content Script
 
-[音量ブースター MediaElementSource 経路 (v1.0.33+ デフォルト、普通サイト向け)]
-  Popup ──chrome.storage.local.set (gain, antiClip, normalize, nightMode, muted)──▶ Storage
-                                                                                       │ onChanged
-  Content Script (src/content/volume-booster.js, 全 http(s) + all_frames:true) ◀───────┘
-    │ isEmeHost(location.hostname) で EME 多用サイト (Netflix 等) なら早期 return
-    │ <video> / <audio> 検出 (起動時 querySelectorAll + MutationObserver で動的追従)
-    │ ctx.createMediaElementSource(media) で attach
-    │ source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination
-    └ user gesture 不要で動画再生開始前から自動適用 (popup を開かなくて OK)
-
-[音量ブースター tabCapture 経路 (EME fallback、Netflix / Prime Video / DAZN 等で必須)]
+[音量ブースター tabCapture 経路 (全サイト一律・唯一の経路。Netflix / Prime Video 等 EME 動画も含む)]
   Popup ──VOLUME_BOOSTER_SET_GAIN (gain, antiClip, normalize, nightMode, muted)──▶ Background
-                                    │ active tab が isEmeUrl のとき popup から呼ばれる
-                                    │ chrome.tabCapture.getMediaStreamId
+                                    │ URL 分岐なし。active tab に対して常に呼ぶ
+                                    │ chrome.tabCapture.getMediaStreamId (user gesture = popup open)
                                     ──ACTION_VOLUME_SET_GAIN──▶ Offscreen Document
                                                                   │ getUserMedia + AudioContext
                                                                   │ source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination
-                                                                  └ EME 動画でも decrypted output を捕獲して増幅 (popup 必須 = user gesture)
+                                                                  └ EME 動画でも decrypted output を捕獲して増幅
+  ※ popup は (gain, antiClip, normalize, nightMode, muted) を chrome.storage.local にも書くが、
+    これは boost トリガーではなく永続化のみ (popup 復元 + autoApplyVolumeBooster がタブ切替時に参照)。
+  ※ ブースト中のタブには Chrome の「このタブのコンテンツは共有されています」バナーが出る (tabCapture 仕様、抑止不可)。
 
 [ルーペ]
   Content Script ──LOUPE_REQUEST_CAPTURE──▶ Background
@@ -112,9 +105,9 @@ Popup (src/popup/popup.{html,js,css})
 
 **テーマ**: ROG (Republic of Gamers) inspired hardware HUD。アクセントカラーは ROG クリムゾン（ライト `#a8081e` / ダーク `#b80828`、変数 `--rog-red`）+ ガンメタル基調背景（ライト `#f0f0f2` / ダーク `#0a0a0c`）。装飾は左右非対称 + 斜めスラッシュ + ヘキサゴンメッシュ SVG + カーボンファイバー風 repeating-linear-gradient + メタリックベベル（`--bevel-top` / `--bevel-bottom`）の 4 層構成。`clip-path: polygon()` で装甲パーツの角カット表現。`<meta name="color-scheme" content="light dark">` でネイティブ要素を `prefers-color-scheme` に追従させ、CSS は `:root` のライト用トークン + `@media (prefers-color-scheme: dark)` のダーク上書きの 2 層構造。派生色は `color-mix(in srgb, var(--rog-red) N%, ...)` で本体色から導出してテーマ追従可能化。CSP meta 明示。詳細な設計判断は popup.css 冒頭コメント L1-44 を参照。
 
-**音量ブースター親トグル**: `volumeBoosterEnabled` (boolean) で master 制御。v1.0.33 以降は **MES 経路がデフォルト** で、popup の `pushVolumeNow` は (1) 音量関連 6 キーを `chrome.storage.local.set` で書き込み (content script の `storage.onChanged` で全タブ MES 経路が反応)、(2) active tab が `VolumeBooster.isEmeUrl(tab.url)` で EME 多用サイト判定なら旧 `VOLUME_BOOSTER_SET_GAIN` 経路で background → tabCapture → offscreen の流れも併用、という 2 経路設計に変更。OFF で `chrome.storage.local.set` のみ（content script が解放 + background の `storage.onChanged` リスナーが `releaseAllVolumeBoosterTabs()` で旧経路の AudioContext も解放）。**OFF でも gain / サブトグル設定は storage に残す**（次回 ON 時に復元）。
+**音量ブースター親トグル**: `volumeBoosterEnabled` (boolean) で master 制御。音量ブースターは **tabCapture 経路一本**（background → offscreen、URL 分岐なし・全サイト一律）。popup の `pushVolumeNow` は (1) 音量関連 6 キーを `chrome.storage.local.set` で **永続化** (boost トリガーではなく popup 復元 + `autoApplyVolumeBooster` 用)、(2) active tab に対して常に `VOLUME_BOOSTER_SET_GAIN` を background に送り tabCapture → offscreen で boost する。OFF で `chrome.storage.local.set` のみ（background の `storage.onChanged` リスナーが `releaseAllVolumeBoosterTabs()` で全 AudioContext を解放）。**OFF でも gain / サブトグル設定は storage に残す**（次回 ON 時に復元）。`chrome.tabCapture` は user gesture 必須なので **popup を開かないと boost されない**（自動適用は無し）。ブースト中タブには Chrome のタブ共有バナーが出る。
 
-**音量スライダー / サブトグル**: input 時 120ms debounce → `pushVolumeNow`（`gain`, `antiClip`, `normalize`, `nightMode`, `muted` を全部 storage に書く + EME ホスト時のみ tabCapture 経路も呼ぶ）。change（マウスアップ）で即 push、100% に戻すボタンは `pushVolumeNow(100)` で release 経路へ。popup 起動時は `chrome.storage.local` の `volumeBoosterLastGain` からスライダー初期値を復元する（offscreen への round-trip 不要）。スライダー UI は 0..200 の内部値を使い、左端 0% / 中央 100% / 右端 300% の実音量へ変換する。マスター ON 時のみ popup open で即座に `pushVolumeNow` して active tab に適用。サブトグル (`volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled`) は change で `cancelVolumePush` → `pushVolumeNow(currentGain)` の順で即時反映（既存 MES / AudioContext があれば自動ゲイン / compressor 状態だけ切り替わり音切れなし）。EME ホストでのエラーは `formatVolumeError(res.error)` で日本語に翻訳。
+**音量スライダー / サブトグル**: input 時 120ms debounce → `pushVolumeNow`（`gain`, `antiClip`, `normalize`, `nightMode`, `muted` を全部 storage に書く + active tab へ tabCapture 経路で送る）。change（マウスアップ）で即 push、100% に戻すボタンは `pushVolumeNow(100)` で release 経路へ。popup 起動時は `chrome.storage.local` の `volumeBoosterLastGain` からスライダー初期値を復元する（offscreen への round-trip 不要）。スライダー UI は 0..200 の内部値を使い、左端 0% / 中央 100% / 右端 300% の実音量へ変換する。マスター ON 時のみ popup open で即座に `pushVolumeNow` して active tab に適用。サブトグル (`volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled`) は change で `cancelVolumePush` → `pushVolumeNow(currentGain)` の順で即時反映（既存 AudioContext があれば自動ゲイン / compressor 状態だけ切り替わり音切れなし）。エラーは `formatVolumeError(res.error)` で日本語に翻訳。
 
 ### Background (`src/background/background.js`)
 Service worker。役割:
@@ -306,31 +299,23 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 - 単純 `[data-e2e="recommend-list-item-container"]` 一律非表示 → 通常動画も巻き込んで全消し
 - modal viewer で `DivCommentContainer` 全体非表示 → プロフィール + キャプション巻き込み
 
-### 音量ブースター (2 経路設計、v1.0.33+ )
-2 経路で構成され、ホスト種別に応じて使い分ける:
+### 音量ブースター (tabCapture 経路一本、`src/background/background.js` + `src/offscreen/offscreen.js`)
+`chrome.tabCapture.getMediaStreamId` + offscreen の `getUserMedia` + AudioContext 方式。**全サイト一律・URL 分岐なし**（Netflix / Prime Video / Amazon 等 EME 動画も含む）。`chrome.tabCapture` は OS / ブラウザレベルで復号された後のタブ音声出力を捕獲するため、EME 動画でもブースト可能。
 
-#### 経路 A: MediaElementSource (デフォルト、`src/content/volume-booster.js`)
-全 http(s) サイト + 全 frame に注入される content script。`<video>` / `<audio>` 要素に対して `ctx.createMediaElementSource(media)` を attach し、6 ノードチェーン (`source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination`) を構築する。**user gesture 不要で動画再生開始前から自動適用** されるのが旧 tabCapture 経路との最大の違い (popup を一度も開かずにブラウザ起動後すぐ音量補正が効く)。
+> **設計史**: v1.0.33 で MediaElementSource (MES) 経路を content script に追加し「普通サイト=MES 自動適用 / EME サイト=tabCapture」の 2 経路 + URL 分岐設計にしたが、(1) Amazon など買い物ページと再生ページが同居するドメインで tabCapture のタブ共有バナーが再生と無関係なページに出る、(2) サイトによって挙動が変わる、という問題があり、ゆろさん指示で **tabCapture 一本（昔の方式）に戻した**（MES 経路 volume-booster.js / EME_HOSTS / isEmeHost / isEmeUrl は撤去済み）。トレードオフ: ①ブースト中タブに Chrome の「このタブのコンテンツは共有されています」バナーが出る（tabCapture 仕様で抑止不可）②popup を開かないと boost されない（自動適用なし）③Firefox MV3 は tabCapture 未対応なので音量ブースターは Chrome 専用（`HAS_VOLUME_BOOSTER` guard で Firefox は UI ごと非表示）。
 
-**EME ホスト除外**: 起動直後に `VolumeBooster.isEmeHost(location.hostname)` を判定し、EME 多用サイト (Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Abema / U-NEXT / TVer / NHK オンデマンド / Spotify / FOD / SPOOX 等、15 サイト) では **早期 return して MES attach 自体をスキップ** する。理由: EME (DRM) 保護動画は復号後の音声 sample を AudioContext に流さない仕様 (Chrome/Firefox 共通) のため、MES attach すると **動画の音そのものが完全無音化** する致命的副作用がある。これらのサイトでは経路 B (tabCapture) で boost する。
+**popup 必須**: `chrome.tabCapture.getMediaStreamId` は user gesture が必須で、background SW から自動呼び出しは Chrome 仕様で禁止。popup open 自体が user gesture を兼ねる。`popup.js pushVolumeNow` は active tab に対して **常に** `VOLUME_BOOSTER_SET_GAIN` を background に送る（URL 判定なし）。
 
-**設計の不変条件は Important Patterns「音量ブースター・MediaElementSource 経路」に集約**。
-
-#### 経路 B: tabCapture + Offscreen Document (EME fallback、`src/background/background.js` + `src/offscreen/offscreen.js`)
-旧来の `chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext 方式。v1.0.33 以降は EME 多用サイト用 fallback として継続保持。`chrome.tabCapture` は OS / ブラウザレベルで復号された後のタブ音声出力を捕獲するため、EME 動画でもブースト可能。
-
-**popup 必須**: `chrome.tabCapture.getMediaStreamId` は user gesture が必須で、background SW から自動呼び出しは Chrome 仕様で禁止。`popup.js pushVolumeNow` が `VolumeBooster.isEmeUrl(tab.url)` で EME ホストと判定したときのみ `VOLUME_BOOSTER_SET_GAIN` を background に送る (popup open 自体が user gesture)。
-
-**処理フロー (経路 B)**:
-1. popup の `pushVolumeNow` で active tab が EME ホストと判定 → `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`, `antiClip`, `normalize`, `nightMode`, `muted`）を background に送信
+**処理フロー**:
+1. popup の `pushVolumeNow`: 音量 6 キーを storage に永続化（boost トリガーではなく popup 復元 + `autoApplyVolumeBooster` 用）+ active tab へ `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`, `antiClip`, `normalize`, `nightMode`, `muted`）を background に送信
 2. background: gain が UNITY かつ全サブトグル OFF かつミュート OFF なら `releaseVolumeBoosterTab` で AudioContext 解放して終了。それ以外は `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext があれば streamId なしで gain / 自動ゲイン / preset / mute だけ更新）
 3. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`, `antiClip`, `normalize`, `nightMode`, `muted`）
-4. offscreen: 未登録タブなら `getUserMedia` → 6 ノード接続。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp、正規化 timer の開始/停止、各 DynamicsCompressor のパラメータ切替
-5. **タブ切替で自動適用**: `tabs.onActivated` → `autoApplyVolumeBooster(tabId)` → **`boostedTabIds` に既登録のタブのみ**が対象（既存 AudioContext があるので `getMediaStreamId` 不要で user gesture 制約に引っかからない）
+4. offscreen: 未登録タブなら `getUserMedia` → 6 ノード接続 (`source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination`)。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp、正規化 timer の開始/停止、各 DynamicsCompressor のパラメータ切替
+5. **タブ切替で自動再適用**: `tabs.onActivated` → `autoApplyVolumeBooster(tabId)` → **`boostedTabIds` に既登録のタブのみ**が対象（既存 AudioContext があるので `getMediaStreamId` 不要で user gesture 制約に引っかからない）。未 boost タブへの初回適用は popup open（= user gesture）が必須
 
 **共通仕様**:
 - `volumeBoosterEnabled` (master) + `volumeBoosterLastGain` (数値 0〜300、初期 100) + `volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterMutedEnabled` の **6 storage key** で管理
-- 全設定はグローバル永続化（タブ間共通）。マスター OFF は両経路の AudioContext を解放
+- 全設定はグローバル永続化（タブ間共通）。マスター OFF は全 AudioContext を解放
 - **ミュート UI**: popup の音量スライダー左にトグルボタン（🔊/🔇、`aria-pressed` ベース）。ミュート ON 中もスライダー値は last gain 位置のまま表示・操作可能で、ユーザーは「ミュート維持のままスライダー値を変更 → ミュート解除で意図した音量に復帰」できる
 - 数値の単一情報源は [`src/lib/actions.js`](src/lib/actions.js) の `VolumeBooster` 定数 — ドキュメントとコードに齟齬が出たら必ずコードを正とすること
 
@@ -339,10 +324,10 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` + host_permissions: `<all_urls>` (ルーペ `captureVisibleTab` を popup close 後 / SPA navigation 後でも確実に動作させるため、v1.0.34 で追加。content_scripts で既に全 http(s) に注入済みなので実質アクセス範囲は同じ) |
-| `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster (`isEmeHost` / `isEmeUrl` 含む、15 ホストブラックリスト) / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
+| `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
 | `src/lib/scan-runner.js` | content script 共通実行ランタイム (`/rere` B1-007/B2-I002/D-002 で抽出)。rAF coalesce + MutationObserver `disconnect → render → takeRecords → observe` ガード + Extension context invalidation guard を `ScanRunner.create({ render, cleanup })` に集約し `globalThis.ScanRunner` 公開。Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が利用 (image-downloader / youtube-shorts は別バッチで移行予定)。cleanup は idempotent 必須 |
 | `src/lib/audio-pipeline.js` | 音量ブースター DSP コア共有モジュール (`/rere` B1-004/B2-I001/D-001 で抽出)。dbToGain / clampNormalizerGain / scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer / stopLoudnessNormalizer / updateLoudnessNormalizer / applyCompressorPreset の 8 関数を `globalThis.AudioPipeline` 公開。MES 経路 (volume-booster.js) と EME fallback 経路 (offscreen.js) が共有し、物理コピー drift を解消。caller は stop/update/applyCompressorPreset の 3 関数を直接呼ぶ (残り 5 は内部相互呼び出し)。値定数は actions.js の VolumeBooster 経由 |
-| `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 (v1.0.33+ は EME fallback 専用、普通サイトは content script の MES 経路に移行) |
+| `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 (tabCapture 経路一本、全サイト一律) |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
 | `src/content/youtube-early.js` | YouTube watch ページ向け `document_start` 注入の最小スクリプト。hideLiveChat ON 時に `<html>` へ `__cpa-sfx-hide-live-chat-pre` クラスを最速付与し、ライブチャット枠の体感ラグを消す。early-framework.js 経由でボイラープレート共通化、サイト固有の MutationObserver / force-hide のみ独自実装 |
@@ -363,15 +348,14 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは **9 マスタートグル** + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3 + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー + RTX 動画強化 master、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット (Regular 400 / SemiBold 600 / Bold 700) 同梱 + popup.html で 3 weight すべて preload |
 | `src/popup/fonts/IBMPlexSansJP-{Regular,SemiBold,Bold}.woff2` | popup タイポグラフィ用 woff2 サブセット。Regular / SemiBold は IBM 純正の subset 済み版 (約 77 / 81 KB)、Bold は `scripts/fetch-bold-woff2.mjs` で IBM/plex full CJK Bold (npm `@ibm/plex-sans-jp@3.0.0`) を Regular と同じ cmap (652 unicode) で subset 化した版 (約 200 KB、subset-font の woff2 encoder が IBM 純正より圧縮率低めのため大きい)。preload で並列 fetch するので popup 起動コストへの影響は小 |
 | `scripts/fetch-bold-woff2.mjs` | Bold woff2 再生成スクリプト。`npm install --no-save fontkit subset-font @ibm/plex-sans-jp@3.0.0` 後に `node scripts/fetch-bold-woff2.mjs` を実行すると、既存 Regular の cmap を読んで同じ unicode 集合の Bold woff2 を `src/popup/fonts/IBMPlexSansJP-Bold.woff2` に書き出す。完了後は `npm ci` で node_modules を package-lock.json 通りに復元すること (75 MB の @ibm/plex-sans-jp パッケージは devDependencies には含めない方針) |
-| `src/content/volume-booster.js` | **音量ブースター MediaElementSource 経路 (v1.0.33+ デフォルト)**: 全 http(s) + all_frames:true に注入、`<video>` / `<audio>` 要素を検出して `ctx.createMediaElementSource(media)` で 6 ノードチェーン attach、storage.onChanged で音量関連 6 キーに即反応。**user gesture 不要で動画再生開始前から自動適用** (popup 開かなくて OK)。冒頭で `VolumeBooster.isEmeHost(location.hostname)` 判定 → EME 多用サイト (Netflix 等) は早期 return して silent 化を防ぐ。MutationObserver で動的追加 video に追従、WeakMap で state 管理 |
-| `src/offscreen/offscreen.{html,js}` | 音量ブースター **EME fallback 用** offscreen document: AudioContext + AnalyserNode + 自動 GainNode + 手動 GainNode + DynamicsCompressor × 2 (night mode / anti-clip) で正規化 + 増幅 + 圧縮。v1.0.33 以降は EME 多用サイト (Netflix / Prime Video / DAZN 等) で popup 経由の tabCapture 経路でのみ使われる |
+| `src/offscreen/offscreen.{html,js}` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体、**唯一の音量ブースター経路**): AudioContext + AnalyserNode + 自動 GainNode + 手動 GainNode + DynamicsCompressor × 2 (night mode / anti-clip) で正規化 + 増幅 + 圧縮。全サイト一律 (EME 動画含む) で popup 経由の tabCapture 経路から使われる。DSP コアは `src/lib/audio-pipeline.js` を共有 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt`。`generate-screenshots.js` が popup.html から `popup-render.html` + `popup-shim.js` を動的生成 → `01-popup-ui.html` が iframe で実 popup を埋め込んで撮影（drift ゼロ）。生成物 `popup-render.html` / `popup-shim.js` は .gitignore 対象 |
 | `manifest.firefox.json` | Firefox AMO 申請用 manifest (Chrome 用 `manifest.json` から `offscreen` / `tabCapture` permission 除外 + `browser_specific_settings.gecko` + `background.scripts` 併記)。zip スクリプトが Firefox xpi 生成時にこれを `manifest.json` として同梱する |
 | `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト 82 件: globalThis 21 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 30 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** / **VolumeBooster.isEmeHost / isEmeUrl 境界値 (suffix attack 防御含む 5 件、v1.0.33)** 等。件数 drift を CI で検知できる単一情報源 |
+| `test/actions.test.js` | 純粋関数テスト 77 件: globalThis 21 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 30 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **RTX_ENHANCER_ENABLED storage key + APPLY_RTX_ENHANCER_CS action (drift 防止)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
 | `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.claude/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
 | `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要。`/vava` Step 8.7-B (CWS drift check) からも自動参照される |
 | `vava.config.json` | `/vava` スキル (`~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |
@@ -385,7 +369,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 
 ### Firefox AMO 対応 (2026-05-16 確立、ReplaceFontSelect の知見ベース)
 
-WebRestrictionRemoval は Chrome + Firefox 両対応。**v1.0.33 以降は音量ブースターも Firefox で部分動作する** (MES 経路で普通サイトのみ、EME 多用サイトは tabCapture 未対応のため不可)。Firefox 版ビルドの不変条件:
+WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースターは tabCapture 一本に戻したため Chrome 専用** (Firefox MV3 は `chrome.tabCapture` / `chrome.offscreen` 未対応)。Firefox では `HAS_VOLUME_BOOSTER` guard で popup の音量 UI ごと非表示になり、音量ブースター以外の全機能が動作する。Firefox 版ビルドの不変条件:
 
 1. **専用 manifest 分割** — `manifest.firefox.json` を別ファイルで持ち、zip スクリプトが Firefox xpi 生成時に `manifest.json` として同梱する。Chrome 版とは以下が違う:
    - `offscreen` / `tabCapture` permission を **除外** (Firefox MV3 未対応)
@@ -469,24 +453,9 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - frame 内の `#close-button` を top frame から `document.querySelector` で探す → そもそも iframe の中なので届かない（`iframe.contentDocument` 必須）
 - pre クラス剥がしを click 成功 *直後* に行う → YouTube が collapsed transition を DOM 反映する前に display:none が解除され、frame default expand state が paint されてしまう (Edge 動画キャプチャで約 270ms expand 表示を確認)。必ず `collapsed` 属性付与を rAF polling で待つ
 
-### 音量ブースター・MediaElementSource 経路 (v1.0.33+ デフォルト)
+### 音量ブースター・Offscreen Document (tabCapture 経路の AudioContext 実体、唯一の経路)
 
-`src/content/volume-booster.js` (全 http(s) + all_frames:true) が `<video>` / `<audio>` 要素に直接 attach する経路。tabCapture と違って **user gesture 不要で自動適用** されるのが最大の利点。
-
-**設計上の不変条件**:
-- **EME ホスト早期 return** — 起動直後に `VolumeBooster.isEmeHost(location.hostname)` を判定し、`EME_HOSTS` (15 サイト) のいずれかにマッチしたら `return` で何もしない。MES attach すると EME (DRM) 保護動画は **動画の音そのものが完全無音化** する Chrome/Firefox 仕様のため、ホスト名ベースで予防する。新規 EME サイトを追加するときは `actions.js` の `VolumeBooster.EME_HOSTS` に正規表現を追加 + `test/actions.test.js` の isEmeHost テスト追加
-- **WeakMap state 管理** — `WeakMap<HTMLMediaElement, AudioState>` で video/audio 要素 → state を保持。要素が DOM から外れれば GC で自動解放されるため、明示的な cleanup なしでメモリリークを防げる。WeakMap は iterate できないので、全 state 操作 (settings 反映 / detach 全体) は `document.querySelectorAll("video, audio")` で iterate して STATE.get で参照する設計
-- **二重 attach 防止 3 層ガード** — `STATE.has(media)` (既 attach) + `EME_DETECTED.has(media)` (EME 検出済み) + `ATTACHING.has(media)` (進行中 race) の 3 つの WeakSet/WeakMap で防ぐ。MediaElementSource は同じ要素に対して 1 度しか attach できず、二重呼び出しは InvalidStateError
-- **encrypted event で後発 EME 検出** — ホスト名で除外できないサイトで EME 動画再生時、`encrypted` イベント発火で `EME_DETECTED.add(media)` + `detachFromMedia(media)` を実行。ただし detach 後の音声経路復元はブラウザ実装依存で完全保証なし → ホスト名ブラックリストが第一防御線
-- **autoplay policy 対応** — `play` イベントで `ctx.state === "suspended"` のとき `ctx.resume()` を試す。Chrome の autoplay policy で AudioContext が suspended で生まれるケースを防ぐ
-- **ノード順序・ramp・preset は経路 B と完全共通** — `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` の 6 ノード接続、`setTargetAtTime` で 45ms ramp、`COMPRESSOR_BYPASS` preset で OFF 時パススルー化。コードは offscreen.js から物理コピーしたものなので、片方を更新したら必ず他方も同期する
-- **MutationObserver で動的 video/audio 追従** — `observer.observe(document.documentElement, { subtree: true, childList: true })` で SPA navigation や lazy load された video にも自動追従。callback 冒頭で `chrome.runtime?.id` チェック (extension context invalidation guard) → orphan なら observer disconnect
-- **UNITY release 条件** — gain 100% + 全サブトグル OFF + muted OFF のときは AudioContext を解放して完全 no-op に戻す (経路 B と同じ条件)
-- **pagehide で全 cleanup** — observer.disconnect + 全 media 要素を detachFromMedia で AudioContext close
-
-### 音量ブースター・Offscreen Document (EME fallback、v1.0.33+ は経路 B 専用)
-
-v1.0.33 以降は経路 A (MediaElementSource) がデフォルトになり、この offscreen + tabCapture 経路は **EME 多用サイト (Netflix / Prime Video / DAZN 等) のフォールバック専用**。以下の不変条件は EME fallback で生き続ける。
+音量ブースターは tabCapture → offscreen の AudioContext 一本（MES 経路 `volume-booster.js` は撤去済み、全サイト一律で EME 動画も含む）。以下の不変条件はこの唯一の経路に適用される。
 
 **オーディオ路の不変条件**:
 - **ノード順序は `source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination` に固定** — 正規化は入力直後の短時間RMSを測って自動 GainNode で平均音量を整え、ナイトモードでダイナミックレンジを狭め、手動 gain の後段に limiter を置く。gain を先頭に置く配置は禁止（v1.0.20 まで誤実装で「正規化 ON で boost が効かない」問題があった）。
@@ -561,7 +530,7 @@ v1.0.x 系では「セッション維持」を `keepAliveOrigins` 配列で **�
 master トグルが OFF 表示になって「消えた」と誤認される UX 問題があった。`updateKeepAliveSitesCount()` で
 「N サイト保存中」バッジを添えて可視化していたが、根本的にはサイト単位設計が把握コスト高で、
 ゆろさん指示で **全タブ共通設計に統一** した (旧 `keepAliveOrigins` 関連コードは全削除済み)。
-- **新機能でサイト単位 ON/OFF を採用しない**: 個別タブ単位での適用が必須な機能は「全タブ共通 master + content script 側でホスト判定して早期 return」のパターンを使う (例: 音量ブースターの `VolumeBooster.isEmeHost`、Amazon 系の URL パターン制限)。これで master 1 個で全体把握が可能、かつタブごとの差別化も両立できる。
+- **新機能でサイト単位 ON/OFF を採用しない**: 個別タブ単位での適用が必須な機能は「全タブ共通 master + content script 側でホスト判定して早期 return」のパターンを使う (例: Amazon 系 content script の URL パターン制限、keepalive の top frame 限定)。これで master 1 個で全体把握が可能、かつタブごとの差別化も両立できる。
 
 **経路 B: popup 内変数の stale 化 race**
 popup の `apply()` が popup load 時のスナップショット変数を元に storage を書き戻すと、複数 popup 同時開きや別経路書き換えで race が起きて他 popup の追加分が wipe される。

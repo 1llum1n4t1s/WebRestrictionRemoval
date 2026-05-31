@@ -34,8 +34,8 @@
         "en": ["12 categories", "Amazon seller"]
       },
       "description": {
-        "ja": ["12 カテゴリ", "Amazon 販売元", "MediaElementSource", "Firefox 142"],
-        "en": ["12 categories", "Amazon seller", "MediaElementSource", "Firefox 142"]
+        "ja": ["12 カテゴリ", "Amazon 販売元", "Firefox 142"],
+        "en": ["12 categories", "Amazon seller", "Firefox 142"]
       }
     }
   }

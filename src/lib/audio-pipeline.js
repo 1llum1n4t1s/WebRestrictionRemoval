@@ -4,14 +4,13 @@
  * audio-pipeline.js — 音量ブースター DSP コア関数共有モジュール
  *
  * /rere B1-004 / B2-I001 / D-001 修正で抽出した共通モジュール。
- * 旧設計では `src/content/volume-booster.js` (MES 経路、普通サイト) と
- * `src/offscreen/offscreen.js` (tabCapture 経路、EME 多用サイト) の両方で同じ 8 関数を
- * 物理コピーで保持していた。コメントに「片方を更新したら必ず他方も同期する」と書いて
- * 人間運用に依存していたが、既に drift (WHY コメント欠落 / console.warn 診断ログ欠落) が発生中で、
- * 「修正の冗長化 × 検証の薄さ」という最悪の組み合わせを抱えていた。
+ * 当初は `src/content/volume-booster.js` (旧 MES 経路、普通サイト) と
+ * `src/offscreen/offscreen.js` (tabCapture 経路) の両方で同じ 8 関数を物理コピーで保持しており、
+ * その drift 解消が抽出動機だった。**MES 経路は撤去済み (音量ブースターは tabCapture 一本に戻した)**
+ * ため、現在の caller は offscreen.js のみ。単一 caller 向けの DSP モジュールとして残している。
  *
- * 本モジュールは両 caller (volume-booster.js / offscreen.js) から `globalThis.AudioPipeline`
- * 経由で参照される。値定数は actions.js の `VolumeBooster` を経由 (既存集約場所)、
+ * 本モジュールは `src/offscreen/offscreen.js` から `globalThis.AudioPipeline` 経由で参照される。
+ * 値定数は actions.js の `VolumeBooster` を経由 (既存集約場所)、
  * DSP フロー制御ロジックのみを本モジュールに集約する。
  *
  * 設計判断:

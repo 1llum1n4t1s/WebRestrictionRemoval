@@ -53,8 +53,8 @@ WEB閲覧アシスト
   ※ クライアント側の DOM 操作・CSS 適用のみで、外部送信は一切行いません。
 
 ・🔊 音量ブースター（オプトイン・デフォルトOFF）
-  アクティブタブの音量を 0〜300% で増幅。マスタートグルを ON にするとスライダーが有効化され、設定（gain 値・サブトグル・ミュート）はグローバル永続化されます。v1.0.33 以降は MediaElementSource + tabCapture の 2 経路設計で、普通の動画サイト（YouTube / X / Twitch / TikTok / Instagram / niconico 等）は content script が <video> / <audio> 要素に直接 attach する MES 経路で **popup を一度も開かずに自動適用**、EME (DRM) 多用サイト（Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Abema / U-NEXT / TVer / Spotify 等の 15 サイト）はホスト名ブラックリストで MES を skip し、popup を開いたタイミングで chrome.tabCapture + オフスクリーン ドキュメント経路で boost します（user gesture 必須）。両経路とも同一の 6 ノードチェーン「自動音量正規化（AnalyserNode による短時間 RMS 測定 + 自動 GainNode）→ ナイトモード圧縮（DynamicsCompressor）→ 手動 GainNode で増幅 → 自動歪み防止 / リミッタ（DynamicsCompressor）」で処理して再出力します（マスタリング定石のラウドネス補正 → コンプ → メイクアップゲイン → リミッタ配置）。自動歪み防止 / 自動音量正規化 / ナイトモードのサブトグル 3 種はいずれもデフォルト OFF。
-  スライダーは 100..300% 区間で等距離 = 等 dB ステップの対数マッピングを採用、gain 変更は 45ms ramp で滑らかに反映してプチノイズを抑えます。スライダーの左端にミュート 🔊/🔇 ボタンを配置し、スライダー値・サブトグル設定を保持したまま 1 クリックで完全消音 → 再クリックで元の音量に高速復帰できます（Chrome 標準のタブミュートとは独立レイヤとして動作）。スライダー 100% でも自動音量正規化 / 自動歪み防止 / ナイトモード / ミュートのいずれかが ON なら AudioContext を維持し、「音量を変えずに突発音だけ抑える」「ポッドキャストの声量差を均す」「夜間に大音量シーンを抑える」「100% のまま即消音」用途にも対応。タブ切替時は既に boost 中のタブのみ自動再適用され、新規タブは MES 経路では自動・tabCapture 経路では popup を開いて操作した時点で適用されます。
+  アクティブタブの音量を 0〜300% で増幅。マスタートグルを ON にするとスライダーが有効化され、設定（gain 値・サブトグル・ミュート）はグローバル永続化されます。chrome.tabCapture + オフスクリーン ドキュメント経路で、URL に依らず全サイト一律（Netflix / Prime Video 等の EME 保護動画も含む）に対応します。popup を開いた瞬間にアクティブタブで boost 開始します（chrome.tabCapture は user gesture が必須なので popup を開く操作がゲスチャを兼ねます）。6 ノードチェーン「自動音量正規化（AnalyserNode による短時間 RMS 測定 + 自動 GainNode）→ ナイトモード圧縮（DynamicsCompressor）→ 手動 GainNode で増幅 → 自動歪み防止 / リミッタ（DynamicsCompressor）」で処理して再出力します（マスタリング定石のラウドネス補正 → コンプ → メイクアップゲイン → リミッタ配置）。自動歪み防止 / 自動音量正規化 / ナイトモードのサブトグル 3 種はいずれもデフォルト OFF。
+  スライダーは 100..300% 区間で等距離 = 等 dB ステップの対数マッピングを採用、gain 変更は 45ms ramp で滑らかに反映してプチノイズを抑えます。スライダーの左端にミュート 🔊/🔇 ボタンを配置し、スライダー値・サブトグル設定を保持したまま 1 クリックで完全消音 → 再クリックで元の音量に高速復帰できます（Chrome 標準のタブミュートとは独立レイヤとして動作）。スライダー 100% でも自動音量正規化 / 自動歪み防止 / ナイトモード / ミュートのいずれかが ON なら AudioContext を維持し、「音量を変えずに突発音だけ抑える」「ポッドキャストの声量差を均す」「夜間に大音量シーンを抑える」「100% のまま即消音」用途にも対応。タブ切替時は既に boost 中のタブのみ自動再適用され、新規タブは popup を開いて操作した時点で適用されます。
   ※ マスタートグル OFF / スライダー 100% かつ全サブトグル OFF かつミュート OFF / タブを閉じる / 拡張機能を無効化 のいずれかで AudioContext を即座に解放してリソースを返却します。
   ※ 録音・保存・外部送信は一切行いません。
 
@@ -152,10 +152,10 @@ WEB閲覧アシスト
   機能トグル・スライダー設定・カラーピッカー履歴を端末内 (chrome.storage.local) に保存するため。
 
   offscreen:
-  音量ブースターの AudioContext / GainNode / DynamicsCompressor チェーンを Service Worker 外で維持するため。v1.0.33 以降は EME (DRM) 多用サイト向けの tabCapture fallback 経路用として主に使われます（普通サイトは content script の MediaElementSource 経路で動作）。
+  音量ブースターの AudioContext / GainNode / DynamicsCompressor チェーンを Service Worker 外で維持するため。tabCapture で取得したタブ音声をこの offscreen document の AudioContext に流し込み、0〜300% の音量補正・正規化・圧縮を行います。
 
   tabCapture:
-  音量ブースターでタブ音声を取得し、AudioContext で 0〜300% の音量補正・正規化・圧縮を行うため。v1.0.33 以降はホスト名ブラックリストに登録された EME (DRM) 多用サイト（Netflix / Prime Video / DAZN 等の 15 サイト）向けの fallback 経路として主に使われます。普通サイトは content script の MediaElementSource 経路で user gesture 不要に自動適用されます。
+  音量ブースターでタブ音声を取得し、AudioContext で 0〜300% の音量補正・正規化・圧縮を行うため。popup を開いて操作したアクティブタブのみが対象で（user gesture 必須）、URL に依らず全サイト一律（Netflix / Prime Video 等の EME 保護動画も含む）で動作します。
 
   <all_urls> (host permission):
   ルーペ機能で chrome.tabs.captureVisibleTab によりアクティブタブの可視領域を JPEG 静止画として取得し、円形レンズに拡大表示するため。activeTab 権限のみだと popup close 後や SPA 内 navigation で grant が早期失効するためルーペが動作しなくなる事例があり、確実な動作のため追加。content_scripts で既に全 http(s) に注入済みでアクセス可能範囲は実質変わらない。

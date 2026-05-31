@@ -39,7 +39,7 @@
 
 [addons.mozilla.org](https://addons.mozilla.org/) で **「Web Viewing Assist」** を検索してインストール。
 
-> Firefox 版は音量ブースターが普通の動画サイト (YouTube / X / Twitch / TikTok / Instagram / niconico 等) のみ対応で、EME 多用サイト (Netflix / Prime Video 等) では音量ブースト不可です (Firefox は `chrome.tabCapture` 未対応のため)。それ以外の 12 機能はすべて利用可能。
+> Firefox 版では**音量ブースターは利用できません**（Chrome 専用）。音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 が未対応のためです（popup のオーディオ欄も自動的に非表示になります）。それ以外の 12 機能はすべて利用可能。
 
 ---
 
@@ -76,8 +76,8 @@
 |------|------|
 | `activeTab` | popup から active tab を操作 (音量ブースター・ルーペ等) |
 | `storage` | 設定の永続化 (`chrome.storage.local`) |
-| `offscreen` | 音量ブースター EME 経路 (Netflix 等で音量増幅するため) |
-| `tabCapture` | 同上 |
+| `offscreen` | 音量ブースターの AudioContext / GainNode チェーンを Service Worker 外で維持するため |
+| `tabCapture` | 音量ブースターでタブ音声を取得して 0〜300% 増幅するため (全サイト共通) |
 | `host_permissions: <all_urls>` | ルーペが popup 自動クローズ後・SPA navigation 後でも画面キャプチャを取れるよう保証 (実質アクセス範囲は content_scripts 注入と同等) |
 
 ---
@@ -88,8 +88,8 @@
 |------|------|
 | **設定したのに効かない** | popup を一度閉じて開き直す。それでもダメなら拡張機能を 🔄 リロード |
 | **YouTube のサイドバーから Shorts が消えない** | YouTube クリーナー > Shorts サブ機能 4 つ (棚 / チップ / サイドバー / ボタン) が個別 ON か確認 |
-| **音量ブースターが Netflix で効かない (Chrome)** | Netflix は EME 多用サイトなので popup を開いた瞬間に boost 開始します (user gesture 必須)。動画再生中に popup を開いて音量を変えてみてください |
-| **音量ブースターが Netflix で効かない (Firefox)** | Firefox は `chrome.tabCapture` 未対応のため EME サイトでの boost は仕様上不可能です |
+| **音量ブースターが効かない (Chrome)** | 音量ブースターは popup を開いた瞬間にアクティブタブで boost 開始します (user gesture 必須・Netflix 等の EME 動画含む全サイト共通)。動画再生中に popup を開いて音量を変えてみてください。ブースト中のタブには「このタブのコンテンツは共有されています」バナーが出ます (tabCapture の仕様) |
+| **音量ブースターが見当たらない (Firefox)** | Firefox 版には音量ブースターがありません (`chrome.tabCapture` 未対応のため Chrome 専用)。popup のオーディオ欄自体が非表示になります |
 | **セッション維持を ON にしても再ログインが発生** | サイトによっては別レイヤー (認証プロキシ等) で idle timeout を持つため、本機能では完全に防げません。HTTP ping サブトグルも併用してみてください |
 
 ---

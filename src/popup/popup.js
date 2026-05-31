@@ -1343,16 +1343,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * 音量関連 6 キー全部を storage に書き込む。content script (volume-booster.js) が
-   * storage.onChanged で反応して全タブ全フレームの `<video>` / `<audio>` に
-   * MediaElementSource + 6 ノードチェーンを attach する設計 (v1.0.33 から MES 経路をデフォルト化)。
+   * gain と各サブトグル状態を background に送って active tab に反映する。
    *
-   * MES 経路は user gesture 不要で **動画再生開始前から自動適用** される (旧 tabCapture 経路の
-   * 「popup を一度開かないと boost されない」制約を解消)。
+   * 音量ブースターは **tabCapture 経路一本** (background → offscreen の AudioContext)。URL に依らず
+   * 全サイト一律で動き (EME 保護動画 Netflix / Prime Video 等も含む)、ホスト判定による経路分岐は
+   * しない。`chrome.tabCapture.getMediaStreamId` は user gesture 必須なので、popup を開く操作が
+   * ゲスチャを兼ねる (= popup を一度開かないと boost されない)。ブースト中のタブには Chrome の
+   * 「このタブのコンテンツは共有されています」バナーが出る (tabCapture の仕様で抑止不可)。
    *
-   * ただし EME 保護動画 (Netflix / Prime Video / DAZN 等、VolumeBooster.EME_HOSTS に列挙) では
-   * MediaElementSource が動画音声を完全無音化するため MES 経路は使えない。これらのサイトでは
-   * **旧 tabCapture 経路 (background → offscreen) で boost する** (popup 必須、改修前と同じ動き)。
+   * storage への 6 キー書き込みは boost トリガーではなく **永続化のみ** の役割: popup 再表示時の
+   * スライダー / トグル復元と、background の autoApplyVolumeBooster (タブ切替時に既ブーストタブへ
+   * 最新設定を再適用) が参照する。100% かつ全サブトグル OFF かつミュート OFF のときは background 側で
+   * release されるため、ここではただ送るだけでよい。
    *
    * antiClip / normalize / nightMode / muted は現在のトグル状態を都度読み取るため、
    * トグルだけ変えて gain は据え置く操作も「pushVolumeNow(現在値)」で全反映できる。
@@ -1365,6 +1367,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // popup クローズ後の orphan await から戻ったときに DOM が detached になっている
     // ケースは storage 書き込みも副作用ゼロ路に倒して終了 (/rere B1-S2-1)。
     if (!document.body?.isConnected) return;
+    // 音量関連 6 キーを storage に永続化 (popup 復元 + background の autoApplyVolumeBooster 用)。
     chrome.storage.local.set({
       [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped,
       [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
@@ -1373,21 +1376,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
     }).catch(logStorageError("volume-pushVolumeNow"));
 
-    // EME ホスト判定: active tab が EME 多用サイトなら旧 tabCapture 経路で boost する。
-    // MES 経路は volume-booster.js 冒頭の isEmeHost guard で skip されている。
+    // tabCapture 経路 (background → offscreen) で active tab を boost する (全サイト一律)。
     const tab = await getActiveHttpTab();
     if (!document.body?.isConnected) return;
     if (!tab) {
-      setVolumeHint("");
+      setVolumeHint(i18n("volumeErrorUnsupportedPage"), true);
       return;
     }
-    if (!VolumeBooster.isEmeUrl(tab.url)) {
-      // 普通のサイトは MES が自動適用するので popup 側は storage 書き込みだけで完了
-      setVolumeHint("");
-      return;
-    }
-
-    // EME ホスト: tabCapture 経路で boost (旧方式と同じ、user gesture = popup open)
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.VOLUME_BOOSTER_SET_GAIN,

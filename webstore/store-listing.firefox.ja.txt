@@ -2,17 +2,17 @@
 Firefox AMO 掲載情報（日本語版）
 ※ Chrome Web Store 用は webstore/store-listing.txt を参照
 ※ 英語版は webstore/store-listing.firefox.en.txt を参照
-※ Firefox 版は音量ブースターを部分対応 (普通サイトのみ、EME 多用サイトは未対応)
+※ Firefox 版は音量ブースター非対応 (Chrome 専用 = chrome.tabCapture 未対応のため)。その他 12 カテゴリは全て利用可能
 ============================================================
 
 ■ 名前
 WEB閲覧アシスト (Firefox 版)
 
 ■ 概要 (250 文字以内)
-閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Firefox 拡張機能。12 カテゴリの補助機能（セッション維持・YouTube クリーナー・Amazon 定期おトク便合計・Amazon ランキング移動・Amazon 販売元バッジ・Instagram/TikTok クリーナー・動画ガンマ補正・動画の黒帯除去・ルーペ・RTX 動画強化・カラーピッカー）+ 普通サイト向け部分対応の音量ブースターを統合。すべてデフォルト OFF のオプトイン方針、外部送信ゼロ。
+閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Firefox 拡張機能。12 カテゴリの補助機能（セッション維持・YouTube クリーナー・Amazon 定期おトク便合計・Amazon ランキング移動・Amazon 販売元バッジ・Instagram/TikTok クリーナー・動画ガンマ補正・動画の黒帯除去・ルーペ・RTX 動画強化・カラーピッカー）を統合。音量ブースターは Chrome 版限定（Firefox は chrome.tabCapture 未対応のため）。すべてデフォルト OFF のオプトイン方針、外部送信ゼロ。
 
 ■ 説明 (16,000 文字以内)
-日々の Web 閲覧を快適にする 12 カテゴリの補助機能 + 部分対応の音量ブースターを統合した拡張機能です。
+日々の Web 閲覧を快適にする 12 カテゴリの補助機能を統合した拡張機能です（音量ブースターは Chrome 版限定）。
 
 ■ Firefox 版で利用できる機能
 
@@ -53,9 +53,8 @@ Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Not
 🔹 カラーピッカー (popup タブ)
 EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`browser.storage.local` のみで外部送信ゼロ。
 
-🔹 音量ブースター（部分対応・普通サイトのみ）
-v1.0.33 以降、音量ブースターを部分対応化しました。普通の動画サイト（YouTube / X / Twitch / TikTok / Instagram / niconico 等）は content script が `<video>` / `<audio>` 要素に直接 attach する MediaElementSource 経路で、popup を一度も開かずに自動適用されます。0〜300% の音量補正・自動歪み防止・自動音量正規化・ナイトモード・ミュート（マスタートグル + サブトグル 3 種 + ミュート、全てデフォルト OFF）。
-ただし EME (DRM) 多用サイト（Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Spotify 等の 15 サイト）は **Firefox 版では未対応** です。Chrome 版ではこれらサイトでも `chrome.tabCapture` 経由の fallback 経路で boost 可能ですが、`tabCapture` API が Firefox MV3 で未対応のためです。Firefox 側で API が実装され次第、フル対応に移行予定です。
+🔹 音量ブースター（Chrome 版のみ）
+音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 はこの API に未対応のため、**Firefox 版では音量ブースターは利用できません**（popup のオーディオ欄も自動的に非表示になります）。Chrome / Edge 版では全サイト（Netflix / Prime Video 等の EME 保護動画も含む）で 0〜300% の音量補正・自動歪み防止・自動音量正規化・ナイトモード・ミュートが利用できます（popup を開いて操作）。
 
 ■ プライバシー
 すべてローカル実行・外部送信ゼロ。`browser.storage.local` のみ使用 (sync なし、クラウド同期なし)。プライバシーポリシーは docs/privacy-policy.md を参照。

@@ -39,7 +39,7 @@ Search for **"Web Viewing Assist"** on the [Chrome Web Store](https://chrome.goo
 
 Search for **"Web Viewing Assist"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
-> On Firefox, the Volume Booster only works on ordinary video sites (YouTube / X / Twitch / TikTok / Instagram / niconico, etc.). EME-heavy sites (Netflix / Prime Video, etc.) are not supported because Firefox does not implement `chrome.tabCapture`. All other 12 features work as on Chrome.
+> On Firefox the **Volume Booster is unavailable** (Chrome-only). It captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not implement (the popup's audio section is hidden automatically). All other 12 features work as on Chrome.
 
 ---
 
@@ -76,8 +76,8 @@ See the [Privacy Policy](docs/privacy-policy.en.md) for details.
 |------------|-----|
 | `activeTab` | Manipulate the active tab from the popup (Volume Booster, Loupe, etc.) |
 | `storage` | Persist settings (`chrome.storage.local`) |
-| `offscreen` | Volume Booster EME path (so audio can be boosted on Netflix etc.) |
-| `tabCapture` | Same as above |
+| `offscreen` | Keeps the Volume Booster's AudioContext / GainNode chain alive outside the Service Worker |
+| `tabCapture` | Captures tab audio for the Volume Booster to amplify 0–300% (all sites) |
 | `host_permissions: <all_urls>` | Lets the Loupe keep capturing the screen after popup auto-close / SPA navigation. Effective access scope is the same as the existing content_scripts injection into all http(s) pages |
 
 ---
@@ -88,8 +88,8 @@ See the [Privacy Policy](docs/privacy-policy.en.md) for details.
 |---------|--------|
 | **A setting doesn't take effect** | Close and re-open the popup. If still failing, reload the extension via 🔄 |
 | **YouTube sidebar still shows Shorts** | Check that all 4 Shorts sub-toggles (shelf / chip / sidebar / button) under the YouTube cleaner are individually ON |
-| **Volume Booster has no effect on Netflix (Chrome)** | Netflix is an EME-heavy site, so boost starts the moment you open the popup (user gesture required). Open the popup while the video is playing and adjust the volume |
-| **Volume Booster has no effect on Netflix (Firefox)** | Firefox does not support `chrome.tabCapture`, so boost on EME sites is structurally impossible |
+| **Volume Booster has no effect (Chrome)** | Boost starts the moment you open the popup on the active tab (user gesture required — works on all sites including EME video like Netflix). Open the popup while the video is playing and adjust the volume. Boosted tabs show a "This tab is being shared" banner (a tabCapture behavior) |
+| **Volume Booster missing (Firefox)** | The Firefox edition has no Volume Booster (`chrome.tabCapture` is unsupported, so it is Chrome-only). The popup's audio section is hidden |
 | **Keep-session-alive is ON but I still get logged out** | Some sites have idle timeouts at a separate layer (auth proxy etc.) that this feature cannot bypass. Try also enabling the HTTP ping sub-toggle |
 
 ---

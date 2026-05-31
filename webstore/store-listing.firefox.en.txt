@@ -2,17 +2,17 @@
 Firefox AMO Listing (English)
 ※ For Chrome Web Store, see webstore/store-listing.en.txt
 ※ For Japanese, see webstore/store-listing.firefox.ja.txt
-※ Firefox edition partially supports Volume Booster (ordinary sites only, EME-heavy sites unsupported)
+※ Firefox edition does NOT support Volume Booster (Chrome-only — Firefox lacks chrome.tabCapture). The other 12 categories all work.
 ============================================================
 
 ■ Name
 Web Viewing Assist (Firefox)
 
 ■ Summary (250 chars max)
-Firefox extension that locally tunes the readability and continuity of the page you are viewing. 12 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker) + partially supported Volume Booster (ordinary sites). All default OFF (opt-in). Zero external network calls.
+Firefox extension that locally tunes the readability and continuity of the page you are viewing. 12 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker). Volume Booster is Chrome-only (Firefox lacks chrome.tabCapture). All default OFF (opt-in). Zero external network calls.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 12 categories of features + partially supported Volume Booster into a single popup.
+A productivity helper that bundles 12 categories of features into a single popup (Volume Booster is Chrome-only).
 
 ■ Features available on Firefox
 
@@ -52,9 +52,8 @@ Injects a 1×1 px invisible hint element on pages containing `<video>` elements 
 🔹 Color Picker (popup tab)
 EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).
 
-🔹 Volume Booster (partial support — ordinary sites only)
-Since v1.0.33, the Volume Booster is partially supported on Firefox. Ordinary video sites (YouTube / X / Twitch / TikTok / Instagram / niconico, etc.) are boosted via the content script's MediaElementSource path — the content script attaches directly to `<video>` / `<audio>` elements and applies automatically without ever opening the popup. Supports 0–300% amplification, auto distortion guard, auto volume normalization, night mode, and mute (master toggle + 3 sub-toggles + mute, all default OFF).
-However, EME (DRM) heavy sites (Netflix / Prime Video / DAZN / Disney+ / Hulu / Apple TV+ / Spotify, etc. — 15 hosts) are **unsupported on the Firefox edition**. The Chrome edition can boost these sites via the `chrome.tabCapture` fallback path, but `tabCapture` is not supported by Firefox MV3. We plan to migrate to full support once Firefox implements the API.
+🔹 Volume Booster (Chrome edition only)
+The Volume Booster captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not support, so **the Volume Booster is unavailable on the Firefox edition** (the popup's audio section is hidden automatically). On Chrome / Edge it works on all sites (including EME-protected video such as Netflix / Prime Video) with 0–300% amplification, auto distortion guard, auto volume normalization, night mode, and mute (open the popup to operate it).
 
 ■ Privacy
 Fully local execution; zero external network calls. Only `browser.storage.local` is used (no sync / no cloud). See docs/privacy-policy.md for details.
