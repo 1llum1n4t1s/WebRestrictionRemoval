@@ -1795,8 +1795,11 @@
     }
     subsListFetchInFlight = (async () => {
       try {
-        // redirect: "manual" でプロキシ環境の cross-origin 302 を opaqueredirect (res.ok===false)
-        // 扱いにし、YouTube セッション Cookie が第三者へ漏れる経路を塞ぐ (fetch 4 原則, keepalive と同型)。
+        // same-origin 認証 fetch: 登録チャンネル一覧はログインセッション必須なので credentials は
+        // "same-origin" 固定 (omit にすると未ログイン扱いで取得不能)。referrerPolicy / ALLOWED_HOSTS は
+        // same-origin では無意味なので付けない。redirect:"manual" でプロキシ環境の cross-origin 302 を
+        // opaqueredirect (res.ok===false) 扱いにし YouTube Cookie 漏洩を塞ぐ (keepalive.js と同型、
+        // external CDN 向けの fetch 4 原則とは別パターン — CLAUDE.md「外部 fetch allowlist 設計」参照)。
         const res = await fetch("/feed/channels", { credentials: "same-origin", redirect: "manual" });
         if (!res.ok) {
           subsListFetchLastFailedAt = Date.now();
@@ -2755,6 +2758,8 @@
         // 100ch ユーザーで平時 100% を 50% (LIVE 配信中チャンネルが少数) 程度に削減できる。
         // /streams にしか出ない archived stream のみのチャンネル (LIVE 終了後アーカイブ) には
         // /videos の通常動画候補が代わりに表示される (UX 影響ほぼなし)。
+        // same-origin 認証 fetch (credentials:"same-origin" 固定、omit 不可)。/feed/channels と同型で、
+        // external CDN 向け fetch 4 原則とは別パターン (CLAUDE.md「外部 fetch allowlist 設計」参照)。
         const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin", redirect: "manual" })
           .then((r) => (r.ok ? r.text() : null))
           .catch(() => null);
