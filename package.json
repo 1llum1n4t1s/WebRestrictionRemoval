@@ -15,7 +15,7 @@
     "chrome-webstore-upload-cli": "^4.0.0",
     "eslint": "^10.4.0",
     "globals": "^17.6.0",
-    "puppeteer": "^25.0.4",
+    "puppeteer": "^25.1.0",
     "sharp": "0.34.5",
     "web-ext": "10.2.0"
   },
