@@ -35,7 +35,7 @@ npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppet
 ### テスト・lint
 
 ```bash
-npm test          # Node.js 標準 test runner、82 件
+npm test          # Node.js 標準 test runner、77 件
 npm run lint      # ESLint v10 flat config
 ```
 

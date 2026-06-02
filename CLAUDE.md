@@ -36,6 +36,9 @@ Lint は未導入。コード変更後は最低限以下を実行:
 
 ```bash
 node --check src/lib/actions.js \
+  && node --check src/lib/scan-runner.js \
+  && node --check src/lib/cleaner-core.js \
+  && node --check src/lib/audio-pipeline.js \
   && node --check src/popup/popup.js \
   && node --check src/background/background.js \
   && node --check src/content/early-framework.js \
