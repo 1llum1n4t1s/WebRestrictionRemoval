@@ -507,6 +507,15 @@
     }
   });
 
+  // ページ破棄時の後始末（bfcache 凍結 persisted=true は温存）。タブ閉じは通常
+  // visibilitychange(hidden) で deactivate されるが、それを経由しない直接破棄の保険として
+  // pagehide でも deactivate（Blob URL revoke + listener detach + observer disconnect）する。
+  // /rere C2-2 PATTERN SYNC（video-fill.js と同型）。deactivate は冪等（!isActive で no-op）。
+  window.addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    deactivate();
+  });
+
   // 初期評価（content script ロード時に storage 状態に従って activate or 待機）
   readSettingsAndApply();
 })();

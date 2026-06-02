@@ -56,7 +56,7 @@
   /** リトライ試行回数（0 始まり）。LIVE_CHAT_COLLAPSE_RETRY_DELAYS のインデックスを進める。 */
   let liveChatCollapseRetryAttempt = 0;
   /** 指数バックオフのディレイ（ms）。close button hydration の典型タイミングをカバーする幅で設定。
-   *  pre クラス (visibility:hidden) で見た目は即時に隠れているため、初回試行は短く取って
+   *  pre クラス (display:none + visibility:hidden 併用) で見た目は即時に隠れているため、初回試行は短く取って
    *  hydration 完了次第すぐ click → pre クラス剥がし → 公式 collapsed bar 表示、を最速化する。 */
   const LIVE_CHAT_COLLAPSE_RETRY_DELAYS = Object.freeze([50, 200, 800]);
 
@@ -64,7 +64,7 @@
    *  - 付与: youtube-early.js (document_start) / onNavigationStart (SPA start) /
    *         syncLiveChatCollapse (SPA finish)
    *  - 削除: clearLiveChatPreHide() 経由で 3 か所 (click 成功 / retry 上限 / detach)
-   *  CSS 側 (`html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame { display: none }`)
+   *  CSS 側 (`html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame { display: none; visibility: hidden }`)
    *  + youtube-early.js の MutationObserver による inline force-hide で frame を完全に
    *  見えなくして体感ラグを消す。 */
   const LIVE_CHAT_PRE_HIDE_CLASS = "__cpa-sfx-hide-live-chat-pre";
@@ -153,7 +153,14 @@
   // ---------- Helpers ----------
   const isShortsPage = () => location.pathname.startsWith("/shorts");
   const isResultsPage = () => location.pathname.startsWith("/results");
-  const isWatchPage = () => location.pathname.startsWith("/watch");
+  // `/watch` に加え、`/@channel/live` や `/channel/ID/live` など `/live` で終わる
+  // ライブ配信 URL もライブチャット欄非表示の対象にする。YouTube は `/live` URL の
+  // pathname を `/watch` に書き換えないことがあり、旧実装（`/watch` のみ判定）では
+  // `/live` から開いた配信で hideLiveChat の折りたたみ処理が丸ごとスキップされ、
+  // frame が丸見えになっていた（実機 `/@ANNnewsCH/live` で確認）。
+  const isWatchPage = () =>
+    location.pathname.startsWith("/watch") ||
+    location.pathname.endsWith("/live");
   // フィードページ判定（ホーム / 登録 / 急上昇 等）。yt-lockup-view-model 系の動画フィルタ対象。
   // v1.0.x で「適用範囲」セレクタを廃止したため常時有効として動作する。
   const isFeedPage = () => SearchFixer.isFeedPath(location.pathname);
@@ -494,7 +501,7 @@
     iframe.__cpaLiveChatLoadAttached = true;
     iframe.addEventListener("load", () => {
       // load 直後は YouTube 側の hydration が走っている最中だが、pre クラス
-      // (visibility:hidden) で見た目はすでに隠れているため、待ち時間を最小に絞って
+      // (display:none + visibility:hidden 併用) で見た目はすでに隠れているため、待ち時間を最小に絞って
       // 早期 click → pre クラス剥がし → 公式 collapsed bar 表示、を最速化する。
       // close button が未 hydration なら scheduleLiveChatCollapseRetry が指数バックオフ
       // で吸収する（[50, 200, 800] ms）。

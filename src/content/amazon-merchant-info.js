@@ -111,31 +111,40 @@
     const shipper = readValue(AmazonMerchantInfo.FULFILLER_DIV_ID) || seller;
 
     // 直販判定: isInternal フラグを最優先（Amazon 自身が出す信頼できるフラグ）
-    let isAmazon = readIsInternal();
-    // script 欠落時の保険判定: 販売元名に Amazon が含まれていれば直販と推定
-    if (isAmazon === null) {
-      isAmazon = AmazonMerchantInfo.isAmazonOwnedName(seller);
+    const internal = readIsInternal();
+    let variant;
+    if (internal === true) {
+      variant = "amazon"; // 確実な直販 → 緑（信頼色）
+    } else if (internal === false) {
+      variant = "marketplace"; // 確実なマーケット → オレンジ（警告色）
+    } else {
+      // script 欠落で isInternal 不明。販売元名の部分一致は誤検知しうる（"Amazon Renewed Hub"
+      // 等のマーケット出品者を緑=信頼色に誤表示すると詐欺マーケット回避シグナルを裏切る）。
+      // 確実でない直販は緑を出さず中立グレー(unknown)に倒し、名前から Amazon らしさが無ければ
+      // マーケット警告(オレンジ)に倒す。/rere D-1
+      variant = AmazonMerchantInfo.isAmazonOwnedName(seller) ? "unknown" : "marketplace";
     }
 
-    upsertPanel(seller, shipper, isAmazon);
+    upsertPanel(seller, shipper, variant);
   }
 
   // ---------- レンダリング ----------
 
-  function upsertPanel(seller, shipper, isAmazon) {
+  function upsertPanel(seller, shipper, variant) {
     if (!panelEl) panelEl = buildPanel();
     if (!panelEl.isConnected) placePanel(panelEl);
 
     // variant 切替（CSS の data-variant attribute selector で色変更）
-    const variant = isAmazon ? "amazon" : "marketplace";
+    // amazon=緑(確実な直販) / marketplace=オレンジ(マーケット) / unknown=グレー(判定不能)
     if (panelEl.getAttribute("data-variant") !== variant) {
       panelEl.setAttribute("data-variant", variant);
     }
 
-    // アイコン: Amazon 直販=📦 / マーケット=🛒
+    // アイコン: Amazon 直販=📦 / マーケット=🛒 / 判定不能=❓
     const iconEl = panelEl.querySelector(`.${ROOT}__icon`);
     if (iconEl) {
-      const nextIcon = isAmazon ? "📦" : "🛒";
+      const nextIcon =
+        variant === "amazon" ? "📦" : variant === "marketplace" ? "🛒" : "❓";
       if (iconEl.textContent !== nextIcon) iconEl.textContent = nextIcon;
     }
 
@@ -154,9 +163,12 @@
     }
 
     // aria-label を「Amazon 直販: 販売 XXX / 出荷 YYY」のような完全形に更新
-    const variantLabel = isAmazon
-      ? safeMsg("amazonMerchantInfoAriaAmazon", "Amazon 直販")
-      : safeMsg("amazonMerchantInfoAriaMarketplace", "マーケット出品");
+    const variantLabel =
+      variant === "amazon"
+        ? safeMsg("amazonMerchantInfoAriaAmazon", "Amazon 直販")
+        : variant === "marketplace"
+        ? safeMsg("amazonMerchantInfoAriaMarketplace", "マーケット出品")
+        : safeMsg("amazonMerchantInfoAriaUnknown", "販売元未確定");
     const aria = `${variantLabel}: ${safeMsg("amazonMerchantInfoSoldBy", "販売")} ${seller} / ${safeMsg("amazonMerchantInfoShipsFrom", "出荷")} ${shipper}`;
     if (panelEl.getAttribute("aria-label") !== aria) {
       panelEl.setAttribute("aria-label", aria);

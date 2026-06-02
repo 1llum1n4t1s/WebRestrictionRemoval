@@ -3,9 +3,11 @@
  *
  * 固定クラス名（`__cpa-amzn-merchant-info` prefix）で構成。AmazonRankingJump ボタンと
  * 同じピル型形状を共有しつつ、クリック不可（`<span>`）であることを `cursor: default` で表現。
- * `data-variant` 属性で 2 色切替:
- *   - `data-variant="amazon"`     : Amazon 直販。緑系。信頼感ある安定色。
+ * `data-variant` 属性で 3 色切替:
+ *   - `data-variant="amazon"`     : Amazon 直販（isInternal=true で確定）。緑系。信頼感ある安定色。
  *   - `data-variant="marketplace"`: マーケット出品。オレンジ警告色。詐欺マーケットプレイス回避の視覚シグナル。
+ *   - `data-variant="unknown"`    : isInternal が取得できず販売元名フォールバックが Amazon らしいだけの
+ *                                   判定不能ケース。中立グレー。誤った信頼色(緑)を出さないための安全色 (/rere D-1)。
  * 両機能 ON（ランキング移動ボタン + 販売元バッジ）のときは横並び。
  */
 
@@ -37,6 +39,14 @@
   background: linear-gradient(180deg, #ffc46b 0%, #d76a00 100%);
   border: 1px solid #a04e00;
   color: #2a1500;
+}
+
+/* 判定不能（isInternal 欠落 + 名前フォールバックのみ）: 中立グレー。
+   緑(信頼)でも明確なオレンジ(警告)でもない「確証なし」を表す安全色 (/rere D-1)。 */
+.__cpa-amzn-merchant-info[data-variant="unknown"] {
+  background: linear-gradient(180deg, #d8dadc 0%, #9aa0a6 100%);
+  border: 1px solid #6f7479;
+  color: #1a1d1f;
 }
 
 .__cpa-amzn-merchant-info__icon {

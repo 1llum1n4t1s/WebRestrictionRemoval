@@ -49,9 +49,23 @@ html.__cpa-sfx-hide-comments ytd-comments#comments {
  *     と判明したため `display: none` を採用
  *   - 過去 NG だった `__cpa-sfx-live-chat-force-hide` は **永続的に** display:none を
  *     当てる設計で「collapsed view ヘッダー (「パネルを開く」) まで消す」副作用があった
- *     が、新方式は **数秒間のみ** の display:none で必ず剥がすため副作用は出ない */
+ *     が、新方式は **数秒間のみ** の display:none で必ず剥がすため副作用は出ない
+ *
+ * display:none に visibility:hidden を **併用** する理由 (SPA 遷移チラつき対策):
+ *   - SPA 遷移で YouTube が frame を再利用して一瞬 expand (display:flex を inline で付与)
+ *     する 1 フレームがあり、その瞬間 class セレクタの display:none は inline に負けて
+ *     コメント本体が見えてしまう (ゆろさん報告「コメント本体が一瞬チラっと見える」)。
+ *   - YouTube は expand 時に display は inline で触るが **visibility は触らない**ため、
+ *     visibility:hidden (class !important) はその 1 フレームでも勝ち、コメント本体を隠せる。
+ *     visibility は子孫 (iframe = コメント本体) に継承されるので確実に効く。
+ *   - 旧「visibility:hidden 単独」で空白枠が 2 秒残った問題は、display:none が主で効いて
+ *     いる限り layout 領域が出ないため再発しない (expand される 1 フレームだけ visibility が
+ *     前面に出るが、即 collapse / 先制非表示の維持で空白枠も一瞬)。
+ *   - frame レベルの操作に留め、#chat-container / iframe 属性 / sidebar-width には触らない
+ *     (CLAUDE.md の player 副作用パターンを回避)。visibility は Polymer state に非介入で安全。 */
 html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame {
   display: none !important;
+  visibility: hidden !important;
 }
 
 /* ==========================================================================

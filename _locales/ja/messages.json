@@ -102,6 +102,7 @@
   "amazonMerchantInfoShipsFrom": { "message": "出荷" },
   "amazonMerchantInfoAriaAmazon": { "message": "Amazon 直販" },
   "amazonMerchantInfoAriaMarketplace": { "message": "マーケット出品" },
+  "amazonMerchantInfoAriaUnknown": { "message": "販売元未確定" },
 
   "keepAliveMaster": { "message": "セッション維持" },
   "keepAliveMasterDesc": { "message": "すべての http(s) サイトで合成イベント dispatch によりアイドル検知をリセット" },

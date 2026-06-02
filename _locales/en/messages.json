@@ -102,6 +102,7 @@
   "amazonMerchantInfoShipsFrom": { "message": "Ships" },
   "amazonMerchantInfoAriaAmazon": { "message": "Amazon-fulfilled" },
   "amazonMerchantInfoAriaMarketplace": { "message": "Marketplace listing" },
+  "amazonMerchantInfoAriaUnknown": { "message": "Seller unverified" },
 
   "keepAliveMaster": { "message": "Keep session alive" },
   "keepAliveMasterDesc": { "message": "Reset idle detection across all http(s) tabs by dispatching synthetic events." },

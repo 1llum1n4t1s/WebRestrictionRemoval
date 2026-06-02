@@ -702,4 +702,12 @@
     });
     return false;
   });
+
+  // ページ破棄時の後始末（bfcache 凍結 persisted=true は温存）。orphan guard は
+  // MutationObserver 発火依存のため、DOM 静止ページで破棄されるケースの保険として
+  // pagehide でも stopObserver（disconnect + abort + removeAllOverlays）する。/rere C2-3 PATTERN SYNC。
+  window.addEventListener("pagehide", (e) => {
+    if (e.persisted) return;
+    stopObserver();
+  });
 })();
