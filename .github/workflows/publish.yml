@@ -22,7 +22,7 @@ jobs:
       # 信頼境界として弱い。Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の
       # 更新 PR を自動生成するので、そちらをマージして最新化する運用。
       - name: リポジトリをチェックアウト
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.0
         # /rere レビュー A3-004: persist-credentials を明示的に無効化。本 workflow では
         # GITHUB_TOKEN を使った git push を行わないので、.git/config に書き残さない方が
         # 防御深層として安全 (script injection 経由の token 漏洩経路を完全に閉じる)
@@ -312,7 +312,7 @@ jobs:
     steps:
       - name: リポジトリをチェックアウト
         # web-ext は devDependencies なので package.json + lockfile が必要 (npm ci で取得)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.0
         # /rere F-OPS-1 修正: package job と防御深層の整合性確保。本 job では git push を
         # 行わないが、persist-credentials: false で GITHUB_TOKEN を .git/config の extraheader に
         # 残さない (script injection 経由の token 漏洩経路を完全に閉じる)
