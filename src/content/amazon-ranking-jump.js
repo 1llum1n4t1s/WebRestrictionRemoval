@@ -120,7 +120,7 @@
     a.setAttribute("role", "button");
     a.setAttribute(
       "aria-label",
-      safeMsg("amazonRankingJumpAriaLabel", "この商品が所属するランキングへ移動")
+      ScanRunner.safeMsg("amazonRankingJumpAriaLabel", "この商品が所属するランキングへ移動")
     );
 
     const icon = document.createElement("span");
@@ -133,7 +133,7 @@
 
     const title = document.createElement("span");
     title.className = `${ROOT}__title`;
-    title.textContent = safeMsg("amazonRankingJumpButton", "この商品が所属するランキングへ移動");
+    title.textContent = ScanRunner.safeMsg("amazonRankingJumpButton", "この商品が所属するランキングへ移動");
 
     const cat = document.createElement("span");
     cat.className = `${ROOT}__cat hidden`;
@@ -170,14 +170,5 @@
     }
     // 念のため DOM 上の残骸も掃除（多重ロード時の保険）
     document.querySelectorAll(`.${ROOT}`).forEach((el) => el.remove());
-  }
-
-  /** context invalidation 後でも throw しない i18n 取得。 */
-  function safeMsg(key, fallback) {
-    try {
-      return chrome.i18n.getMessage(key) || fallback;
-    } catch {
-      return fallback;
-    }
   }
 })();

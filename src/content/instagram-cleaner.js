@@ -55,36 +55,18 @@
   const f = (key) => active && features[key] === true;
 
   // ---------- 状態購読 ----------
-  chrome.storage.local
-    .get([StorageKeys.INSTAGRAM_CLEANER_ENABLED, StorageKeys.INSTAGRAM_CLEANER_FEATURES])
-    .then((stored) => {
-      active = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
-      features = InstagramCleaner.mergeFeatures(stored[StorageKeys.INSTAGRAM_CLEANER_FEATURES]);
+  // 設定購読 3 経路 (初期 get / onMessage / onChanged 部分更新) は CleanerCore に集約。
+  // active / features の保持と applyBodyClasses / DOM スイープ等の固有ロジックは本 cs に残す。
+  CleanerCore.subscribe({
+    masterKey: StorageKeys.INSTAGRAM_CLEANER_ENABLED,
+    featuresKey: StorageKeys.INSTAGRAM_CLEANER_FEATURES,
+    applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS,
+    mergeFeatures: (raw) => InstagramCleaner.mergeFeatures(raw),
+    onUpdate: (patch) => {
+      if ("active" in patch) active = patch.active;
+      if ("features" in patch) features = patch.features;
       onSettingsChanged();
-    })
-    .catch(() => {});
-
-  chrome.runtime.onMessage.addListener((request, sender) => {
-    if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action !== Actions.APPLY_INSTAGRAM_CLEANER_CS) return;
-    const data = request.data ?? {};
-    active = data.enabled === true;
-    features = InstagramCleaner.mergeFeatures(data.features);
-    onSettingsChanged();
-  });
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    let touched = false;
-    if (StorageKeys.INSTAGRAM_CLEANER_ENABLED in changes) {
-      active = changes[StorageKeys.INSTAGRAM_CLEANER_ENABLED].newValue === true;
-      touched = true;
-    }
-    if (StorageKeys.INSTAGRAM_CLEANER_FEATURES in changes) {
-      features = InstagramCleaner.mergeFeatures(changes[StorageKeys.INSTAGRAM_CLEANER_FEATURES].newValue);
-      touched = true;
-    }
-    if (touched) onSettingsChanged();
+    },
   });
 
   // ---------- 設定変更ディスパッチャ ----------

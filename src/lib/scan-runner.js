@@ -202,5 +202,19 @@
     });
   }
 
-  globalThis.ScanRunner = Object.freeze({ create });
+  /**
+   * context invalidation 後でも throw しない i18n 取得ヘルパー。
+   * Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が同型コピー (ranking-jump /
+   * merchant-info) や try/catch 無しのインライン (delivery-total) で持っていた
+   * `chrome.i18n.getMessage(key) || fallback` を集約する。orphan 化後も fallback を返して安全。
+   */
+  function safeMsg(key, fallback) {
+    try {
+      return chrome.i18n.getMessage(key) || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  globalThis.ScanRunner = Object.freeze({ create, safeMsg });
 })();

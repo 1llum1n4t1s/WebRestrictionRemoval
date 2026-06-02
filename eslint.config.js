@@ -40,6 +40,7 @@ const ACTIONS_GLOBALS = {
   // /rere B1-007/B2-I002/D-002 + B1-004/B2-I001/D-001 で追加した共通モジュール
   ScanRunner: "readonly",       // src/lib/scan-runner.js
   AudioPipeline: "readonly",    // src/lib/audio-pipeline.js
+  CleanerCore: "readonly",      // src/lib/cleaner-core.js (/opop で追加)
 };
 
 const COMMON_RULES = {

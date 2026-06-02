@@ -18,7 +18,7 @@ npm run ci:install           # CI 用 (npm ci。lockfile 厳守)
 npm run build                # アイコン + スクリーンショット一括生成
 npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 23 globalThis 定数列挙 (actions.js 21 + ScanRunner + AudioPipeline、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
+npm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 24 globalThis 定数列挙 (actions.js 21 + ScanRunner + AudioPipeline + CleanerCore、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
 npm test                     # Node.js 標準 test runner、77 件（FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 6 キー + RTX_ENHANCER_ENABLED + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 を含む）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
@@ -36,6 +36,9 @@ Lint は未導入。コード変更後は最低限以下を実行:
 
 ```bash
 node --check src/lib/actions.js \
+  && node --check src/lib/scan-runner.js \
+  && node --check src/lib/cleaner-core.js \
+  && node --check src/lib/audio-pipeline.js \
   && node --check src/popup/popup.js \
   && node --check src/background/background.js \
   && node --check src/content/early-framework.js \
@@ -325,8 +328,9 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` + host_permissions: `<all_urls>` (ルーペ `captureVisibleTab` を popup close 後 / SPA navigation 後でも確実に動作させるため、v1.0.34 で追加。content_scripts で既に全 http(s) に注入済みなので実質アクセス範囲は同じ) |
 | `src/lib/actions.js` | `Object.freeze` された 21 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / KeepAlive / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / VideoFill / Loupe / ColorPicker / PopupTabs |
-| `src/lib/scan-runner.js` | content script 共通実行ランタイム (`/rere` B1-007/B2-I002/D-002 で抽出)。rAF coalesce + MutationObserver `disconnect → render → takeRecords → observe` ガード + Extension context invalidation guard を `ScanRunner.create({ render, cleanup })` に集約し `globalThis.ScanRunner` 公開。Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が利用 (image-downloader / youtube-shorts は別バッチで移行予定)。cleanup は idempotent 必須 |
-| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア共有モジュール (`/rere` B1-004/B2-I001/D-001 で抽出)。dbToGain / clampNormalizerGain / scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer / stopLoudnessNormalizer / updateLoudnessNormalizer / applyCompressorPreset の 8 関数を `globalThis.AudioPipeline` 公開。MES 経路 (volume-booster.js) と EME fallback 経路 (offscreen.js) が共有し、物理コピー drift を解消。caller は stop/update/applyCompressorPreset の 3 関数を直接呼ぶ (残り 5 は内部相互呼び出し)。値定数は actions.js の VolumeBooster 経由 |
+| `src/lib/scan-runner.js` | content script 共通実行ランタイム (`/rere` B1-007/B2-I002/D-002 で抽出)。rAF coalesce + MutationObserver `disconnect → render → takeRecords → observe` ガード + Extension context invalidation guard を `ScanRunner.create({ render, cleanup })` に集約し `globalThis.ScanRunner` 公開。Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が利用 (image-downloader / youtube-shorts は別バッチで移行予定)。cleanup は idempotent 必須。context invalidation 後でも throw しない i18n 取得 `ScanRunner.safeMsg(key, fallback)` も公開し Amazon 3-cs の重複ヘルパー (ranking-jump / merchant-info の同型コピー + delivery-total のインライン) を統合 (/opop) |
+| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア共有モジュール (`/rere` B1-004/B2-I001/D-001 で抽出)。dbToGain / clampNormalizerGain / scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer / stopLoudnessNormalizer / updateLoudnessNormalizer / applyCompressorPreset の 8 関数を `globalThis.AudioPipeline` 公開。offscreen.js (tabCapture 経路・唯一の音量ブースター経路) が使用 (MES 経路 volume-booster.js は撤去済みのため現 caller は offscreen 単独。Firefox catch-up 時の再利用に備え共有モジュール構造は維持)。caller は stop/update/applyCompressorPreset の 3 関数を直接呼ぶ (残り 5 は内部相互呼び出し)。値定数は actions.js の VolumeBooster 経由 |
+| `src/lib/cleaner-core.js` | body-class クリーナーの設定購読共通ランタイム (/opop で抽出)。master + features 2 キーの購読 3 経路 (初期 storage.get / runtime.onMessage gate / storage.onChanged 部分更新) を `CleanerCore.subscribe({ masterKey, featuresKey, applyAction, mergeFeatures, onUpdate })` に集約し `globalThis.CleanerCore` 公開。Instagram / TikTok クリーナーが利用。active/features 保持と applyBodyClasses/固有ロジック (Instagram の DOM スイープ・URL guard 等) は各 cs に残す最小責務分離 (early-framework.js / scan-runner.js と同じ思想で config 肥大化を回避)。onUpdate(patch) は変わったキーだけ通知し各 cs が部分適用 (片方キーのみ変化時の undefined 上書き罠を回避) |
 | `src/background/background.js` | Service worker: sender 検証付きメッセージ転送、設定マイグレーション、offscreen document 管理、音量ブースター制御 (tabCapture 経路一本、全サイト一律) |
 | `src/content/keepalive.js` | 合成アクティビティ + 同一オリジン HTTP ping ポーラー（top + cross-origin iframe）+ 起動ランナー |
 | `src/content/early-framework.js` | document_start early script 共通フレームワーク。`<style>` 注入 / pre クラス同期付与 / `storage.local.get` / `storage.onChanged` 購読を `window.__cpaEarlyFramework.setup(config)` に集約。各 early エントリで先頭ロード、actions.js には依存しない |
@@ -493,11 +497,13 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - **TikTok** は `p\d+` プレフィックス必須 (`/^p\d+(-[a-z0-9-]+)?\.tiktokcdn(-us)?\.com$/`) — `evil.tiktokcdn.com` / `tracking.tiktokcdn-us.com` / `static.tiktokcdn.com` を全部拒否 (/rere レビュー A2-SC-1 で確立)
 - 新サブドメインを追加する場合は **prefix 必須化** を守ること (実 prefix が「p<数字>」「scontent-」のような構造プレフィックスを持っている場合のみ許可)
 
-**fetch セキュリティ 4 原則** (image-downloader.js / search-fixer.js / keepalive.js 共通):
+**fetch セキュリティ 4 原則** (**external cross-origin fetch 向け** — image-downloader.js の fbcdn / tiktokcdn / i.ytimg.com 等の CDN fetch):
 1. `credentials: "omit"` — クロスオリジン Cookie 送信を回避
 2. `redirect: "manual"` — 302 経由の第三者ドメインへの認証情報送信を遮断 (opaqueredirect は `r.ok === false` 扱いで自動スキップ)
 3. `referrerPolicy: "no-referrer"` — リファラ送信ゼロ
 4. `hostname` を `ALLOWED_HOSTS` で検証 — 攻撃者注入 `<img>` 経由の代理 fetch を防ぐ
+
+**⚠️ 4 原則は external cross-origin fetch 専用。same-origin 認証 fetch は別パターン**: `/feed/channels` / `/${handle}/videos` / `/${handle}/streams` (search-fixer.js、YouTube 自身のログイン必須ページから登録チャンネル / 動画リストを取得) や SharePoint 等への HTTP ping (keepalive.js) は **`credentials: "same-origin"` + `redirect: "manual"`** を使う。`credentials: "omit"` にすると認証セッションが切れて登録チャンネル一覧等が取得できず機能が壊れる。`referrerPolicy: "no-referrer"` / `ALLOWED_HOSTS` 検証は same-origin では無意味なので付けない (referrer は自オリジンへの送信で漏洩にならず、宛先は固定 same-origin のため)。`redirect: "manual"` だけは両パターン共通で必須 (認証プロキシ環境の cross-origin 302 で Cookie が漏れる経路を opaqueredirect = `r.ok === false` 扱いで遮断)。**external CDN ルール (4 原則) を same-origin 認証 fetch に丸ごと適用しないこと** (/opop で CodeRabbit がこの 2 パターンを混同して `credentials: "omit"` を誤提案した実績あり)。
 
 ### image-downloader 並列化のセマンティクス維持
 `fetchFirstAvailable` は srcset の最大解像度から順に並んだ候補配列を受け取り、**「最初に 200 OK を返した最大解像度」** を採用する。

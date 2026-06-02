@@ -31,38 +31,18 @@
   const f = (key) => active && features[key] === true;
 
   // ---------- 状態購読 ----------
-  chrome.storage.local
-    .get([StorageKeys.TIKTOK_CLEANER_ENABLED, StorageKeys.TIKTOK_CLEANER_FEATURES])
-    .then((stored) => {
-      active = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
-      features = TikTokCleaner.mergeFeatures(stored[StorageKeys.TIKTOK_CLEANER_FEATURES]);
+  // 設定購読 3 経路 (初期 get / onMessage / onChanged 部分更新) は CleanerCore に集約。
+  // active / features の保持と applyBodyClasses は本 cs に残す (最小責務分離)。
+  CleanerCore.subscribe({
+    masterKey: StorageKeys.TIKTOK_CLEANER_ENABLED,
+    featuresKey: StorageKeys.TIKTOK_CLEANER_FEATURES,
+    applyAction: Actions.APPLY_TIKTOK_CLEANER_CS,
+    mergeFeatures: (raw) => TikTokCleaner.mergeFeatures(raw),
+    onUpdate: (patch) => {
+      if ("active" in patch) active = patch.active;
+      if ("features" in patch) features = patch.features;
       onSettingsChanged();
-    })
-    .catch(() => {});
-
-  chrome.runtime.onMessage.addListener((request, sender) => {
-    if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action !== Actions.APPLY_TIKTOK_CLEANER_CS) return;
-    const data = request.data ?? {};
-    active = data.enabled === true;
-    features = TikTokCleaner.mergeFeatures(data.features);
-    onSettingsChanged();
-  });
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    let touched = false;
-    if (StorageKeys.TIKTOK_CLEANER_ENABLED in changes) {
-      active = changes[StorageKeys.TIKTOK_CLEANER_ENABLED].newValue === true;
-      touched = true;
-    }
-    if (StorageKeys.TIKTOK_CLEANER_FEATURES in changes) {
-      features = TikTokCleaner.mergeFeatures(
-        changes[StorageKeys.TIKTOK_CLEANER_FEATURES].newValue
-      );
-      touched = true;
-    }
-    if (touched) onSettingsChanged();
+    },
   });
 
   // ---------- 設定変更ディスパッチャ ----------
