@@ -497,11 +497,13 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - **TikTok** は `p\d+` プレフィックス必須 (`/^p\d+(-[a-z0-9-]+)?\.tiktokcdn(-us)?\.com$/`) — `evil.tiktokcdn.com` / `tracking.tiktokcdn-us.com` / `static.tiktokcdn.com` を全部拒否 (/rere レビュー A2-SC-1 で確立)
 - 新サブドメインを追加する場合は **prefix 必須化** を守ること (実 prefix が「p<数字>」「scontent-」のような構造プレフィックスを持っている場合のみ許可)
 
-**fetch セキュリティ 4 原則** (image-downloader.js / search-fixer.js / keepalive.js 共通):
+**fetch セキュリティ 4 原則** (**external cross-origin fetch 向け** — image-downloader.js の fbcdn / tiktokcdn / i.ytimg.com 等の CDN fetch):
 1. `credentials: "omit"` — クロスオリジン Cookie 送信を回避
 2. `redirect: "manual"` — 302 経由の第三者ドメインへの認証情報送信を遮断 (opaqueredirect は `r.ok === false` 扱いで自動スキップ)
 3. `referrerPolicy: "no-referrer"` — リファラ送信ゼロ
 4. `hostname` を `ALLOWED_HOSTS` で検証 — 攻撃者注入 `<img>` 経由の代理 fetch を防ぐ
+
+**⚠️ 4 原則は external cross-origin fetch 専用。same-origin 認証 fetch は別パターン**: `/feed/channels` / `/${handle}/videos` / `/${handle}/streams` (search-fixer.js、YouTube 自身のログイン必須ページから登録チャンネル / 動画リストを取得) や SharePoint 等への HTTP ping (keepalive.js) は **`credentials: "same-origin"` + `redirect: "manual"`** を使う。`credentials: "omit"` にすると認証セッションが切れて登録チャンネル一覧等が取得できず機能が壊れる。`referrerPolicy: "no-referrer"` / `ALLOWED_HOSTS` 検証は same-origin では無意味なので付けない (referrer は自オリジンへの送信で漏洩にならず、宛先は固定 same-origin のため)。`redirect: "manual"` だけは両パターン共通で必須 (認証プロキシ環境の cross-origin 302 で Cookie が漏れる経路を opaqueredirect = `r.ok === false` 扱いで遮断)。**external CDN ルール (4 原則) を same-origin 認証 fetch に丸ごと適用しないこと** (/opop で CodeRabbit がこの 2 パターンを混同して `credentials: "omit"` を誤提案した実績あり)。
 
 ### image-downloader 並列化のセマンティクス維持
 `fetchFirstAvailable` は srcset の最大解像度から順に並んだ候補配列を受け取り、**「最初に 200 OK を返した最大解像度」** を採用する。
