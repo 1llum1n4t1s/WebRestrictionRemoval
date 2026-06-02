@@ -104,14 +104,14 @@
     const root = document.createElement("div");
     root.className = AmazonDeliveryTotal.TOTAL_ROOT_CLASS;
     root.setAttribute("role", "note");
-    root.setAttribute("aria-label", chrome.i18n.getMessage("amazonTotalAriaLabel") || "この月の合計金額");
+    root.setAttribute("aria-label", ScanRunner.safeMsg("amazonTotalAriaLabel", "この月の合計金額"));
 
     const inner = document.createElement("div");
     inner.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__inner`;
 
     const txt = document.createElement("span");
     txt.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__txt`;
-    txt.textContent = chrome.i18n.getMessage("amazonTotalText") || "合計金額";
+    txt.textContent = ScanRunner.safeMsg("amazonTotalText", "合計金額");
 
     const sym = document.createElement("span");
     sym.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__sym`;
@@ -123,7 +123,7 @@
 
     const unit = document.createElement("span");
     unit.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__unit`;
-    unit.textContent = chrome.i18n.getMessage("amazonTotalUnit") || "円";
+    unit.textContent = ScanRunner.safeMsg("amazonTotalUnit", "円");
 
     inner.append(txt, sym, price, unit);
     root.append(inner);

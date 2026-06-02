@@ -859,7 +859,7 @@ const ImageDownloader = Object.freeze({
       const u = new URL(url);
       if (u.protocol !== "http:" && u.protocol !== "https:") return false;
       hostname = u.hostname.toLowerCase();
-    } catch (_err) {
+    } catch {
       return false;
     }
     const allowed = ImageDownloader.ALLOWED_HOSTS[host];
@@ -1311,8 +1311,6 @@ const Loupe = Object.freeze({
    * これより短い debounce 値にすると quota エラーが発生する。500ms は最小安全値。
    */
   RECAPTURE_DEBOUNCE_MS: 500,
-  /** レンズ DOM の z-index。image-downloader と同値で「拡張機能 UI として最前面」を統一 */
-  LENS_Z_INDEX: 2147483646,
   /** 注入する DOM 要素の id 名 / class 名 */
   LENS_ID: "__cpa-loupe-lens",
   CLASS_LENS: "__cpa-loupe-lens",

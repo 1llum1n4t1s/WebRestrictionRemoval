@@ -82,7 +82,7 @@
     },
     {
       "matches": ["*://*.instagram.com/*"],
-      "js": ["src/lib/actions.js", "src/content/instagram-cleaner.js", "src/content/image-downloader.js"],
+      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/instagram-cleaner.js", "src/content/image-downloader.js"],
       "css": ["src/content/instagram-cleaner.css", "src/content/image-downloader.css"],
       "run_at": "document_idle",
       "all_frames": false
@@ -95,7 +95,7 @@
     },
     {
       "matches": ["*://*.tiktok.com/*"],
-      "js": ["src/lib/actions.js", "src/content/tiktok-cleaner.js", "src/content/image-downloader.js"],
+      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/tiktok-cleaner.js", "src/content/image-downloader.js"],
       "css": ["src/content/tiktok-cleaner.css", "src/content/image-downloader.css"],
       "run_at": "document_idle",
       "all_frames": false

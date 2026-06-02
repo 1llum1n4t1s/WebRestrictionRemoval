@@ -151,7 +151,6 @@
   const CLASS_DEMOTED = "cpa-sfx-demoted";
 
   // ---------- Helpers ----------
-  const isShortsPage = () => location.pathname.startsWith("/shorts");
   const isResultsPage = () => location.pathname.startsWith("/results");
   // `/watch` に加え、`/@channel/live` や `/channel/ID/live` など `/live` で終わる
   // ライブ配信 URL もライブチャット欄非表示の対象にする。YouTube は `/live` URL の
@@ -538,72 +537,6 @@
   // ライブ配信アーカイブで「チャットのリプレイを表示」ボタンしか出ない動画など、
   // 公式トグルで閉じられない状態を CSS で frame ごと display:none する。
   const LIVE_CHAT_FORCE_HIDE_CLASS = "__cpa-sfx-live-chat-force-hide";
-
-  // 「表示する」系のボタンラベル（=既に折りたたみ済みで、押すと開いてしまうので絶対 click 禁止）。
-  // 「を表示」「のリプレイを表示」「Show chat」「Show chat replay」などの末尾パターンを広めに拾う。
-  const SHOW_BUTTON_RE = /(を表示|リプレイを表示|show chat|show replay)/i;
-  // 「非表示にする」系のボタンラベル（=現在チャットが開いていて、押すと折りたたまれる）。
-  // 「を非表示」「Hide chat」「Close chat」など。SHOW にもマッチする可能性があるので SHOW を先に判定する。
-  const HIDE_BUTTON_RE = /(非表示|閉じる|たたむ|hide chat|close chat|collapse chat)/i;
-
-  function findLiveChatToggle(chatFrame) {
-    // 検索スコープ: chatFrame 自身に加えて、隣接親 (`#chat-container`, `ytd-watch-grid`, `ytd-watch-flexy`)
-    // も探す。YouTube は折りたたみボタンを frame の外（隣接ヘッダー）に置くケースがあり、
-    // chatFrame.querySelector のみだと見逃す。
-    const scopes = new Set();
-    scopes.add(chatFrame);
-    let p = chatFrame.parentElement;
-    let depth = 0;
-    while (p && depth < 4) {
-      // 親方向に最大 4 階層遡って toggle を探す
-      scopes.add(p);
-      if (
-        p.id === "chat-container" ||
-        p.tagName === "YTD-WATCH-GRID" ||
-        p.tagName === "YTD-WATCH-FLEXY"
-      ) break;
-      p = p.parentElement;
-      depth += 1;
-    }
-
-    // legacy ID セレクタ。ただし `#show-hide-button` は「表示」「非表示」両方の状態で同じ ID を持つため、
-    // ヒットしてもそのまま click せず、aria-label / textContent で「非表示にする」状態のみ採用する。
-    const idSelectors = [
-      "#close-button button",
-      "#close-button [role='button']",
-      "#show-hide-button button",
-      "#show-hide-button [role='button']",
-      "#close-button",
-      "#show-hide-button",
-    ];
-
-    /** 候補 button が「閉じる」アクション (=hide) かどうかを aria/text で判定 */
-    const isHideAction = (el) => {
-      const aria = (el.getAttribute("aria-label") ?? "").trim();
-      const text = (el.textContent ?? "").trim().slice(0, 50);
-      // 「表示する」系を最優先で除外（誤クリックすると逆に開いてしまう）
-      if (SHOW_BUTTON_RE.test(aria) || SHOW_BUTTON_RE.test(text)) return false;
-      // 「非表示」系を採用
-      if (HIDE_BUTTON_RE.test(aria) || HIDE_BUTTON_RE.test(text)) return true;
-      // ラベルが空 / 不明な場合は安全側で false（無闇に click しない）
-      return false;
-    };
-
-    for (const scope of scopes) {
-      // 1. legacy ID 経路（ヒット時もアクション判定で hide のみ採用）
-      for (const sel of idSelectors) {
-        const el = scope.querySelector(sel);
-        if (el && typeof el.click === "function" && isHideAction(el)) return el;
-      }
-      // 2. aria-label / textContent による全 button スキャン
-      const candidates = scope.querySelectorAll("button, [role='button']");
-      for (const c of candidates) {
-        if (typeof c.click !== "function") continue;
-        if (isHideAction(c)) return c;
-      }
-    }
-    return null;
-  }
 
   /**
    * ライブチャット panel の close button を探す。
@@ -1862,7 +1795,9 @@
     }
     subsListFetchInFlight = (async () => {
       try {
-        const res = await fetch("/feed/channels", { credentials: "same-origin" });
+        // redirect: "manual" でプロキシ環境の cross-origin 302 を opaqueredirect (res.ok===false)
+        // 扱いにし、YouTube セッション Cookie が第三者へ漏れる経路を塞ぐ (fetch 4 原則, keepalive と同型)。
+        const res = await fetch("/feed/channels", { credentials: "same-origin", redirect: "manual" });
         if (!res.ok) {
           subsListFetchLastFailedAt = Date.now();
           subsListFetchBackoffMs = Math.min(60000, Math.max(2000, subsListFetchBackoffMs * 2));
@@ -2820,7 +2755,7 @@
         // 100ch ユーザーで平時 100% を 50% (LIVE 配信中チャンネルが少数) 程度に削減できる。
         // /streams にしか出ない archived stream のみのチャンネル (LIVE 終了後アーカイブ) には
         // /videos の通常動画候補が代わりに表示される (UX 影響ほぼなし)。
-        const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin" })
+        const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin", redirect: "manual" })
           .then((r) => (r.ok ? r.text() : null))
           .catch(() => null);
         // 軽量 LIVE 検出: 1 マッチで早期判定 (matchAll の前段、lastIndex 進行を避けるため new RegExp)
@@ -2829,7 +2764,7 @@
           new RegExp('"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"').test(videosHtml);
         let streamsHtml = null;
         if (!liveDetectedInVideos) {
-          streamsHtml = await fetch(`/${handle}/streams`, { credentials: "same-origin" })
+          streamsHtml = await fetch(`/${handle}/streams`, { credentials: "same-origin", redirect: "manual" })
             .then((r) => (r.ok ? r.text() : null))
             .catch(() => null);
         }

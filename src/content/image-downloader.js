@@ -82,20 +82,20 @@
       if (!chrome.runtime || !chrome.runtime.id) {
         contextInvalidated = true;
       }
-    } catch (_) {
+    } catch {
       contextInvalidated = true;
     }
     if (contextInvalidated) {
       if (mutationObserver) {
-        try { mutationObserver.disconnect(); } catch (_) {}
+        try { mutationObserver.disconnect(); } catch {}
         mutationObserver = null;
       }
       if (abortController) {
-        try { abortController.abort(); } catch (_) {}
+        try { abortController.abort(); } catch {}
         abortController = null;
       }
       active = false;
-      try { removeAllOverlays(); } catch (_) {}
+      try { removeAllOverlays(); } catch {}
     }
     return contextInvalidated;
   }
