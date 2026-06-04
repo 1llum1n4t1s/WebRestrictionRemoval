@@ -6,7 +6,7 @@ Firefox AMO Listing (English)
 ============================================================
 
 ■ Name
-Web Viewing Assist (Firefox)
+Vuora (Firefox)
 
 ■ Summary (250 chars max)
 Firefox extension that locally tunes the readability and continuity of the page you are viewing. 12 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker). Volume Booster is Chrome-only (Firefox lacks chrome.tabCapture). All default OFF (opt-in). Zero external network calls.

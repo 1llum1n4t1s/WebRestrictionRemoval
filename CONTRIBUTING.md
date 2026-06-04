@@ -1,6 +1,6 @@
 # 開発者向けガイド (Contributing)
 
-このドキュメントは **WEB閲覧アシスト** に手を入れる開発者向けです。
+このドキュメントは **Vuora** に手を入れる開発者向けです。
 利用者向けのインストール手順や機能説明は [README.md](README.md) を参照してください。
 
 LLM (Claude / Codex 等) 向けの詳細な実装規約は [CLAUDE.md](CLAUDE.md) にあります。

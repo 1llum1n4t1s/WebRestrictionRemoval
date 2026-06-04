@@ -2,166 +2,186 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Screenshot 1 - Popup UI</title>
+  <title>Vuora — Popup UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,400&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Old+Mincho:wght@600;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --ink: #25201f;
-      --muted: #6f5f5a;
-      --paper: #fff7ec;
-      --paper-deep: #efd8c1;
-      --akane: #c0605a;
-      --akane-dark: #8f433f;
-      --gold: #d9a441;
-      --shadow: rgba(61, 39, 33, 0.28);
+      --bg0: #0b0e13;
+      --ink: #f5efe4;
+      --mut: rgba(245, 239, 228, 0.60);
+      --amber: #f3ba8a;
+      --rose: #c64b54;
+      --teal: #6fc2cf;
+      --line: rgba(245, 239, 228, 0.10);
+      --card: rgba(20, 25, 33, 0.78);
+      --serif: "Fraunces", "Zen Old Mincho", Georgia, serif;
+      --mincho: "Zen Old Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+      --gothic: "Zen Kaku Gothic New", "BIZ UDPGothic", "Yu Gothic", sans-serif;
     }
     body {
       width: 1280px;
       height: 800px;
       overflow: hidden;
       color: var(--ink);
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+      font-family: var(--gothic);
+      position: relative;
       background:
-        radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.92), transparent 24%),
-        radial-gradient(circle at 88% 12%, rgba(217, 164, 65, 0.25), transparent 26%),
-        radial-gradient(circle at 80% 88%, rgba(192, 96, 90, 0.34), transparent 34%),
-        linear-gradient(135deg, #fffaf0 0%, #f2dac2 48%, #ba665b 100%);
+        radial-gradient(ellipse 50% 46% at 16% 16%, rgba(243, 186, 138, 0.20), transparent 60%),
+        radial-gradient(ellipse 52% 50% at 88% 90%, rgba(198, 75, 84, 0.24), transparent 60%),
+        radial-gradient(circle at 96% 6%, rgba(111, 194, 207, 0.12), transparent 42%),
+        var(--bg0);
       display: grid;
       place-items: center;
     }
     body::before {
       content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        repeating-linear-gradient(90deg, rgba(37, 32, 31, 0.025) 0 1px, transparent 1px 7px),
-        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 11px);
-      mix-blend-mode: multiply;
-      pointer-events: none;
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(ellipse 84% 84% at 50% 50%, #000 32%, transparent 80%);
+      opacity: 0.45;
     }
     .sheet {
       position: relative;
-      width: 1136px;
-      height: 690px;
-      border-radius: 38px;
-      background: rgba(255, 247, 236, 0.82);
-      box-shadow: 0 42px 90px var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.62);
+      width: 1152px;
+      height: 700px;
+      border-radius: 36px;
+      background: var(--card);
+      box-shadow:
+        inset 0 0 0 1px var(--line),
+        0 44px 100px rgba(0, 0, 0, 0.55);
       display: grid;
-      grid-template-columns: 1fr 420px;
-      gap: 68px;
+      grid-template-columns: 1fr 430px;
+      gap: 60px;
       align-items: center;
-      padding: 54px 72px;
+      padding: 56px 70px;
       overflow: hidden;
     }
+    /* aura ring 装飾（右上） */
     .sheet::before {
       content: "";
       position: absolute;
-      width: 520px;
-      height: 520px;
-      right: -180px;
-      top: -190px;
+      width: 540px; height: 540px;
+      right: -210px; top: -210px;
       border-radius: 50%;
-      border: 72px solid rgba(192, 96, 90, 0.17);
-    }
-    .sheet::after {
-      content: "";
-      position: absolute;
-      left: 54px;
-      bottom: 46px;
-      width: 280px;
-      height: 12px;
-      border-radius: 99px;
-      background: linear-gradient(90deg, var(--akane), transparent);
-      opacity: 0.42;
+      background: conic-gradient(from 200deg, var(--amber), var(--rose), var(--teal), var(--amber));
+      filter: blur(6px);
+      opacity: 0.4;
+      mask-image: radial-gradient(circle, transparent 58%, #000 60%, #000 70%, transparent 72%);
+      -webkit-mask-image: radial-gradient(circle, transparent 58%, #000 60%, #000 70%, transparent 72%);
     }
     .copy {
       position: relative;
       z-index: 1;
-      align-self: stretch;
       display: flex;
       flex-direction: column;
       justify-content: center;
     }
-    .kicker {
+    .eyebrow {
       display: inline-flex;
       width: max-content;
       align-items: center;
-      gap: 10px;
-      padding: 9px 15px;
-      border-radius: 999px;
-      color: var(--akane-dark);
-      background: rgba(192, 96, 90, 0.11);
-      border: 1px solid rgba(192, 96, 90, 0.2);
-      font: 700 14px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
-      letter-spacing: 0.08em;
-      margin-bottom: 28px;
+      gap: 11px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 19px;
+      color: var(--amber);
+      margin-bottom: 22px;
     }
-    .kicker::before {
+    .eyebrow::before {
       content: "";
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--akane);
-      box-shadow: 16px 0 0 var(--gold);
+      width: 26px; height: 26px; border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, transparent 40%, rgba(243,186,138,0.9) 46%, transparent 58%),
+        conic-gradient(from 210deg, var(--amber), var(--rose), var(--teal), var(--amber));
+      box-shadow: 0 0 16px rgba(243, 186, 138, 0.5);
     }
-    h1 {
-      font-size: 72px;
-      line-height: 0.98;
-      letter-spacing: -0.06em;
-      font-weight: 800;
+    .wordmark {
+      font-family: var(--serif);
+      font-weight: 900;
+      font-size: 132px;
+      line-height: 0.84;
+      letter-spacing: -0.035em;
+      background: linear-gradient(166deg, #fbf4e8 12%, #f3ba8a 56%, #d98a64 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin-bottom: 4px;
+    }
+    .reading {
+      font-family: var(--mincho);
+      font-size: 16px;
+      letter-spacing: 0.42em;
+      color: var(--mut);
       margin-bottom: 26px;
+      padding-left: 4px;
     }
-    h1 span {
-      color: var(--akane-dark);
+    h2 {
+      font-family: var(--mincho);
+      font-weight: 700;
+      font-size: 32px;
+      line-height: 1.28;
+      letter-spacing: -0.01em;
+      margin-bottom: 18px;
     }
+    h2 em { font-style: normal; color: var(--amber); }
     p {
-      max-width: 520px;
-      font: 500 21px/1.85 "BIZ UDPGothic", "Yu Gothic", sans-serif;
-      color: var(--muted);
+      max-width: 470px;
+      font-size: 16px;
+      line-height: 1.9;
+      color: var(--mut);
     }
     .chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 34px;
-      max-width: 520px;
+      gap: 9px;
+      margin-top: 30px;
+      max-width: 480px;
     }
     .chip {
-      padding: 10px 13px;
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.72);
-      color: #513d38;
-      font: 700 13px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
-      box-shadow: inset 0 0 0 1px rgba(143, 67, 63, 0.14);
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: rgba(245, 239, 228, 0.06);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: inset 0 0 0 1px var(--line);
     }
+    .chip b { color: var(--teal); font-family: var(--serif); font-weight: 900; }
+    /* 右：実 popup ステージ */
     .popup-wrap {
       position: relative;
       z-index: 1;
+      display: grid;
+      place-items: center;
     }
     .popup-wrap::before {
       content: "LOCAL ONLY";
       position: absolute;
-      right: -48px;
-      top: -22px;
-      rotate: 8deg;
+      right: -30px; top: -34px;
+      rotate: 7deg;
+      z-index: 2;
       padding: 10px 16px;
-      border-radius: 14px;
+      border-radius: 12px;
       background: var(--ink);
-      color: #fff7ec;
-      font: 800 13px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      color: var(--bg0);
+      font: 900 12.5px/1 var(--gothic);
       letter-spacing: 0.14em;
-      box-shadow: 0 18px 34px rgba(37, 32, 31, 0.25);
+      box-shadow: 0 18px 34px rgba(0, 0, 0, 0.45);
     }
     .popup-frame {
       width: 380px;
       height: 720px;
       overflow: hidden;
-      border-radius: 24px;
+      border-radius: 22px;
       background: #fff;
       box-shadow:
-        0 42px 80px rgba(73, 40, 33, 0.32),
-        0 0 0 9px rgba(255, 255, 255, 0.55),
-        inset 0 0 0 1px rgba(37, 32, 31, 0.08);
+        0 46px 90px rgba(0, 0, 0, 0.6),
+        0 0 0 8px rgba(245, 239, 228, 0.07),
+        0 0 70px 4px rgba(243, 186, 138, 0.16);
     }
     .popup-frame iframe {
       width: 380px;
@@ -174,19 +194,22 @@
 <body>
   <main class="sheet">
     <section class="copy">
-      <div class="kicker">Chrome 拡張機能</div>
-      <h1>WEB閲覧<br><span>アシスト</span></h1>
-      <p>見やすさ、聞きやすさ、作業の続きやすさを 1 つのパネルで調整。必要なサイトだけ、必要な機能だけをローカルで適用します。</p>
+      <div class="eyebrow">view&nbsp;+&nbsp;aura</div>
+      <div class="wordmark">Vuora</div>
+      <div class="reading">ヴオラ</div>
+      <h2>13 機能を、<em>1 つのパネル</em>で。</h2>
+      <p>見やすさ・聞きやすさ・作業の続けやすさを、ひとつのポップアップから調整。必要な機能だけを自分で ON にする、外部送信ゼロの Chrome 拡張機能です。</p>
       <div class="chips" aria-label="主な特徴">
-        <span class="chip">データ収集ゼロ</span>
+        <span class="chip"><b>13</b> 機能カテゴリ</span>
         <span class="chip">全機能オプトイン</span>
+        <span class="chip">データ収集ゼロ</span>
         <span class="chip">音量 0〜300%</span>
-        <span class="chip">ナイトモード対応</span>
+        <span class="chip">ダーク / ライト追従</span>
       </div>
     </section>
     <aside class="popup-wrap" aria-label="ポップアップ画面">
       <div class="popup-frame">
-        <iframe src="popup-render.html" title="WEB閲覧アシスト ポップアップ"></iframe>
+        <iframe src="popup-render.html" title="Vuora ポップアップ"></iframe>
       </div>
     </aside>
   </main>

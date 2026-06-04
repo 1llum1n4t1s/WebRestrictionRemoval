@@ -1,4 +1,4 @@
-# 📖 Web Viewing Assist
+# 📖 Vuora
 
 > [日本語版](README.md) もあります。
 
@@ -33,11 +33,11 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 
 ### Chrome / Edge
 
-Search for **"Web Viewing Assist"** on the [Chrome Web Store](https://chrome.google.com/webstore).
+Search for **"Vuora"** on the [Chrome Web Store](https://chrome.google.com/webstore).
 
 ### Firefox (142 or later)
 
-Search for **"Web Viewing Assist"** on [addons.mozilla.org](https://addons.mozilla.org/).
+Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 > On Firefox the **Volume Booster is unavailable** (Chrome-only). It captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not implement (the popup's audio section is hidden automatically). All other 12 features work as on Chrome.
 

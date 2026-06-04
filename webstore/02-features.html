@@ -2,35 +2,54 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Screenshot 2 - Features</title>
+  <title>Vuora — Feature Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,400&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Old+Mincho:wght@600;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --ink: #211d1b;
-      --paper: #fff8ee;
-      --soft: #f1dcc8;
-      --akane: #c0605a;
-      --akane-dark: #823c38;
-      --green: #486b55;
-      --blue: #365f7f;
-      --gold: #c99437;
+      --bg0: #0b0e13;
+      --ink: #f5efe4;
+      --mut: rgba(245, 239, 228, 0.58);
+      --amber: #f3ba8a;
+      --rose: #c64b54;
+      --teal: #6fc2cf;
+      --line: rgba(245, 239, 228, 0.10);
+      --card: rgba(20, 25, 33, 0.74);
+      --serif: "Fraunces", "Zen Old Mincho", Georgia, serif;
+      --mincho: "Zen Old Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+      --gothic: "Zen Kaku Gothic New", "BIZ UDPGothic", "Yu Gothic", sans-serif;
     }
     body {
       width: 1280px;
       height: 800px;
       overflow: hidden;
       color: var(--ink);
-      font-family: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+      font-family: var(--gothic);
+      position: relative;
       background:
-        radial-gradient(circle at 8% 82%, rgba(72, 107, 85, 0.22), transparent 28%),
-        radial-gradient(circle at 92% 16%, rgba(192, 96, 90, 0.26), transparent 25%),
-        linear-gradient(120deg, #fffbf2 0%, #f3dfca 100%);
-      display: grid;
-      place-items: center;
+        radial-gradient(ellipse 46% 40% at 88% 8%, rgba(243, 186, 138, 0.18), transparent 60%),
+        radial-gradient(ellipse 48% 46% at 6% 96%, rgba(198, 75, 84, 0.20), transparent 60%),
+        radial-gradient(ellipse 40% 40% at 96% 96%, rgba(111, 194, 207, 0.12), transparent 60%),
+        var(--bg0);
+    }
+    body::before {
+      content: "";
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(ellipse 90% 86% at 50% 46%, #000 36%, transparent 84%);
+      opacity: 0.45;
     }
     .canvas {
-      width: 1120px;
-      height: 682px;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      padding: 56px 64px 50px;
       display: grid;
       grid-template-rows: auto 1fr;
       gap: 34px;
@@ -39,94 +58,129 @@
       display: grid;
       grid-template-columns: 1fr auto;
       align-items: end;
-      gap: 30px;
+      gap: 40px;
     }
-    .label {
-      color: var(--akane-dark);
-      font-weight: 900;
-      letter-spacing: 0.16em;
-      font-size: 14px;
-      margin-bottom: 12px;
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      color: var(--amber);
+      margin-bottom: 16px;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 22px; height: 22px; border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, transparent 40%, rgba(243,186,138,0.9) 46%, transparent 58%),
+        conic-gradient(from 210deg, var(--amber), var(--rose), var(--teal), var(--amber));
+      box-shadow: 0 0 14px rgba(243, 186, 138, 0.5);
     }
     h1 {
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-      font-size: 62px;
-      letter-spacing: -0.05em;
-      line-height: 1.02;
+      font-family: var(--mincho);
+      font-weight: 700;
+      font-size: 50px;
+      line-height: 1.04;
+      letter-spacing: -0.02em;
     }
+    h1 em { font-style: normal; color: var(--amber); }
     .note {
-      width: 318px;
-      padding: 18px 20px;
-      border-radius: 22px;
-      background: rgba(33, 29, 27, 0.9);
-      color: #fff8ee;
-      box-shadow: 0 22px 44px rgba(33, 29, 27, 0.22);
-      font-size: 15px;
-      line-height: 1.7;
+      width: 340px;
+      padding: 18px 22px;
+      border-radius: 18px;
+      background: var(--card);
+      box-shadow: inset 0 0 0 1px var(--line);
+      font-size: 13.5px;
+      line-height: 1.74;
+      color: var(--mut);
     }
+    .note b { color: var(--ink); font-weight: 700; }
+
     .grid {
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr 1fr;
-      grid-template-rows: 1fr 1fr;
+      grid-template-columns: repeat(4, 1fr);
       gap: 18px;
     }
-    .card {
+    .col {
       position: relative;
-      border-radius: 30px;
-      padding: 28px;
+      border-radius: 24px;
+      padding: 24px 22px;
+      background: var(--card);
+      box-shadow: inset 0 0 0 1px var(--line);
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 20px;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.74);
-      box-shadow: 0 24px 50px rgba(81, 55, 45, 0.16), inset 0 0 0 1px rgba(255,255,255,0.68);
     }
-    .card::after {
-      content: attr(data-mark);
+    .col::before {
+      content: "";
       position: absolute;
-      right: 18px;
-      bottom: -18px;
-      font-family: "Yu Mincho", serif;
-      font-size: 96px;
-      font-weight: 900;
-      color: rgba(33, 29, 27, 0.055);
-      letter-spacing: -0.1em;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--accent);
+      opacity: 0.85;
     }
-    .card:nth-child(1) { background: #fffdf7; }
-    .card:nth-child(2) { background: #f7e0dc; }
-    .card:nth-child(3) { background: #e9f0e7; }
-    .card:nth-child(4) { background: #e8eff4; }
-    .card:nth-child(5) { background: #fff1cf; }
-    .card:nth-child(6) { background: #f5e7d9; }
-    .num {
-      display: inline-grid;
-      place-items: center;
-      width: 34px;
-      height: 34px;
+    .col::after {
+      content: "";
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 160px; height: 160px;
       border-radius: 50%;
-      background: var(--ink);
-      color: #fff;
-      font-weight: 900;
-      font-size: 14px;
-      margin-bottom: 20px;
+      background: radial-gradient(circle, var(--accent), transparent 68%);
+      opacity: 0.16;
     }
-    .name {
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-      font-size: 27px;
-      font-weight: 900;
-      margin-bottom: 10px;
-      letter-spacing: -0.04em;
+    .col.c1 { --accent: var(--rose); }
+    .col.c2 { --accent: var(--amber); }
+    .col.c3 { --accent: var(--teal); }
+    .col.c4 { --accent: #c9a36b; }
+    .col-head { position: relative; z-index: 1; }
+    .kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      margin-bottom: 8px;
     }
-    .desc {
-      position: relative;
-      z-index: 1;
-      font-size: 15px;
-      line-height: 1.72;
-      color: #685853;
-      max-width: 270px;
+    .col-title {
+      font-family: var(--mincho);
+      font-weight: 700;
+      font-size: 21px;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
     }
-    .wide { grid-column: span 2; }
-    .wide .desc { max-width: 480px; }
-    .accent {
-      color: var(--akane-dark);
+    .feats { display: grid; gap: 14px; align-content: start; position: relative; z-index: 1; }
+    .feat { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; }
+    .feat i {
+      font-style: normal;
+      font-size: 19px;
+      width: 36px; height: 36px;
+      display: grid; place-items: center;
+      border-radius: 11px;
+      background: rgba(245, 239, 228, 0.07);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .feat b {
+      display: block;
+      font-weight: 700;
+      font-size: 15.5px;
+      letter-spacing: -0.01em;
+      margin-bottom: 3px;
+    }
+    .feat span {
+      display: block;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--mut);
+    }
+    .feat b u {
+      text-decoration: none;
+      color: var(--accent);
       font-weight: 900;
+      font-family: var(--serif);
+      font-size: 13px;
+      margin-left: 4px;
     }
   </style>
 </head>
@@ -134,41 +188,60 @@
   <main class="canvas">
     <header>
       <div>
-        <div class="label">FEATURE MAP</div>
-        <h1>主要機能を<br>必要な場所だけに。</h1>
+        <div class="eyebrow">feature map · Vuora</div>
+        <h1>必要な機能だけ、<em>手元で</em>。</h1>
       </div>
-      <p class="note">初期状態はすべて控えめ。サイト挙動を勝手に変えず、使いたい機能だけを手元で切り替えます。下記以外に Amazon ランキング移動／TikTok クリーナー（3 機能）／動画ガンマ補正／動画の黒帯除去／ルーペ／RTX 動画強化も提供。</p>
+      <p class="note">インストール直後は<b>すべて OFF</b>。サイトの挙動を勝手に書き換えず、使いたい機能だけを自分で ON にする<b>オプトイン方式</b>。設定は端末内のみ・外部送信ゼロ。</p>
     </header>
+
     <section class="grid" aria-label="機能一覧">
-      <article class="card" data-mark="KEEP">
-        <span class="num">01</span>
-        <h2 class="name">セッション維持</h2>
-        <p class="desc">現在のサイト単位で、アイドル検知を軽くリセット。HTTP ping も明示的に ON。</p>
+      <article class="col c1">
+        <div class="col-head">
+          <div class="kicker">CLEAN UP</div>
+          <div class="col-title">見る雑音を、消す</div>
+        </div>
+        <div class="feats">
+          <div class="feat"><i>🧹</i><div><b>YouTube クリーナー<u>30</u></b><span>Shorts・コメント欄・ライブチャット・登録チャンネル整理</span></div></div>
+          <div class="feat"><i>📷</i><div><b>Instagram クリーナー<u>11</u></b><span>Reels / Explore / Stories / Threads 誘導を非表示</span></div></div>
+          <div class="feat"><i>🎵</i><div><b>TikTok クリーナー<u>3</u></b><span>コメント欄・おすすめ非表示・画像ダウンロード</span></div></div>
+        </div>
       </article>
-      <article class="card wide" data-mark="YT">
-        <span class="num">02</span>
-        <h2 class="name">YouTube クリーナー</h2>
-        <p class="desc">Shorts、コメント欄、ライブチャット、検索結果のノイズなど <span class="accent">30 機能</span> を細かく制御。</p>
+
+      <article class="col c2">
+        <div class="col-head">
+          <div class="kicker">TUNE A/V</div>
+          <div class="col-title">映像と音を、補正</div>
+        </div>
+        <div class="feats">
+          <div class="feat"><i>🔊</i><div><b>音量ブースター</b><span>0〜300% ＋ 正規化・歪み防止・ナイトモード</span></div></div>
+          <div class="feat"><i>🎞️</i><div><b>動画ガンマ補正</b><span>暗い動画の明るさをスライダーで調整</span></div></div>
+          <div class="feat"><i>🖥️</i><div><b>動画の黒帯除去</b><span>ウルトラワイドの上下左右の帯をカット</span></div></div>
+          <div class="feat"><i>🔍</i><div><b>ルーペ</b><span>マウス追従の円形拡大鏡・倍率 3 段階</span></div></div>
+          <div class="feat"><i>🎮</i><div><b>RTX 動画強化</b><span>GPU ドライバ側の映像補正を検知補助</span></div></div>
+        </div>
       </article>
-      <article class="card" data-mark="AMZ">
-        <span class="num">03</span>
-        <h2 class="name">Amazon 合計</h2>
-        <p class="desc">定期おトク便の月別合計をページ上で計算。買いすぎ確認をすばやく。</p>
+
+      <article class="col c3">
+        <div class="col-head">
+          <div class="kicker">SHOP SMART</div>
+          <div class="col-title">買い物を、助ける</div>
+        </div>
+        <div class="feats">
+          <div class="feat"><i>📦</i><div><b>定期おトク便 合計</b><span>配送月ごとの合計金額をページ上で計算</span></div></div>
+          <div class="feat"><i>🏆</i><div><b>ランキングへ移動</b><span>最も細かいサブカテゴリへワンクリック</span></div></div>
+          <div class="feat"><i>🏷️</i><div><b>販売元・出荷元バッジ</b><span>Amazon 直販＝緑 / マーケット＝オレンジ警告</span></div></div>
+        </div>
       </article>
-      <article class="card" data-mark="IG">
-        <span class="num">04</span>
-        <h2 class="name">Instagram 整理</h2>
-        <p class="desc">Reels、Explore、Stories、いいね数など <span class="accent">11 機能</span> を非表示。</p>
-      </article>
-      <article class="card" data-mark="VOL">
-        <span class="num">05</span>
-        <h2 class="name">音量ブースター</h2>
-        <p class="desc">0〜300% の調整に、自動歪み防止・ラウドネス正規化風補正・ナイトモード。</p>
-      </article>
-      <article class="card" data-mark="COLOR">
-        <span class="num">06</span>
-        <h2 class="name">カラーピッカー</h2>
-        <p class="desc">EyeDropper API で画面の色を採取。履歴はローカル保存のみ。</p>
+
+      <article class="col c4">
+        <div class="col-head">
+          <div class="kicker">WORK &amp; TOOLS</div>
+          <div class="col-title">作業と、道具</div>
+        </div>
+        <div class="feats">
+          <div class="feat"><i>🔄</i><div><b>セッション維持</b><span>全タブ共通でアイドル検知をやさしくリセット</span></div></div>
+          <div class="feat"><i>🎨</i><div><b>カラーピッカー</b><span>画面の色を採取・HEX / RGB / HSL・履歴 20 件</span></div></div>
+        </div>
       </article>
     </section>
   </main>

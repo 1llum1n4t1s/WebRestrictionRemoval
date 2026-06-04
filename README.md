@@ -1,4 +1,4 @@
-# 📖 WEB閲覧アシスト
+# 📖 Vuora
 
 > [English version](README.en.md) is also available.
 
@@ -33,11 +33,11 @@
 
 ### Chrome / Edge
 
-[Chrome Web Store](https://chrome.google.com/webstore) で **「WEB閲覧アシスト」** を検索してインストール。
+[Chrome Web Store](https://chrome.google.com/webstore) で **「Vuora」** を検索してインストール。
 
 ### Firefox (142 以降)
 
-[addons.mozilla.org](https://addons.mozilla.org/) で **「Web Viewing Assist」** を検索してインストール。
+[addons.mozilla.org](https://addons.mozilla.org/) で **「Vuora」** を検索してインストール。
 
 > Firefox 版では**音量ブースターは利用できません**（Chrome 専用）。音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 が未対応のためです（popup のオーディオ欄も自動的に非表示になります）。それ以外の 12 機能はすべて利用可能。
 

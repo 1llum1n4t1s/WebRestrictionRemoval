@@ -1,46 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+  <title id="title">Broken web link icon</title>
   <defs>
-    <linearGradient id="wrench" x1="24%" y1="8%" x2="76%" y2="92%">
-      <stop offset="0%" stop-color="#D46F68"/>
-      <stop offset="100%" stop-color="#A94E49"/>
+    <linearGradient id="link" x1="72" y1="377" x2="440" y2="145" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#12D7B6"/>
+      <stop offset="0.55" stop-color="#2597FF"/>
+      <stop offset="1" stop-color="#8D7CFF"/>
     </linearGradient>
-    <linearGradient id="detail" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8F3F3B"/>
-      <stop offset="100%" stop-color="#73302D"/>
+    <linearGradient id="break" x1="197" y1="69" x2="339" y2="454" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE76E"/>
+      <stop offset="1" stop-color="#FF7B46"/>
     </linearGradient>
-    <mask id="wrench-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
-      <rect x="0" y="0" width="512" height="512" fill="#000000"/>
-      <g transform="translate(256,256) rotate(-45) scale(1.58)">
-        <path d="M-75,-150
-                 H75
-                 V-86
-                 L34,-36
-                 H26
-                 L24,92
-                 L48,120
-                 V150
-                 L20,174
-                 H-20
-                 L-48,150
-                 V120
-                 L-24,92
-                 L-26,-36
-                 H-34
-                 L-75,-86 Z"
-              fill="#FFFFFF"/>
-        <path d="M-42,-178
-                 H42
-                 V-92
-                 H-42 Z"
-              fill="#000000"/>
-      </g>
+    <mask id="broken-link" maskUnits="userSpaceOnUse">
+      <rect width="512" height="512" fill="#FFFFFF"/>
+      <path d="M286 42L181 270H254L217 470L374 214H294L349 42Z" fill="#000000"/>
     </mask>
   </defs>
 
-  <rect x="0" y="0" width="512" height="512" fill="url(#wrench)" mask="url(#wrench-mask)"/>
-  <g transform="translate(256,256) rotate(-45) scale(1.58)">
-    <path d="M-26,94 H22 L28,106 H-20 Z" fill="url(#detail)" opacity="0.46"/>
-    <path d="M-28,118 H20 L26,130 H-22 Z" fill="url(#detail)" opacity="0.46"/>
-    <path d="M-30,142 H18 L24,154 H-24 Z" fill="url(#detail)" opacity="0.46"/>
+  <g transform="rotate(-28 256 256)" fill="none" stroke-linecap="round" stroke-linejoin="round" mask="url(#broken-link)">
+    <rect x="72" y="154" width="368" height="224" rx="112" stroke="#F8FCFF" stroke-width="88"/>
+    <rect x="72" y="154" width="368" height="224" rx="112" stroke="#10243A" stroke-width="62"/>
+    <rect x="72" y="154" width="368" height="224" rx="112" stroke="url(#link)" stroke-width="38"/>
   </g>
+
+  <path d="M286 42L181 270H254L217 470L374 214H294L349 42Z"
+        fill="#F8FCFF" stroke="#10243A" stroke-width="30" stroke-linejoin="round"/>
+  <path d="M286 42L181 270H254L217 470L374 214H294L349 42Z"
+        fill="url(#break)"/>
 </svg>

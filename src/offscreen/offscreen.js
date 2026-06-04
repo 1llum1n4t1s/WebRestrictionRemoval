@@ -31,7 +31,7 @@
  * ナイトモード / 自動歪み防止の compressor は常時チェーン接続し、OFF 時は ratio:1 のバイパス設定にする。
  */
 const audioStates = new Map();
-/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, normalizerAnalyzer: AnalyserNode, normalizerGainNode: GainNode, normalizerBuffer: Float32Array, normalizerTimer: number|null, normalizeEnabled: boolean, normalizerTargetGain: number, nightModeNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
+/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, normalizerAnalyzer: AnalyserNode, normalizerGainNode: GainNode, normalizerBuffer: Float32Array, normalizerTimer: number|null, normalizeEnabled: boolean, normalizerTargetGain: number, normalizerSmoothedRms: number|null, nightModeNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
 const audioInitPromises = new Map();
 
 /**
@@ -178,10 +178,10 @@ async function createAudioState(tabId, streamId) {
     // 正規化は「音源全体の平均的な音量」を先に整え、ナイトモードはその後で瞬間的な大小差を狭める。
     //
     // fftSize は周波数解析用パラメータだが、`getFloatTimeDomainData` でも測定窓サイズとして使われる。
-    // 旧値 2048 (約 46ms @ 44.1kHz) は RMS 測定として過大で、NORMALIZE_UPDATE_MS ごとの
-    // RMS 計算ループが offscreen の CPU を持続的に消費していた (/rere レビュー C-#16)。
-    // 512 (約 11ms @ 44.1kHz) でラウドネス正規化に十分な精度を保ちつつ計算量を 1/4 に圧縮する。
-    normalizerAnalyzer.fftSize = 512;
+    // 512 (約 11ms) では窓が短すぎて瞬間振幅を拾い、RMS が乱高下 → 正規化が効かない / 変動が速い
+    // 体感になっていた (ゆろさん実機報告 2026-06-04)。NORMALIZE_ANALYSER_FFT_SIZE (4096 ≒ 85ms) で
+    // 音節〜フレーズ単位のラウドネスを安定測定する。RMS 計算は 400ms に 1 回だけなので CPU は非問題。
+    normalizerAnalyzer.fftSize = VolumeBooster.NORMALIZE_ANALYSER_FFT_SIZE;
     normalizerGainNode.gain.value = 1;
     const nightModeNode = ctx.createDynamicsCompressor();
     const antiClipNode = ctx.createDynamicsCompressor();
@@ -205,6 +205,7 @@ async function createAudioState(tabId, streamId) {
       normalizerTimer: null,
       normalizeEnabled: false,
       normalizerTargetGain: 1,
+      normalizerSmoothedRms: null,
       nightModeNode,
       antiClipNode,
       stream,

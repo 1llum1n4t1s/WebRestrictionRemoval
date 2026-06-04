@@ -2,252 +2,342 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Screenshot 3 - Hero Promo</title>
+  <title>Vuora — Hero</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;0,9..144,900;1,9..144,400&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Old+Mincho:wght@400;600;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --ink: #171414;
-      --paper: #fff8ea;
-      --akane: #c0605a;
-      --akane-dark: #7d3936;
-      --night: #182232;
-      --line: rgba(255, 248, 234, 0.12);
+      --bg0: #0b0e13;
+      --ink: #f5efe4;
+      --mut: rgba(245, 239, 228, 0.60);
+      --amber: #f3ba8a;
+      --rose: #c64b54;
+      --teal: #6fc2cf;
+      --line: rgba(245, 239, 228, 0.10);
+      --serif: "Fraunces", "Zen Old Mincho", Georgia, serif;
+      --mincho: "Zen Old Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+      --gothic: "Zen Kaku Gothic New", "BIZ UDPGothic", "Yu Gothic", sans-serif;
     }
     body {
       width: 1280px;
       height: 800px;
       overflow: hidden;
-      color: var(--paper);
-      font-family: "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      color: var(--ink);
+      font-family: var(--gothic);
+      position: relative;
       background:
+        radial-gradient(ellipse 50% 44% at 80% 20%, rgba(243, 186, 138, 0.22), transparent 60%),
+        radial-gradient(ellipse 52% 50% at 16% 86%, rgba(198, 75, 84, 0.24), transparent 60%),
+        radial-gradient(circle at 52% 128%, rgba(111, 194, 207, 0.12), transparent 46%),
+        var(--bg0);
+    }
+    /* 精密グリッドの薄膜 */
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
         linear-gradient(var(--line) 1px, transparent 1px),
-        linear-gradient(90deg, var(--line) 1px, transparent 1px),
-        radial-gradient(circle at 78% 24%, rgba(192, 96, 90, 0.34), transparent 30%),
-        radial-gradient(circle at 20% 80%, rgba(217, 164, 65, 0.22), transparent 28%),
-        #182232;
-      background-size: 38px 38px, 38px 38px, auto, auto, auto;
-      display: grid;
-      place-items: center;
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 30%, transparent 78%);
+      opacity: 0.5;
     }
     .stage {
-      width: 1130px;
-      height: 670px;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
       display: grid;
-      grid-template-columns: 500px 1fr;
-      gap: 58px;
+      grid-template-columns: 560px 1fr;
       align-items: center;
+      gap: 40px;
+      padding: 0 88px;
     }
-    .badge {
+    /* ── 左：ブランドコピー ── */
+    .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 999px;
-      background: rgba(255, 248, 234, 0.1);
-      border: 1px solid rgba(255, 248, 234, 0.16);
-      color: #f4c29c;
-      font-weight: 900;
-      letter-spacing: 0.13em;
-      font-size: 13px;
-      margin-bottom: 28px;
-    }
-    .badge::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #f4c29c;
-      box-shadow: 14px 0 0 var(--akane);
-    }
-    h1 {
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-      font-size: 72px;
-      line-height: 1.02;
-      letter-spacing: -0.06em;
+      gap: 11px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 21px;
+      color: var(--amber);
+      letter-spacing: 0.02em;
       margin-bottom: 26px;
     }
-    h1 span { color: #f4c29c; }
+    .eyebrow::before {
+      content: "";
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, transparent 40%, rgba(243,186,138,0.9) 46%, transparent 58%),
+        conic-gradient(from 210deg, var(--amber), var(--rose), var(--teal), var(--amber));
+      box-shadow: 0 0 18px rgba(243, 186, 138, 0.55);
+    }
+    .wordmark {
+      font-family: var(--serif);
+      font-weight: 900;
+      font-size: 150px;
+      line-height: 0.84;
+      letter-spacing: -0.035em;
+      background: linear-gradient(168deg, #fbf4e8 12%, #f3ba8a 58%, #d98a64 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 6px;
+    }
+    .reading {
+      font-family: var(--mincho);
+      font-size: 18px;
+      letter-spacing: 0.42em;
+      color: var(--mut);
+      margin-bottom: 30px;
+      padding-left: 4px;
+    }
+    h1 {
+      font-family: var(--mincho);
+      font-weight: 700;
+      font-size: 50px;
+      line-height: 1.12;
+      letter-spacing: -0.01em;
+      margin-bottom: 22px;
+    }
+    h1 em {
+      font-style: normal;
+      color: var(--amber);
+      position: relative;
+    }
     .lead {
-      color: rgba(255, 248, 234, 0.76);
-      font-size: 20px;
-      line-height: 1.85;
-      margin-bottom: 36px;
+      font-size: 17.5px;
+      line-height: 1.95;
+      color: var(--mut);
+      max-width: 488px;
+      margin-bottom: 38px;
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-    }
-    .stat {
-      padding: 16px 14px;
-      border-radius: 18px;
-      background: rgba(255, 248, 234, 0.1);
-      border: 1px solid rgba(255, 248, 234, 0.13);
+      grid-template-columns: repeat(3, auto);
+      gap: 38px;
+      align-items: end;
     }
     .stat strong {
       display: block;
-      font-family: "Yu Mincho", serif;
-      font-size: 32px;
-      color: #f4c29c;
-      line-height: 1;
-      margin-bottom: 8px;
-    }
-    .stat span {
-      font-size: 12px;
-      color: rgba(255, 248, 234, 0.65);
-      font-weight: 700;
-    }
-    .browser {
-      position: relative;
-      height: 520px;
-      border-radius: 30px;
-      background: #fff8ea;
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 50px;
+      line-height: 0.9;
+      letter-spacing: -0.03em;
       color: var(--ink);
-      box-shadow: 0 44px 88px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255,255,255,0.7);
-      overflow: hidden;
-      rotate: -1.2deg;
     }
-    .bar {
-      height: 58px;
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 0 22px;
-      background: #f0decc;
-      border-bottom: 1px solid rgba(23, 20, 20, 0.08);
+    .stat:nth-child(1) strong { color: var(--amber); }
+    .stat:nth-child(2) strong { color: var(--teal); }
+    .stat span {
+      display: block;
+      margin-top: 12px;
+      font-size: 12.5px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--mut);
     }
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot:nth-child(1) { background: #df6b62; }
-    .dot:nth-child(2) { background: #d6a13e; }
-    .dot:nth-child(3) { background: #60896c; }
-    .url {
-      margin-left: 12px;
-      flex: 1;
-      height: 30px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.72);
-      color: #7d6c63;
-      display: flex;
-      align-items: center;
-      padding-left: 18px;
-      font-size: 13px;
-      font-weight: 700;
-    }
-    .browser-body {
+    .stat .div { display: contents; }
+
+    /* ── 右：aura ring（光学レンズ）ビジュアル ── */
+    .optic {
       position: relative;
-      height: calc(100% - 58px);
-      padding: 30px;
       display: grid;
-      grid-template-columns: 1fr 190px;
-      gap: 22px;
+      place-items: center;
+      height: 100%;
     }
-    .video {
-      border-radius: 26px;
+    .lens {
+      position: relative;
+      width: 462px;
+      height: 462px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
       background:
-        radial-gradient(circle at 68% 42%, rgba(192, 96, 90, 0.34), transparent 24%),
-        linear-gradient(135deg, #2a3038, #111820);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
-      padding: 26px;
+        radial-gradient(circle at 50% 34%, #28333f, #0a0f16 72%);
+      box-shadow:
+        inset 0 0 0 1px rgba(245, 239, 228, 0.14),
+        inset 0 0 60px rgba(0, 0, 0, 0.7),
+        0 0 0 13px rgba(11, 14, 19, 0.72),
+        0 0 0 14px rgba(245, 239, 228, 0.07),
+        0 44px 120px rgba(0, 0, 0, 0.6),
+        0 0 150px 6px rgba(243, 186, 138, 0.20);
+      overflow: hidden;
+    }
+    /* オーラの光環 */
+    .lens::before {
+      content: "";
+      position: absolute;
+      inset: -26%;
+      background: conic-gradient(from 215deg,
+        rgba(243,186,138,0) 0deg,
+        rgba(243,186,138,0.55) 70deg,
+        rgba(198,75,84,0.5) 150deg,
+        rgba(111,194,207,0.42) 250deg,
+        rgba(243,186,138,0) 360deg);
+      filter: blur(34px);
+      opacity: 0.6;
+    }
+    /* 絞り羽根の細リング */
+    .lens::after {
+      content: "";
+      position: absolute;
+      inset: 26px;
+      border-radius: 50%;
+      border: 1px solid rgba(245, 239, 228, 0.12);
+      box-shadow:
+        inset 0 0 0 1px rgba(245, 239, 228, 0.05),
+        inset 0 0 40px rgba(243, 186, 138, 0.12);
+    }
+    .scene {
+      position: relative;
+      z-index: 2;
+      width: 70%;
+      height: 70%;
+      border-radius: 22px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 64% 36%, rgba(198, 75, 84, 0.4), transparent 38%),
+        linear-gradient(150deg, #1c2632 0%, #0e141d 100%);
+      box-shadow: inset 0 0 0 1px rgba(245, 239, 228, 0.10);
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
-      min-height: 260px;
+      padding: 22px;
     }
-    .soundbar {
-      height: 58px;
-      border-radius: 18px;
-      background: rgba(255, 248, 234, 0.13);
+    .play {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -64%);
+      width: 70px; height: 70px;
+      border-radius: 50%;
+      background: rgba(245, 239, 228, 0.14);
+      backdrop-filter: blur(2px);
       display: grid;
-      grid-template-columns: repeat(18, 1fr);
-      gap: 5px;
-      align-items: end;
-      padding: 10px 14px;
+      place-items: center;
+      box-shadow: inset 0 0 0 1px rgba(245, 239, 228, 0.3);
     }
-    .soundbar i {
+    .play::after {
+      content: "";
+      border-left: 22px solid var(--ink);
+      border-top: 13px solid transparent;
+      border-bottom: 13px solid transparent;
+      margin-left: 6px;
+    }
+    .eq {
+      position: relative;
+      z-index: 1;
+      height: 50px;
+      display: grid;
+      grid-template-columns: repeat(20, 1fr);
+      gap: 4px;
+      align-items: end;
+    }
+    .eq i {
       display: block;
       border-radius: 99px;
-      background: #f4c29c;
-      opacity: 0.88;
+      background: var(--amber);
     }
-    .soundbar i:nth-child(3n) { height: 21px; background: #c0605a; }
-    .soundbar i:nth-child(3n+1) { height: 34px; }
-    .soundbar i:nth-child(3n+2) { height: 44px; }
-    .side {
-      display: grid;
-      gap: 14px;
-    }
-    .pill {
-      border-radius: 20px;
-      background: #fff;
-      padding: 16px;
-      box-shadow: 0 16px 30px rgba(58, 41, 34, 0.1);
-      font-weight: 900;
-      line-height: 1.45;
-    }
-    .pill small {
-      display: block;
-      color: #8c7770;
-      font-size: 12px;
-      margin-top: 5px;
-      font-weight: 700;
-    }
-    .floating {
+    .eq i:nth-child(4n) { background: var(--rose); }
+    .eq i:nth-child(3n+1) { height: 38%; }
+    .eq i:nth-child(3n+2) { height: 70%; }
+    .eq i:nth-child(3n)   { height: 52%; }
+    .eq i:nth-child(7), .eq i:nth-child(13) { height: 100%; }
+    .eq i:nth-child(2), .eq i:nth-child(17) { height: 26%; }
+    /* レンズ縁の倍率タグ */
+    .mag {
       position: absolute;
-      left: 300px;
-      bottom: 42px;
-      width: 250px;
-      padding: 18px;
-      border-radius: 24px;
-      background: #211d1b;
-      color: #fff8ea;
-      box-shadow: 0 26px 48px rgba(33, 29, 27, 0.36);
-      rotate: 2.8deg;
+      z-index: 3;
+      bottom: 50px; right: 40px;
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 19px;
+      color: var(--ink);
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(11, 14, 19, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(245, 239, 228, 0.18);
+      letter-spacing: 0.02em;
     }
-    .floating strong {
-      display: block;
-      color: #f4c29c;
-      margin-bottom: 8px;
+    /* 浮遊する機能チップ */
+    .chip {
+      position: absolute;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 13px 18px 13px 14px;
+      border-radius: 16px;
+      background: rgba(18, 23, 31, 0.92);
+      box-shadow:
+        inset 0 0 0 1px rgba(245, 239, 228, 0.12),
+        0 22px 44px rgba(0, 0, 0, 0.5);
+      font-weight: 700;
       font-size: 15px;
+      white-space: nowrap;
     }
-    .floating span {
-      color: rgba(255, 248, 234, 0.7);
-      font-size: 13px;
-      line-height: 1.6;
+    .chip i {
+      font-style: normal;
+      font-size: 18px;
+      width: 30px; height: 30px;
+      display: grid; place-items: center;
+      border-radius: 9px;
+      background: rgba(245, 239, 228, 0.08);
     }
+    .chip small {
+      display: block;
+      font-weight: 500;
+      font-size: 11.5px;
+      color: var(--mut);
+      margin-top: 2px;
+    }
+    .chip.a { top: 60px; left: -6px; }
+    .chip.b { top: 214px; right: -18px; }
+    .chip.c { bottom: 70px; left: 12px; }
+    .chip-accent { color: var(--amber); }
   </style>
 </head>
 <body>
   <main class="stage">
     <section>
-      <div class="badge">VIEWING ASSIST</div>
-      <h1>動画も、SNSも、<br><span>ちょうどよく。</span></h1>
-      <p class="lead">YouTube のノイズ整理、配信の音量差補正、Instagram の集中モード、Amazon の月別合計まで。日常の Web 閲覧をローカル処理で整えます。</p>
-      <div class="stats" aria-label="特徴">
-        <div class="stat"><strong>6</strong><span>閲覧支援カテゴリ</span></div>
-        <div class="stat"><strong>300%</strong><span>タブ音量調整</span></div>
+      <div class="eyebrow">view&nbsp;+&nbsp;aura</div>
+      <div class="wordmark">Vuora</div>
+      <div class="reading">ヴオラ</div>
+      <h1>見ているページを、<br><em>澄ませる</em>拡張機能。</h1>
+      <p class="lead">YouTube・Instagram・TikTok のノイズ除去から、音量・明るさ・黒帯・拡大の映像補正、Amazon の買い物支援まで。すべてブラウザ内のローカル処理で、外部送信はゼロ。</p>
+      <div class="stats">
+        <div class="stat"><strong>13</strong><span>機能カテゴリ</span></div>
+        <div class="stat"><strong>300%</strong><span>タブ音量ブースト</span></div>
         <div class="stat"><strong>0</strong><span>外部データ送信</span></div>
       </div>
     </section>
-    <section class="browser" aria-label="利用イメージ">
-      <div class="bar">
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        <div class="url">youtube.com/watch</div>
-      </div>
-      <div class="browser-body">
-        <div class="video">
-          <div class="soundbar" aria-hidden="true">
-            <i style="height:18px"></i><i style="height:29px"></i><i style="height:44px"></i><i style="height:26px"></i><i style="height:38px"></i><i style="height:52px"></i><i style="height:20px"></i><i style="height:30px"></i><i style="height:42px"></i><i style="height:24px"></i><i style="height:36px"></i><i style="height:48px"></i><i style="height:19px"></i><i style="height:31px"></i><i style="height:39px"></i><i style="height:23px"></i><i style="height:34px"></i><i style="height:45px"></i>
+
+    <section class="optic">
+      <div class="lens">
+        <div class="scene">
+          <div class="play" aria-hidden="true"></div>
+          <div class="eq" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
           </div>
         </div>
-        <div class="side">
-          <div class="pill">Shorts を非表示<small>YouTube クリーナー</small></div>
-          <div class="pill">ナイトモード<small>声とゲーム音を聞きやすく</small></div>
-          <div class="pill">コメント欄 OFF<small>動画ページをすっきり</small></div>
-        </div>
+        <div class="mag">2.5×</div>
       </div>
-      <div class="floating">
-        <strong>自動音量正規化 ON</strong>
-        <span>小さい場面を持ち上げ、大きすぎるピークは自然に抑えます。</span>
+      <div class="chip a">
+        <i>🧹</i>
+        <div>Shorts を非表示<small>YouTube クリーナー・30 機能</small></div>
+      </div>
+      <div class="chip b">
+        <i>🔊</i>
+        <div><span class="chip-accent">音量 300%</span> ＋ 正規化<small>自動歪み防止・ナイトモード</small></div>
+      </div>
+      <div class="chip c">
+        <i>🖥️</i>
+        <div>黒帯を除去<small>ウルトラワイド最適化</small></div>
       </div>
     </section>
   </main>

@@ -2,127 +2,207 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Promo Marquee - 1400x560</title>
+  <title>Vuora — Marquee 1400x560</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,400&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Zen+Old+Mincho:wght@600;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --paper: #fff8ea;
-      --ink: #201b19;
-      --akane: #c0605a;
-      --akane-dark: #7d3936;
-      --gold: #d9a441;
+      --bg0: #0b0e13;
+      --ink: #f5efe4;
+      --mut: rgba(245, 239, 228, 0.58);
+      --amber: #f3ba8a;
+      --rose: #c64b54;
+      --teal: #6fc2cf;
+      --line: rgba(245, 239, 228, 0.10);
+      --card: rgba(20, 25, 33, 0.72);
+      --serif: "Fraunces", "Zen Old Mincho", Georgia, serif;
+      --mincho: "Zen Old Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+      --gothic: "Zen Kaku Gothic New", "BIZ UDPGothic", "Yu Gothic", sans-serif;
     }
     body {
       width: 1400px;
       height: 560px;
       overflow: hidden;
       color: var(--ink);
-      font-family: "BIZ UDPGothic", "Yu Gothic", sans-serif;
+      font-family: var(--gothic);
+      position: relative;
       background:
-        radial-gradient(circle at 90% 14%, rgba(192, 96, 90, 0.28), transparent 28%),
-        radial-gradient(circle at 12% 80%, rgba(217, 164, 65, 0.22), transparent 30%),
-        linear-gradient(120deg, #fffaf0 0%, #eed6bd 100%);
-      display: grid;
-      place-items: center;
+        radial-gradient(ellipse 42% 70% at 30% 24%, rgba(243, 186, 138, 0.20), transparent 62%),
+        radial-gradient(ellipse 46% 80% at 4% 96%, rgba(198, 75, 84, 0.22), transparent 60%),
+        radial-gradient(ellipse 44% 70% at 98% 80%, rgba(111, 194, 207, 0.13), transparent 60%),
+        var(--bg0);
+    }
+    body::before {
+      content: "";
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(ellipse 88% 90% at 50% 50%, #000 32%, transparent 82%);
+      opacity: 0.4;
     }
     .stage {
       position: relative;
-      width: 1260px;
-      height: 430px;
-      border-radius: 42px;
-      background: rgba(255, 248, 234, 0.82);
-      box-shadow: 0 34px 80px rgba(76, 49, 39, 0.2), inset 0 0 0 1px rgba(255,255,255,0.7);
+      z-index: 1;
+      width: 100%;
+      height: 100%;
       display: grid;
-      grid-template-columns: 500px 1fr;
+      grid-template-columns: 540px 1fr;
       align-items: center;
       gap: 56px;
-      padding: 46px 58px;
-      overflow: hidden;
+      padding: 0 70px;
     }
-    .stage::after {
-      content: "LOCAL ONLY";
-      position: absolute;
-      right: 38px;
-      top: 32px;
-      color: rgba(32, 27, 25, 0.13);
-      font: 900 42px/1 "BIZ UDPGothic", "Yu Gothic", sans-serif;
-      letter-spacing: 0.08em;
-    }
-    .copy {
-      position: relative;
-      z-index: 1;
-    }
+    /* 左：ブランド */
     .eyebrow {
-      color: var(--akane-dark);
-      font-weight: 900;
-      letter-spacing: 0.17em;
-      font-size: 14px;
-      margin-bottom: 16px;
-    }
-    h1 {
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-      font-size: 60px;
-      line-height: 1.04;
-      letter-spacing: -0.06em;
+      display: inline-flex; align-items: center; gap: 11px;
+      font-family: var(--serif); font-style: italic;
+      font-size: 19px; color: var(--amber);
       margin-bottom: 18px;
     }
-    p {
-      color: #685853;
-      font-size: 18px;
-      line-height: 1.78;
+    .eyebrow::before {
+      content: ""; width: 26px; height: 26px; border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, transparent 40%, rgba(243,186,138,0.9) 46%, transparent 58%),
+        conic-gradient(from 210deg, var(--amber), var(--rose), var(--teal), var(--amber));
+      box-shadow: 0 0 16px rgba(243, 186, 138, 0.5);
     }
+    .wordmark {
+      font-family: var(--serif);
+      font-weight: 900;
+      font-size: 128px;
+      line-height: 0.82;
+      letter-spacing: -0.035em;
+      background: linear-gradient(166deg, #fbf4e8 12%, #f3ba8a 56%, #d98a64 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-family: var(--mincho);
+      font-weight: 700;
+      font-size: 34px;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+    h1 em { font-style: normal; color: var(--amber); }
+    .lead {
+      font-size: 15.5px;
+      line-height: 1.8;
+      color: var(--mut);
+      max-width: 470px;
+    }
+    .lead b { color: var(--ink); font-weight: 700; }
+
+    /* 右：4カテゴリ 2×2 */
     .rail {
-      position: relative;
-      z-index: 1;
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
       gap: 16px;
     }
-    .feat {
-      min-height: 104px;
-      border-radius: 24px;
-      padding: 19px;
-      background: rgba(255, 255, 255, 0.76);
-      box-shadow: 0 18px 34px rgba(80, 52, 42, 0.12);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+    .cat {
+      position: relative;
+      border-radius: 22px;
+      padding: 22px 22px 20px;
+      background: var(--card);
+      box-shadow: inset 0 0 0 1px var(--line);
+      overflow: hidden;
     }
-    .feat b {
-      display: inline-grid;
-      place-items: center;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      color: #fff;
-      background: var(--ink);
-      font-size: 13px;
+    .cat::after {
+      content: "";
+      position: absolute; top: -50px; right: -50px;
+      width: 140px; height: 140px; border-radius: 50%;
+      background: radial-gradient(circle, var(--accent), transparent 68%);
+      opacity: 0.18;
     }
-    .feat span {
+    .cat.c1 { --accent: var(--rose); }
+    .cat.c2 { --accent: var(--amber); }
+    .cat.c3 { --accent: var(--teal); }
+    .cat.c4 { --accent: #c9a36b; }
+    .cat-title {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--mincho);
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+    .cat-title i {
+      font-style: normal; font-size: 18px;
+      width: 34px; height: 34px;
+      display: grid; place-items: center;
+      border-radius: 10px;
+      background: rgba(245, 239, 228, 0.07);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .tags {
+      position: relative; z-index: 1;
+      display: flex; flex-wrap: wrap; gap: 7px;
+    }
+    .tags span {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 11px;
+      border-radius: 999px;
+      color: var(--ink);
+      background: rgba(245, 239, 228, 0.06);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .tags span b {
+      color: var(--accent);
+      font-family: var(--serif);
       font-weight: 900;
-      font-size: 16px;
-      letter-spacing: -0.02em;
+      font-size: 11px;
+      margin-left: 3px;
     }
-    .feat:nth-child(2), .feat:nth-child(5) { background: #f7e0dc; }
-    .feat:nth-child(3) { background: #e9f0e7; }
-    .feat:nth-child(4) { background: #e8eff4; }
-    .feat:nth-child(6) { background: #fff1cf; }
   </style>
 </head>
 <body>
   <main class="stage">
-    <section class="copy">
-      <div class="eyebrow">WEB VIEWING ASSIST</div>
-      <h1>閲覧を、<br>自分の手元で整える。</h1>
-      <p>セッション維持、動画・SNS の整理、月別合計、音量補正、色採取まで。外部送信なしの Chrome 拡張機能。</p>
+    <section>
+      <div class="eyebrow">view&nbsp;+&nbsp;aura</div>
+      <div class="wordmark">Vuora</div>
+      <h1>見ているページを、<em>澄ませる</em>。</h1>
+      <p class="lead">動画・SNS のノイズ除去、音量と映像の補正、Amazon の買い物支援、作業の継続まで。<b>13 機能</b>をひとつのポップアップに。すべてローカル処理・<b>外部送信ゼロ</b>の Chrome 拡張機能。</p>
     </section>
-    <section class="rail" aria-label="主要機能">
-      <div class="feat"><b>01</b><span>現在サイトだけ<br>セッション維持</span></div>
-      <div class="feat"><b>02</b><span>YouTube<br>22 機能クリーナー</span></div>
-      <div class="feat"><b>03</b><span>Amazon<br>月別合計</span></div>
-      <div class="feat"><b>04</b><span>Instagram<br>集中モード</span></div>
-      <div class="feat"><b>05</b><span>音量 0〜300%<br>ナイトモード</span></div>
-      <div class="feat"><b>06</b><span>カラーピッカー<br>履歴ローカル保存</span></div>
+
+    <section class="rail" aria-label="機能カテゴリ">
+      <div class="cat c1">
+        <div class="cat-title"><i>🧹</i>見る雑音を、消す</div>
+        <div class="tags">
+          <span>YouTube<b>30</b></span>
+          <span>Instagram<b>11</b></span>
+          <span>TikTok<b>3</b></span>
+        </div>
+      </div>
+      <div class="cat c2">
+        <div class="cat-title"><i>🔊</i>映像と音を、補正</div>
+        <div class="tags">
+          <span>音量<b>300%</b></span>
+          <span>ガンマ補正</span>
+          <span>黒帯除去</span>
+          <span>ルーペ</span>
+          <span>RTX</span>
+        </div>
+      </div>
+      <div class="cat c3">
+        <div class="cat-title"><i>📦</i>買い物を、助ける</div>
+        <div class="tags">
+          <span>定期便 合計</span>
+          <span>ランキング移動</span>
+          <span>販売元バッジ</span>
+        </div>
+      </div>
+      <div class="cat c4">
+        <div class="cat-title"><i>🔄</i>作業と、道具</div>
+        <div class="tags">
+          <span>セッション維持</span>
+          <span>カラーピッカー</span>
+        </div>
+      </div>
     </section>
   </main>
 </body>

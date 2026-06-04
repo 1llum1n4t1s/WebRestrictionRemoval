@@ -6,7 +6,7 @@ Chrome Web Store listing copy (English)
 ------------------------------------------------------------
 
 ■ Name (under 30 chars)
-Web Viewing Assist
+Vuora
 
 ■ Summary (under 132 chars)
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
@@ -162,10 +162,13 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
 ■ Host-permission justifications
 
   http://*/* and https://*/*:
-  Required so that the keep-session-alive, Video Gamma, and Remove-video-black-bars content scripts can be injected on all http(s) sites.
+  Required so that five features — Keep session alive, Video Gamma, Remove video black bars, Loupe, and RTX Video Enhancement — can be injected as content scripts on all http(s) sites.
   (1) Keep session alive: the injected content script starts the poller on every http(s) tab when the master toggle is ON in the popup, and dispatches synthetic mousemove / pointermove / scroll / focus events. The HTTP ping is a separate sub-toggle (default OFF) and only fires same-origin HEAD / GET when ON.
   (2) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
-  Neither feature reads, modifies, or transmits the page DOM (Video Gamma only attaches a filter to <video>; it does not read or save video data).
+  (3) Remove video black bars: when the master toggle is ON, detects each <video>'s aspect ratio and removes top/bottom or left/right bars via CSS transform (all frames; the original inline transform is restored on removal).
+  (4) Loupe: when the master toggle is ON, shows a cursor-following circular magnifier (the magnified image itself is obtained via captureVisibleTab — see <all_urls> below).
+  (5) RTX Video Enhancement: when the master toggle is ON, injects a 1×1 transparent hint element into pages that contain <video> to help GPU driver-side video enhancement detect video pages.
+  None of these read, modify, or transmit the page DOM (Video Gamma / Remove video black bars only attach a filter / transform to <video>; they do not read or save video data).
 
   *://*.youtube.com/*:
   Required for the YouTube cleaner (30 sub-features including Shorts removal and subscriptions enhancements). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.

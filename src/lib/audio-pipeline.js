@@ -15,7 +15,7 @@
  *
  * 設計判断:
  *   - state オブジェクト (`{ ctx, normalizerGainNode, normalizerAnalyzer, normalizerBuffer,
- *     normalizerTimer, normalizeEnabled, normalizerTargetGain }`) は caller 側が構築する
+ *     normalizerTimer, normalizeEnabled, normalizerTargetGain, normalizerSmoothedRms }`) は caller 側が構築する
  *     (両 caller で 6 ノードチェーン構築は微妙に違うため、本モジュールは「state を受け取って
  *     DSP 制御する」純粋関数群に責務を絞る)
  *   - 6 ノードチェーン構築自体は caller 側に残す (source タイプが MediaElement vs MediaStream で
@@ -107,13 +107,24 @@
     const rms = Math.sqrt(sum / buffer.length);
     const silenceGate = dbToGain(VolumeBooster.NORMALIZE_SILENCE_GATE_DB);
     if (!Number.isFinite(rms)) return;
+    // 無音/ノイズ区間は即 unity 復帰。平滑値 (normalizerSmoothedRms) は最後の有効音の値を保持し、
+    // リセットしない (句間の度にリセットすると喋り再開ごとに追従がやり直しになり効かなくなる)。
     if (rms < silenceGate) {
       scheduleNormalizerGain(state, 1, { force: true });
       return;
     }
 
+    // 瞬間 RMS は測定窓内でも tick 間でも揺れるため、EMA で平滑化して動画全体のラウドネスを安定推定する。
+    // これをしないと「うるさい/小さい動画でも targetGain がほぼ 1 に丸まる」(効かない) 問題が出る。
+    const alpha = VolumeBooster.NORMALIZE_RMS_SMOOTHING;
+    const prevSmoothed = state.normalizerSmoothedRms;
+    const smoothedRms = Number.isFinite(prevSmoothed)
+      ? alpha * rms + (1 - alpha) * prevSmoothed
+      : rms;
+    state.normalizerSmoothedRms = smoothedRms;
+
     const targetRms = dbToGain(VolumeBooster.NORMALIZE_TARGET_RMS_DB);
-    scheduleNormalizerGain(state, targetRms / rms);
+    scheduleNormalizerGain(state, targetRms / smoothedRms);
   }
 
   /**

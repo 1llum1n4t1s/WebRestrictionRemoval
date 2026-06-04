@@ -1,6 +1,6 @@
 {
   "appName": {
-    "message": "WEB閲覧アシスト",
+    "message": "Vuora",
     "description": "拡張機能名 (chrome://extensions およびストア表示)"
   },
   "appDescription": {
@@ -8,12 +8,12 @@
     "description": "拡張機能の短い説明 (manifest.description)"
   },
   "defaultTitle": {
-    "message": "WEB閲覧アシスト",
+    "message": "Vuora",
     "description": "ツールバーアイコンの hover ツールチップ"
   },
 
   "headerTitle": {
-    "message": "WEB閲覧アシスト",
+    "message": "Vuora",
     "description": "popup ヘッダーの h1"
   },
   "headerTagline": {

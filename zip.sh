@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WEB閲覧アシスト 拡張機能パッケージ生成スクリプト
+# Vuora 拡張機能パッケージ生成スクリプト
 # 使い方:
 #   ./zip.sh                 # Chrome + Firefox 両方
 #   ./zip.sh chrome          # Chrome のみ

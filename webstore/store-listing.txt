@@ -7,7 +7,7 @@ Chrome Web Store 掲載情報（コピペ用）
 ------------------------------------------------------------
 
 ■ 名前（30文字以内）
-WEB閲覧アシスト
+Vuora
 
 ■ 概要（132文字以内）
 閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Chrome 拡張機能。
@@ -163,10 +163,13 @@ WEB閲覧アシスト
 ■ ホスト権限の正当性
 
   http://*/* および https://*/*:
-  セッション維持・動画ガンマ補正・動画の黒帯除去のため、全 http(s) サイトに content script を注入する必要がある。
+  セッション維持・動画ガンマ補正・動画の黒帯除去・ルーペ・RTX 動画強化の 5 機能のため、全 http(s) サイトに content script を注入する必要がある。
   (1) セッション維持: 注入された content script は、ユーザーが popup で master トグルを ON にしたときのみ全 http(s) タブでポーラーを起動し、合成 mousemove / pointermove / scroll / focus を dispatch する。HTTP ping は別サブトグル（デフォルト OFF）で、ON 時のみ同一オリジン HEAD / GET を発射する。
   (2) 動画ガンマ補正: マスタートグル ON 時のみ <video> 要素に SVG filter (url(#__cpa-video-gamma)) を当てる CSS と SVG <feComponentTransfer type="gamma"> 定義を <body> に注入する。全タブ + 全フレーム (iframe 内 <video> 含む) に適用するため http://*/* + https://*/* + all_frames: true の content script として動作する。
-  どちらもページ DOM の読み取り・書き換え・外部送信は一切行わない（ガンマ補正は <video> へのフィルタ適用のみで、動画データの読み取りや保存は行わない）。
+  (3) 動画の黒帯除去: マスタートグル ON 時のみ <video> の縦横比を検出し、CSS transform で上下/左右の黒帯を除去する（全フレーム対象、元の inline transform は撤去時に復元）。
+  (4) ルーペ: マスタートグル ON 時のみマウス追従の円形拡大鏡を表示する（拡大画像そのものは下記 <all_urls> の captureVisibleTab で取得）。
+  (5) RTX 動画強化: マスタートグル ON 時のみ <video> を持つページに 1×1 透明 hint 要素を inject し、GPU ドライバ側映像補正の動画ページ検知を補助する。
+  いずれもページ DOM の読み取り・書き換え・外部送信は一切行わない（ガンマ補正・黒帯除去は <video> へのフィルタ / transform 適用のみで、動画データの読み取りや保存は行わない）。
 
   *://*.youtube.com/*:
   YouTube クリーナー（30 サブ機能・Shorts 削除・登録チャンネル拡張を含む）のため。検索結果ノイズ除去・動画ページ装飾（コメント欄非表示 / ライブチャット折りたたみ）・ホームグリッド列数調整・/shorts/<id> → /watch?v=<id> リダイレクト・/feed/channels グリッド化を DOM/CSS 操作のみで実装。読み取り情報は端末外へ送信しない。

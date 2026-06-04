@@ -1,4 +1,4 @@
-# Runbook — WEB閲覧アシスト
+# Runbook — Vuora
 
 本拡張機能のユーザー報告対応・リリースロールバック・Day-2 Ops 障害対応の初動ガイド。
 詳細な実装パターンは [CLAUDE.md](../CLAUDE.md) の「Important Patterns」を参照。

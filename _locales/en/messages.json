@@ -1,6 +1,6 @@
 {
   "appName": {
-    "message": "Web Viewing Assist",
+    "message": "Vuora",
     "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
   },
   "appDescription": {
@@ -8,12 +8,12 @@
     "description": "Short description (manifest.description)"
   },
   "defaultTitle": {
-    "message": "Web Viewing Assist",
+    "message": "Vuora",
     "description": "Hover tooltip on the toolbar icon"
   },
 
   "headerTitle": {
-    "message": "Web Viewing Assist",
+    "message": "Vuora",
     "description": "h1 in the popup header"
   },
   "headerTagline": {

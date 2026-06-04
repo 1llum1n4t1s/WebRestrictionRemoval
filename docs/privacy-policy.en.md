@@ -1,10 +1,10 @@
-# Privacy Policy — Web Viewing Assist
+# Privacy Policy — Vuora
 
 Last updated: May 4, 2026
 
 ## Introduction
 
-"Web Viewing Assist" (formerly "Web Restriction Removal Helper", hereafter "the Extension") respects user privacy and is committed to protecting personal information. This Privacy Policy explains how the Extension handles data.
+"Vuora" (formerly "Web Viewing Assist" / "Web Restriction Removal Helper", hereafter "the Extension") respects user privacy and is committed to protecting personal information. This Privacy Policy explains how the Extension handles data.
 
 ## Data we collect
 

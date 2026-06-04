@@ -1,4 +1,4 @@
-# WEB閲覧アシスト 拡張機能パッケージ生成スクリプト
+# Vuora 拡張機能パッケージ生成スクリプト
 # 使い方:
 #   powershell -ExecutionPolicy Bypass -File zip.ps1                    # Chrome + Firefox 両方
 #   powershell -ExecutionPolicy Bypass -File zip.ps1 -Target chrome     # Chrome のみ
