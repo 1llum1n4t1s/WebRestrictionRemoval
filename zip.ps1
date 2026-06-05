@@ -23,9 +23,9 @@ if ($scriptDir) { Set-Location $scriptDir }
 
 # 依存インストール & アイコン生成
 Write-Host "依存パッケージを lockfile どおりにインストール中..." -ForegroundColor Yellow
-npm ci --silent
+pnpm install --frozen-lockfile --silent
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "npm ci に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
+    Write-Host "pnpm install --frozen-lockfile に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
     exit 1
 }
 

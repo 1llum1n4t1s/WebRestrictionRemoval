@@ -1,12 +1,13 @@
 // IBM Plex Sans JP Bold (weight 700) woff2 を IBM 公式 full version から subset 化して生成。
 //
 // 使い方:
-//   1. 必要な依存をワンタイム install (devDependencies には保存しない):
-//        npm install --no-save fontkit subset-font @ibm/plex-sans-jp@3.0.0
+//   1. 必要な依存をワンタイム install:
+//        pnpm add fontkit subset-font @ibm/plex-sans-jp@3.0.0
 //   2. このスクリプトを実行:
 //        node scripts/fetch-bold-woff2.mjs
-//   3. 完了後 node_modules を片付ける場合:
-//        npm ci   # package.json の devDependencies に戻す
+//   3. 完了後 node_modules / lockfile を片付ける場合:
+//        pnpm install --frozen-lockfile   # package.json / pnpm-lock.yaml を lockfile どおりに戻す
+//        (上記 3 パッケージは devDependencies に残さない方針なので package.json から取り除く)
 //
 // 戦略:
 //   - 既存 src/popup/fonts/IBMPlexSansJP-Regular.woff2 の cmap (約 652 文字) を fontkit で抽出

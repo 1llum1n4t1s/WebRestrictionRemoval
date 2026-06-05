@@ -4,10 +4,10 @@
   "type": "commonjs",
   "description": "Chrome extension that bundles session keep-alive, YouTube cleaner, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {
-    "ci:install": "npm ci",
+    "ci:install": "pnpm install --frozen-lockfile",
     "generate-icons": "node scripts/generate-icons.js",
     "generate-screenshots": "node webstore/generate-screenshots.js",
-    "build": "npm run generate-icons && npm run generate-screenshots",
+    "build": "pnpm run generate-icons && pnpm run generate-screenshots",
     "test": "node --test",
     "lint": "eslint src/ test/ scripts/"
   },

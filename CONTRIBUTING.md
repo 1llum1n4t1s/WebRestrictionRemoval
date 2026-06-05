@@ -11,7 +11,7 @@ LLM (Claude / Codex 等) 向けの詳細な実装規約は [CLAUDE.md](CLAUDE.md
 ## 開発環境
 
 - **Node.js**: 22+ (Volta 管理を推奨)
-- **npm**: 11+
+- **pnpm**: 11+
 - **対象ブラウザ**: Chrome 140+ / Firefox 142+
 
 ## セットアップ
@@ -19,7 +19,7 @@ LLM (Claude / Codex 等) 向けの詳細な実装規約は [CLAUDE.md](CLAUDE.md
 ```bash
 git clone https://github.com/1llum1n4t1s/WebRestrictionRemoval.git
 cd WebRestrictionRemoval
-npm install
+pnpm install
 ```
 
 ## 主要コマンド
@@ -27,16 +27,16 @@ npm install
 ### ビルド
 
 ```bash
-npm run build                # アイコン + スクリーンショット一括生成
-npm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
-npm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
+pnpm run build                # アイコン + スクリーンショット一括生成
+pnpm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
+pnpm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
 ```
 
 ### テスト・lint
 
 ```bash
-npm test          # Node.js 標準 test runner、77 件
-npm run lint      # ESLint v10 flat config
+pnpm test          # Node.js 標準 test runner、77 件
+pnpm run lint      # ESLint v10 flat config
 ```
 
 ### ストア申請用パッケージ生成

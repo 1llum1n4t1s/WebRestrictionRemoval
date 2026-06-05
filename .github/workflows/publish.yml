@@ -48,22 +48,28 @@ jobs:
           fi
           echo "✅ ブランチ名と manifest バージョン一致: $expected"
 
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+        with:
+          version: 11
+
       - name: Node セットアップ
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.0.0
         with:
           node-version: '20'
+          cache: 'pnpm'
 
       - name: 依存インストール
-        # lockfile の整合性を強制するため npm ci のみ。`|| npm install` フォールバックは
-        # lockfile を迂回して最新依存を取得するため、サプライチェーン攻撃の経路になりうる。
-        # lockfile が古い場合は CI を失敗させ、開発者に更新を促す。
+        # lockfile の整合性を強制するため pnpm install --frozen-lockfile のみ。
+        # frozen-lockfile は lockfile を迂回した最新依存取得を禁止し、サプライチェーン攻撃の
+        # 経路を塞ぐ。lockfile が古い場合は CI を失敗させ、開発者に更新を促す。
         env:
           # publish workflow ではスクリーンショット生成をしないため、Puppeteer のブラウザ取得は不要。
           PUPPETEER_SKIP_DOWNLOAD: "1"
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: テスト実行
-        run: npm test
+        run: pnpm test
 
       - name: アイコン生成
         run: node scripts/generate-icons.js
@@ -215,7 +221,7 @@ jobs:
           # (Submit for review は Draft の最新コミット + 最新 listing で行われるため、listing 変更が
           # 先行していれば追従する)。
           #
-          # upload job は npm ci / npx / checkout を行わず、Secrets を第三者 npm lifecycle の後段に置かない。
+          # upload job は pnpm install / pnpm exec / checkout を行わず、Secrets を第三者 npm lifecycle の後段に置かない。
           # package job が作った ZIP artifact だけを fresh runner で受け取り、CWS API へ直接アップロードする。
           #
           # **stdout/stderr は直接ストリームする**: `output=$(... 2>&1)` で一旦変数に取り込んで echo すると、
@@ -311,7 +317,7 @@ jobs:
     # AMO_JWT_ISSUER / AMO_JWT_SECRET secrets で動かす (Chrome 側と同じ秘匿レベル)。
     steps:
       - name: リポジトリをチェックアウト
-        # web-ext は devDependencies なので package.json + lockfile が必要 (npm ci で取得)
+        # web-ext は devDependencies なので package.json + lockfile が必要 (pnpm install で取得)
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.0
         # /rere F-OPS-1 修正: package job と防御深層の整合性確保。本 job では git push を
         # 行わないが、persist-credentials: false で GITHUB_TOKEN を .git/config の extraheader に
@@ -325,17 +331,23 @@ jobs:
           name: web-viewing-assist-firefox-source
           path: firefox-build/
 
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1  # v4
+        with:
+          version: 11
+
       - name: Node セットアップ
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.0.0
         with:
           node-version: '20'
+          cache: 'pnpm'
 
       - name: web-ext 依存インストール
-        # web-ext は package.json に exact pin (10.1.0)、npm ci で integrity 検証。
+        # web-ext は package.json に exact pin、pnpm install --frozen-lockfile で integrity 検証。
         # publish では screenshot 生成不要なので Puppeteer browser DL は skip。
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: バージョン pre-flight check (AMO / 既 submission 済み version なら skip)
         # /rere F-002 修正 + セルフレビュー #2/#4 修正:
@@ -408,7 +420,7 @@ jobs:
             echo "  登録: gh secret set AMO_JWT_ISSUER / gh secret set AMO_JWT_SECRET"
             exit 1
           fi
-          # npx --no で package-lock.json integrity 検証済みのローカル版を呼ぶ (CWS 側と同じ
+          # pnpm exec で frozen-lockfile install 済みのローカル版を呼ぶ (CWS 側と同じ
           # サプライチェーン方針)。--source-dir は package job で構築した firefox-build/。
           # --amo-metadata=.amo-metadata.json で version.license: "MIT" を毎回 submission に含める
           # (AMO API v5 仕様: 各 version 提出時に license 明示必須、過去 version からの継承なし)。
@@ -420,7 +432,7 @@ jobs:
           # submission 自体は受理済み (URL から確認できる) なので、timeout exceeded を検出したら
           # warning 扱いで exit 0 に書き換えて CI を green 化する。それ以外の exit 1 はそのまま fail。
           set +e
-          npx --no web-ext sign \
+          pnpm exec web-ext sign \
             --source-dir=firefox-build \
             --artifacts-dir=web-ext-artifacts \
             --channel=listed \

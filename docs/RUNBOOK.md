@@ -115,7 +115,7 @@ CI からは新規 add-on 作成不可。次のメンテナがゼロから再現
 3. ローカルで:
    ```bash
    WEB_EXT_API_KEY=<issuer> WEB_EXT_API_SECRET=<secret> \
-     npx --no web-ext sign \
+     pnpm exec web-ext sign \
      --source-dir=firefox-build \
      --channel=listed \
      --amo-metadata=.amo-metadata.json
@@ -148,7 +148,7 @@ API 経由で送る `<ul>` 等の HTML は `&lt;ul&gt;` としてエスケープ
 7. `webstore/store-listing.{,en,firefox.ja,firefox.en}.txt` の機能リスト
 8. `webstore/02-features.html` の件数（スクリーンショット生成で焼き込まれる）
 
-`npm test` で件数 drift を CI 検知できる。
+`pnpm test` で件数 drift を CI 検知できる。
 
 ---
 

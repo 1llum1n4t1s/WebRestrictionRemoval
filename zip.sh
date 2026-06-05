@@ -27,8 +27,8 @@ fi
 
 # 依存インストール & アイコン生成
 echo "依存パッケージを lockfile どおりにインストール中..."
-if ! npm ci --silent; then
-  echo "npm ci に失敗しました"
+if ! pnpm install --frozen-lockfile --silent; then
+  echo "pnpm install --frozen-lockfile に失敗しました"
   exit 1
 fi
 if ! node scripts/generate-icons.js; then
