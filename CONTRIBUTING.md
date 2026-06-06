@@ -56,8 +56,8 @@ bash ./zip.sh firefox
 ```
 
 生成物:
-- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (13 機能フル対応、音量ブースターは tabCapture 経路)
-- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (音量ブースター以外の 12 機能。Firefox MV3 は tabCapture / offscreen 未対応のため、音量ブースターは `HAS_VOLUME_BOOSTER` guard で popup の UI ごと非表示)
+- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (11 機能フル対応、音量ブースターは tabCapture 経路)
+- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (音量ブースター以外の 10 機能。Firefox MV3 は tabCapture / offscreen 未対応のため、音量ブースターは `HAS_VOLUME_BOOSTER` guard で popup の UI ごと非表示)
 
 ## ローカル動作確認
 

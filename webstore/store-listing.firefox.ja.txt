@@ -2,26 +2,22 @@
 Firefox AMO 掲載情報（日本語版）
 ※ Chrome Web Store 用は webstore/store-listing.txt を参照
 ※ 英語版は webstore/store-listing.firefox.en.txt を参照
-※ Firefox 版は音量ブースター非対応 (Chrome 専用 = chrome.tabCapture 未対応のため)。その他 12 カテゴリは全て利用可能
+※ Firefox 版は音量ブースター非対応 (Chrome 専用 = chrome.tabCapture 未対応のため)。その他 10 カテゴリは全て利用可能
 ============================================================
 
 ■ 名前
 Vuora (Firefox 版)
 
 ■ 概要 (250 文字以内)
-閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Firefox 拡張機能。12 カテゴリの補助機能（セッション維持・YouTube クリーナー・Amazon 定期おトク便合計・Amazon ランキング移動・Amazon 販売元バッジ・Instagram/TikTok クリーナー・動画ガンマ補正・動画の黒帯除去・ルーペ・RTX 動画強化・カラーピッカー）を統合。音量ブースターは Chrome 版限定（Firefox は chrome.tabCapture 未対応のため）。すべてデフォルト OFF のオプトイン方針、外部送信ゼロ。
+閲覧中ページの見やすさ・聞きやすさをローカルで整える Firefox 拡張機能。10 カテゴリの補助機能（YouTube クリーナー・Amazon 定期おトク便合計・Amazon ランキング移動・Amazon 販売元バッジ・Instagram/TikTok クリーナー・動画ガンマ補正・動画の黒帯除去・ルーペ・カラーピッカー）を統合。音量ブースターは Chrome 版限定（Firefox は chrome.tabCapture 未対応のため）。すべてデフォルト OFF のオプトイン方針、外部送信ゼロ。
 
 ■ 説明 (16,000 文字以内)
-日々の Web 閲覧を快適にする 12 カテゴリの補助機能を統合した拡張機能です（音量ブースターは Chrome 版限定）。
+日々の Web 閲覧を快適にする 10 カテゴリの補助機能を統合した拡張機能です（音量ブースターは Chrome 版限定）。
 
 ■ Firefox 版で利用できる機能
 
-🔹 セッション維持
-合成イベント dispatch + 同一オリジン HTTP ping で、社内ポータルや管理画面の自動ログアウトを抑止します。
-HTTP ping はデフォルト OFF（オプトイン）。AbortSignal で 5 秒タイムアウト、同一オリジン only、redirect: manual で第三者ドメインへの認証情報送信ゼロ。
-
-🔹 YouTube クリーナー (30 サブ機能)
-検索結果のノイズ除去 / Shorts 削除 (5 サブ機能) / 動画ページ整形 / コメント欄非表示 / ライブチャット非表示 / グリッド列数調整 / 登録チャンネル拡張 (subs feed をグリッド化 + lazy thumbnail) など、YouTube の冗長 UI を細かく制御。
+🔹 YouTube クリーナー (31 サブ機能)
+検索結果のノイズ除去 / Shorts 削除 (5 サブ機能) / 動画ページ整形 / コメント欄非表示 / ライブチャット非表示 / グリッド列数調整 / 登録チャンネル拡張 (subs feed をグリッド化 + lazy thumbnail) / ライブ配信の接続モニター など、YouTube の冗長 UI を細かく制御。
 
 🔹 Amazon 定期おトク便 月別合計
 amazon.co.jp/auto-deliveries で配送月ごとの合計金額を自動算出して表示。
@@ -46,9 +42,6 @@ Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Not
 
 🔹 ルーペ
 マウス追従の円形拡大鏡。倍率 3 段階 / レンズサイズ可変。`tabs.captureVisibleTab` で取得した静止画を貼り付けるため、動画 / iframe / canvas の細部も拡大可能。
-
-🔹 RTX 動画強化
-`<video>` 要素のあるページに 1×1 px の透明 hint 要素を inject して GPU ドライバ側映像補正 (NVIDIA RTX Super Resolution / AMD FidelityFX 等) の動画ページ検知を補助。ドライバ機能の有効化自体は GPU 側設定 (NVIDIA Control Panel 等) に依存。外部送信ゼロ。
 
 🔹 カラーピッカー (popup タブ)
 EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`browser.storage.local` のみで外部送信ゼロ。

@@ -101,8 +101,7 @@ extension reload / 自動更新で content script が orphan 化する。`chrome
 | TikTok DOM 変更 | 該当機能だけ silent fail | F-003 余地（DOM mismatch 検知未実装） |
 | chrome.tabCapture user gesture 要件 | 新規タブで音量ブースター初回適用失敗 | popup を開く操作が user gesture になる |
 | chrome.tabs.captureVisibleTab 2fps 上限 | Loupe で再キャプチャ間隔 500ms に強制 | 仕様内、ユーザー UX 影響軽微 |
-| 認証プロキシ 401/302 ループ（Zscaler 等） | keepalive HTTP ping で再ループ消費 | デフォルト OFF（opt-in）、5s timeout |
-| Memory Saver でタブ freeze | keepalive / 音量ブースターが停止 | 復帰でユーザーが popup 再操作 |
+| Memory Saver でタブ freeze | 音量ブースターが停止 | 復帰でユーザーが popup 再操作 |
 
 ---
 
@@ -158,4 +157,4 @@ API 経由で送る `<ul>` 等の HTML は `&lt;ul&gt;` としてエスケープ
 
 ### 既知の事故事例
 
-- **v1.0.29 RTX 動画強化機能完全破壊** (2026-05-16, /rere レビュー A2-001): `background.js` の `normalizeSettings` 関数に `rtxEnhancerEnabled` フィールドが欠落していて、popup から ON しても storage に書かれず永久 OFF 固定。v1.0.30 で hotfix。再発防止: `test/actions.test.js` に `StorageKeys.RTX_ENHANCER_ENABLED` アサート追加 + 新機能追加時は `normalizeSettings` / `toStorageRecord` / `notifyContentScripts` の 3 関数を必ず同時更新する（CLAUDE.md「設計の起点」参照）。
+- **新機能追加時の永久 OFF 化バグ防止 (歴史的教訓)**: 過去に `normalizeSettings` / `toStorageRecord` / `notifyContentScripts` / popup の `chrome.storage.local.get` リスト / `APPLY_SETTINGS_KEYS` のいずれかへの追加忘れで、popup から ON にしても storage に書き戻されず永久 OFF 固定になる事故があった。新機能追加時は CLAUDE.md「設計の起点」と「APPLY_SETTINGS 経路の partial payload 防御」の 6 ポイントチェックリストを必ず通す。`test/actions.test.js` の SettingsSchema / popup get list drift 検知で構造的に防御済み。

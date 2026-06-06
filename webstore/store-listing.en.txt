@@ -12,21 +12,13 @@ Vuora
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 13 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
-(In v1.0.18 the former "restriction removal" features were retired; the Extension is now focused exclusively on web viewing assistance.)
+An extension that consolidates 11 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
 
 ■ Main features
 
-· 🔄 Keep session alive (opt-in, default OFF)
-  Mitigates idle-based session timeouts on sites such as SharePoint / Box.
-  When the master toggle is ON, the top frame of every http(s) tab periodically dispatches synthetic mousemove / pointermove / scroll / focus events to reset the site's JS idle detection.
-  Additionally, on SharePoint (*.sharepoint.{com,cn,de,us}) it tries a dedicated GET, and on other sites it tries a lightweight HEAD against the current URL / origin root from the top frame to help extend the server-side session.
-  The popup slider lets you adjust the interval from 1 to 15 minutes (default 4 minutes).
-  ※ Sites that reject HEAD or auth-proxy idle timeouts may not be helped by this feature.
-
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
-  In addition, the YouTube cleaner offers 30 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements).
+  In addition, the YouTube cleaner offers 31 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, live-stream connection monitor).
 
 · 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
   Shows a per-month total on https://www.amazon.co.jp/auto-deliveries.
@@ -65,10 +57,6 @@ An extension that consolidates 13 categories of viewing aids — plus a shared s
   Removes the letterbox/pillarbox black bars seen on ultrawide monitors by Zoom (aspect-preserving crop) or Stretch (expand only the deficient axis) to fill the screen. Master toggle + display-mode selection + target-monitor preset; the video's aspect ratio is auto-detected from videoWidth / videoHeight. Shared across tabs, and <video> inside iframes also receive the same treatment via all_frames: true.
   ※ Video data is not read, recorded, or transmitted; the feature only applies a CSS transform, fully client-side.
 
-· ✨ RTX Video Enhancer (opt-in, default OFF)
-  Helps GPU drivers (e.g., NVIDIA RTX Super Resolution / AMD FidelityFX) detect video pages by injecting a 1×1 px invisible hint element on pages containing `<video>` elements. The driver-side feature itself must be enabled in the GPU settings (e.g., NVIDIA Control Panel); the Extension only handles the browser-side hint injection.
-  ※ Zero external transmission. Only DOM injection — no video data is read or recorded.
-
 · 🔍 Loupe (opt-in, default OFF)
   A circular magnifier that follows the mouse cursor. When the master toggle is ON, the active tab is captured as a JPEG snapshot via chrome.tabs.captureVisibleTab, attached as the background-image of a circular position: fixed lens (clip-path: circle()), and the background-position is updated at 60 fps with rAF coalescing on mousemove to magnify the area under the cursor. Because the captured pixels include video / iframe / canvas content, this is ideal for "pause a video and inspect fine details". Zoom is selected from 1.5× / 2.5× / 4× in the popup segment control; the lens diameter is adjustable 150–1000 px via a slider. Left-clicking the page while the lens is showing removes it instantly and flips the master toggle OFF. Re-capture is triggered automatically on initial activation / scroll (500 ms debounced) / large DOM changes (MutationObserver) / window resize.
   ※ The captured JPEG is converted to a Blob URL referenced only by the content script DOM, and is released via URL.revokeObjectURL on OFF. No recording, storage, or external transmission.
@@ -92,7 +80,6 @@ Settings are auto-saved and restored on next launch.
 · No personal information or user data is collected.
 · Settings are stored only on your device (chrome.storage.local).
 · No communication with any third-party external servers.
-  (When keep-session-alive's lightweight ping is ON, same-origin HEAD / GET requests may be issued against the user's enabled site itself.)
   (When the Instagram / TikTok image download button is ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
 · While Volume Booster is in use, tab audio data is only amplified and re-output through an AudioContext; no recording, storage, or external transmission is performed.
 
@@ -162,16 +149,14 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
 ■ Host-permission justifications
 
   http://*/* and https://*/*:
-  Required so that five features — Keep session alive, Video Gamma, Remove video black bars, Loupe, and RTX Video Enhancement — can be injected as content scripts on all http(s) sites.
-  (1) Keep session alive: the injected content script starts the poller on every http(s) tab when the master toggle is ON in the popup, and dispatches synthetic mousemove / pointermove / scroll / focus events. The HTTP ping is a separate sub-toggle (default OFF) and only fires same-origin HEAD / GET when ON.
-  (2) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
-  (3) Remove video black bars: when the master toggle is ON, detects each <video>'s aspect ratio and removes top/bottom or left/right bars via CSS transform (all frames; the original inline transform is restored on removal).
-  (4) Loupe: when the master toggle is ON, shows a cursor-following circular magnifier (the magnified image itself is obtained via captureVisibleTab — see <all_urls> below).
-  (5) RTX Video Enhancement: when the master toggle is ON, injects a 1×1 transparent hint element into pages that contain <video> to help GPU driver-side video enhancement detect video pages.
+  Required so that three features — Video Gamma, Remove video black bars, and Loupe — can be injected as content scripts on all http(s) sites.
+  (1) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
+  (2) Remove video black bars: when the master toggle is ON, detects each <video>'s aspect ratio and removes top/bottom or left/right bars via CSS transform (all frames; the original inline transform is restored on removal).
+  (3) Loupe: when the master toggle is ON, shows a cursor-following circular magnifier (the magnified image itself is obtained via captureVisibleTab — see <all_urls> below).
   None of these read, modify, or transmit the page DOM (Video Gamma / Remove video black bars only attach a filter / transform to <video>; they do not read or save video data).
 
   *://*.youtube.com/*:
-  Required for the YouTube cleaner (30 sub-features including Shorts removal and subscriptions enhancements). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
+  Required for the YouTube cleaner (31 sub-features including Shorts removal, subscriptions enhancements, and the connection monitor). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
 
   *://www.amazon.co.jp/auto-deliveries*:
   Required to show a per-month total on the Amazon recurring-delivery page. The script reads `subscription-price` per month and inserts the computed total into the same page. Nothing read is transmitted off-device.

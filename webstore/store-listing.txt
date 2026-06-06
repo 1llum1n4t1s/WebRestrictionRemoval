@@ -13,21 +13,14 @@ Vuora
 閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカルで整える Chrome 拡張機能。
 
 ■ 説明（16,000文字以内）
-日々の Web 閲覧を快適にする 13 カテゴリの補助機能 + 共通サブ機能（Instagram / TikTok の画像ダウンロードボタン）を 1 つのポップアップに統合した拡張機能です。
+日々の Web 閲覧を快適にする 11 カテゴリの補助機能 + 共通サブ機能（Instagram / TikTok の画像ダウンロードボタン）を 1 つのポップアップに統合した拡張機能です。
 （v1.0.18 でかつての「制限解除」機能は廃止し、Web 閲覧支援機能のみに特化しました）
 
 ■ 主な機能
 
-・🔄 セッション維持（オプトイン・デフォルトOFF）
-  SharePoint / Box 等でアイドル判定によるセッションタイムアウトを緩和します。
-  ポップアップで master トグルを ON にすると、すべての http(s) タブで合成 mousemove / pointermove / scroll / focus を定期発射し、JS 側のアイドル検知をリセット。
-  さらに SharePoint（*.sharepoint.{com,cn,de,us}）では専用 GET、その他サイトでも現在 URL / origin root への軽量 HEAD を top frame から試行してサーバー側セッション延長を補助します。
-  ポップアップのスライダーで 1〜15 分の範囲で間隔を調整可能（デフォルト 4 分）。
-  ※ HEAD を受け付けないサイトや認証プロキシ側の idle timeout には効かない場合があります。
-
 ・📺 YouTube 整理（オプトイン・デフォルトOFF）
   サイドバー / 棚 / 検索結果から Shorts を非表示・物理削除し、`/shorts/<id>` の URL を `/watch?v=<id>` にリダイレクト。
-  さらに YouTube クリーナーとして 30 機能（検索結果ノイズ除去 / 動画属性で削除 / ハイライト / 動画ページレイアウト〈コメント欄非表示・ライブチャット非表示〉/ グリッド列数 / ホーム・フィードのグリッド整列 / 登録チャンネル拡張）を細かく設定できます。
+  さらに YouTube クリーナーとして 31 機能（検索結果ノイズ除去 / 動画属性で削除 / ハイライト / 動画ページレイアウト〈コメント欄非表示・ライブチャット非表示〉/ グリッド列数 / ホーム・フィードのグリッド整列 / 登録チャンネル拡張 / ライブ配信の接続モニター）を細かく設定できます。
 
 ・📦 Amazon 定期おトク便 月別合計（オプトイン・デフォルトOFF）
   https://www.amazon.co.jp/auto-deliveries ページで配送月ごとの合計金額を表示します。
@@ -66,10 +59,6 @@ Vuora
   ウルトラワイドモニターなどで動画の上下/左右に出る黒帯（レターボックス / ピラーボックス）を、ズーム（アスペクト維持で拡大クロップ）または引き伸ばし（不足軸のみ拡大）で除去して画面いっぱいに表示します。マスタートグル + 表示モード選択 + 目標モニターのプリセット構成で、動画側の縦横比は videoWidth / videoHeight から自動検出します。全タブ共通設定で、iframe 内の <video> にも all_frames: true で同じ処理が当たります。
   ※ 動画データの読み取り・録画・外部送信は一切行わず、CSS transform を当てるだけのクライアントサイド処理です。
 
-・✨ RTX 動画強化（オプトイン・デフォルトOFF）
-  動画ストリーミング配信中の GPU ドライバ側映像補正（NVIDIA RTX Super Resolution / AMD FidelityFX 等）の検知を補助するため、`<video>` 要素のあるページに 1×1 px の透明 hint 要素を inject します。ドライバ機能の有効化自体は GPU 側設定（NVIDIA Control Panel など）に依存し、本拡張機能はブラウザ側の hint inject のみを担います。
-  ※ 外部送信ゼロ。DOM の追加のみで動画データの読み取りや録画は一切行いません。
-
 ・🔍 ルーペ（オプトイン・デフォルトOFF）
   マウスカーソルに追従する円形拡大鏡。マスタートグルを ON にすると、現在のタブを chrome.tabs.captureVisibleTab で JPEG 静止画として取得し、円形レンズ (position: fixed + clip-path: circle()) に background-image として貼り付け、mousemove から background-position を rAF コアレス 60fps で更新してカーソル下の領域を拡大表示します。動画 / iframe / canvas を含む描画ピクセルがそのまま映るため「動画を一時停止して細部を確認」する用途に最適です。倍率はポップアップのセグメントコントロールで 1.5× / 2.5× / 4× の 3 段階から選択、レンズサイズはスライダーで 150〜1000px の範囲で可変。画面上で左クリックすると即座にレンズが撤去されマスタートグルも OFF に書き戻ります。再キャプチャは初回 / スクロール (500ms debounced) / DOM 大幅変化 (MutationObserver) / ウィンドウリサイズ で自動的に発火します。
   ※ 取得した JPEG は Blob URL に変換して content script の DOM 上で参照され、OFF 時に URL.revokeObjectURL で確実に解放されます。録画・保存・外部送信は一切行いません。
@@ -93,7 +82,6 @@ Vuora
 ・個人情報・ユーザーデータの収集は一切行いません
 ・設定はお使いの端末内（chrome.storage.local）にのみ保存されます
 ・第三者の外部サーバーへの通信は一切行いません
-  （セッション維持の軽量 ping ON 時、有効化したサイト自身への同一オリジン HEAD / GET が発生することがあります）
   （Instagram / TikTok の画像ダウンロードボタン ON 時、ユーザーがボタンをクリックした瞬間のみ各サイトの正規 CDN（*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com）に画像 GET を発行します。credentials:omit + redirect:manual + referrerPolicy:no-referrer でクロスオリジン認証情報送信を遮断し、それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します）
 ・音量ブースター利用時のタブ音声データは AudioContext で増幅・再出力するのみで、録音・保存・外部送信は行いません
 
@@ -163,16 +151,14 @@ Vuora
 ■ ホスト権限の正当性
 
   http://*/* および https://*/*:
-  セッション維持・動画ガンマ補正・動画の黒帯除去・ルーペ・RTX 動画強化の 5 機能のため、全 http(s) サイトに content script を注入する必要がある。
-  (1) セッション維持: 注入された content script は、ユーザーが popup で master トグルを ON にしたときのみ全 http(s) タブでポーラーを起動し、合成 mousemove / pointermove / scroll / focus を dispatch する。HTTP ping は別サブトグル（デフォルト OFF）で、ON 時のみ同一オリジン HEAD / GET を発射する。
-  (2) 動画ガンマ補正: マスタートグル ON 時のみ <video> 要素に SVG filter (url(#__cpa-video-gamma)) を当てる CSS と SVG <feComponentTransfer type="gamma"> 定義を <body> に注入する。全タブ + 全フレーム (iframe 内 <video> 含む) に適用するため http://*/* + https://*/* + all_frames: true の content script として動作する。
-  (3) 動画の黒帯除去: マスタートグル ON 時のみ <video> の縦横比を検出し、CSS transform で上下/左右の黒帯を除去する（全フレーム対象、元の inline transform は撤去時に復元）。
-  (4) ルーペ: マスタートグル ON 時のみマウス追従の円形拡大鏡を表示する（拡大画像そのものは下記 <all_urls> の captureVisibleTab で取得）。
-  (5) RTX 動画強化: マスタートグル ON 時のみ <video> を持つページに 1×1 透明 hint 要素を inject し、GPU ドライバ側映像補正の動画ページ検知を補助する。
+  動画ガンマ補正・動画の黒帯除去・ルーペの 3 機能のため、全 http(s) サイトに content script を注入する必要がある。
+  (1) 動画ガンマ補正: マスタートグル ON 時のみ <video> 要素に SVG filter (url(#__cpa-video-gamma)) を当てる CSS と SVG <feComponentTransfer type="gamma"> 定義を <body> に注入する。全タブ + 全フレーム (iframe 内 <video> 含む) に適用するため http://*/* + https://*/* + all_frames: true の content script として動作する。
+  (2) 動画の黒帯除去: マスタートグル ON 時のみ <video> の縦横比を検出し、CSS transform で上下/左右の黒帯を除去する（全フレーム対象、元の inline transform は撤去時に復元）。
+  (3) ルーペ: マスタートグル ON 時のみマウス追従の円形拡大鏡を表示する（拡大画像そのものは下記 <all_urls> の captureVisibleTab で取得）。
   いずれもページ DOM の読み取り・書き換え・外部送信は一切行わない（ガンマ補正・黒帯除去は <video> へのフィルタ / transform 適用のみで、動画データの読み取りや保存は行わない）。
 
   *://*.youtube.com/*:
-  YouTube クリーナー（30 サブ機能・Shorts 削除・登録チャンネル拡張を含む）のため。検索結果ノイズ除去・動画ページ装飾（コメント欄非表示 / ライブチャット折りたたみ）・ホームグリッド列数調整・/shorts/<id> → /watch?v=<id> リダイレクト・/feed/channels グリッド化を DOM/CSS 操作のみで実装。読み取り情報は端末外へ送信しない。
+  YouTube クリーナー（31 サブ機能・Shorts 削除・登録チャンネル拡張・接続モニターを含む）のため。検索結果ノイズ除去・動画ページ装飾（コメント欄非表示 / ライブチャット折りたたみ）・ホームグリッド列数調整・/shorts/<id> → /watch?v=<id> リダイレクト・/feed/channels グリッド化を DOM/CSS 操作のみで実装。読み取り情報は端末外へ送信しない。
 
   *://www.amazon.co.jp/auto-deliveries*:
   Amazon 定期おトク便の月別合計表示のため。配送月ごとの subscription-price を読み取って合計値を計算し、同ページに挿入する。読み取り情報は端末外へ送信しない。

@@ -55,11 +55,16 @@
    * これで RMS の細かい揺れによる ±数 dB のポンピングを止め、BGM のうねりを耳から消す。
    * `options.force === true` (機能 OFF 時の 1.0x 復帰など) のときは dead zone を無視して必ず適用する。
    *
-   * 同じ target への再 schedule はスキップ。silence-gate 経路は 400ms 毎に force=true で
-   * unity (1) を要求してくるが、既に target=1 で ramp 中の状態で再度 setTargetAtTime すると、
-   * direction 判定が `clamped < previousTarget` で false になって UP_TIME_CONSTANT (8s) に
-   * 切り替わり、せっかくの fast DOWN ramp が遅い ramp に上書きされて silence/noise が長時間
-   * boosted のままになる事故を起こす (Codex P2 指摘 2026-05-08)。
+   * 同じ target への再 schedule はスキップ (`clamped === previousTarget` の早期 return)。
+   * silence-gate 経路は 400ms 毎に force=true で unity (1) を要求してくるが、既に target=1 で
+   * settled (`state.normalizerTargetGain === 1`) なら早期 return でスキップする。これで「同じ
+   * target への重複 schedule」を構造的に止め、ramp が毎 tick 再 schedule されて settle しない
+   * 罠を回避する (元 Codex P2 指摘 2026-05-08)。
+   *
+   * 現行 ramp 設計は UP=2.5s < DOWN=3.0s (actions.js NORMALIZE_GAIN_*_TIME_CONSTANT)。
+   * 「上げる方が速く、下げる方がゆっくり」の非対称で、急な大音量からはゆっくり守りつつ
+   * 小音源は素早く適切音量へ持ち上げる方針。silence からの復帰 (clamped > previousTarget) は
+   * UP=2.5s、boost 中→silence への遷移 (clamped < previousTarget) は DOWN=3.0s が選ばれる。
    *
    * @param {object} state - { ctx, normalizerGainNode, normalizerTargetGain }
    * @param {number} targetGain 目標ゲイン倍率（clamp 前）
@@ -107,9 +112,17 @@
     const rms = Math.sqrt(sum / buffer.length);
     const silenceGate = dbToGain(VolumeBooster.NORMALIZE_SILENCE_GATE_DB);
     if (!Number.isFinite(rms)) return;
-    // 無音/ノイズ区間は即 unity 復帰。平滑値 (normalizerSmoothedRms) は最後の有効音の値を保持し、
-    // リセットしない (句間の度にリセットすると喋り再開ごとに追従がやり直しになり効かなくなる)。
-    if (rms < silenceGate) {
+    // 無音/ノイズ区間は即 unity 復帰。**瞬間 rms と平滑値 (smoothedRms) の二重判定** で、
+    // 瞬間 rms の揺れが gate を一瞬下回るだけ (= 通常音声中のディップ) ではスキップしない設計。
+    // 両方が gate 下のときだけ「確実な無音」と判定して unity 復帰、片方だけなら EMA 経路に流す。
+    // これにより「ON にして 10 秒で boost 到達 → 瞬間 rms が gate を割って force UNITY → 即下がる」
+    // タイプのチャタリング (silence gate 跨ぎポンピング) を根絶する。
+    // 平滑値は最後の有効音の値を保持しリセットしない (句間の度にリセットすると喋り再開ごとに
+    // 追従がやり直しになり効かなくなる)。初回 tick (prevSmoothed が null/NaN) は瞬間 rms ベース
+    // fallback で従来通り動作 → initial silence もちゃんと拾える。
+    const prevSmoothed = state.normalizerSmoothedRms;
+    const prevFinite = Number.isFinite(prevSmoothed);
+    if (rms < silenceGate && (!prevFinite || prevSmoothed < silenceGate)) {
       scheduleNormalizerGain(state, 1, { force: true });
       return;
     }
@@ -117,8 +130,7 @@
     // 瞬間 RMS は測定窓内でも tick 間でも揺れるため、EMA で平滑化して動画全体のラウドネスを安定推定する。
     // これをしないと「うるさい/小さい動画でも targetGain がほぼ 1 に丸まる」(効かない) 問題が出る。
     const alpha = VolumeBooster.NORMALIZE_RMS_SMOOTHING;
-    const prevSmoothed = state.normalizerSmoothedRms;
-    const smoothedRms = Number.isFinite(prevSmoothed)
+    const smoothedRms = prevFinite
       ? alpha * rms + (1 - alpha) * prevSmoothed
       : rms;
     state.normalizerSmoothedRms = smoothedRms;

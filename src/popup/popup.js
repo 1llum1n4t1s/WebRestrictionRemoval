@@ -160,7 +160,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ----- 要素参照 -----
-  const $keepAliveToggle = document.getElementById("keepAliveToggle");
   const $searchFixerToggle = document.getElementById("searchFixerToggle");
   const $amazonDeliveryToggle = document.getElementById("amazonDeliveryToggle");
   const $amazonRankingJumpToggle = document.getElementById("amazonRankingJumpToggle");
@@ -176,10 +175,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeNightModeToggle = document.getElementById("volumeNightModeToggle");
   const $volumeMuteBtn = document.getElementById("volumeMuteBtn");
   const $volumeMuteIcon = $volumeMuteBtn?.querySelector(".volume-mute-icon");
-  const $intervalRow = document.getElementById("intervalRow");
-  const $intervalSlider = document.getElementById("intervalSlider");
-  const $intervalValue = document.getElementById("intervalValue");
-  const $keepAliveHttpPingToggle = document.getElementById("keepAliveHttpPingToggle");
   const $featureCategories = document.getElementById("featureCategories");
   const $searchFixerPill = document.getElementById("searchFixerPill");
   // $gridItemsSelect は buildFeatureCategories で menu_ui カテゴリ末尾に動的挿入されるため、
@@ -195,7 +190,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $videoFillTargetSelect = document.getElementById("videoFillTargetSelect");
   const $loupeToggle = document.getElementById("loupeToggle");
   const $loupeRow = document.getElementById("loupeRow");
-  const $rtxEnhancerToggle = document.getElementById("rtxEnhancerToggle");
   const $loupeZoomSegment = document.getElementById("loupeZoomSegment");
   const $loupeZoomValue = document.getElementById("loupeZoomValue");
   const $loupeSizeSlider = document.getElementById("loupeSizeSlider");
@@ -220,13 +214,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   /** 動画黒帯除去の表示モード（"zoom" | "stretch"）。モードセグメントのクリックで更新。 */
   let videoFillMode = VideoFill.DEFAULT_MODE;
 
-  // ----- スライダー単位は分、storage は ms -----
-  const MIN_MIN = Math.round(KeepAlive.MIN_INTERVAL_MS / KeepAlive.MS_PER_MIN);
-  const MAX_MIN = Math.round(KeepAlive.MAX_INTERVAL_MS / KeepAlive.MS_PER_MIN);
-  const DEFAULT_MIN = Math.round(KeepAlive.DEFAULT_INTERVAL_MS / KeepAlive.MS_PER_MIN);
-  $intervalSlider.min = String(MIN_MIN);
-  $intervalSlider.max = String(MAX_MIN);
-
   buildFeatureCategories();
   // menu_ui カテゴリ末尾に挿入された gridItemsSelect を以降の処理で参照する。
   // _buildAccordionCategories が cat.id === "menu_ui" のとき _buildGridItemsRow で生成する。
@@ -241,9 +228,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // popup 起動時の直列 RTT (旧: 2 回 await) を 1 回に削減する。
   // P0-#3: INSTALL_SENTINEL も同じ get に乗せて storage 破損 / リセットを検知する。
   const stored = await chrome.storage.local.get([
-    StorageKeys.KEEP_ALIVE_ENABLED,
-    StorageKeys.KEEP_ALIVE_INTERVAL_MS,
-    StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
@@ -268,10 +252,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.LOUPE_ENABLED,
     StorageKeys.LOUPE_ZOOM,
     StorageKeys.LOUPE_SIZE,
-    // RTX 動画強化マスタートグル。get リストから欠落していると popup load 時に常に
-    // OFF 表示 → apply() で false 送信 → storage の既存 true が上書きで OFF 化される
-    // 「いつの間にか OFF」現象の真因のひとつ。
-    StorageKeys.RTX_ENHANCER_ENABLED,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
@@ -293,10 +273,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       .catch(logStorageError("install-sentinel"));
   }
 
-  // セッション維持: 全タブ共通設計に変更したため、現在タブの origin チェックは廃止。
-  // popup 起動時は storage の master トグルをそのまま反映するだけ。
-  $keepAliveToggle.checked = stored[StorageKeys.KEEP_ALIVE_ENABLED] === true;
-  $keepAliveHttpPingToggle.checked = stored[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] === true;
   $searchFixerToggle.checked = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
   $amazonDeliveryToggle.checked = stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true;
   $amazonRankingJumpToggle.checked = stored[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] === true;
@@ -331,7 +307,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ルーペの初期値設定
   $loupeToggle.checked = stored[StorageKeys.LOUPE_ENABLED] === true;
-  $rtxEnhancerToggle.checked = stored[StorageKeys.RTX_ENHANCER_ENABLED] === true;
   $loupeSizeSlider.min = String(Loupe.SIZE_MIN);
   $loupeSizeSlider.max = String(Loupe.SIZE_MAX);
   $loupeSizeSlider.step = String(Loupe.SIZE_STEP);
@@ -356,14 +331,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if ($volumeBoosterToggle.checked) {
     pushVolumeNow(savedGain).catch(logVolumeError("popup-init"));
   }
-
-  const storedIntervalMs = Number.isFinite(stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS])
-    ? stored[StorageKeys.KEEP_ALIVE_INTERVAL_MS]
-    : KeepAlive.DEFAULT_INTERVAL_MS;
-  const storedMin = clampMinutes(Math.round(storedIntervalMs / KeepAlive.MS_PER_MIN));
-  $intervalSlider.value = String(storedMin);
-  updateIntervalLabel(storedMin);
-  updateIntervalRowVisibility();
 
   const storedFeatures = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
   for (const [key, input] of featureInputs) {
@@ -537,12 +504,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       hexIncludeHash = changes[StorageKeys.COLOR_PICKER_HEX_HASH].newValue !== false;
       $hexHashCheck.checked = hexIncludeHash;
     }
-    // セッション維持: 全タブ共通設計で keepAliveEnabled 単一 boolean のみ監視。
-    // 別 popup や別経路 (例えば DevTools 経由 storage.local.set) で keepAliveEnabled が
-    // 変更されたら、現 popup の master トグル UI を即同期する。
-    if (changes[StorageKeys.KEEP_ALIVE_ENABLED]) {
-      $keepAliveToggle.checked = changes[StorageKeys.KEEP_ALIVE_ENABLED].newValue === true;
-    }
     // /rere B1-005 修正: popup 直書き経路の主要キーを同期。
     // 別 popup 同時開き / DevTools 操作 / background の onInstalled マイグレーション等で
     // storage が変わったときに UI が古いままになる問題を防ぐ。すべて master トグル / 数値スライダー
@@ -565,9 +526,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
       updateMuteBtnVisual?.();
     }
-    if (changes[StorageKeys.RTX_ENHANCER_ENABLED]) {
-      $rtxEnhancerToggle.checked = changes[StorageKeys.RTX_ENHANCER_ENABLED].newValue === true;
-    }
     if (changes[StorageKeys.LOUPE_ENABLED]) {
       $loupeToggle.checked = changes[StorageKeys.LOUPE_ENABLED].newValue === true;
       // ルーペサブ UI (zoom/size) の表示切替も追従
@@ -576,13 +534,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ----- イベントバインド -----
-  $keepAliveToggle.addEventListener("change", () => {
-    updateIntervalRowVisibility();
-    apply();
-  });
-  $keepAliveHttpPingToggle.addEventListener("change", apply);
-  // RTX 動画強化: master トグルだけ (サブ設定なし)、変更で即 apply → background → content script
-  $rtxEnhancerToggle.addEventListener("change", apply);
   $searchFixerToggle.addEventListener("change", () => {
     updateCleanerDimState();
     apply();
@@ -739,11 +690,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     await pushVolumeNow(v).catch(logVolumeError("compressor-toggle"));
   }
-
-  $intervalSlider.addEventListener("input", () => {
-    updateIntervalLabel(Number($intervalSlider.value));
-  });
-  $intervalSlider.addEventListener("change", apply);
 
   for (const input of featureInputs.values()) {
     input.addEventListener("change", () => {
@@ -1059,7 +1005,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       { icon: "🔊", labelKey: "groupAudio",   sectionId: "audioGroupSection" },
       { icon: "🎞️", labelKey: "groupVideo",   sectionId: "videoGroupSection" },
       { icon: "📦", labelKey: "groupAmazon",  sectionId: "amazonGroupSection" },
-      { icon: "🔄", labelKey: "groupSession", sectionId: "sessionGroupSection" },
     ];
 
     const entries = defs
@@ -1124,9 +1069,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ----- 適用 -----
   async function apply() {
-    // セッション維持: 全タブ共通設計に変更。master トグルの boolean をそのまま使う。
-    const keepAliveEnabled = $keepAliveToggle.checked;
-    const keepAliveHttpPingEnabled = $keepAliveHttpPingToggle.checked;
     const searchFixerEnabled = $searchFixerToggle.checked;
     const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
     const amazonRankingJumpEnabled = $amazonRankingJumpToggle.checked;
@@ -1138,9 +1080,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const videoFillEnabled = $videoFillToggle.checked;
     const videoFillTarget = VideoFill.normalizeTarget($videoFillTargetSelect.value);
     const loupeEnabled = $loupeToggle.checked;
-    const rtxEnhancerEnabled = $rtxEnhancerToggle.checked;
-    const minutes = clampMinutes(Number($intervalSlider.value));
-    const keepAliveIntervalMs = minutes * KeepAlive.MS_PER_MIN;
     const searchFixerFeatures = collectFeatureValues();
     const searchFixerGridItems = SearchFixer.clampGridItems($gridItemsSelect.value);
     const instagramCleanerFeatures = collectIgFeatureValues();
@@ -1151,9 +1090,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const res = await chrome.runtime.sendMessage({
         action: Actions.APPLY_SETTINGS,
         data: {
-          keepAliveEnabled,
-          keepAliveIntervalMs,
-          keepAliveHttpPingEnabled,
           searchFixerEnabled,
           searchFixerFeatures,
           searchFixerGridItems,
@@ -1170,14 +1106,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           videoFillMode,
           videoFillTarget,
           loupeEnabled,
-          rtxEnhancerEnabled,
         },
       });
       if (seq !== applySeq) return;
       if (res?.ok) {
         showStatus(
           buildOkMessage(
-            keepAliveEnabled,
             searchFixerEnabled,
             amazonDeliveryTotalEnabled,
             amazonRankingJumpEnabled,
@@ -1210,7 +1144,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   function collectTtFeatureValues() { return collectInputValues(ttFeatureInputs); }
 
   function buildOkMessage(
-    keepAliveEnabled,
     searchFixerEnabled,
     amazonDeliveryTotalEnabled,
     amazonRankingJumpEnabled,
@@ -1222,7 +1155,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     loupeEnabled
   ) {
     const parts = [];
-    if (keepAliveEnabled) parts.push(i18n("applyOkSession"));
     if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
     if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
     if (amazonRankingJumpEnabled) parts.push(i18n("applyOkAmazonRanking"));
@@ -1234,15 +1166,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (loupeEnabled) parts.push(i18n("applyOkLoupe"));
     if (parts.length === 0) return i18n("applyOkAllStopped");
     return i18n("applyOkPrefix") + parts.join(i18n("applyOkSeparator"));
-  }
-
-  // ----- ヘルパー -----
-  function updateIntervalLabel(min) {
-    $intervalValue.textContent = i18n("intervalUnit", String(min));
-  }
-
-  function updateIntervalRowVisibility() {
-    $intervalRow.classList.toggle("hidden", !$keepAliveToggle.checked);
   }
 
   // ----- 動画ガンマ補正 ヘルパー -----
@@ -1481,13 +1404,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch {
       return null;
     }
-  }
-
-  function clampMinutes(min) {
-    const n = Number(min);
-    if (!Number.isFinite(n)) return DEFAULT_MIN;
-    const ms = KeepAlive.clampIntervalMs(n * KeepAlive.MS_PER_MIN);
-    return Math.round(ms / KeepAlive.MS_PER_MIN);
   }
 
   function showStatus(msg, type) {

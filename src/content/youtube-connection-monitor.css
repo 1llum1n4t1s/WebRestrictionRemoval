@@ -1,0 +1,228 @@
+/*
+ * YouTube ライブ配信の接続モニター HUD
+ *
+ * プレーヤー (#movie_player) 内右上に absolute 配置するオーバーレイ。
+ * ROG クリムゾン + ガンメタル基調背景に半透明黒で動画上にも視認性を確保する。
+ * data-verdict 属性で結論カテゴリに応じたアクセント色を切り替える。
+ *
+ * 動作対象は **`*://*.youtube.com/*` の top frame のみ**。content script から動的に
+ * `<div class="__cpa-cm-overlay">` を inject するため、CSS は always loaded だが
+ * セレクタが他要素に副作用を与えないよう完全名前空間化 (__cpa-cm-) してある。
+ */
+
+.__cpa-cm-overlay {
+  /* 親 (#movie_player) は position:relative なので absolute 配置で右上に出る */
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483646; /* YouTube player 内最上層、ただし ytp 右クリックメニューより 1 低い保険 */
+
+  /* 横幅は内容に追従、ただし最大 280px に頭打ちで動画の邪魔をしない */
+  min-width: 200px;
+  max-width: 280px;
+
+  /* ガンメタル基調背景 + 半透明黒で動画上の視認性確保 */
+  background: linear-gradient(180deg, rgba(20, 22, 26, 0.92), rgba(12, 14, 18, 0.92));
+  color: #f0f0f2;
+  border: 1px solid rgba(184, 8, 40, 0.45);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+
+  /* user-select 抑止 + ドラッグ中のテキスト選択防止 */
+  user-select: none;
+  -webkit-user-select: none;
+
+  /* 動画と完全に被ったときも視線誘導は最低限 (透明度演出は verdict 別で行う) */
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+
+.__cpa-cm-overlay.__cpa-cm-dragging {
+  /* ドラッグ中はトランジション無効化してマウス追従を即時に */
+  transition: none;
+  cursor: grabbing;
+}
+
+/* 折りたたみ状態: detail だけ hidden（metric は常時表示）、handle 高さ縮め */
+.__cpa-cm-overlay.__cpa-cm-collapsed .__cpa-cm-detail {
+  display: none;
+}
+
+/* ハンドル: emoji + verdict ラベル + 折りたたみボタン */
+.__cpa-cm-handle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.__cpa-cm-overlay.__cpa-cm-collapsed .__cpa-cm-handle {
+  border-bottom: none;
+}
+.__cpa-cm-handle:active {
+  cursor: grabbing;
+}
+
+.__cpa-cm-verdict {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.__cpa-cm-collapse-btn {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #b8b8c0;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.__cpa-cm-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f0f0f2;
+}
+.__cpa-cm-overlay.__cpa-cm-collapsed .__cpa-cm-collapse-btn {
+  transform: rotate(-90deg);
+}
+
+/* body: 数値メトリクス + 経路診断 */
+.__cpa-cm-body {
+  padding: 6px 8px 8px;
+}
+
+.__cpa-cm-metric {
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: #d8d8dc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 詳細セクション（▼ 展開時のみ表示） ---------- */
+
+.__cpa-cm-detail {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.__cpa-cm-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.__cpa-cm-detail-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #909098;
+}
+
+.__cpa-cm-detail-value {
+  font-size: 11px;
+  color: #d0d0d6;
+  line-height: 1.4;
+}
+
+.__cpa-cm-detail-empty {
+  color: #707078;
+  font-style: italic;
+}
+
+.__cpa-cm-buffer-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.__cpa-cm-buffer-log li {
+  font-size: 11px;
+  color: #d0d0d6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* verdict 別アクセント色（境界線色 + verdict ラベル色） */
+.__cpa-cm-overlay[data-verdict="stable"] {
+  border-color: rgba(72, 168, 96, 0.55);
+}
+.__cpa-cm-overlay[data-verdict="stable"] .__cpa-cm-verdict {
+  color: #8fd6a3;
+}
+
+.__cpa-cm-overlay[data-verdict="network"] {
+  border-color: rgba(232, 152, 48, 0.65);
+}
+.__cpa-cm-overlay[data-verdict="network"] .__cpa-cm-verdict {
+  color: #ffc878;
+}
+
+.__cpa-cm-overlay[data-verdict="device"] {
+  border-color: rgba(96, 144, 232, 0.65);
+}
+.__cpa-cm-overlay[data-verdict="device"] .__cpa-cm-verdict {
+  color: #94b8ff;
+}
+
+.__cpa-cm-overlay[data-verdict="youtube_cdn"] {
+  border-color: rgba(184, 8, 40, 0.6);
+}
+.__cpa-cm-overlay[data-verdict="youtube_cdn"] .__cpa-cm-verdict {
+  color: #ff7a8a;
+}
+
+.__cpa-cm-overlay[data-verdict="routing"] {
+  border-color: rgba(184, 8, 40, 0.6);
+}
+.__cpa-cm-overlay[data-verdict="routing"] .__cpa-cm-verdict {
+  color: #ffa0ad;
+}
+
+.__cpa-cm-overlay[data-verdict="international"] {
+  border-color: rgba(168, 96, 208, 0.6);
+}
+.__cpa-cm-overlay[data-verdict="international"] .__cpa-cm-verdict {
+  color: #d8a0ff;
+}
+
+.__cpa-cm-overlay[data-verdict="unknown"] {
+  border-color: rgba(120, 120, 130, 0.5);
+}
+.__cpa-cm-overlay[data-verdict="unknown"] .__cpa-cm-verdict {
+  color: #b0b0b8;
+}
+
+/* 高 DPI / フルスクリーン時もそのまま機能。フルスクリーンに入ると movie_player 自体が
+   :fullscreen 疑似クラスでフルスクリーンになるため overlay も追従して右上に出る */
+:fullscreen .__cpa-cm-overlay,
+:-webkit-full-screen .__cpa-cm-overlay {
+  top: 24px;
+  right: 24px;
+}

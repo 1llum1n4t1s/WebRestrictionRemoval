@@ -7,7 +7,6 @@
  *
  * 対象:
  *   - VolumeBooster: clampValue / percentToGain / gainToPercent / sliderPositionToPercent / percentToSliderPosition
- *   - KeepAlive: clampIntervalMs
  *   - SearchFixer: clampGridItems / mergeFeatures
  *   - InstagramCleaner: mergeFeatures
  *   - ColorPicker: isValidFormat / normalizeFormat
@@ -301,23 +300,6 @@ test("StorageKeys.LOUPE_* が 3 キー揃っている", () => {
   assert.equal(G.StorageKeys.LOUPE_SIZE, "loupeSize");
 });
 
-// ---------- KeepAlive ----------
-
-test("KeepAlive.clampIntervalMs: 範囲内・範囲外・不正値の正規化", () => {
-  const mid = (G.KeepAlive.MIN_INTERVAL_MS + G.KeepAlive.MAX_INTERVAL_MS) / 2;
-  assert.equal(G.KeepAlive.clampIntervalMs(mid), mid);
-  assert.equal(G.KeepAlive.clampIntervalMs(0), G.KeepAlive.MIN_INTERVAL_MS);
-  assert.equal(G.KeepAlive.clampIntervalMs(-100), G.KeepAlive.MIN_INTERVAL_MS);
-  assert.equal(
-    G.KeepAlive.clampIntervalMs(G.KeepAlive.MAX_INTERVAL_MS * 10),
-    G.KeepAlive.MAX_INTERVAL_MS
-  );
-  assert.equal(G.KeepAlive.clampIntervalMs(NaN), G.KeepAlive.DEFAULT_INTERVAL_MS);
-  assert.equal(G.KeepAlive.clampIntervalMs("abc"), G.KeepAlive.DEFAULT_INTERVAL_MS);
-  assert.equal(G.KeepAlive.clampIntervalMs(undefined), G.KeepAlive.DEFAULT_INTERVAL_MS);
-});
-
-
 // ---------- SearchFixer ----------
 
 test("SearchFixer.clampGridItems: 0/4/5/6 のみ受理", () => {
@@ -588,7 +570,6 @@ test("actions.js は globalThis に 21 個の定数を公開する", () => {
     "SenderCheck",
     "Offscreen",
     "StorageKeys",
-    "KeepAlive",
     "YouTubeShorts",
     "SearchFixer",
     "AmazonDeliveryTotal",
@@ -601,6 +582,7 @@ test("actions.js は globalThis に 21 個の定数を公開する", () => {
     "VideoGamma",
     "VideoFill",
     "Loupe",
+    "ConnectionMonitor",
     "ColorPicker",
     "PopupTabs",
   ];
@@ -778,14 +760,11 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 30, "SearchFixer.FEATURES は 30 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 31, "SearchFixer.FEATURES は 31 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 11, "InstagramCleaner.FEATURES は 11 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });
 
-// /rere レビュー B3-006 修正: RTX_ENHANCER_ENABLED storage key と APPLY_RTX_ENHANCER_CS
-// アクションの drift 検知。actions.js への追加漏れ + popup / background / content script の
-// 配線漏れ（A2-001 で発覚した normalizeSettings 漏れと同型）を CI で検知できる単一情報源。
 // /rere レビュー B1-002 修正: SettingsSchema が StorageKeys / Actions と整合していることを検証。
 // 新機能追加時に SettingsSchema への追加忘れ / storageKey 不一致 / applyAction 不一致を CI 検知する。
 // A2-001 (RTX 機能完全破壊バグ) と同型の drift を再発防止するための単一情報源。
@@ -805,7 +784,6 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
   // 件数 drift 検知: 主要機能の field が SettingsSchema に揃っていることを確認
   const fields = new Set(G.SettingsSchema.map((e) => e.field));
   for (const required of [
-    "keepAliveEnabled",
     "searchFixerEnabled",
     "amazonDeliveryTotalEnabled",
     "amazonRankingJumpEnabled",
@@ -815,9 +793,12 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
     "videoGammaEnabled",
     "videoFillEnabled",
     "loupeEnabled",
-    "rtxEnhancerEnabled",
   ]) {
     assert.ok(fields.has(required), `SettingsSchema に "${required}" field が存在する必要がある`);
+  }
+  // セッション維持と RTX 動画強化は v1.0.x で完全撤去されたため、SettingsSchema からも除去済み。
+  for (const removed of ["keepAliveEnabled", "keepAliveIntervalMs", "keepAliveHttpPingEnabled", "rtxEnhancerEnabled"]) {
+    assert.ok(!fields.has(removed), `SettingsSchema から "${removed}" field は撤去されているはず`);
   }
 });
 
@@ -916,17 +897,202 @@ test("ImageDownloader.isAllowedFetchUrl: cdninstagram.com は scontent- prefix �
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://attacker.cdninstagram.com/exfil"), false);
 });
 
-test("StorageKeys.RTX_ENHANCER_ENABLED + Actions.APPLY_RTX_ENHANCER_CS が定義されている", () => {
-  // storage key のキー名は popup / background / content script 全てから参照されるため
-  // 文字列値も固定する（drift = 機能死活）。
-  assert.equal(typeof G.StorageKeys.RTX_ENHANCER_ENABLED, "string");
-  assert.equal(G.StorageKeys.RTX_ENHANCER_ENABLED, "rtxEnhancerEnabled");
-  // background → content script の配信 message も固定。
-  assert.equal(typeof G.Actions.APPLY_RTX_ENHANCER_CS, "string");
-  assert.ok(
-    G.Actions.APPLY_RTX_ENHANCER_CS.length > 0,
-    "Actions.APPLY_RTX_ENHANCER_CS は空文字列であってはならない"
+// 接続モニターは YouTube クリーナーのサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
+// 独立 storage key / action は持たず、SearchFixer.FEATURES の watch_page カテゴリに存在することと、
+// 旧独立キーが完全に撤去されていることを drift 検知する（再導入の事故を CI で防ぐ）。
+test("接続モニターは SearchFixer.FEATURES の connectionMonitor サブ機能に統合されている", () => {
+  const cm = G.SearchFixer.FEATURES.find((f) => f.key === "connectionMonitor");
+  assert.ok(cm, "SearchFixer.FEATURES に connectionMonitor が存在する必要がある");
+  assert.equal(cm.category, "watch_page", "connectionMonitor は watch_page カテゴリ");
+  // mergeFeatures が未設定時に false を埋めることを確認（オプトイン保証）
+  assert.equal(G.SearchFixer.mergeFeatures({}).connectionMonitor, false);
+  assert.equal(G.SearchFixer.mergeFeatures({ connectionMonitor: true }).connectionMonitor, true);
+  // 旧独立 master トグルの痕跡が actions.js から完全撤去されていること
+  assert.equal(G.StorageKeys.CONNECTION_MONITOR_ENABLED, undefined, "旧 storage key は撤去済みのはず");
+  assert.equal(G.Actions.APPLY_CONNECTION_MONITOR_CS, undefined, "旧 action は撤去済みのはず");
+  // ConnectionMonitor namespace（純粋ロジック）は引き続き公開されている
+  assert.equal(typeof G.ConnectionMonitor.classify, "function");
+});
+
+// ConnectionMonitor.median: 集計の中央値計算が正しく動くこと（baseline 計算で使う純粋関数）。
+test("ConnectionMonitor.median: 奇数 / 偶数 / 不正値混入 / 空配列の境界値", () => {
+  const M = G.ConnectionMonitor.median;
+  // 奇数個 → 中央値そのもの
+  assert.equal(M([1, 2, 3]), 2);
+  assert.equal(M([5]), 5);
+  // 偶数個 → 中央 2 値の平均
+  assert.equal(M([1, 2, 3, 4]), 2.5);
+  // 順不同でもソートして計算
+  assert.equal(M([10, 2, 7, 1]), 4.5);
+  // 不正値（NaN / Infinity / null / string）は除外して計算
+  assert.equal(M([1, NaN, 2, Infinity, "x", 3]), 2);
+  // 全部不正値 → null
+  assert.equal(M([NaN, undefined, null]), null);
+  // 空配列 → null
+  assert.equal(M([]), null);
+  // 非配列 → null
+  assert.equal(M(null), null);
+  assert.equal(M(undefined), null);
+  assert.equal(M("not array"), null);
+});
+
+// ConnectionMonitor.classify: ヒューリスティクス分岐の境界値テスト。
+// ライブ視聴中のクルクル要因を切り分けるロジックそのものなので、回帰防止が最重要。
+test("ConnectionMonitor.classify: バッファ 0 回 → STABLE", () => {
+  const C = G.ConnectionMonitor;
+  assert.equal(C.classify({ bufferingCountRecent: 0 }), C.VERDICT.STABLE);
+  // 他フィールドが充実していても 0 回なら STABLE
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 0,
+      downlinkBaseline: 25,
+      downlinkDuringBuffering: 1,
+      droppedFramesRatio: 0.9,
+      googleRttMedian: 500,
+      cloudflareRttMedian: 500,
+    }),
+    C.VERDICT.STABLE
   );
+});
+
+test("ConnectionMonitor.classify: buffering 中の downlink が 50% 以下 → NETWORK", () => {
+  const C = G.ConnectionMonitor;
+  // baseline 25Mbps の 50% (12.5) 以下なら NETWORK
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 3,
+      downlinkBaseline: 25,
+      downlinkDuringBuffering: 8,
+    }),
+    C.VERDICT.NETWORK
+  );
+  // ぴったり 50% 境界も NETWORK 判定
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 1,
+      downlinkBaseline: 20,
+      downlinkDuringBuffering: 10,
+    }),
+    C.VERDICT.NETWORK
+  );
+  // 50% より少し上 → 経路診断 fallback で YOUTUBE_CDN (両 RTT 不明時)
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 1,
+      downlinkBaseline: 20,
+      downlinkDuringBuffering: 11,
+    }),
+    C.VERDICT.YOUTUBE_CDN
+  );
+});
+
+test("ConnectionMonitor.classify: dropped frames 比率 30% 以上 → DEVICE", () => {
+  const C = G.ConnectionMonitor;
+  // baseline 帯域が落ちていない + dropped 比率高 → DEVICE
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 2,
+      downlinkBaseline: 25,
+      downlinkDuringBuffering: 24,
+      droppedFramesRatio: 0.4,
+    }),
+    C.VERDICT.DEVICE
+  );
+  // ぴったり 30% 境界も DEVICE
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 1,
+      downlinkBaseline: 25,
+      downlinkDuringBuffering: 25,
+      droppedFramesRatio: 0.3,
+    }),
+    C.VERDICT.DEVICE
+  );
+});
+
+test("ConnectionMonitor.classify: 経路診断による細分化（YOUTUBE_CDN / ROUTING / INTERNATIONAL）", () => {
+  const C = G.ConnectionMonitor;
+  // Google と CF どちらも快適 (< 100ms) → YouTube CDN 個別不調
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 2,
+      googleRttMedian: 80,
+      cloudflareRttMedian: 60,
+    }),
+    C.VERDICT.YOUTUBE_CDN
+  );
+  // Google だけ異常 (> 200ms) かつ CF 快適 → Google エッジ / ルーティング
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 2,
+      googleRttMedian: 350,
+      cloudflareRttMedian: 50,
+    }),
+    C.VERDICT.ROUTING
+  );
+  // 両方異常 → 国際線 / 中継 ISP 経路遅延
+  assert.equal(
+    C.classify({
+      bufferingCountRecent: 2,
+      googleRttMedian: 350,
+      cloudflareRttMedian: 280,
+    }),
+    C.VERDICT.INTERNATIONAL
+  );
+  // RTT 情報がない場合 → YOUTUBE_CDN (fallback)
+  assert.equal(
+    C.classify({ bufferingCountRecent: 2 }),
+    C.VERDICT.YOUTUBE_CDN
+  );
+});
+
+test("ConnectionMonitor.classify: 不正入力は UNKNOWN", () => {
+  const C = G.ConnectionMonitor;
+  assert.equal(C.classify(null), C.VERDICT.UNKNOWN);
+  assert.equal(C.classify(undefined), C.VERDICT.UNKNOWN);
+  assert.equal(C.classify("garbage"), C.VERDICT.UNKNOWN);
+});
+
+test("ConnectionMonitor.VERDICT: 7 種類の識別子が全て string + 固定値", () => {
+  const V = G.ConnectionMonitor.VERDICT;
+  // メッセージキー対応 + i18n 側で固定文字列依存しているので値も固定する
+  assert.equal(V.STABLE, "stable");
+  assert.equal(V.NETWORK, "network");
+  assert.equal(V.DEVICE, "device");
+  assert.equal(V.YOUTUBE_CDN, "youtube_cdn");
+  assert.equal(V.ROUTING, "routing");
+  assert.equal(V.INTERNATIONAL, "international");
+  assert.equal(V.UNKNOWN, "unknown");
+});
+
+test("ConnectionMonitor: 経路診断 endpoint は generate_204 / speed.cloudflare.com の HTTPS 固定", () => {
+  // セキュリティ + プライバシー上のクリティカル設定。
+  // ローカル endpoint や任意ドメインへの fetch に書き換わったら CI で気付ける。
+  // Cloudflare は 1.1.1.1 直 IP がブロックされる環境があるため speed.cloudflare.com の公式 speedtest endpoint を使用
+  assert.equal(G.ConnectionMonitor.ENDPOINT_GOOGLE, "https://www.gstatic.com/generate_204");
+  assert.equal(G.ConnectionMonitor.ENDPOINT_CLOUDFLARE, "https://speed.cloudflare.com/__down?bytes=10");
+});
+
+test("ConnectionMonitor: 動画 chunk 実 throughput 計測の閾値定数が定義されている", () => {
+  // navigator.connection.downlink (bucket 化された粗い見積もり) ではなく PerformanceObserver で
+  // googlevideo.com の transferSize / download 時間から実測 throughput を取る仕様。
+  // 小さい chunk は warmup overhead 支配で無意味なため VIDEO_CHUNK_MIN_BYTES で除外する。
+  assert.equal(typeof G.ConnectionMonitor.VIDEO_CHUNK_MIN_BYTES, "number");
+  assert.ok(G.ConnectionMonitor.VIDEO_CHUNK_MIN_BYTES > 0, "VIDEO_CHUNK_MIN_BYTES は正の数");
+  assert.equal(typeof G.ConnectionMonitor.VIDEO_THROUGHPUT_WINDOW_MS, "number");
+  assert.ok(G.ConnectionMonitor.VIDEO_THROUGHPUT_WINDOW_MS > 0, "VIDEO_THROUGHPUT_WINDOW_MS は正の数");
+});
+
+// セッション維持と RTX 動画強化は v1.0.x で完全撤去された。actions.js から関連定数・KeepAlive 名前空間が
+// 完全に消えていることを drift 検知し、再導入の事故を CI で防ぐ（撤去残骸の文字列が紛れ込んでも assert で落ちる）。
+test("セッション維持 / RTX 動画強化は actions.js から完全撤去されている", () => {
+  assert.equal(G.StorageKeys.KEEP_ALIVE_ENABLED, undefined, "旧 keepAlive storage key は撤去済み");
+  assert.equal(G.StorageKeys.KEEP_ALIVE_INTERVAL_MS, undefined, "旧 keepAlive 間隔キーは撤去済み");
+  assert.equal(G.StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED, undefined, "旧 keepAlive HTTP ping キーは撤去済み");
+  assert.equal(G.StorageKeys.RTX_ENHANCER_ENABLED, undefined, "旧 RTX storage key は撤去済み");
+  assert.equal(G.Actions.APPLY_KEEP_ALIVE_CS, undefined, "旧 APPLY_KEEP_ALIVE_CS action は撤去済み");
+  assert.equal(G.Actions.APPLY_RTX_ENHANCER_CS, undefined, "旧 APPLY_RTX_ENHANCER_CS action は撤去済み");
+  assert.equal(G.KeepAlive, undefined, "KeepAlive 名前空間自体が globalThis から撤去済み");
 });
 
 // Amazon ランキング移動ボタンの storage key / action の drift 検知（機能死活の単一情報源）。

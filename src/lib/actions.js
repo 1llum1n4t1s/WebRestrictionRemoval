@@ -26,8 +26,6 @@ const Actions = Object.freeze({
   APPLY_AMAZON_RANKING_JUMP_CS: "applyAmazonRankingJumpCS",
   /** background → Amazon 販売元・出荷元バッジ content script: バッジ表示の有効/無効を反映 */
   APPLY_AMAZON_MERCHANT_INFO_CS: "applyAmazonMerchantInfoCS",
-  /** background → keepalive content script: セッション維持設定を反映 */
-  APPLY_KEEP_ALIVE_CS: "applyKeepAliveCS",
   /** background → Instagram content script: Instagram クリーナー設定を反映 */
   APPLY_INSTAGRAM_CLEANER_CS: "applyInstagramCleanerCS",
   /** background → TikTok content script: TikTok クリーナー設定を反映 */
@@ -38,8 +36,8 @@ const Actions = Object.freeze({
   APPLY_VIDEO_FILL_CS: "applyVideoFillCS",
   /** background → loupe content script: ルーペ機能の有効/無効を反映 */
   APPLY_LOUPE_CS: "applyLoupeCS",
-  /** background → rtx-enhancer content script: NVIDIA RTX Super Resolution 補助の有効/無効を反映 */
-  APPLY_RTX_ENHANCER_CS: "applyRtxEnhancerCS",
+  // 接続モニターは YouTube クリーナーのサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
+  // 独自 action は持たず APPLY_SEARCH_FIXER_CS を購読する (youtube-shorts.js と同方式)。
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
   /** popup → background: 指定タブのブーストを解放（スライダー 100% 復帰時） */
@@ -107,14 +105,6 @@ const Offscreen = Object.freeze({
 
 /** @readonly ストレージキー */
 const StorageKeys = Object.freeze({
-  /** セッション維持機能の有効/無効 */
-  KEEP_ALIVE_ENABLED: "keepAliveEnabled",
-  /** セッション維持のポーリング間隔（ミリ秒） */
-  KEEP_ALIVE_INTERVAL_MS: "keepAliveIntervalMs",
-  /** セッション維持の HTTP ping 機能の有効/無効（オプトイン・デフォルト OFF）。
-   *  master が ON でもこれが OFF のときは合成イベント dispatch のみ行い HTTP ping は出さない。
-   *  認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発するのを避ける用途。 */
-  KEEP_ALIVE_HTTP_PING_ENABLED: "keepAliveHttpPingEnabled",
   /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 30 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
@@ -151,12 +141,8 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_MUTED_ENABLED: "volumeBoosterMutedEnabled",
   /** 動画ガンマ補正: マスタートグル（OFF 時は SVG filter 一切注入せず completely no-op） */
   VIDEO_GAMMA_ENABLED: "videoGammaEnabled",
-  /** RTX 動画強化: マスタートグル（OFF 時は hint オーバーレイ要素を一切 inject せず completely no-op、オプトイン）。
-   *  動画ストリーミング配信中に GPU の Super Resolution / 高画質補正処理を GPU ドライバが認識しやすくするため、
-   *  <video> 要素を含むページに極小の透明 hint 要素を挿入する独自実装。NVIDIA RTX Super Resolution / AMD FidelityFX
-   *  などのドライバ側機能が対象だが、本拡張機能はあくまでブラウザ側の hint inject のみで、ドライバ機能の有効化は
-   *  GPU 側の設定 (NVIDIA Control Panel など) に依存する。 */
-  RTX_ENHANCER_ENABLED: "rtxEnhancerEnabled",
+  // 接続モニターは独立 storage key を持たず、YouTube クリーナーの searchFixerFeatures.connectionMonitor
+  // サブ機能として searchFixerEnabled (master) AND で制御する (Shorts 5 サブ機能と同じ統合方式)。
   /** 動画ガンマ補正: ガンマ値（VideoGamma.MIN..MAX、デフォルト 1.0 = 補正なし） */
   VIDEO_GAMMA_VALUE: "videoGammaValue",
   /** 動画黒帯除去: マスタートグル（OFF または拡大率 1.0 のとき style 一切注入せず completely no-op、オプトイン） */
@@ -184,30 +170,6 @@ const StorageKeys = Object.freeze({
    *  `chrome.storage.local` が破損・リセットされた可能性として開発者コンソールに警告を出す（#3）。
    *  接頭辞 "_" でユーザー向け設定キーと区別する。 */
   INSTALL_SENTINEL: "_installSentinel",
-});
-
-/** @readonly セッション維持機能の定数 */
-const KeepAlive = Object.freeze({
-  MS_PER_MIN: 60_000,
-  /** デフォルトのポーリング間隔（4分） */
-  DEFAULT_INTERVAL_MS: 4 * 60 * 1000,
-  MIN_INTERVAL_MS: 1 * 60 * 1000,
-  MAX_INTERVAL_MS: 15 * 60 * 1000,
-  /** SharePoint 等のサイトプリセット（同一オリジン GET 用） */
-  PRESET_ENDPOINTS: Object.freeze([
-    Object.freeze({
-      name: "SharePoint",
-      test: (hostname) =>
-        /(^|\.)sharepoint\.(com|cn|de|us)$/i.test(hostname),
-      paths: Object.freeze(["/_api/web"]),
-    }),
-  ]),
-  clampIntervalMs(ms) {
-    if (!Number.isFinite(ms)) return KeepAlive.DEFAULT_INTERVAL_MS;
-    if (ms < KeepAlive.MIN_INTERVAL_MS) return KeepAlive.MIN_INTERVAL_MS;
-    if (ms > KeepAlive.MAX_INTERVAL_MS) return KeepAlive.MAX_INTERVAL_MS;
-    return ms;
-  },
 });
 
 /**
@@ -308,6 +270,10 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({ key: "highlightThumb", category: "search_only" }),
   Object.freeze({ key: "hideComments", category: "watch_page" }),
   Object.freeze({ key: "hideLiveChat", category: "watch_page" }),
+  // 接続モニター: ライブ配信視聴中のクルクル要因を切り分ける in-player HUD。
+  // 拡張機能内で唯一の外部 fetch（Google generate_204 / Cloudflare cdn-cgi/trace への RTT 計測のみ）。
+  // 実装は専用 content script youtube-connection-monitor.js（純粋ロジックは ConnectionMonitor namespace）。
+  Object.freeze({ key: "connectionMonitor", category: "watch_page" }),
   Object.freeze({ key: "redirectShortsUrl", category: "watch_page" }),
   Object.freeze({ key: "searchGrid", category: "search_only" }),
   Object.freeze({ key: "removeShortsChip", category: "search_only" }),
@@ -1012,22 +978,34 @@ const VolumeBooster = Object.freeze({
    * 自動音量正規化: RMS の指数移動平均 (EMA) 係数。0〜1、小さいほど平滑。
    * tick ごとの瞬間 RMS をそのまま使うと「うるさい/小さい動画でも targetGain がほぼ 1 に丸まる」
    * (効かない) ため、複数 tick を EMA で累積して動画全体のラウドネスを安定推定する。
-   * 0.3 = 1 tick で 30% 反映、約 4〜5 tick (1.6〜2.0s) で大勢が決まる。
+   * 0.5 = 1 tick で 50% 反映、約 2〜3 tick (0.8〜1.2s) で大勢が決まる。
+   * (0.3 → 0.5 に引き上げ: 場面切替時の追従が遅すぎて「効かない」体感の主因の 1 つだった
+   *  ため、平滑化と応答速度のバランスを応答側に寄せる。fftSize=4096 (~85ms 窓) で十分長く
+   *  瞬間揺れは既に窓内で平均化済みなので、α 引き上げによる揺れ再発リスクは低い。)
    */
-  NORMALIZE_RMS_SMOOTHING: 0.3,
+  NORMALIZE_RMS_SMOOTHING: 0.5,
   /**
    * 自動音量正規化: これ未満は無音/ノイズ扱いにして増幅しない。
    * BGM + 喋りの動画で「言葉と言葉の隙間に残る BGM」も無音側に倒すため、-50 → -38 に上げて
    * gate を強めにかける。-50 だと隙間 BGM の RMS でも有効音判定 → 目標 -24dB まで持ち上げる
    * → 喋り出した瞬間に下げる、というポンピングが発生していた。
+   *
+   * 判定は **瞬間 rms と平滑値 smoothedRms の二重判定** (audio-pipeline.js tickLoudnessNormalizer)
+   * で両方が gate 下のときだけ無音復帰する。瞬間 rms 単独だと「ON にして boost 到達 → 瞬間 rms が
+   * gate を一瞬下回って force UNITY → 即下がる」の silence gate 跨ぎチャタリングが起きていた。
+   * 二重判定により、通常音声中のディップは smoothedRms が gate 上なのでスキップしない。
    */
   NORMALIZE_SILENCE_GATE_DB: -38,
   /**
    * 自動音量正規化: 小さい音源を持ち上げる最大量。
-   * +12dB (4倍ブースト) まで持ち上げて、YouTube 側スライダーで音量を 25% に下げても元の音量に戻せるようにする。
+   * +18dB (約 8 倍ブースト) まで持ち上げて、入力 RMS -42 dBFS の小音源（個人録音 / 古い動画 /
+   * ASMR / ambient）でも target -24 dBFS に到達できるようにする。後段の antiClipNode (-3 dBFS
+   * hard limiter / ratio 12) でクリップは構造的に防がれるため、上限拡大しても破綻しない。
    * 過剰持ち上げによる環境ノイズの増幅は dead zone と silence gate (-38 dB) で抑制する設計。
+   * (12 → 18 に拡大: +12dB だと入力 -36 dBFS 未満で target 未達のまま頭打ちで「効かない」
+   *  体感の主因だったため、カバー範囲を -36 → -42 dBFS まで広げる。)
    */
-  NORMALIZE_MAX_GAIN_DB: 12,
+  NORMALIZE_MAX_GAIN_DB: 18,
   /** 自動音量正規化: 大きい音源を下げる最大量。 */
   NORMALIZE_MIN_GAIN_DB: -12,
   /**
@@ -1044,12 +1022,18 @@ const VolumeBooster = Object.freeze({
   NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 3.0,
   /**
    * 自動音量正規化: 音が小さいときに上げる追従速度。
-   * 6.0s ≒ 3τ で 18 秒で 95% 到達。動画ごとの音量差をゆっくり揃えつつ、
-   * 言葉の隙間（数百 ms オーダー）では実質ノーリアクションで BGM のうねりを抑える設計。
-   * DOWN (3.0s) より遅く設定することで、句末 BGM の立ち上がりよりは緩やかに上げる。
-   * (4.0s → 6.0s に延長: ゆろさん要望 2026-06-04)
+   * 2.5s ≒ 3τ で 7.5 秒で 95% 到達 (1τ=2.5s で 63% 到達、+6dB ジャンプなら 1 秒で +2.2dB)。
+   * UP < DOWN の非対称 (UP fast / DOWN slow) は業界 AGC (Orban Optimod / TC LM6 等) の classic
+   * 配置と整合。「素早く適切音量に到達 + 急な大音量からはゆっくり守る」リスニング安全方針。
+   * 言葉の隙間や瞬間的な小音量ピットでの過剰反応は前段の EMA (α=0.5, ~1s 平滑) + dead zone (2dB)
+   * + silence gate (-38dB) の 3 段防御で抑制し、ramp 短縮による「ramp 自体のポンピング再発」は
+   * 構造的に起きない設計。
+   * (6.0s → 2.5s に短縮: 6.0s だと 3τ=18 秒で 95% 到達、EMA との直列で実時間 ~20 秒となり、
+   *  ショート動画 / シーン切替 / CM 入りに「反応中に次の音源に変わる」状態だった。v1.0.38 の
+   *  延長判断は揺れ抑制狙いだったが、揺れ抑制の責務は v1.0.38 で導入した EMA に既に移譲済みで、
+   *  ramp の遅さは不要だった。)
    */
-  NORMALIZE_GAIN_UP_TIME_CONSTANT: 6.0,
+  NORMALIZE_GAIN_UP_TIME_CONSTANT: 2.5,
   /**
    * 自動音量正規化: ヒステリシス（dead zone）。目標ゲインと現在ターゲットの差がこの dB 値
    * 未満ならゲイン更新をスキップし、細かい RMS 揺れによるポンピングを抑える。
@@ -1434,6 +1418,186 @@ const Loupe = Object.freeze({
 });
 
 /**
+ * @readonly YouTube ライブ配信の接続モニター（独自実装）の定数。
+ *
+ * ライブ視聴中に「クルクル（バッファリング）の原因」を切り分けて表示する HUD 機能。
+ * `*://*.youtube.com/*` の watch / live ページ top frame のみで動作し、`<video>.duration === Infinity`
+ * のときだけ計測ループとオーバーレイを起動する（通常動画では一切介入しない）。
+ *
+ * ## 計測ソース（クライアントサイドのみ・外部送信なし）
+ *   - `<video>.getVideoPlaybackQuality()` → droppedVideoFrames / totalVideoFrames（PC 性能切り分け）
+ *   - `<video>` の `waiting` / `playing` イベント → バッファリング開始 / 終了のピンポイント検知
+ *   - `<video>.buffered` / `currentTime` → 先読みバッファ秒数
+ *   - `navigator.connection` → downlink (Mbps) / rtt (ms) / effectiveType（回線品質）
+ *
+ * ## 経路診断（公開無認証 endpoint への RTT 計測のみ・個人特定情報なし）
+ *   - Google 側 RTT: `https://www.gstatic.com/generate_204` (Google が ChromeOS/Android 接続確認用に
+ *     公開している 204 No Content endpoint、no-cors + GET で軽量)
+ *   - Cloudflare 側 RTT: `https://speed.cloudflare.com/__down?bytes=10` (Cloudflare 公式 speedtest endpoint。
+ *     初期実装の `https://1.1.1.1/cdn-cgi/trace` は ISP / 企業 firewall / OS DNS 設定によって 1.1.1.1 への
+ *     直 IP HTTPS アクセスがブロックされる環境が一定数あり、実機実測で TypeError 連発を確認したため変更。
+ *     `speed.cloudflare.com` は HTTPS でドメイン解決経由、地理的に近い Cloudflare エッジへ確実に到達する)
+ *   - 両者は **代表 CDN への到達時間** を比較対照する目的で固定。例えば Google だけ遅ければ
+ *     YouTube CDN/Google エッジ側の不調、両方遅ければ国際線/中継 ISP 経路の遅延と推定する。
+ *   - fetch は `mode:"no-cors"` + `credentials:"omit"` + `referrerPolicy:"no-referrer"` で
+ *     クロスオリジン Cookie 送信ゼロ・リファラ送信ゼロを保証する。
+ *
+ * ## 判定ヒューリスティクス（直近 30 秒の中央値ベース）
+ *   - buffering 発生時 downlink が baseline の `DOWNLINK_DROP_RATIO` 以下 → **回線が原因**
+ *   - dropped frames 増分が `DROPPED_FRAME_RATIO` 以上 → **PC 性能が原因**
+ *   - 両方該当しない場合は経路診断:
+ *       - Google も Cloudflare も < `RTT_GOOD_MS` → **YouTube CDN 個別不調**
+ *       - Google だけ > `RTT_BAD_MS` → **Google エッジ / ルーティング異常**
+ *       - 両方 > `RTT_BAD_MS` → **国際線 / 中継 ISP 経由の遅延**
+ *   - 直近 1 分間 buffering 0 回 → **安定**
+ *
+ * ## 動作対象 / 設計上の不変条件
+ *   - master OFF / 非 YouTube / 非ライブ / orphan 化のいずれかで HUD・タイマー・listener を完全撤去
+ *   - top frame 限定（埋め込みプレイヤーには介入しない）
+ *   - VERDICT 値は popup / content script の表示分岐キーに使う固定文字列（i18n キーへのマッピングは
+ *     content script 側で行う、ここでは識別子のみ）
+ */
+const ConnectionMonitor = Object.freeze({
+  /** メイン計測タイマー間隔（video 状態 + Network Information API スナップショット） */
+  SAMPLE_INTERVAL_MS: 1000,
+  /** 経路診断タイマー間隔（generate_204 + speed.cloudflare.com への fetch RTT 計測） */
+  DIAGNOSIS_INTERVAL_MS: 5000,
+  /** メイン計測の ring buffer サイズ（直近 30 秒分） */
+  RING_BUFFER_SIZE: 30,
+  /** 経路診断の ring buffer サイズ（直近 6 サンプル ≒ 30 秒の中央値判定用） */
+  DIAGNOSIS_BUFFER_SIZE: 6,
+  /** 経路診断 fetch の timeout（DIAGNOSIS_INTERVAL_MS 未満に抑えて重複発射を防ぐ） */
+  ENDPOINT_TIMEOUT_MS: 4500,
+  /** 経路診断: Google 側 endpoint（204 No Content を返す軽量診断 URL） */
+  ENDPOINT_GOOGLE: "https://www.gstatic.com/generate_204",
+  /** 経路診断: Cloudflare 側 endpoint（Cloudflare 公式 speedtest 用、bytes=10 で最小ペイロード）。
+   * 1.1.1.1 直 IP / cdn-cgi/trace パスは ISP / firewall でブロックされる環境があるため speed.cloudflare.com に変更 */
+  ENDPOINT_CLOUDFLARE: "https://speed.cloudflare.com/__down?bytes=10",
+
+  /** baseline 帯域中央値に対するこの比率以下なら「回線が原因」と判定する閾値（0.5 = 50%） */
+  DOWNLINK_DROP_RATIO: 0.5,
+  /** 直近サンプル間の dropped frames 増分 / 総フレームがこの比率以上なら「PC 性能不足」と判定する閾値（0.3 = 30%） */
+  DROPPED_FRAME_RATIO: 0.3,
+  /** RTT がこの値未満なら「高速」扱い（経路診断ロジック用） */
+  RTT_GOOD_MS: 100,
+  /** RTT がこの値超過なら「異常」扱い（経路診断ロジック用） */
+  RTT_BAD_MS: 200,
+  /** 「直近 N 分の buffering 回数」を集計するウィンドウ */
+  BUFFERING_WINDOW_MS: 60_000,
+
+  /** HUD の最小描画間隔（mousemove や value 微変動で再描画しすぎないように間引く） */
+  RENDER_THROTTLE_MS: 250,
+
+  /** バッファリングイベントを「直近」として扱う期間。BUFFERING_WINDOW_MS と同じ */
+  EVENT_RETENTION_MS: 60_000,
+
+  /**
+   * 動画 chunk の実 throughput 計測の最小バイト数。これ未満の chunk は warmup overhead が支配して
+   * throughput 指標として無意味なので除外する（manifest / 末尾 segment / range-request の小片など）。
+   * 50KB なら ~1 秒分の audio chunk より大きく、video chunk として意味ある粒度。
+   */
+  VIDEO_CHUNK_MIN_BYTES: 50_000,
+
+  /** 実 throughput サンプルの保持ウィンドウ（60 秒で min/avg/max を計算） */
+  VIDEO_THROUGHPUT_WINDOW_MS: 60_000,
+
+  /**
+   * 結論識別子（popup / content script の表示分岐用）。i18n メッセージキーへのマッピングは
+   * content script 側で `cm_verdict_<id>_label` のような prefix で行う設計。
+   */
+  VERDICT: Object.freeze({
+    STABLE: "stable",
+    NETWORK: "network",
+    DEVICE: "device",
+    YOUTUBE_CDN: "youtube_cdn",
+    ROUTING: "routing",
+    INTERNATIONAL: "international",
+    UNKNOWN: "unknown",
+  }),
+
+  /** オーバーレイ位置（ドラッグで動かしたあとの座標）の localStorage キー */
+  LS_KEY_OVERLAY_POS: "__cpa_cm_overlay_pos",
+  /** オーバーレイ折りたたみ状態の localStorage キー */
+  LS_KEY_OVERLAY_COLLAPSED: "__cpa_cm_overlay_collapsed",
+
+  /**
+   * 数値列の中央値（不正値・空配列で null を返す純粋関数）。
+   * baseline 計算 / RTT サンプル集約に使う。
+   */
+  median(values) {
+    if (!Array.isArray(values)) return null;
+    const xs = values.filter((v) => Number.isFinite(v));
+    if (xs.length === 0) return null;
+    const sorted = xs.slice().sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  },
+
+  /**
+   * 状態スナップショットを判定識別子に変換する純粋関数。
+   *
+   * @param {object} input
+   *   - bufferingCountRecent: 直近 BUFFERING_WINDOW_MS の buffering 回数
+   *   - downlinkBaseline: 直近 baseline downlink 中央値 (Mbps、null 許容)
+   *   - downlinkDuringBuffering: buffering 発生時の downlink 中央値 (Mbps、null 許容)
+   *   - droppedFramesRatio: 直近の dropped/total フレーム比 (0..1、null 許容)
+   *   - googleRttMedian: Google 診断 endpoint の RTT 中央値 (ms、null 許容)
+   *   - cloudflareRttMedian: Cloudflare 診断 endpoint の RTT 中央値 (ms、null 許容)
+   * @returns {string} VERDICT.* の値
+   */
+  classify(input) {
+    if (!input || typeof input !== "object") return ConnectionMonitor.VERDICT.UNKNOWN;
+    const {
+      bufferingCountRecent = 0,
+      downlinkBaseline = null,
+      downlinkDuringBuffering = null,
+      droppedFramesRatio = null,
+      googleRttMedian = null,
+      cloudflareRttMedian = null,
+    } = input;
+
+    // バッファリング 0 回 → 安定
+    if (bufferingCountRecent === 0) return ConnectionMonitor.VERDICT.STABLE;
+
+    // 回線が原因: buffering 発生時の downlink が baseline の 50% 以下
+    if (
+      Number.isFinite(downlinkBaseline) &&
+      Number.isFinite(downlinkDuringBuffering) &&
+      downlinkBaseline > 0 &&
+      downlinkDuringBuffering <= downlinkBaseline * ConnectionMonitor.DOWNLINK_DROP_RATIO
+    ) {
+      return ConnectionMonitor.VERDICT.NETWORK;
+    }
+
+    // PC 性能不足: 直近 dropped frames 比率が 30% 以上
+    if (
+      Number.isFinite(droppedFramesRatio) &&
+      droppedFramesRatio >= ConnectionMonitor.DROPPED_FRAME_RATIO
+    ) {
+      return ConnectionMonitor.VERDICT.DEVICE;
+    }
+
+    // 経路診断: Google と Cloudflare の RTT を比較
+    const googleOk = Number.isFinite(googleRttMedian);
+    const cfOk = Number.isFinite(cloudflareRttMedian);
+    if (googleOk && cfOk) {
+      if (googleRttMedian < ConnectionMonitor.RTT_GOOD_MS && cloudflareRttMedian < ConnectionMonitor.RTT_GOOD_MS) {
+        return ConnectionMonitor.VERDICT.YOUTUBE_CDN;
+      }
+      if (googleRttMedian > ConnectionMonitor.RTT_BAD_MS && cloudflareRttMedian < ConnectionMonitor.RTT_GOOD_MS) {
+        return ConnectionMonitor.VERDICT.ROUTING;
+      }
+      if (googleRttMedian > ConnectionMonitor.RTT_BAD_MS && cloudflareRttMedian > ConnectionMonitor.RTT_BAD_MS) {
+        return ConnectionMonitor.VERDICT.INTERNATIONAL;
+      }
+    }
+
+    // 経路診断が不確定なら YouTube CDN 側を疑う（最も無難な fallback）
+    return ConnectionMonitor.VERDICT.YOUTUBE_CDN;
+  },
+});
+
+/**
  * @readonly カラーピッカー（独自実装）の定数。
  *
  * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
@@ -1521,9 +1685,6 @@ const PopupTabs = Object.freeze({
    * 3 関数を generated にする (中規模リファクタ、別 PR シリーズ)。
    */
   const SettingsSchema = Object.freeze([
-    Object.freeze({ field: "keepAliveEnabled", storageKey: StorageKeys.KEEP_ALIVE_ENABLED, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
-    Object.freeze({ field: "keepAliveIntervalMs", storageKey: StorageKeys.KEEP_ALIVE_INTERVAL_MS, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
-    Object.freeze({ field: "keepAliveHttpPingEnabled", storageKey: StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED, applyAction: Actions.APPLY_KEEP_ALIVE_CS }),
     Object.freeze({ field: "searchFixerEnabled", storageKey: StorageKeys.SEARCH_FIXER_ENABLED, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerFeatures", storageKey: StorageKeys.SEARCH_FIXER_FEATURES, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerGridItems", storageKey: StorageKeys.SEARCH_FIXER_GRID_ITEMS, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
@@ -1540,7 +1701,7 @@ const PopupTabs = Object.freeze({
     Object.freeze({ field: "videoFillMode", storageKey: StorageKeys.VIDEO_FILL_MODE, applyAction: Actions.APPLY_VIDEO_FILL_CS }),
     Object.freeze({ field: "videoFillTarget", storageKey: StorageKeys.VIDEO_FILL_TARGET, applyAction: Actions.APPLY_VIDEO_FILL_CS }),
     Object.freeze({ field: "loupeEnabled", storageKey: StorageKeys.LOUPE_ENABLED, applyAction: Actions.APPLY_LOUPE_CS }),
-    Object.freeze({ field: "rtxEnhancerEnabled", storageKey: StorageKeys.RTX_ENHANCER_ENABLED, applyAction: Actions.APPLY_RTX_ENHANCER_CS }),
+    // 接続モニターは searchFixerFeatures.connectionMonitor サブ機能のため SettingsSchema には独立 entry を持たない。
   ]);
 
   // P0-#2: 全定数を globalThis に明示的に公開する。これで content scripts / popup / offscreen /
@@ -1552,7 +1713,6 @@ const PopupTabs = Object.freeze({
   globalThis.SenderCheck = SenderCheck;
   globalThis.Offscreen = Offscreen;
   globalThis.StorageKeys = StorageKeys;
-  globalThis.KeepAlive = KeepAlive;
   globalThis.YouTubeShorts = YouTubeShorts;
   globalThis.SearchFixer = SearchFixer;
   globalThis.AmazonDeliveryTotal = AmazonDeliveryTotal;
@@ -1565,6 +1725,7 @@ const PopupTabs = Object.freeze({
   globalThis.VideoGamma = VideoGamma;
   globalThis.VideoFill = VideoFill;
   globalThis.Loupe = Loupe;
+  globalThis.ConnectionMonitor = ConnectionMonitor;
   globalThis.ColorPicker = ColorPicker;
   globalThis.PopupTabs = PopupTabs;
 })();

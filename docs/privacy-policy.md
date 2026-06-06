@@ -2,7 +2,7 @@
 
 > [English version](privacy-policy.en.md) is also available.
 
-最終更新日: 2026年5月4日
+最終更新日: 2026年6月6日
 
 ## はじめに
 
@@ -16,11 +16,8 @@
 
 本拡張機能は、以下の設定データをユーザーの端末内（`chrome.storage.local`）にのみ保存します。
 
-- **`keepAliveEnabled`**（真偽値）: セッション維持機能の有効/無効。ON のときすべての http(s) タブに適用されます。
-- **`keepAliveIntervalMs`**（数値・ミリ秒）: セッション維持のポーリング間隔（1〜15 分の範囲）。
-- **`keepAliveHttpPingEnabled`**（真偽値）: セッション維持の「軽量 HTTP ping」サブ機能の有効/無効（オプトイン・デフォルト OFF）。
-- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む 30 サブ機能の親）の有効/無効。
-- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 30 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張）の個別 ON/OFF 状態。
+- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・接続モニターを含む 31 サブ機能の親）の有効/無効。
+- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 31 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張 / 接続モニター）の個別 ON/OFF 状態。
 - **`searchFixerGridItems`**（数値）: YouTube ホームグリッドの列数指定（0=自動 / 4 / 5 / 6）。
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。
 - **`amazonRankingJumpEnabled`**（真偽値）: Amazon 商品ページの「この商品が所属するランキングへ移動」ボタンの有効/無効。デフォルト OFF。
@@ -37,7 +34,6 @@
 - **`loupeEnabled`**（真偽値）: ルーペ機能のマスタートグル。デフォルト OFF。
 - **`loupeZoom`**（数値）: ルーペの倍率。1.5 / 2.5 / 4.0 のいずれか。デフォルト 2.5。
 - **`loupeSize`**（数値・150〜1000 / 10px step）: ルーペのレンズ直径 (px)。デフォルト 220。
-- **`rtxEnhancerEnabled`**（真偽値）: RTX 動画強化機能のマスタートグル。デフォルト OFF。ON 時は `<video>` 要素のあるページに極小の透明 hint 要素を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正の検知を補助します。ネットワーク通信は発生せず、DOM の追加のみ。
 - **`videoGammaEnabled`**（真偽値）: 動画ガンマ補正のマスタートグル。デフォルト OFF。
 - **`videoGammaValue`**（数値・0.3〜3.0）: 動画ガンマ補正のガンマ値。デフォルト 1.0（補正なし）。
 - **`videoFillEnabled`**（真偽値）: 動画の黒帯除去のマスタートグル。デフォルト OFF。
@@ -66,11 +62,29 @@
 
 ## ネットワーク通信
 
-本拡張機能は、第三者の外部サーバーへの通信を一切行いません。「セッション維持」機能を有効化している場合のデフォルト動作は、ユーザーが有効化したサイトの top frame で、サイト側 JS のアイドル検知をリセットするための合成イベント（`mousemove` / `pointermove` / `scroll` / `focus`）を `document` / `window` に dispatch するクライアントサイド処理のみで、ネットワーク通信は発生しません。
+本拡張機能は、以下に明示する 2 つの例外を除き、第三者の外部サーバーへの通信を一切行いません。
 
-サブ機能「サーバーへの軽量 ping を併発」（オプトイン・デフォルト OFF）を有効化した場合に限り、サーバー側のセッションタイムアウトを延長するため、ユーザーが有効化したサイト自身（同一オリジン）の top frame から軽量なエンドポイントへ `HEAD` または `GET` リクエストを発行します。例として、SharePoint（`*.sharepoint.{com,cn,de,us}`）では `/_api/web` に GET、その他の多くのサイトでは現在のページ URL または origin root に軽量 HEAD を試行します。これは現にログイン済みであるサイト自身への通信のみであり、第三者サーバーへの送信ではありません（`credentials: same-origin` で同一オリジン以外には Cookie が送信されません）。認証プロキシ環境（Zscaler 等）で 401/302 ループや SIEM ログアラートを誘発する可能性があるため、副作用を理解した上で有効化することを推奨します。
+### 例外 1: 画像ダウンロード（Instagram / TikTok クリーナーのサブ機能）
 
 Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `p<数字>.tiktokcdn.com` / `p<数字>.tiktokcdn-us.com`）に対して画像 GET を発行します。これは現にブラウザが `<img>` タグでロードしているドメインと同一であり、`credentials: "omit"` でクッキーは送信せず、`redirect: "manual"` で 302 経由の第三者ドメイン送信を遮断し、`referrerPolicy: "no-referrer"` でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します（YouTube では本機能は提供されません）。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されるのみで、外部送信は一切行いません。
+
+### 例外 2: 接続モニター（YouTube クリーナーのサブ機能）
+
+YouTube クリーナーのサブ機能「接続モニター」（`searchFixerFeatures.connectionMonitor`、オプトイン・デフォルト OFF）を有効化し、かつ YouTube のライブ配信を視聴している間のみ、ライブ配信視聴中のバッファリング原因（自分の回線 / 端末性能 / YouTube CDN / 国際線経路 / etc.）を切り分ける in-player HUD のために、以下 2 つの公開ヘルスチェック endpoint への RTT 計測 fetch を 5 秒周期で発行します。
+
+- `https://www.gstatic.com/generate_204` — Google エッジへの到達時間計測
+- `https://speed.cloudflare.com/__down?bytes=10` — Cloudflare（国際線ベースライン）への到達時間計測
+
+これらの fetch は以下のプライバシー設定で実行されます。
+
+- `mode: "no-cors"`: レスポンス本文は **読み取り不能** (opaque response) としてブラウザに渡され、本拡張機能は到達時間 (`performance.now()` の差分) しか測定しません
+- `credentials: "omit"`: クッキーは送信しません
+- `referrerPolicy: "no-referrer"`: リファラを送信しません
+- `AbortSignal.timeout(4500)`: 4.5 秒で必ず abort されます
+
+**送信される情報は「Vuora が ON であるという事実」と「視聴中のおおよその時刻」のみ**であり、ユーザー識別子・クッキー・YouTube 視聴履歴・チャンネル名・動画 ID・自分の IP アドレス以外の個人データは一切送信されません（IP アドレスは HTTP リクエスト送信時に通信プロトコル上必然的に対向サーバーへ届きますが、これは通常の Web ブラウジング全般と同等の性質です）。送信先 URL は `actions.js` の定数として固定されており、ユーザー操作や設定では変更できません（テストで値固定をアサート済み）。endpoint は Google と Cloudflare が一般公開している計測用エンドポイントであり、Vuora 専用に運用するサーバーは存在しません。
+
+接続モニターサブ機能 OFF 時 / YouTube クリーナーのマスタートグル OFF 時 / YouTube ライブ視聴中以外（VOD 動画視聴中 / 別ページ閲覧中）には、これらの fetch は **一切発行されません**。計測した RTT 値は content script スコープのメモリ ring buffer (最大 6 サンプル / 30 秒分) にのみ保持され、永続化されません。マスター OFF / サブ機能 OFF / overlay 撤去で即座に破棄されます。
 
 ## 権限の使用目的
 

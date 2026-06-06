@@ -2814,7 +2814,7 @@
             // `redirect: "manual"` で 3xx を opaqueredirect として捕捉する。CDN 設定変更や中間者による
             // 認証ドメインへの 302 を `r.ok === false` 扱いにして候補スキップする防御
             // (/rere レビュー A2-I-4)。`credentials: "omit"` + redirect:manual の組み合わせは
-            // image-downloader.js / keepalive.js と同じパターン。
+            // image-downloader.js と同じパターン (外部 CDN fetch の 4 原則、CLAUDE.md「外部 fetch allowlist 設計」参照)。
             fetch(`https://i.ytimg.com/vi/${vid}/maxresdefault.jpg`, {
               method: "HEAD",
               credentials: "omit",

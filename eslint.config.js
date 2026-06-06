@@ -5,7 +5,8 @@
  * v9 で flat config が標準化されたため、`.eslintrc.*` 系は廃止。
  *
  * 設計方針:
- * - `src/` の IIFE + globalThis 公開 20 定数を明示列挙 (no-implicit-globals 違反を防ぎつつ、
+ * - `src/` の IIFE + globalThis 公開 24 定数 (actions.js 21 + 共通モジュール 3: ScanRunner /
+ *   AudioPipeline / CleanerCore) を明示列挙 (no-implicit-globals 違反を防ぎつつ、
  *   actions.js が公開する定数を読み取り専用 global として承認する)
  * - `scripts/` / `webstore/generate-screenshots.js` は Node ESM/CJS 環境
  * - `test/` は Node 標準 test runner 環境
@@ -14,7 +15,7 @@
 const globals = require("globals");
 
 const ACTIONS_GLOBALS = {
-  // src/lib/actions.js が globalThis に公開する 21 個。
+  // src/lib/actions.js が globalThis に公開する定数。
   // 新規 globalThis 公開を追加したら本リストにも追加すること。
   SettingsSchema: "readonly",
   Actions: "readonly",
@@ -22,7 +23,6 @@ const ACTIONS_GLOBALS = {
   SenderCheck: "readonly",
   Offscreen: "readonly",
   StorageKeys: "readonly",
-  KeepAlive: "readonly",
   YouTubeShorts: "readonly",
   SearchFixer: "readonly",
   AmazonDeliveryTotal: "readonly",
@@ -35,6 +35,7 @@ const ACTIONS_GLOBALS = {
   VideoGamma: "readonly",
   VideoFill: "readonly",
   Loupe: "readonly",
+  ConnectionMonitor: "readonly",
   ColorPicker: "readonly",
   PopupTabs: "readonly",
   // /rere B1-007/B2-I002/D-002 + B1-004/B2-I001/D-001 で追加した共通モジュール

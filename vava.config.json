@@ -29,13 +29,14 @@
       "en": ["Vuora"]
     },
     "amo": {
+      "_comment": "Firefox AMO listing は音量ブースター (tabCapture 非対応) を除く 10 機能カテゴリで構成される。Chrome 用は 11 機能だが AMO の drift check では Firefox 用 listing の文言と一致させる。",
       "summary": {
-        "ja": ["12 カテゴリ", "Amazon 販売元"],
-        "en": ["12 categories", "Amazon seller"]
+        "ja": ["10 カテゴリ", "Amazon 販売元"],
+        "en": ["10 categories", "Amazon seller"]
       },
       "description": {
-        "ja": ["12 カテゴリ", "Amazon 販売元", "Firefox 142"],
-        "en": ["12 categories", "Amazon seller", "Firefox 142"]
+        "ja": ["10 カテゴリ", "Amazon 販売元", "Firefox 142"],
+        "en": ["10 categories", "Amazon seller", "Firefox 142"]
       }
     }
   }

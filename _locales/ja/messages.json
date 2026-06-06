@@ -31,7 +31,6 @@
   "groupAudio": { "message": "オーディオ" },
   "groupVideo": { "message": "映像" },
   "groupAmazon": { "message": "Amazon" },
-  "groupSession": { "message": "セッション" },
 
   "volumeBoosterMaster": { "message": "音量ブースター" },
   "volumeBoosterMasterDesc": { "message": "タブの音声を増幅・補正します。設定はタブ切替で自動適用されます" },
@@ -71,8 +70,27 @@
 
   "loupeMaster": { "message": "ルーペ" },
   "loupeMasterDesc": { "message": "現在の画面を円形レンズで拡大。動画は一時停止してから使うのがおすすめ。左クリックで OFF" },
-  "rtxEnhancerMaster": { "message": "RTX 動画強化" },
-  "rtxEnhancerMasterDesc": { "message": "video 要素のあるページに hint を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正を認識しやすくします（GPU 側で NVIDIA Control Panel 等の有効化が必要）" },
+
+  "cmDragHandle": { "message": "ドラッグで移動、ボタンで折りたたみ" },
+  "cmToggleCollapse": { "message": "折りたたみ / 展開" },
+  "cmVerdictStable": { "message": "安定（直近 1 分でバッファ無し）" },
+  "cmVerdictNetwork": { "message": "回線が原因の可能性" },
+  "cmVerdictDevice": { "message": "PC 性能不足の可能性" },
+  "cmVerdictYoutubeCdn": { "message": "YouTube CDN 側の可能性" },
+  "cmVerdictRouting": { "message": "Google エッジ / ルーティング異常の可能性" },
+  "cmVerdictInternational": { "message": "国際線 / 中継 ISP 経路の遅延" },
+  "cmVerdictUnknown": { "message": "計測中…" },
+  "cmBufferingPerMinute": { "message": "バッファ {0} 回 / 1 分" },
+  "cmDiagnosis": { "message": "Google {0} · Cloudflare {1}" },
+  "cmPathRttTitle": { "message": "経路 RTT" },
+  "cmPathRttEntry": { "message": "{0} ({1} 回)" },
+  "cmBufferLogTitle": { "message": "直近バッファ" },
+  "cmBufferLogEmpty": { "message": "直近 1 分はバッファ無し" },
+  "cmBufferLogEntrySec": { "message": "{0} 秒前" },
+  "cmBufferLogEntryMin": { "message": "{0} 分前" },
+  "cmBwTitle": { "message": "帯域 60 秒" },
+  "cmBwStat": { "message": "最小 {0} / 平均 {1} / 最大 {2}" },
+  "cmDetailNotMeasured": { "message": "未計測" },
   "loupeZoomLabel": { "message": "倍率" },
   "loupeZoomAriaLabel": { "message": "倍率を選択" },
   "loupeSizeLabel": { "message": "レンズサイズ" },
@@ -103,12 +121,6 @@
   "amazonMerchantInfoAriaAmazon": { "message": "Amazon 直販" },
   "amazonMerchantInfoAriaMarketplace": { "message": "マーケット出品" },
   "amazonMerchantInfoAriaUnknown": { "message": "販売元未確定" },
-
-  "keepAliveMaster": { "message": "セッション維持" },
-  "keepAliveMasterDesc": { "message": "すべての http(s) サイトで合成イベント dispatch によりアイドル検知をリセット" },
-  "keepAliveIntervalLabel": { "message": "ポーリング間隔" },
-  "keepAliveHttpPingLabel": { "message": "サーバーへの軽量 ping を併発" },
-  "keepAliveHttpPingDesc": { "message": "各タブの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨" },
 
   "searchFixerMaster": { "message": "YouTube クリーナー" },
   "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 30 サブ機能を一括管理" },
@@ -217,7 +229,6 @@
   "categoryIgExtra": { "message": "追加機能" },
   "categoryTtMain": { "message": "主要機能" },
 
-  "applyOkSession": { "message": "セッション維持" },
   "applyOkSearchFixer": { "message": "YT クリーナー" },
   "applyOkAmazon": { "message": "Amazon" },
   "applyOkAmazonRanking": { "message": "ランキング移動" },
@@ -231,12 +242,6 @@
   "applyOkPrefix": { "message": "✓  " },
   "applyOkSeparator": { "message": "  /  " },
   "applyError": { "message": "⚠️ このページには適用できません" },
-
-  "intervalUnit": {
-    "message": "$N$ min",
-    "description": "セッション維持のポーリング間隔表示 (例: 4 min)。「分」単位は短縮の min を使用",
-    "placeholders": { "n": { "content": "$1" } }
-  },
 
   "volumeErrorInvalidTab": { "message": "⚠ タブを取得できません" },
   "volumeErrorOffscreenUnavailable": { "message": "⚠ 内部処理を起動できません" },
@@ -299,6 +304,8 @@
   "feat_sf_hideComments_desc": { "message": "動画ページ下部のコメントセクション（件数・並び替え・入力欄・スレッド一覧）を一括で非表示化。ライブ配信のチャット欄は対象外" },
   "feat_sf_hideLiveChat_label": { "message": "ライブチャット欄非表示" },
   "feat_sf_hideLiveChat_desc": { "message": "ライブ配信アーカイブの右側に表示されるライブコメント欄を、YouTube 公式操作と同じ折りたたみで非表示化。通常動画には影響なし" },
+  "feat_sf_connectionMonitor_label": { "message": "ライブ配信の接続モニター" },
+  "feat_sf_connectionMonitor_desc": { "message": "YouTube ライブ視聴中にプレーヤー右上 HUD を表示し、クルクル（バッファリング）の原因を「回線 / PC / YouTube / 経路」で切り分けます。経路診断のため Google / Cloudflare の公開エンドポイントへ RTT 計測のみ送信" },
   "feat_sf_redirectShortsUrl_label": { "message": "Shorts URL を /watch にリダイレクト" },
   "feat_sf_redirectShortsUrl_desc": { "message": "/shorts/<ID> で開いた縦動画ページを通常の /watch?v=<ID> プレイヤーに強制リダイレクト" },
   "feat_sf_searchGrid_label": { "message": "検索結果をグリッド表示" },

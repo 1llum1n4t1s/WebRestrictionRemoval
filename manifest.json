@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.0.38",
+  "version": "1.0.39",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -23,12 +23,6 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/keepalive.js"],
-      "run_at": "document_idle",
-      "all_frames": false
-    },
-    {
       "matches": ["*://*.youtube.com/*"],
       "js": ["src/content/early-framework.js", "src/content/youtube-early.js"],
       "run_at": "document_start",
@@ -38,6 +32,13 @@
       "matches": ["*://*.youtube.com/*"],
       "js": ["src/lib/actions.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js"],
       "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["src/lib/actions.js", "src/content/youtube-connection-monitor.js"],
+      "css": ["src/content/youtube-connection-monitor.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -98,12 +99,6 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["src/lib/actions.js", "src/content/loupe.js"],
       "css": ["src/content/loupe.css"],
-      "run_at": "document_idle",
-      "all_frames": false
-    },
-    {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/rtx-enhancer.js"],
       "run_at": "document_idle",
       "all_frames": false
     }

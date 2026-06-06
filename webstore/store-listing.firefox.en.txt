@@ -2,25 +2,22 @@
 Firefox AMO Listing (English)
 ※ For Chrome Web Store, see webstore/store-listing.en.txt
 ※ For Japanese, see webstore/store-listing.firefox.ja.txt
-※ Firefox edition does NOT support Volume Booster (Chrome-only — Firefox lacks chrome.tabCapture). The other 12 categories all work.
+※ Firefox edition does NOT support Volume Booster (Chrome-only — Firefox lacks chrome.tabCapture). The other 10 categories all work.
 ============================================================
 
 ■ Name
 Vuora (Firefox)
 
 ■ Summary (250 chars max)
-Firefox extension that locally tunes the readability and continuity of the page you are viewing. 12 categories of helpers (Session Keep-alive, YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, RTX Video Enhancer, Color Picker). Volume Booster is Chrome-only (Firefox lacks chrome.tabCapture). All default OFF (opt-in). Zero external network calls.
+Firefox extension that locally tunes the readability of the page you are viewing. 10 categories of helpers (YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, Color Picker). Volume Booster is Chrome-only (Firefox lacks chrome.tabCapture). All default OFF (opt-in). Zero external network calls.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 12 categories of features into a single popup (Volume Booster is Chrome-only).
+A productivity helper that bundles 10 categories of features into a single popup (Volume Booster is Chrome-only).
 
 ■ Features available on Firefox
 
-🔹 Session Keep-alive
-Dispatches synthesized activity events and same-origin HTTP pings to suppress auto-logout on intranet portals and admin dashboards. HTTP ping is opt-in (default OFF), uses 5-second AbortSignal timeout, same-origin only, redirect: manual to prevent credential leakage to third-party domains.
-
-🔹 YouTube Cleaner (30 sub-features)
-Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, subscription channel expansion (subs feed → grid + lazy thumbnail), and more granular controls for YouTube's verbose UI.
+🔹 YouTube Cleaner (31 sub-features)
+Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, subscription channel expansion (subs feed → grid + lazy thumbnail), live-stream connection monitor, and more granular controls for YouTube's verbose UI.
 
 🔹 Amazon Subscribe & Save totals
 On amazon.co.jp/auto-deliveries, computes per-month delivery totals and inserts them inline.
@@ -45,9 +42,6 @@ Removes the letterbox/pillarbox black bars on ultrawide screens by Zoom (aspect-
 
 🔹 Loupe
 Mouse-following circular magnifier. 3-step zoom / variable lens size. Uses `tabs.captureVisibleTab` so videos / iframes / canvases can also be magnified.
-
-🔹 RTX Video Enhancer
-Injects a 1×1 px invisible hint element on pages containing `<video>` elements to help GPU drivers (e.g., NVIDIA RTX Super Resolution / AMD FidelityFX) detect video pages. The driver-side feature itself must be enabled in the GPU settings (e.g., NVIDIA Control Panel). Zero external transmission.
 
 🔹 Color Picker (popup tab)
 EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).

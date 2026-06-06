@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: May 4, 2026
+Last updated: June 6, 2026
 
 ## Introduction
 
@@ -14,11 +14,8 @@ The Extension does not collect any personal information.
 
 The Extension stores the following settings only on the user's device (`chrome.storage.local`):
 
-- **`keepAliveEnabled`** (boolean): whether keep-session-alive is enabled. When ON, the feature applies to all http(s) tabs.
-- **`keepAliveIntervalMs`** (number, milliseconds): polling interval for keep-session-alive (1–15 minutes).
-- **`keepAliveHttpPingEnabled`** (boolean): whether the lightweight HTTP ping sub-feature for keep-session-alive is enabled (opt-in, default OFF).
-- **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 30 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
-- **`searchFixerFeatures`** (object): on/off state of each of the 30 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
+- **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 31 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
+- **`searchFixerFeatures`** (object): on/off state of each of the 31 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
 - **`amazonRankingJumpEnabled`** (boolean): whether the "Go to this product's ranking" button on Amazon product pages is enabled. Default OFF.
@@ -35,7 +32,6 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`loupeEnabled`** (boolean): Loupe master toggle. Default OFF.
 - **`loupeZoom`** (number): Loupe magnification. One of 1.5 / 2.5 / 4.0. Default 2.5.
 - **`loupeSize`** (number, 150 – 1000 / 10 px step): Loupe lens diameter in px. Default 220.
-- **`rtxEnhancerEnabled`** (boolean): RTX video enhancement master toggle. Default OFF. When ON, inserts a tiny invisible hint element on pages containing `<video>` elements to help GPU drivers (e.g., NVIDIA RTX Super Resolution) detect the video and apply automatic enhancement. No network traffic; DOM insertion only.
 - **`videoGammaEnabled`** (boolean): Video Gamma master toggle. Default OFF.
 - **`videoGammaValue`** (number, 0.3–3.0): Video Gamma value. Default 1.0 (no correction).
 - **`videoFillEnabled`** (boolean): Remove-video-black-bars master toggle. Default OFF.
@@ -64,11 +60,29 @@ The Extension does not share any data with third parties.
 
 ## Network communication
 
-The Extension does not communicate with any third-party external servers. When the keep-session-alive feature is enabled, the default behavior is purely client-side: synthetic events (`mousemove` / `pointermove` / `scroll` / `focus`) are dispatched against `document` / `window` in the top frame of an enabled site to reset the site's idle detection. No network communication is involved.
+The Extension does not communicate with any third-party external servers, with the two explicit exceptions listed below.
 
-If the user enables the "Also send a lightweight server ping" sub-feature (opt-in, default OFF), the Extension issues `HEAD` or `GET` requests to lightweight endpoints from the top frame of the enabled site (same origin only) to extend server-side session timeouts. For example, on SharePoint (`*.sharepoint.{com,cn,de,us}`), it issues a GET to `/_api/web`; on most other sites, it tries a lightweight HEAD against the current page URL or the origin root. These are communications with the user's already-authenticated site itself, not with any third party. (`credentials: same-origin` ensures cookies are not sent across origins.) In environments behind authentication proxies (e.g. Zscaler), this can trigger 401/302 loops or generate alerts in SIEM logs. We recommend enabling this only after understanding the side effects.
+### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
 When the Instagram / TikTok cleaner's "Show download button on images" sub-feature (opt-in, default OFF) is enabled, an image GET is issued only at the moment the user clicks the download button, and only against each site's official CDN (Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`; TikTok: `p<digits>.tiktokcdn.com` / `p<digits>.tiktokcdn-us.com`). These are the same domains the browser already loads via `<img>` tags. The fetch uses `credentials: "omit"` (no cookies), `redirect: "manual"` (blocks redirect-based third-party transmission), and `referrerPolicy: "no-referrer"` (no referrer). Proxy fetches to other origins are blocked by a hostname allowlist (YouTube does not provide this feature). Downloaded images are saved locally via Blob URL + `<a download>` only; nothing is transmitted externally.
+
+### Exception 2: Connection monitor (YouTube cleaner sub-feature)
+
+When the YouTube cleaner's "Connection monitor" sub-feature (`searchFixerFeatures.connectionMonitor`, opt-in, default OFF) is enabled **and** the user is actively viewing a YouTube live stream, the Extension issues round-trip-time (RTT) measurement fetches to the two public health-check endpoints below every 5 seconds. These measurements feed the in-player HUD that helps the user diagnose buffering causes (their own network / device performance / YouTube CDN / international routing / etc.).
+
+- `https://www.gstatic.com/generate_204` — RTT to a Google edge endpoint
+- `https://speed.cloudflare.com/__down?bytes=10` — RTT to a Cloudflare endpoint (international-route baseline)
+
+These fetches run with the following privacy controls:
+
+- `mode: "no-cors"`: the response body is delivered as an **unreadable** (opaque) response. The Extension only measures the round-trip time via `performance.now()` deltas
+- `credentials: "omit"`: no cookies are sent
+- `referrerPolicy: "no-referrer"`: no referrer is sent
+- `AbortSignal.timeout(4500)`: every request is forcibly aborted after 4.5 seconds
+
+**The only information conveyed to the endpoints is "the fact that Vuora is ON" and "the approximate time the user is viewing a live stream."** No user identifier, cookies, YouTube watch history, channel names, video IDs, or other personal data are transmitted (the user's IP address inevitably reaches the destination server as part of the HTTP request protocol, but this is the same property as any ordinary web browsing). The destination URLs are hard-coded constants in `actions.js` and cannot be changed by any user action or setting (a unit test asserts the URLs are fixed). Both endpoints are public measurement endpoints operated by Google and Cloudflare; the Extension does **not** operate any server of its own.
+
+When the connection-monitor sub-feature is OFF, when the YouTube cleaner master toggle is OFF, or when the user is **not** on a YouTube live stream (e.g. watching a VOD or browsing any other page), **none of these fetches are issued**. Measured RTT values are held only in a content-script-scope memory ring buffer (at most 6 samples / 30 seconds of data) and are not persisted. They are discarded immediately when the master toggle / sub-feature is turned OFF or the overlay is removed.
 
 ## Permission usage
 

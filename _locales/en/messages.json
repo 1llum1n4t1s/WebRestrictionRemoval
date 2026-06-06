@@ -31,7 +31,6 @@
   "groupAudio": { "message": "Audio" },
   "groupVideo": { "message": "Video" },
   "groupAmazon": { "message": "Amazon" },
-  "groupSession": { "message": "Session" },
 
   "volumeBoosterMaster": { "message": "Volume Booster" },
   "volumeBoosterMasterDesc": { "message": "Amplify and shape tab audio. Settings auto-apply on tab switch." },
@@ -71,8 +70,28 @@
 
   "loupeMaster": { "message": "Loupe" },
   "loupeMasterDesc": { "message": "Magnify the current view with a circular lens. Best used after pausing videos. Left-click to turn off." },
-  "rtxEnhancerMaster": { "message": "RTX video enhancement" },
-  "rtxEnhancerMasterDesc": { "message": "Inject a hint element on pages containing <video> so GPU drivers like NVIDIA RTX Super Resolution can detect the video and apply automatic enhancement (requires GPU-side activation, e.g., in NVIDIA Control Panel)." },
+
+  "cmDragHandle": { "message": "Drag to move, click button to collapse" },
+  "cmToggleCollapse": { "message": "Collapse / expand" },
+  "cmVerdictStable": { "message": "Stable (no buffering in the last minute)" },
+  "cmVerdictNetwork": { "message": "Likely your network" },
+  "cmVerdictDevice": { "message": "Likely device performance" },
+  "cmVerdictYoutubeCdn": { "message": "Likely YouTube CDN" },
+  "cmVerdictRouting": { "message": "Likely Google edge / routing issue" },
+  "cmVerdictInternational": { "message": "Likely international transit / ISP latency" },
+  "cmVerdictUnknown": { "message": "Measuring…" },
+  "cmBufferingPerMinute": { "message": "Buffering {0} / min" },
+  "cmDiagnosis": { "message": "Google {0} · Cloudflare {1}" },
+  "cmPathRttTitle": { "message": "Path RTT" },
+  "cmPathRttEntry": { "message": "{0} (n={1})" },
+  "cmBufferLogTitle": { "message": "Recent buffering" },
+  "cmBufferLogEmpty": { "message": "No buffering in the last minute" },
+  "cmBufferLogEntrySec": { "message": "{0} sec ago" },
+  "cmBufferLogEntryMin": { "message": "{0} min ago" },
+  "cmBwTitle": { "message": "Bandwidth 60 s" },
+  "cmBwStat": { "message": "min {0} / avg {1} / max {2}" },
+  "cmDetailNotMeasured": { "message": "Not measured" },
+
   "loupeZoomLabel": { "message": "Zoom" },
   "loupeZoomAriaLabel": { "message": "Select zoom level" },
   "loupeSizeLabel": { "message": "Lens size" },
@@ -104,12 +123,6 @@
   "amazonMerchantInfoAriaMarketplace": { "message": "Marketplace listing" },
   "amazonMerchantInfoAriaUnknown": { "message": "Seller unverified" },
 
-  "keepAliveMaster": { "message": "Keep session alive" },
-  "keepAliveMasterDesc": { "message": "Reset idle detection across all http(s) tabs by dispatching synthetic events." },
-  "keepAliveIntervalLabel": { "message": "Polling interval" },
-  "keepAliveHttpPingLabel": { "message": "Also send a lightweight server ping" },
-  "keepAliveHttpPingDesc": { "message": "HEAD/GET only against the top frame of each tab. Disable behind auth proxies." },
-
   "searchFixerMaster": { "message": "YouTube cleaner" },
   "searchFixerMasterDesc": { "message": "Manage 30 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
 
@@ -122,7 +135,7 @@
   "cleanerHint": { "message": "Active only while the master toggle (cleaner) is on. Pick the individual sub-features you want." },
 
   "pickerActivateJp": { "message": "Pick a color from the screen" },
-  "pickerActivateEn": { "message": "" },
+  "pickerActivateEn": { "message": "activate eyedropper" },
   "pickerNoteIdle": { "message": "Press the button to pick any color on screen (Esc cancels)." },
   "specimenAriaLabel": { "message": "Picked color" },
   "specimenTitle": { "message": "Specimen" },
@@ -217,7 +230,6 @@
   "categoryIgExtra": { "message": "Extras" },
   "categoryTtMain": { "message": "Main" },
 
-  "applyOkSession": { "message": "Keep-alive" },
   "applyOkSearchFixer": { "message": "YT cleaner" },
   "applyOkAmazon": { "message": "Amazon" },
   "applyOkAmazonRanking": { "message": "Ranking jump" },
@@ -231,12 +243,6 @@
   "applyOkPrefix": { "message": "✓  " },
   "applyOkSeparator": { "message": "  /  " },
   "applyError": { "message": "⚠️ Cannot apply on this page" },
-
-  "intervalUnit": {
-    "message": "$N$ min",
-    "description": "Polling interval label (e.g. \"4 min\")",
-    "placeholders": { "n": { "content": "$1" } }
-  },
 
   "volumeErrorInvalidTab": { "message": "⚠ Cannot read tab" },
   "volumeErrorOffscreenUnavailable": { "message": "⚠ Cannot start internal processor" },
@@ -299,6 +305,8 @@
   "feat_sf_hideComments_desc": { "message": "Hide the entire comment section (count, sort, input, threads) on the watch page. Live-stream chat is unaffected." },
   "feat_sf_hideLiveChat_label": { "message": "Hide live chat" },
   "feat_sf_hideLiveChat_desc": { "message": "Collapse the live-chat panel on archived live streams using YouTube's own collapse action. Regular videos are unaffected." },
+  "feat_sf_connectionMonitor_label": { "message": "Live stream connection monitor" },
+  "feat_sf_connectionMonitor_desc": { "message": "While watching a YouTube live stream, show a HUD in the top-right of the player and classify the cause of buffering (your network / your device / YouTube CDN / network route). For route diagnosis it sends RTT-only probes to public Google / Cloudflare endpoints." },
   "feat_sf_redirectShortsUrl_label": { "message": "Redirect Shorts URL to /watch" },
   "feat_sf_redirectShortsUrl_desc": { "message": "Force a /shorts/<ID> vertical-video page to the regular /watch?v=<ID> player." },
   "feat_sf_searchGrid_label": { "message": "Show search results as grid" },

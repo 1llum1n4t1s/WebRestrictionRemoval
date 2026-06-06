@@ -59,7 +59,7 @@
       </button>
     </nav>
 
-    <!-- ===== Panel: Tune (オーディオ / 映像 / Amazon / セッション) ===== -->
+    <!-- ===== Panel: Tune (オーディオ / 映像 / Amazon) ===== -->
     <div class="panel panel--tune is-active" id="panelTune"
          role="tabpanel" aria-labelledby="tabTune">
 
@@ -260,20 +260,6 @@
         <input type="range" id="loupeSizeSlider" class="range" />
       </div>
 
-      <!-- RTX 動画強化 master トグル: <video> 要素のあるページに極小の透明 hint 要素を inject して、
-           NVIDIA RTX Super Resolution / AMD FidelityFX などの GPU ドライバ側映像補正の検知を補助する。
-           ドライバ機能の有効化自体は GPU 側設定 (NVIDIA Control Panel 等) に依存。オプトイン・デフォルト OFF -->
-      <label class="toggle-row" id="rtxEnhancerToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔆</span>
-        <span class="tr-text">
-          <span class="tr-name" data-i18n="rtxEnhancerMaster">RTX 動画強化</span>
-          <span class="tr-desc" data-i18n="rtxEnhancerMasterDesc">video 要素のあるページに hint を挿入し、NVIDIA RTX Super Resolution などの GPU ドライバ側映像補正を認識しやすくします（GPU 側で NVIDIA Control Panel 等の有効化が必要）</span>
-        </span>
-        <span class="switch">
-          <input type="checkbox" id="rtxEnhancerToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
     </section>
 
     <!-- ===== Amazon Group ===== -->
@@ -319,51 +305,10 @@
       </label>
     </section>
 
-    <!-- ===== Session ===== -->
-    <section class="grp" id="sessionGroupSection" data-i18n-attr="aria-label:groupSession" aria-label="セッション">
-      <h2 class="grp-title"><span class="grp-title-text" data-i18n="groupSession">セッション</span></h2>
-
-      <label class="toggle-row" id="keepAliveToggleRow">
-          <span class="tr-icon" aria-hidden="true">🔄</span>
-          <span class="tr-text">
-            <span class="tr-name">
-              <span data-i18n="keepAliveMaster">セッション維持</span>
-            </span>
-            <span class="tr-desc" data-i18n="keepAliveMasterDesc">すべての http(s) サイトで合成イベント dispatch によりアイドル検知をリセット</span>
-          </span>
-        <span class="switch">
-          <input type="checkbox" id="keepAliveToggle" />
-          <span class="switch-track" aria-hidden="true"></span>
-        </span>
-      </label>
-
-      <!-- セッション維持 ON 時のみ表示するサブ設定群 -->
-      <div class="sub-block hidden" id="intervalRow">
-        <div class="sub-head">
-          <span class="sub-label" data-i18n="keepAliveIntervalLabel">ポーリング間隔</span>
-          <span class="sub-value" id="intervalValue"></span>
-        </div>
-        <input type="range" id="intervalSlider" class="range" step="1" />
-
-        <!-- HTTP ping サブトグル（オプトイン・デフォルト OFF） -->
-        <label class="toggle-row toggle-row--sub" id="keepAliveHttpPingToggleRow">
-          <span class="tr-icon" aria-hidden="true">🌐</span>
-          <span class="tr-text">
-            <span class="tr-name" data-i18n="keepAliveHttpPingLabel">サーバーへの軽量 ping を併発</span>
-            <span class="tr-desc" data-i18n="keepAliveHttpPingDesc">このサイトの top frame だけに HEAD/GET。認証プロキシ環境では OFF 推奨</span>
-          </span>
-          <span class="switch">
-            <input type="checkbox" id="keepAliveHttpPingToggle" />
-            <span class="switch-track" aria-hidden="true"></span>
-          </span>
-        </label>
-      </div>
-
-    </section>
-
     </div><!-- /panel.tune -->
 
-    <!-- ===== Panel: YouTube (クリーナー 30 機能 + ホーム列数) ===== -->
+    <!-- ===== Panel: YouTube (クリーナー 31 機能 + ホーム列数。接続モニターは watch_page カテゴリの
+         サブ機能としてアコーディオン内に FEATURES 駆動で自動描画される) ===== -->
     <div class="panel panel--youtube" id="panelYoutube"
          role="tabpanel" aria-labelledby="tabYoutube" hidden>
 

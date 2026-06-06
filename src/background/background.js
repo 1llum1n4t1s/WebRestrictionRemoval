@@ -84,24 +84,19 @@ chrome.runtime.onInstalled.addListener(async () => {
       .catch(() => {});
   }
 
-  // セッション維持の全タブ共通化に伴い旧キー keepAliveOrigins (サイト単位 origin allowlist) を撤去。
-  // ゆろさん指示でクリーンスタート方針: 既存ユーザーは一旦 keepAliveEnabled も false に戻し、
-  // popup で改めて ON を選んでもらう。旧 origin リストは情報として残しても無意味なので削除。
-  // 重要: onInstalled は install / update / chrome_update / shared_module_update / リロードのたびに
-  // 走るため、旧キー存在検知でマイグレーションを 1 度きりに gate する (毎リロードで keepAliveEnabled を
-  // 強制 false にする経路を回避)。
-  const legacyOriginsCheck = await chrome.storage.local.get("keepAliveOrigins").catch(() => ({}));
-  if ("keepAliveOrigins" in legacyOriginsCheck) {
-    await chrome.storage.local.remove("keepAliveOrigins").catch(() => {});
-    await chrome.storage.local
-      .set({ [StorageKeys.KEEP_ALIVE_ENABLED]: false })
-      .catch(() => {});
-  }
+  // セッション維持機能の撤去に伴い旧キー (keepAliveOrigins / keepAliveEnabled /
+  // keepAliveIntervalMs / keepAliveHttpPingEnabled) と RTX 動画強化の rtxEnhancerEnabled を一括削除する。
+  await chrome.storage.local
+    .remove([
+      "keepAliveOrigins",
+      "keepAliveEnabled",
+      "keepAliveIntervalMs",
+      "keepAliveHttpPingEnabled",
+      "rtxEnhancerEnabled",
+    ])
+    .catch(() => {});
 
   const stored = await chrome.storage.local.get([
-    StorageKeys.KEEP_ALIVE_ENABLED,
-    StorageKeys.KEEP_ALIVE_INTERVAL_MS,
-    StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
@@ -125,7 +120,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VIDEO_FILL_TARGET,
     StorageKeys.LOUPE_ENABLED,
     StorageKeys.LOUPE_ZOOM,
-    StorageKeys.RTX_ENHANCER_ENABLED,
     StorageKeys.LOUPE_SIZE,
     StorageKeys.COLOR_PICKER_HISTORY,
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
@@ -133,14 +127,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.POPUP_LAST_TAB,
   ]);
   const defaults = {};
-  if (!(StorageKeys.KEEP_ALIVE_ENABLED in stored)) defaults[StorageKeys.KEEP_ALIVE_ENABLED] = false;
-  if (!(StorageKeys.KEEP_ALIVE_INTERVAL_MS in stored)) {
-    defaults[StorageKeys.KEEP_ALIVE_INTERVAL_MS] = KeepAlive.DEFAULT_INTERVAL_MS;
-  }
-  if (!(StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED in stored)) {
-    // HTTP ping は副作用大（認証プロキシ環境で 401/302 ループ誘発）のためデフォルト OFF
-    defaults[StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED] = false;
-  }
   if (!(StorageKeys.SEARCH_FIXER_ENABLED in stored)) {
     defaults[StorageKeys.SEARCH_FIXER_ENABLED] = false;
   }
@@ -211,12 +197,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!(StorageKeys.LOUPE_ENABLED in stored)) {
     defaults[StorageKeys.LOUPE_ENABLED] = false;
   }
-  // RTX 動画強化: master OFF で初期化（オプトイン）。
-  // GPU ドライバ側の機能 (NVIDIA RTX Super Resolution など) はユーザーの GPU 設定に依存するため、
-  // ブラウザ側でデフォルト ON にしても効果がないケース（非対応 GPU / ドライバ未設定）が多い。
-  if (!(StorageKeys.RTX_ENHANCER_ENABLED in stored)) {
-    defaults[StorageKeys.RTX_ENHANCER_ENABLED] = false;
-  }
+  // 接続モニターは searchFixerFeatures.connectionMonitor サブ機能に統合済み。SearchFixer.mergeFeatures が
+  // 未設定キーを false に埋めるため、独立した onInstalled 初期化は不要（master searchFixerEnabled も既定 OFF）。
   if (!(StorageKeys.LOUPE_ZOOM in stored)) {
     defaults[StorageKeys.LOUPE_ZOOM] = Loupe.DEFAULT_ZOOM;
   }
@@ -504,8 +486,7 @@ async function getActiveTab() {
 // APPLY_SETTINGS payload で受け取った値だけを差分マージするために、
 // toStorageRecord が扱う全キーを 1 箇所に列挙する。settings に含まれないキーは
 // storage 既存値で補完してから normalizeSettings へ渡すことで、partial payload が
-// 来ても他キーが「正規化で false 化」されて消える事故 (= keepAliveEnabled が
-// いつの間にか OFF になる) を防ぐ二重防御。
+// 来ても他キーが「正規化で false 化」されて消える事故を防ぐ二重防御。
 // /rere B2-I003/D-003 修正: SettingsSchema の storageKey から導出して手書き列挙を廃止。
 // 新 master トグル / 設定キー追加時の「APPLY_SETTINGS_KEYS への追加忘れ」事故を構造的に防止。
 // 旧実装は SettingsSchema と APPLY_SETTINGS_KEYS と normalizeSettings と toStorageRecord の
@@ -544,9 +525,6 @@ async function handleApplySettings(settings) {
  */
 function normalizeSettings(settings) {
   return {
-    keepAliveEnabled: settings?.keepAliveEnabled === true,
-    keepAliveIntervalMs: KeepAlive.clampIntervalMs(settings?.keepAliveIntervalMs),
-    keepAliveHttpPingEnabled: settings?.keepAliveHttpPingEnabled === true,
     searchFixerEnabled: settings?.searchFixerEnabled === true,
     searchFixerFeatures: SearchFixer.mergeFeatures(settings?.searchFixerFeatures),
     searchFixerGridItems: SearchFixer.clampGridItems(settings?.searchFixerGridItems),
@@ -563,9 +541,7 @@ function normalizeSettings(settings) {
     videoFillMode: VideoFill.normalizeMode(settings?.videoFillMode),
     videoFillTarget: VideoFill.normalizeTarget(settings?.videoFillTarget),
     loupeEnabled: settings?.loupeEnabled === true,
-    // /rere レビュー A2-001 修正: rtxEnhancerEnabled が return に含まれないと
-    // toStorageRecord / notifyContentScripts に undefined が渡って RTX 機能が永久 OFF になる。
-    rtxEnhancerEnabled: settings?.rtxEnhancerEnabled === true,
+    // 接続モニターは searchFixerFeatures.connectionMonitor に統合済み（searchFixerFeatures 経由で正規化される）。
   };
 }
 
@@ -595,22 +571,15 @@ async function notifyContentScripts(s) {
   if (!url.startsWith("http://") && !url.startsWith("https://")) return;
 
   // A1-2 / #11 対策: top frame のみ注入の content script (search-fixer / amazon-delivery-total /
-  // instagram-cleaner / tiktok-cleaner / loupe / rtx-enhancer) は frameId 指定なしだと
+  // instagram-cleaner / tiktok-cleaner / loupe) は frameId 指定なしだと
   // 全フレームへブロードキャストされるため、`{ frameId: 0 }` で明示する。
-  // keepalive は `all_frames: true` / video-gamma も `all_frames: true` で全フレーム必要なので
-  // 意図的に frameId 指定なし。
+  // video-gamma は `all_frames: true` で全フレーム必要なので意図的に frameId 指定なし。
   const TOP_FRAME = { frameId: 0 };
 
   // /opop PF-1 + CL-6: 各 sendMessage は独立 (受信側 cs は別 isolated world)、5〜8 RTT を
   // 直列 await ではなく Promise.all で並列発射して apply 経路全体のレイテンシを max(各 RTT) に圧縮。
   // 受信側不在 reject (chrome:// / about: / 非マッチタブ) は expected なので safeSendMessage で silent skip。
   const messages = [
-    // keepalive: all_frames: true なので frameId 指定なし
-    [{ action: Actions.APPLY_KEEP_ALIVE_CS, data: {
-      keepAliveEnabled: s.keepAliveEnabled,
-      keepAliveIntervalMs: s.keepAliveIntervalMs,
-      keepAliveHttpPingEnabled: s.keepAliveHttpPingEnabled,
-    } }, undefined],
     // 動画ガンマ補正: all_frames: true (iframe 内 <video> も対象)
     [{ action: Actions.APPLY_VIDEO_GAMMA_CS, data: {
       enabled: s.videoGammaEnabled,
@@ -624,13 +593,12 @@ async function notifyContentScripts(s) {
     } }, undefined],
     // ルーペ: top frame のみ
     [{ action: Actions.APPLY_LOUPE_CS, data: { enabled: s.loupeEnabled } }, TOP_FRAME],
-    // RTX 動画強化: top frame のみ
-    [{ action: Actions.APPLY_RTX_ENHANCER_CS, data: { enabled: s.rtxEnhancerEnabled } }, TOP_FRAME],
   ];
   if (isYouTubeUrl(url)) {
-    // Shorts 削除も YouTube クリーナーのサブ機能 (features.removeShorts) として統合されたため、
-    // メッセージは APPLY_SEARCH_FIXER_CS のみ。youtube-shorts.js / search-fixer.js の両方が
-    // 同一 isolated world でこの 1 メッセージを購読し、各々の責務に応じて反応する。
+    // Shorts 削除 (features.removeShorts*) と接続モニター (features.connectionMonitor) はいずれも
+    // YouTube クリーナーのサブ機能として統合されているため、メッセージは APPLY_SEARCH_FIXER_CS のみ。
+    // search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js の 3 つが同一 isolated world で
+    // この 1 メッセージを購読し、各々の責務に応じて反応する。
     messages.push([{ action: Actions.APPLY_SEARCH_FIXER_CS, data: {
       enabled: s.searchFixerEnabled,
       features: s.searchFixerFeatures,
