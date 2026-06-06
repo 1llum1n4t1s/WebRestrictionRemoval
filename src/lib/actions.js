@@ -433,13 +433,20 @@ const AmazonDeliveryTotal = Object.freeze({
 const AmazonRankingJump = Object.freeze({
   /** ボタンと装飾クラスの接頭辞 */
   ROOT_CLASS: "__cpa-amzn-ranking-jump",
-  /** 売れ筋ランキングリンクを探す商品詳細コンテナ群（この中だけを走査して非商品ページの誤検出を防ぐ） */
+  /**
+   * 売れ筋ランキングリンクを探す商品詳細コンテナ群（この中だけを走査して非商品ページの誤検出を防ぐ）。
+   * Amazon の新 layout (例: B0FXKSZRDM 「by Amazon あたりめ」等の Private Brand / 食品系新カード UI)
+   * では従来の `detailBullets` 系コンテナに売れ筋リンクが入らず、`#item_details` に移動するため
+   * 両方を併記する。同一ページ内に複数コンテナが共存することもあるが selectTargetHref が
+   * 「DOM 出現順で最後のサブカテゴリ」を選ぶため、重複しても結果は安定する。
+   */
   DETAIL_CONTAINER_SELECTORS: Object.freeze([
     "#detailBulletsWrapper_feature_div",
     "#detailBullets_feature_div",
     "#productDetails_detailBullets_sections1",
     "#prodDetails",
     "#SalesRank",
+    "#item_details", // 新 layout (B0FXKSZRDM 等の新カード UI でランキングリンクが集約される)
   ]),
   /** 売れ筋ランキングへのアンカー（商品詳細コンテナ内から取得） */
   BESTSELLER_LINK_SELECTOR: 'a[href*="bestsellers/"]',
@@ -502,6 +509,20 @@ const AmazonMerchantInfo = Object.freeze({
   FULFILLER_DIV_ID: "fulfillerInfoFeature_feature_div",
   /** 値テキストを持つ安定マーカー span（Amazon の build を跨いで残る class） */
   VALUE_SELECTOR: "span.offer-display-feature-text-message",
+  /**
+   * isInternal フラグを持つ merchant-stats JSON `<script>` が埋め込まれる可能性のあるコンテナ群。
+   * Amazon の新 layout (例: B0FXKSZRDM 「by Amazon」Private Brand 等) では
+   * `#merchantInfoFeature_feature_div` 内に script が無く、availability 系コンテナ配下に
+   * 移動している。同じ ASIN の merchant-stats は同一値なので、先頭一致でも main product の
+   * isInternal を取り違える心配は無い (実機検証で 5 個全部同 ASIN 確認済 2026-06-07)。
+   *
+   * 配列順は narrower → broader の優先度。最初に typeof boolean が取れた script を採用。
+   */
+  IS_INTERNAL_CONTAINER_SELECTORS: Object.freeze([
+    "#merchantInfoFeature_feature_div", // 旧 layout (script が seller div 内に直接ある)
+    "#addToCart",                       // 新 layout (買い物カゴ周辺の availability accordion 配下)
+    "#dp-container",                    // 最終フォールバック (商品詳細ページの最大スコープ)
+  ]),
   /** Amazon 自身を示す販売元名のパターン（部分一致）。Amazon 直販と推定するときの fallback 用 */
   AMAZON_OWNED_NAMES: Object.freeze(["Amazon.co.jp", "Amazon.com", "Amazon"]),
 
@@ -978,12 +999,17 @@ const VolumeBooster = Object.freeze({
    * 自動音量正規化: RMS の指数移動平均 (EMA) 係数。0〜1、小さいほど平滑。
    * tick ごとの瞬間 RMS をそのまま使うと「うるさい/小さい動画でも targetGain がほぼ 1 に丸まる」
    * (効かない) ため、複数 tick を EMA で累積して動画全体のラウドネスを安定推定する。
-   * 0.5 = 1 tick で 50% 反映、約 2〜3 tick (0.8〜1.2s) で大勢が決まる。
-   * (0.3 → 0.5 に引き上げ: 場面切替時の追従が遅すぎて「効かない」体感の主因の 1 つだった
-   *  ため、平滑化と応答速度のバランスを応答側に寄せる。fftSize=4096 (~85ms 窓) で十分長く
-   *  瞬間揺れは既に窓内で平均化済みなので、α 引き上げによる揺れ再発リスクは低い。)
+   * 0.3 = 1 tick で 30% 反映、約 4〜5 tick (1.6〜2.0s) で大勢が決まる。
+   *
+   * 履歴:
+   * - 0.3 → 0.5 (v1.0.39): 場面切替時の追従を速める狙い。fftSize=4096 (~85ms 窓) で十分長く
+   *   瞬間揺れは窓内で平均化済みのため α 引き上げによる揺れ再発リスクは低い、と判断していた。
+   * - 0.5 → 0.3 に戻す (2026-06-07): MAX_GAIN_DB=18 / UP_TIME_CONSTANT=2.5 と同時に動かしたため、
+   *   BGM の verse↔chorus / 喋りの息継ぎ / 動画のシーン切替で smoothedRms が大きく動き、
+   *   dead zone を超えた速い ramp でポンピング (急上下) する体感に (ゆろさん実機報告 2026-06-07)。
+   *   「効く」体感は MAX_GAIN_DB=18 で温存しつつ、α は v1.0.38 の値に戻して平滑性を確保する。
    */
-  NORMALIZE_RMS_SMOOTHING: 0.5,
+  NORMALIZE_RMS_SMOOTHING: 0.3,
   /**
    * 自動音量正規化: これ未満は無音/ノイズ扱いにして増幅しない。
    * BGM + 喋りの動画で「言葉と言葉の隙間に残る BGM」も無音側に倒すため、-50 → -38 に上げて
@@ -1022,18 +1048,23 @@ const VolumeBooster = Object.freeze({
   NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 3.0,
   /**
    * 自動音量正規化: 音が小さいときに上げる追従速度。
-   * 2.5s ≒ 3τ で 7.5 秒で 95% 到達 (1τ=2.5s で 63% 到達、+6dB ジャンプなら 1 秒で +2.2dB)。
-   * UP < DOWN の非対称 (UP fast / DOWN slow) は業界 AGC (Orban Optimod / TC LM6 等) の classic
-   * 配置と整合。「素早く適切音量に到達 + 急な大音量からはゆっくり守る」リスニング安全方針。
-   * 言葉の隙間や瞬間的な小音量ピットでの過剰反応は前段の EMA (α=0.5, ~1s 平滑) + dead zone (2dB)
-   * + silence gate (-38dB) の 3 段防御で抑制し、ramp 短縮による「ramp 自体のポンピング再発」は
-   * 構造的に起きない設計。
-   * (6.0s → 2.5s に短縮: 6.0s だと 3τ=18 秒で 95% 到達、EMA との直列で実時間 ~20 秒となり、
-   *  ショート動画 / シーン切替 / CM 入りに「反応中に次の音源に変わる」状態だった。v1.0.38 の
-   *  延長判断は揺れ抑制狙いだったが、揺れ抑制の責務は v1.0.38 で導入した EMA に既に移譲済みで、
-   *  ramp の遅さは不要だった。)
+   * 6.0s ≒ 3τ で 18 秒で 95% 到達 (1τ=6.0s で 63% 到達、+6dB ジャンプなら 1 秒で +0.93dB)。
+   * UP=6.0 / DOWN=3.0 で「下げる方が倍速い」非対称配置 (= "サスペンションダンパー" イメージ)。
+   * 急な大音量からは素早く守り、小音源の持ち上げはポンピング感ゼロでゆっくり追従させる方針。
+   * 聴感上は 3-5 秒で 63〜78% 到達するので「効いてる」感は十分。
+   *
+   * 履歴:
+   * - 6.0s → 2.5s (v1.0.39): ramp が遅くて「ショート動画 / シーン切替 / CM 入りに反応中に
+   *   次の音源に変わる」状態 (= 効かない体感) の解消狙い。ただし真因は MAX_GAIN_DB=12 で頭打ち
+   *   だったことで、ramp 短縮は副次対策に過ぎなかった。
+   * - 2.5s → 4.0s (2026-06-07 暫定): ポンピング体感 (ゆろさん実機報告) の中間着地案。
+   * - 4.0s → 6.0s に戻す (2026-06-07): v1.0.x の実績値に完全復帰。EMA α=0.3 に戻したので
+   *   smoothedRms の動き自体がもう速くなく、ramp が遅くてもピーク逃しが起きない。「効く」の
+   *   主因は MAX_GAIN_DB=18 (= -42 dBFS まで覆う) で維持済み、ramp 速度を効きに使う必要なし
+   *   というゆろさん判断。τ=6.0s でも 1 秒で +0.93dB ramp、聴感上の「効いてる」感を保ちつつ
+   *   ポンピングを構造的に消す。
    */
-  NORMALIZE_GAIN_UP_TIME_CONSTANT: 2.5,
+  NORMALIZE_GAIN_UP_TIME_CONSTANT: 6.0,
   /**
    * 自動音量正規化: ヒステリシス（dead zone）。目標ゲインと現在ターゲットの差がこの dB 値
    * 未満ならゲイン更新をスキップし、細かい RMS 揺れによるポンピングを抑える。

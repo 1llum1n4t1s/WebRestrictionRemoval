@@ -327,10 +327,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(savedGain));
   updateVolumeLabel(savedGain);
   updateVolumeBoosterDimState();
-  // マスター ON 時は active tab にも保存設定を即適用（タブ切替で漏れた場合の保証）
-  if ($volumeBoosterToggle.checked) {
-    pushVolumeNow(savedGain).catch(logVolumeError("popup-init"));
-  }
+  // popup open での active tab への自動 push はしない (2026-06-07 修正)。
+  // 「popup 必須＝自動適用なし」設計 (memory: volume-booster-uniform-preference) のとおり、
+  // 未 boost タブへの初回 tabCapture (= 「このタブのコンテンツは共有されています」バナー誘発)
+  // はユーザーの能動操作 (スライダー / サブトグル / ミュート変更) を契機にする。
+  // 旧コード `pushVolumeNow(savedGain)` は「タブ切替で漏れた場合の保証」名目だったが、
+  // active tab が未 boost (例: Amazon 買い物ページ) でも問答無用で tabCapture を呼び、
+  // 再生と無関係なタブで誤バナーが出る原因になっていた。
+  // 既 boost 中タブへの設定追従は (a) background の chrome.tabs.onActivated →
+  // autoApplyVolumeBooster (= boostedTabIds 既登録のみ対象、tabCapture 発動なし) と、
+  // (b) popup のスライダー / トグル操作時の pushVolumeNow が担う。
 
   const storedFeatures = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
   for (const [key, input] of featureInputs) {

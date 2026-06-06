@@ -61,10 +61,11 @@
    * target への重複 schedule」を構造的に止め、ramp が毎 tick 再 schedule されて settle しない
    * 罠を回避する (元 Codex P2 指摘 2026-05-08)。
    *
-   * 現行 ramp 設計は UP=2.5s < DOWN=3.0s (actions.js NORMALIZE_GAIN_*_TIME_CONSTANT)。
-   * 「上げる方が速く、下げる方がゆっくり」の非対称で、急な大音量からはゆっくり守りつつ
-   * 小音源は素早く適切音量へ持ち上げる方針。silence からの復帰 (clamped > previousTarget) は
-   * UP=2.5s、boost 中→silence への遷移 (clamped < previousTarget) は DOWN=3.0s が選ばれる。
+   * 現行 ramp 設計は UP=6.0s > DOWN=3.0s (actions.js NORMALIZE_GAIN_*_TIME_CONSTANT)。
+   * 「下げる方が倍速い」非対称で、急な大音量からは素早く守り、小音源の持ち上げは
+   * ポンピングを起こさない速度でゆっくり追従させる方針 ("サスペンションダンパー" イメージ)。
+   * silence からの復帰 (clamped > previousTarget) は UP=6.0s、boost 中→silence への遷移
+   * (clamped < previousTarget) は DOWN=3.0s が選ばれる。
    *
    * @param {object} state - { ctx, normalizerGainNode, normalizerTargetGain }
    * @param {number} targetGain 目標ゲイン倍率（clamp 前）

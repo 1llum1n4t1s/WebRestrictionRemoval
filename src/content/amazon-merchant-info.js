@@ -85,17 +85,26 @@
   }
 
   /**
-   * `#merchantInfoFeature_feature_div` 内の script 要素を全部走査し、
-   * `parseIsInternal` で boolean が取れた最初の値を返す。複数 script がある場合は最初のヒット優先。
+   * `IS_INTERNAL_CONTAINER_SELECTORS` の各コンテナを順に走査し、
+   * `parseIsInternal` で boolean が取れた最初の値を返す。
+   *
+   * Amazon の旧 layout は `#merchantInfoFeature_feature_div` 内に script が直接埋まっていたが、
+   * 新 layout (B0FXKSZRDM 等の Private Brand / 新カード UI) では availability 系コンテナ配下に
+   * 移動している (実機確認 2026-06-07)。同一ページ内に複数の merchant-stats script が
+   * 別 widget 用に重複していても、ASIN が同じなので isInternal 値も同一 (実機検証で
+   * 5 個全部同 ASIN 確認済) → 先頭一致で main product の値を取り違える心配はない。
+   *
    * @returns {boolean|null}
    */
   function readIsInternal() {
-    const div = document.getElementById(AmazonMerchantInfo.MERCHANT_DIV_ID);
-    if (!div) return null;
-    const scripts = div.querySelectorAll("script");
-    for (const s of scripts) {
-      const v = AmazonMerchantInfo.parseIsInternal(s.textContent || "");
-      if (typeof v === "boolean") return v;
+    for (const sel of AmazonMerchantInfo.IS_INTERNAL_CONTAINER_SELECTORS) {
+      const container = document.querySelector(sel);
+      if (!container) continue;
+      const scripts = container.querySelectorAll("script");
+      for (const s of scripts) {
+        const v = AmazonMerchantInfo.parseIsInternal(s.textContent || "");
+        if (typeof v === "boolean") return v;
+      }
     }
     return null;
   }
