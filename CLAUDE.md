@@ -394,7 +394,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
 | `src/content/amazon-ranking-jump.{js,css}` | Amazon ランキングへ移動ボタン: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の売れ筋ランキングリンクから「一番細かいサブカテゴリ」を選んで商品情報最上部に集約ボタン (`<a href>`) を挿入、同じタブで移動。商品ページで自己ゲート、rAF coalesce + observer guard、外部送信ゼロ |
 | `src/content/amazon-merchant-info.{js,css}` | Amazon 販売元・出荷元バッジ: `*://www.amazon.co.jp/*` の top frame に注入、隠し div (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) から販売元・出荷元を抽出し、「📦 販売: XXX / 出荷: YYY」を商品情報最上部 (ランキングボタンの隣) に **クリック不可の情報バッジ** (`<span>` ベース) で表示。**Amazon 直販 = 緑 / マーケット出品 = オレンジ警告** で視覚区別 (`data-variant` 属性で CSS 切替)。直販判定は `AmazonMerchantInfo.parseIsInternal` で script 埋め込み JSON の `isInternal` フラグを最優先、欠落時は `isAmazonOwnedName` の販売元名フォールバック (両純粋関数とも境界値テスト可能化)。商品ページで自己ゲート、rAF coalesce + observer guard + context invalidation guard、外部送信ゼロ |
-| `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject + CSS `filter: url(#...)` で `<video>` に適用 |
+| `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject。**v1.0.41 で video-fill と同型 lifecycle に統一**: 旧 CSS rule 一斉注入 → **per-video inline `style.setProperty("filter", "url(#...)", "important")` + `loadedmetadata` 待ち + WeakMap original + AbortController + MutationObserver で detach 即 revert**。動機: 旧設計が video element の readyState 関係なく filter 当てるため DRM player の session 取得中に attestation 干渉する理論的リスクを構造的に排除 |
 | `src/content/video-fill.js` | 動画の黒帯除去 (ワイド表示): 全 http(s) + iframe に注入 (video-gamma と同 manifest エントリ)。`videoFillEnabled` (master) + `videoFillMode` (`zoom`/`stretch`) + `videoFillTarget` (モニター aspect preset) の 3 storage key。設定はモニター aspect のみ、動画側 aspect は `videoWidth`/`videoHeight` から要素ごとに自動検出して `VideoFill.computeTransform` で拡大率算出。`!important` inline transform で site stylesheet にも勝つ。`loadedmetadata` 待機 + MutationObserver(subtree) で遅延 video 追従 + Extension context invalidation guard で orphan 化対応。元 inline transform は WeakMap に退避し撤去時復元 |
 | `src/content/loupe.{js,css}` | ルーペ機能: 全 http(s) の top frame に注入、`chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `position: fixed` 円形レンズに `background-image` で貼り、mousemove で `background-position` を rAF コアレス 60fps 更新。再キャプチャ trigger は初回 / scroll (500ms debounced) / MutationObserver(childList, subtree:false) / resize。Blob URL に変換して `<img>`/`background-image` で参照し cleanup 時に `URL.revokeObjectURL` で確実に解放 |
 | `src/content/youtube-connection-monitor.{js,css}` | 接続モニター（**YouTube クリーナーのサブ機能** `searchFixerFeatures.connectionMonitor`、master `searchFixerEnabled` AND で制御。独立 storage key なし・`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js と共に購読・`computeActive()` 判定）: `*://*.youtube.com/*` の top frame に注入 (`document_idle`)。`isLiveVideo()` の DOM シグナル判定（`.ytp-time-display.ytp-live` クラス OR `.ytp-live-badge` 可視 OR `duration === Infinity`。DVR ライブは duration が有限で伸びるため duration 単独では不可・実機較正済み）+ `isLiveTrackedVideo` sticky フラグ（trackedVideo identity 同一中はライブ判定維持で「DOM 一瞬ブレで overlay 消滅」防止）でライブ配信のみ対象。**HUD は 2 段構成: コンパクト = verdict + metric 1 行常時、▼ 展開 = 経路 RTT 個別 + 直近バッファ履歴 + 帯域 60 秒統計（dropped frames は端末対処不能のため非表示）**。1s 周期で `navigator.connection.downlink/rtt` + `getVideoPlaybackQuality().droppedVideoFrames` を 30 サンプル ring buffer に蓄積、5s 周期で `https://www.gstatic.com/generate_204` + `https://speed.cloudflare.com/__down?bytes=10` への RTT 計測 (`mode:"no-cors"` + `credentials:"omit"` + `referrerPolicy:"no-referrer"` + `AbortSignal.any([cancel, AbortSignal.timeout(4500)])`)、純粋関数 `ConnectionMonitor.classify` で 7 分類 (stable / network / device / youtube_cdn / routing / international / unknown)。in-player 右上に ROG クリムゾン HUD、ドラッグ + 折りたたみ可能、`localStorage` に位置 / 折りたたみ状態永続化、`:fullscreen` 追従。`applyInFlight`/`applyQueued` で設定購読を直列化、context invalidation guard で orphan 化時に全 timer + observer + overlay 撤去。`createElement` ベースで Trusted Types 安全。endpoint URL は `actions.js` 定数 + `test/actions.test.js` で値固定アサート。**接続モニターのみ外部 fetch あり** (それ以外の機能はすべて外部送信ゼロ) |
@@ -441,6 +441,9 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 - [hideLiveChat（YouTube ライブチャット非表示）](#hidelivechatyoutube-ライブチャット非表示) — iframe click + CSS 先制非表示 + 復活禁止パターン
 - [音量ブースター・Offscreen Document](#音量ブースターoffscreen-document-tabcapture-経路の-audiocontext-実体唯一の経路) — DSP ノード順序 / silence gate 二重判定 / **DSP チューニング履歴表**
 - [YouTube DOM の罠](#youtube-dom-の罠v1027-で得た知見) — handle Unicode / Trusted Types / Polymer / thumbnail URL
+
+**機能別パターン（追加）**
+- [video-gamma / video-fill の lifecycle 統一](#video-gamma--video-fill-の-lifecycle-統一-v1041-で確立) — per-video inline style + loadedmetadata 待ち + WeakMap original + AbortController + MutationObserver
 
 **外部 fetch / セキュリティ**
 - [外部 fetch allowlist 設計](#外部-fetch-allowlist-設計-imagedownloaderallowed_hosts) — 4 原則 / scontent- prefix / same-origin との使い分け
@@ -596,6 +599,47 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 - **subs section の DOM 構造**: `#header-entry` は別の `#header` div、`#items.firstElementChild` は collapsible (見出しっぽい expander)。`querySelector("ytd-guide-entry-renderer:not(#header-entry)")` で最初のチャンネル entry を取得して直前に挿入するのが正解。
 - **Trusted Types policy 対応**: YouTube は Trusted Types を有効化しているため、`innerHTML` 文字列代入は MAIN world で弾かれる。content script の isolated world では制約緩いが、安全側で **`createElement` ベース**で構築。SVG は `createElementNS` を使う。
 - **handle は ASCII 限定じゃない、URL エンコード必須**（2026-05-13 修正） — YouTube ハンドルには日本語 / 韓国語 / 中国語 / アクセント記号など Unicode が含まれるケースが多数（`@むめいの有名になりたい` / `@あゆむさんぽ` / `@Ailas足脚の世界` 等）。DOM の `getAttribute("href")` は **URL エンコード形式** (`/@%E3%82%80...`) で返すため、`href.match(/(@[\w.-]{1,60})/)` のような ASCII 専用正規表現では完全に失敗する。`SearchFixer.extractHandleFromHref` (`src/lib/actions.js`) で **`decodeURIComponent` → Unicode property escapes `\p{L}\p{N}` マッチ** で実装している。subsChannelsGrid のサムネ取得が日本語ハンドルで永遠にスキップされる重大バグの原因だった。新規に handle を扱うコードを書くときは必ず `SearchFixer.extractHandleFromHref` を使うこと。
+
+### video-gamma / video-fill の lifecycle 統一 (v1.0.41 で確立)
+
+video element に視覚エフェクト (filter / transform) を inline style で当てる content script は **video-fill のパターンを正として揃える** こと。video-gamma も v1.0.41 で旧 CSS rule 一斉注入から video-fill 同型に移行済み。
+
+**統一パターン (両 cs 共通)**:
+1. **per-video inline style + `!important`** で apply (CSS rule 注入はしない、`<head>` の `<style>` 注入も廃止)
+2. **`loadedmetadata` 待ち** で apply (intrinsic size 不要な video-gamma でも待つ、DRM player の session 取得完了後に効果が当たる挙動に統一)
+3. **`original` WeakMap** で元 inline style (priority 込み) を退避、`revertVideo` で復元 (撤去時の状態保証)
+4. **`metaListenerCtrl` (AbortController)** で listener 一括 abort、`revertAll` で新 AbortController に差し替え
+5. **`metaAttached` (WeakSet)** で二重登録防止、revertAll で `new WeakSet()` に差し替え (detach 済み video も含めた追跡を O(1) 一括リセット、DOM プロパティマーカーだと取り残し発生する Codex 4 巡目 P2 対策)
+6. **MutationObserver(subtree)** で SPA / 遅延追加 video を追従、`removedNodes` 検知時に `isConnected` チェックで非接続 video を即 `revertVideo` (reparent は除外、後続 scanAndApply で再 attach)
+7. **rAF coalesce (`scanRaf`)** で高頻度 mutation を 1 フレーム 1 回に間引き
+8. **`pagehide` (persisted=false)** で teardown、bfcache 凍結 (persisted=true) は observer 凍結で CPU 消費ゼロのため温存
+9. **`chrome.runtime?.id` orphan guard** で拡張リロード後の content script orphan 化を検知 → `teardownOrphan` で observer 切断 + revertAll + 関連 DOM 撤去
+
+**video-fill 固有 (video-gamma にない)**:
+- `videoWidth/videoHeight` を読んで `VideoFill.computeTransform` で video ごとに拡大率算出
+- `MAX_SCALE` clamp
+- `zoom` / `stretch` モード分岐
+
+**video-gamma 固有 (video-fill にない)**:
+- SVG filter ホスト (`ensureSvgFilter` で `<filter>` を `<body>` に inject、URL 参照 `filter: url(#__cpa-video-gamma)` のため同一ドキュメント必須)
+- `removeSvgFilter` で OFF 時に svg host も撤去 (svg host だけ残置すると `pointer-events:none + off-screen` でも DOM 汚染)
+- value 変更時は `ensureSvgFilter` の子ノード差し替えで exponent を更新 (host 再作成は不要)
+
+**新規 video 系視覚エフェクト cs を追加する場合の必須チェックリスト**:
+- [ ] inline style + `!important` で apply (CSS rule 注入はしない)
+- [ ] `loadedmetadata` 待ちで apply (DRM player 干渉回避)
+- [ ] `original` WeakMap で元 inline style 退避 + `revertVideo` で復元
+- [ ] `metaListenerCtrl` AbortController で listener 一括解除
+- [ ] `metaAttached` WeakSet で二重登録防止
+- [ ] MutationObserver で detach 即 revert + rAF coalesce
+- [ ] `pagehide(persisted=false)` で teardown
+- [ ] `chrome.runtime?.id` orphan guard
+- [ ] iframe 内 cs (`all_frames: true`) でも各 frame 自身の document に対して処理
+
+**復活禁止の失敗パターン**:
+- `<head>` に `<style>video { effect: ... !important }</style>` を CSS rule 注入する (= 旧 video-gamma 方式): video element の readyState 関係なく一斉適用 → DRM session 取得中に当たって player attestation 干渉する理論的リスク
+- `loadedmetadata` を待たずに即 apply: 同上のリスク。intrinsic size 不要な effect でも待つ
+- DOM プロパティマーカー (`v.__cpaAttached = true`) で listener 二重登録防止: detach 済み video のマーカーが取り残されて reinsert+再 ON 時に listener 再 attach 不能 (= Codex 4 巡目 P2 で実例化)
 
 ### 外部 fetch allowlist 設計 (`ImageDownloader.ALLOWED_HOSTS`)
 画像ダウンロード機能が許可する CDN ホストは `actions.js` の `ImageDownloader.ALLOWED_HOSTS` で regex 配列として宣言する。**任意サブドメインを通す広いパターンは禁止** (`evil.{cdn}.com` を allowlist 通過させて代理 fetch 攻撃面を作る)。
