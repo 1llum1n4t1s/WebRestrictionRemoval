@@ -16,7 +16,7 @@
     "eslint": "^10.5.0",
     "globals": "^17.6.0",
     "puppeteer": "^25.0.4",
-    "sharp": "0.34.5",
+    "sharp": "0.35.1",
     "web-ext": "^10.3.0"
   },
   "keywords": [
