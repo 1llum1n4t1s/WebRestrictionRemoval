@@ -44,8 +44,6 @@
   "volumeMuteTitleOn": { "message": "Unmute (restore volume)" },
   "volumeAntiClipLabel": { "message": "Auto Distortion Guard" },
   "volumeAntiClipDesc": { "message": "Tame sudden shouts and effect peaks to prevent clipping when boosting." },
-  "volumeNormalizeLabel": { "message": "Auto Volume Normalization" },
-  "volumeNormalizeDesc": { "message": "Measure the average loudness of each video or stream and equalize it via auto-gain." },
   "volumeNightModeLabel": { "message": "Night Mode" },
   "volumeNightModeDesc": { "message": "Gently compress loud voices and explosions so quiet game audio is not buried." },
 

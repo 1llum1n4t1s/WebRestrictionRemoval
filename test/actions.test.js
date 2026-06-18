@@ -71,20 +71,42 @@ test("VolumeBooster.sliderPositionToPercent: SLIDER_UNITY で UNITY", () => {
 
 // ---------- StorageKeys: 音量ブースター系の鍵が揃っているか ----------
 
-test("StorageKeys.VOLUME_BOOSTER_* が 6 キー揃っている（master + lastGain + 3 サブトグル + muted）", () => {
-  // 6 キーいずれかを追加・削除する場合は次を必ず同時更新:
+test("StorageKeys.VOLUME_BOOSTER_* が 5 キー揃っている（master + lastGain + 2 サブトグル + muted）", () => {
+  // 5 キーいずれかを追加・削除する場合は次を必ず同時更新:
   //   - background.js の cachedVolumeSettings 監視リストと onInstalled 初期化
   //   - popup.js の storage.local.get / event handler
   //   - _locales/{en,ja}/messages.json (UI 露出する場合)
-  //   - CLAUDE.md "5 storage key" / "6 storage key" の数値整合
+  //   - CLAUDE.md "5 storage key" の数値整合
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_LAST_GAIN, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, "string");
-  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED, "string");
   // 旧仕様の混入チェック (snake_case や大文字小文字違いの誤キー混入を防ぐ)
   assert.equal(G.StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED, "volumeBoosterMutedEnabled");
+});
+
+test("撤去済み: 自動音量正規化サブ機能の痕跡が actions.js から完全消去されている", () => {
+  // 自動音量正規化 (volumeBoosterNormalize) は「現実的でない」ため撤去 (2026-06-19)。
+  // 復活防止 + drift 検知: storage key / DSP 定数が actions.js に残っていないことを物理確認する。
+  // CLAUDE.md「撤去済み機能と教訓」§ 参照。
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED, undefined);
+  assert.ok(
+    !("VOLUME_BOOSTER_NORMALIZE_ENABLED" in G.StorageKeys),
+    "VOLUME_BOOSTER_NORMALIZE_ENABLED は StorageKeys から撤去済みのはず"
+  );
+  // NORMALIZE_* DSP 定数群 (NORMALIZE_TARGET_RMS_DB 等) も VolumeBooster から撤去済み。
+  const leftoverNormalizeKeys = Object.keys(G.VolumeBooster).filter((k) =>
+    k.startsWith("NORMALIZE_")
+  );
+  assert.deepEqual(
+    leftoverNormalizeKeys,
+    [],
+    `VolumeBooster に NORMALIZE_* 定数が残存: ${leftoverNormalizeKeys.join(", ")}`
+  );
+  // 音量サブトグルは自動歪み防止 / ナイトモードの 2 つに減った (正規化は撤去)。
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
 });
 
 // ---------- VideoGamma ----------

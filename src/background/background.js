@@ -85,7 +85,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 
   // セッション維持機能の撤去に伴い旧キー (keepAliveOrigins / keepAliveEnabled /
-  // keepAliveIntervalMs / keepAliveHttpPingEnabled) と RTX 動画強化の rtxEnhancerEnabled を一括削除する。
+  // keepAliveIntervalMs / keepAliveHttpPingEnabled)、RTX 動画強化の rtxEnhancerEnabled、
+  // 自動音量正規化サブ機能の volumeBoosterNormalizeEnabled を一括削除する
+  // (自動音量正規化は現実的でないため撤去、CLAUDE.md「撤去済み機能と教訓」参照)。
   await chrome.storage.local
     .remove([
       "keepAliveOrigins",
@@ -93,6 +95,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       "keepAliveIntervalMs",
       "keepAliveHttpPingEnabled",
       "rtxEnhancerEnabled",
+      "volumeBoosterNormalizeEnabled",
     ])
     .catch(() => {});
 
@@ -110,7 +113,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VOLUME_BOOSTER_ENABLED,
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VIDEO_GAMMA_ENABLED,
@@ -165,9 +167,6 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] = false;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] = false;
   }
   if (!(StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] = false;
@@ -267,7 +266,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       request.data?.tabId,
       request.data?.gain,
       request.data?.antiClip,
-      request.data?.normalize,
       request.data?.nightMode,
       request.data?.muted
     )
@@ -398,7 +396,6 @@ async function autoApplyVolumeBooster(tabId) {
       StorageKeys.VOLUME_BOOSTER_ENABLED,
       StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
       StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
       StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
       StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     ]);
@@ -413,21 +410,19 @@ async function autoApplyVolumeBooster(tabId) {
   if (stored[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) return;
   const gain = VolumeBooster.clampValue(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT);
   const antiClip = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
-  const normalize = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
   const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
   const muted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
-  await setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode, muted);
+  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted);
 }
 
 // ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
 chrome.storage.onChanged.addListener((changes) => {
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効、設定変化も無視
-  // 6 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
+  // 5 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN in changes ||
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes
   ) {
@@ -512,7 +507,7 @@ async function handleApplySettings(settings) {
  * `!!` だと truthy 判定されて誤って ON 化されうる。デフォルト OFF 方針を堅持するため、
  * 明示的な `true` のときだけ有効化する。
  *
- * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / Normalize / NightMode / Muted) は
+ * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / NightMode / Muted) は
  * APPLY_SETTINGS の対象外**: popup が VOLUME_BOOSTER_SET_GAIN メッセージで gain と一緒に
  * 渡してくるため、storage.set は popup 側で直接行う。content script への配信も不要なので
  * normalizeSettings / toStorageRecord には含めない。新しい音量関連 storage key を増やすときは
@@ -944,11 +939,11 @@ async function isVolumeBoosterActive() {
  * 指定タブの音量を設定する。スライダー値が UNITY (100) のときは AudioContext を解放するだけで
  * 新規 tabCapture は呼ばない（リソース節約 + chrome:// 等での無駄なエラー回避）。
  *
- * `antiClip` / `normalize` は popup から渡される DynamicsCompressor 機能フラグで、
+ * `antiClip` / `nightMode` は popup から渡される DynamicsCompressor 機能フラグで、
  * offscreen 側で各 compressor のパラメータを切り替える。両 OFF 時もチェーンには残し
  * ratio:1 のバイパス設定にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode, muted) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted) {
   // P2-#13: tabId は popup origin（SenderCheck.isFromPopup で検証済み）から渡されるが、
   // popup の中では `getActiveHttpTab()` 経由で active tab の id を入れて送ってくる。
   // popup CSP (`script-src 'self'`) で外部スクリプトが popup 内で動くことは事実上不可能なため、
@@ -960,18 +955,16 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
   }
   const clamped = VolumeBooster.clampValue(gain);
   const antiClipFlag = antiClip === true;
-  const normalizeFlag = normalize === true;
   const nightModeFlag = nightMode === true;
   const mutedFlag = muted === true;
 
   // スライダーが等倍位置 (100%) かつ全サブトグル OFF かつミュート OFF のときだけ release → リソース返却。
-  // 100% でも自動歪み防止 / 自動音量正規化 / ナイトモードのいずれかが ON なら compressor を効かせる必要があり、
+  // 100% でも自動歪み防止 / ナイトモードのいずれかが ON なら compressor を効かせる必要があり、
   // ミュート ON なら gain を 0 にランプし続ける必要があるため、いずれの場合も AudioContext を維持して通常経路に進む
   // （gain は 1.0x または 0 にランプ、compressor は preset 通り適用）。
   if (
     clamped === VolumeBooster.UNITY &&
     !antiClipFlag &&
-    !normalizeFlag &&
     !nightModeFlag &&
     !mutedFlag
   ) {
@@ -996,7 +989,6 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
         streamId: null,
         gain: clamped,
         antiClip: antiClipFlag,
-        normalize: normalizeFlag,
         nightMode: nightModeFlag,
         muted: mutedFlag,
       });
@@ -1051,7 +1043,6 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, normalize, nightMode,
       streamId,
       gain: clamped,
       antiClip: antiClipFlag,
-      normalize: normalizeFlag,
       nightMode: nightModeFlag,
       muted: mutedFlag,
     });

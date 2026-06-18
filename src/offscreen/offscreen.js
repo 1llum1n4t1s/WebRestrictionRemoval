@@ -18,35 +18,27 @@
  * tabId → AudioState の Map。AudioContext は close するまで音声を増幅し続けるため
  * release 時に必ず close する。
  *
- * AudioState の構造（ノードチェーン: source → normalizerAnalyzer → normalizerGainNode → nightModeNode → gainNode → antiClipNode → destination）:
+ * AudioState の構造（ノードチェーン: source → nightModeNode → gainNode → antiClipNode → destination）:
  *   - ctx: AudioContext
  *   - gainNode: GainNode（ユーザースライダーの 0-300% ブースト）
- *   - normalizerAnalyzer: AnalyserNode（自動音量正規化の短時間RMS測定）
- *   - normalizerGainNode: GainNode（測定値から自動調整するラウドネス補正）
  *   - nightModeNode: DynamicsCompressorNode（ゲーム配信向けナイトモード圧縮、OFF 時はバイパス設定）
  *   - antiClipNode: DynamicsCompressorNode（自動歪み防止 / リミッタ、OFF 時はバイパス設定）
  *   - stream: MediaStream
  *
- * 自動音量正規化はコンプレッサーではなく、短時間RMSを目標値へ寄せる自動 GainNode として動く。
  * ナイトモード / 自動歪み防止の compressor は常時チェーン接続し、OFF 時は ratio:1 のバイパス設定にする。
  */
 const audioStates = new Map();
-/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, normalizerAnalyzer: AnalyserNode, normalizerGainNode: GainNode, normalizerBuffer: Float32Array, normalizerTimer: number|null, normalizeEnabled: boolean, normalizerTargetGain: number, normalizerSmoothedRms: number|null, nightModeNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
+/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, nightModeNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
 const audioInitPromises = new Map();
 
 /**
- * DynamicsCompressorNode に preset を適用する。
- * 機能 OFF 時は VolumeBooster.COMPRESSOR_BYPASS（ratio:1）を渡してパススルー化する。
+ * DSP コア関数は src/lib/audio-pipeline.js に集約 (globalThis.AudioPipeline)。
+ * 旧 MES 経路 (volume-booster.js) との物理コピー drift 解消が当初の抽出動機。MES 経路 +
+ * 自動音量正規化の撤去後は applyCompressorPreset のみが残る。
+ * applyCompressorPreset は DynamicsCompressorNode に preset を適用する。機能 OFF 時は
+ * VolumeBooster.COMPRESSOR_BYPASS（ratio:1）を渡してパススルー化する。
  */
-// /rere B1-004/B2-I001/D-001 修正: DSP コア 8 関数を src/lib/audio-pipeline.js に集約。
-// 旧実装は volume-booster.js (MES 経路) と同一の 8 関数を物理コピーで持ち、「片方を更新したら
-// 必ず他方も同期する」を人間運用に依存していたため drift 既発。値定数は actions.js の
-// VolumeBooster (既存集約場所) を経由、フロー制御ロジックのみを audio-pipeline.js に集約する。
-// caller (この offscreen) が直接呼ぶのは 3 関数のみ。dbToGain / clampNormalizerGain /
-// scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer は audio-pipeline.js の
-// 内部で相互に呼ばれるだけ (updateLoudnessNormalizer / stopLoudnessNormalizer 経由) なので
-// destructure しない (ESLint no-unused-vars 回避、セルフレビュー 2 巡目)。
-const { stopLoudnessNormalizer, updateLoudnessNormalizer, applyCompressorPreset } = AudioPipeline;
+const { applyCompressorPreset } = AudioPipeline;
 
 /**
  * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。
@@ -55,12 +47,11 @@ const { stopLoudnessNormalizer, updateLoudnessNormalizer, applyCompressorPreset 
  * @param {string} streamId chrome.tabCapture.getMediaStreamId が返した stream ID
  * @param {number} gainPercent 0-300 の整数（％）
  * @param {boolean} antiClip 自動歪み防止 ON/OFF
- * @param {boolean} normalize 自動音量正規化 ON/OFF
  * @param {boolean} nightMode ナイトモード圧縮 ON/OFF
  * @param {boolean} muted ミュート ON/OFF（true なら gainPercent によらず 0 にランプ、lastSetPercent は保持）
  * @returns {Promise<{ok: boolean, gain?: number, error?: string}>}
  */
-async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize, nightMode, muted) {
+async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, muted) {
   try {
     if (!Number.isInteger(tabId) || tabId <= 0) {
       return { ok: false, error: "invalid-tab-id" };
@@ -118,7 +109,6 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, normalize, 
     // ユーザーが意図したスライダー位置を保持（gain.value はランプ中で別値、ミュート中も保持）。
     state.lastSetPercent = clamped;
     // 既存ノードのプロパティを書き換えるだけなので AudioContext 再構築は不要。トグル切替時も音切れなし。
-    updateLoudnessNormalizer(state, normalize === true);
     applyCompressorPreset(
       state.nightModeNode,
       nightMode === true ? VolumeBooster.NIGHT_MODE_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
@@ -161,7 +151,7 @@ async function createAudioState(tabId, streamId) {
     // suspended のままだと tabCapture stream は流れているのに destination から音が出ず、
     // タブ音実体がミュート状態に陥り YouTube プレイヤー側もそれを検出してミュート UI を出す。
     // background → offscreen の sendMessage 連鎖は user gesture を保持しているため
-    // resume() は同期的に成功するはず。失敗時は無視（後続の tickLoudnessNormalizer 等で
+    // resume() は同期的に成功するはず。失敗時は無視（後続の音声処理で
     // 自然に resume されるケースもある）。
     if (ctx.state === "suspended") {
       try { await ctx.resume(); } catch (err) {
@@ -170,26 +160,14 @@ async function createAudioState(tabId, streamId) {
       }
     }
     const source = ctx.createMediaStreamSource(stream);
-    const normalizerAnalyzer = ctx.createAnalyser();
-    const normalizerGainNode = ctx.createGain();
     const gainNode = ctx.createGain();
-    // ノード順序: ラウドネス正規化（測定 + 自動 gain）→ ナイトモード（コンプ）
-    // → ブースト（gain）→ 自動歪み防止（リミッタ）の直列接続。
-    // 正規化は「音源全体の平均的な音量」を先に整え、ナイトモードはその後で瞬間的な大小差を狭める。
-    //
-    // fftSize は周波数解析用パラメータだが、`getFloatTimeDomainData` でも測定窓サイズとして使われる。
-    // 512 (約 11ms) では窓が短すぎて瞬間振幅を拾い、RMS が乱高下 → 正規化が効かない / 変動が速い
-    // 体感になっていた (ゆろさん実機報告 2026-06-04)。NORMALIZE_ANALYSER_FFT_SIZE (4096 ≒ 85ms) で
-    // 音節〜フレーズ単位のラウドネスを安定測定する。RMS 計算は 400ms に 1 回だけなので CPU は非問題。
-    normalizerAnalyzer.fftSize = VolumeBooster.NORMALIZE_ANALYSER_FFT_SIZE;
-    normalizerGainNode.gain.value = 1;
+    // ノード順序: ナイトモード（コンプ）→ ブースト（gain）→ 自動歪み防止（リミッタ）の直列接続。
+    // ナイトモードで瞬間的な大小差を先に狭め、gain でブーストし、最後に anti-clip でピークを抑える。
     const nightModeNode = ctx.createDynamicsCompressor();
     const antiClipNode = ctx.createDynamicsCompressor();
     applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
     applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
-    source.connect(normalizerAnalyzer);
-    normalizerAnalyzer.connect(normalizerGainNode);
-    normalizerGainNode.connect(nightModeNode);
+    source.connect(nightModeNode);
     nightModeNode.connect(gainNode);
     gainNode.connect(antiClipNode);
     antiClipNode.connect(ctx.destination);
@@ -199,13 +177,6 @@ async function createAudioState(tabId, streamId) {
     const state = {
       ctx,
       gainNode,
-      normalizerAnalyzer,
-      normalizerGainNode,
-      normalizerBuffer: new Float32Array(normalizerAnalyzer.fftSize),
-      normalizerTimer: null,
-      normalizeEnabled: false,
-      normalizerTargetGain: 1,
-      normalizerSmoothedRms: null,
       nightModeNode,
       antiClipNode,
       stream,
@@ -253,7 +224,6 @@ async function volumeReleaseTab(tabId) {
   if (!state) return { ok: true };
   audioStates.delete(tabId);
   try {
-    stopLoudnessNormalizer(state);
     state.stream?.getTracks().forEach((t) => t.stop());
     await state.ctx.close();
   } catch (err) {
@@ -297,7 +267,6 @@ function cleanupAllAudio() {
   cleanedUp = true;
   for (const state of audioStates.values()) {
     try {
-      stopLoudnessNormalizer(state);
       state.stream?.getTracks().forEach((t) => t.stop());
       // P3-#20: `AudioContext.close()` は Promise を返すが、`pagehide` ハンドラから同期的に
       // 呼ばれるため await 不可。fire-and-forget で発射するだけで十分（offscreen document
@@ -333,7 +302,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       msg.streamId,
       msg.gain,
       msg.antiClip,
-      msg.normalize,
       msg.nightMode,
       msg.muted
     ).then(sendResponse);

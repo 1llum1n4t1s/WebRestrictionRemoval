@@ -132,8 +132,6 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_LAST_GAIN: "volumeBoosterLastGain",
   /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
-  /** 音量ブースター: 自動音量正規化（短時間RMSを測って自動ゲイン調整） */
-  VOLUME_BOOSTER_NORMALIZE_ENABLED: "volumeBoosterNormalizeEnabled",
   /** 音量ブースター: ナイトモード（ゲーム配信用途） */
   VOLUME_BOOSTER_NIGHT_MODE_ENABLED: "volumeBoosterNightModeEnabled",
   /** 音量ブースター: ミュート（スライダー値・サブトグル設定は保持したまま gain を 0 にランプ）。
@@ -984,95 +982,6 @@ const VolumeBooster = Object.freeze({
     attack: 0.001,
     release: 0.05,
   }),
-  /** 自動音量正規化: 目標RMS。厳密な LUFS ではなく、リアルタイム用途の短時間ラウドネス近似。 */
-  NORMALIZE_TARGET_RMS_DB: -24,
-  /**
-   * 自動音量正規化: RMS 測定窓 (AnalyserNode.fftSize)。`getFloatTimeDomainData` の測定窓サイズ。
-   * 512 (約 11ms) は窓が短すぎて瞬間振幅を拾い、RMS が tick ごとに乱高下 → targetGain が定まらず
-   * 「正規化が効かない / 変動が速い」体感になっていた (ゆろさん実機報告 2026-06-04)。
-   * 4096 (約 85ms @48kHz) に拡大し、音節〜フレーズ単位のラウドネスを安定測定する。RMS 計算ループは
-   * NORMALIZE_UPDATE_MS (400ms) ごとに 1 回だけなので、窓拡大による CPU 影響は無視できる
-   * (旧 /rere C-#16 の CPU 懸念は UPDATE_MS が短かった頃の話で、現行 400ms では非問題)。
-   */
-  NORMALIZE_ANALYSER_FFT_SIZE: 4096,
-  /**
-   * 自動音量正規化: RMS の指数移動平均 (EMA) 係数。0〜1、小さいほど平滑。
-   * tick ごとの瞬間 RMS をそのまま使うと「うるさい/小さい動画でも targetGain がほぼ 1 に丸まる」
-   * (効かない) ため、複数 tick を EMA で累積して動画全体のラウドネスを安定推定する。
-   * 0.3 = 1 tick で 30% 反映、約 4〜5 tick (1.6〜2.0s) で大勢が決まる。
-   *
-   * 履歴:
-   * - 0.3 → 0.5 (v1.0.39): 場面切替時の追従を速める狙い。fftSize=4096 (~85ms 窓) で十分長く
-   *   瞬間揺れは窓内で平均化済みのため α 引き上げによる揺れ再発リスクは低い、と判断していた。
-   * - 0.5 → 0.3 に戻す (2026-06-07): MAX_GAIN_DB=18 / UP_TIME_CONSTANT=2.5 と同時に動かしたため、
-   *   BGM の verse↔chorus / 喋りの息継ぎ / 動画のシーン切替で smoothedRms が大きく動き、
-   *   dead zone を超えた速い ramp でポンピング (急上下) する体感に (ゆろさん実機報告 2026-06-07)。
-   *   「効く」体感は MAX_GAIN_DB=18 で温存しつつ、α は v1.0.38 の値に戻して平滑性を確保する。
-   */
-  NORMALIZE_RMS_SMOOTHING: 0.3,
-  /**
-   * 自動音量正規化: これ未満は無音/ノイズ扱いにして増幅しない。
-   * BGM + 喋りの動画で「言葉と言葉の隙間に残る BGM」も無音側に倒すため、-50 → -38 に上げて
-   * gate を強めにかける。-50 だと隙間 BGM の RMS でも有効音判定 → 目標 -24dB まで持ち上げる
-   * → 喋り出した瞬間に下げる、というポンピングが発生していた。
-   *
-   * 判定は **瞬間 rms と平滑値 smoothedRms の二重判定** (audio-pipeline.js tickLoudnessNormalizer)
-   * で両方が gate 下のときだけ無音復帰する。瞬間 rms 単独だと「ON にして boost 到達 → 瞬間 rms が
-   * gate を一瞬下回って force UNITY → 即下がる」の silence gate 跨ぎチャタリングが起きていた。
-   * 二重判定により、通常音声中のディップは smoothedRms が gate 上なのでスキップしない。
-   */
-  NORMALIZE_SILENCE_GATE_DB: -38,
-  /**
-   * 自動音量正規化: 小さい音源を持ち上げる最大量。
-   * +18dB (約 8 倍ブースト) まで持ち上げて、入力 RMS -42 dBFS の小音源（個人録音 / 古い動画 /
-   * ASMR / ambient）でも target -24 dBFS に到達できるようにする。後段の antiClipNode (-3 dBFS
-   * hard limiter / ratio 12) でクリップは構造的に防がれるため、上限拡大しても破綻しない。
-   * 過剰持ち上げによる環境ノイズの増幅は dead zone と silence gate (-38 dB) で抑制する設計。
-   * (12 → 18 に拡大: +12dB だと入力 -36 dBFS 未満で target 未達のまま頭打ちで「効かない」
-   *  体感の主因だったため、カバー範囲を -36 → -42 dBFS まで広げる。)
-   */
-  NORMALIZE_MAX_GAIN_DB: 18,
-  /** 自動音量正規化: 大きい音源を下げる最大量。 */
-  NORMALIZE_MIN_GAIN_DB: -12,
-  /**
-   * 自動音量正規化: 音量測定とゲイン更新の間隔。
-   * 250ms → 400ms に伸ばし、瞬間 RMS の揺れに対する応答頻度を下げる。
-   */
-  NORMALIZE_UPDATE_MS: 400,
-  /**
-   * 自動音量正規化: 音が大きいときに下げる追従速度。
-   * 「サスペンションダンパー」イメージで上下とも遅く動かす方針。
-   * 3.0s ≒ 3τ で 9 秒で 95% 到達。瞬間ピークでは下げず、平均的に大きい音源にだけ反応する。
-   * (2.0s → 3.0s に延長: RMS 平滑化と併せて変動をさらにゆっくりに / ゆろさん要望 2026-06-04)
-   */
-  NORMALIZE_GAIN_DOWN_TIME_CONSTANT: 3.0,
-  /**
-   * 自動音量正規化: 音が小さいときに上げる追従速度。
-   * 6.0s ≒ 3τ で 18 秒で 95% 到達 (1τ=6.0s で 63% 到達、+6dB ジャンプなら 1 秒で +0.93dB)。
-   * UP=6.0 / DOWN=3.0 で「下げる方が倍速い」非対称配置 (= "サスペンションダンパー" イメージ)。
-   * 急な大音量からは素早く守り、小音源の持ち上げはポンピング感ゼロでゆっくり追従させる方針。
-   * 聴感上は 3-5 秒で 63〜78% 到達するので「効いてる」感は十分。
-   *
-   * 履歴:
-   * - 6.0s → 2.5s (v1.0.39): ramp が遅くて「ショート動画 / シーン切替 / CM 入りに反応中に
-   *   次の音源に変わる」状態 (= 効かない体感) の解消狙い。ただし真因は MAX_GAIN_DB=12 で頭打ち
-   *   だったことで、ramp 短縮は副次対策に過ぎなかった。
-   * - 2.5s → 4.0s (2026-06-07 暫定): ポンピング体感 (ゆろさん実機報告) の中間着地案。
-   * - 4.0s → 6.0s に戻す (2026-06-07): v1.0.x の実績値に完全復帰。EMA α=0.3 に戻したので
-   *   smoothedRms の動き自体がもう速くなく、ramp が遅くてもピーク逃しが起きない。「効く」の
-   *   主因は MAX_GAIN_DB=18 (= -42 dBFS まで覆う) で維持済み、ramp 速度を効きに使う必要なし
-   *   というゆろさん判断。τ=6.0s でも 1 秒で +0.93dB ramp、聴感上の「効いてる」感を保ちつつ
-   *   ポンピングを構造的に消す。
-   */
-  NORMALIZE_GAIN_UP_TIME_CONSTANT: 6.0,
-  /**
-   * 自動音量正規化: ヒステリシス（dead zone）。目標ゲインと現在ターゲットの差がこの dB 値
-   * 未満ならゲイン更新をスキップし、細かい RMS 揺れによるポンピングを抑える。
-   * RMS 平滑化 (EMA) で targetGain が安定したため 3 → 2 dB に狭め、「うるさい/小さい動画」の
-   * 数 dB 差もスルーせず補正できるようにする (効きを強める / ゆろさん要望 2026-06-04)。
-   * ポンピング再発は EMA + silence gate (-38dB) で抑制。
-   */
-  NORMALIZE_DEAD_ZONE_DB: 2,
   /**
    * ナイトモード用コンプレッサー（ダイナミックレンジを縮める）。
    *

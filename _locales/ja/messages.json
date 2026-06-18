@@ -44,8 +44,6 @@
   "volumeMuteTitleOn": { "message": "ミュート解除（音量を復帰）" },
   "volumeAntiClipLabel": { "message": "自動歪み防止" },
   "volumeAntiClipDesc": { "message": "突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます" },
-  "volumeNormalizeLabel": { "message": "自動音量正規化" },
-  "volumeNormalizeDesc": { "message": "動画や配信ごとの平均音量を測り、自動ゲインで聞こえ方をそろえます" },
   "volumeNightModeLabel": { "message": "ナイトモード" },
   "volumeNightModeDesc": { "message": "大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます" },
 

@@ -171,7 +171,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeResetBtn = document.getElementById("volumeResetBtn");
   const $volumeHint = document.getElementById("volumeHint");
   const $volumeAntiClipToggle = document.getElementById("volumeAntiClipToggle");
-  const $volumeNormalizeToggle = document.getElementById("volumeNormalizeToggle");
   const $volumeNightModeToggle = document.getElementById("volumeNightModeToggle");
   const $volumeMuteBtn = document.getElementById("volumeMuteBtn");
   const $volumeMuteIcon = $volumeMuteBtn?.querySelector(".volume-mute-icon");
@@ -241,7 +240,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.VOLUME_BOOSTER_ENABLED,
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VIDEO_GAMMA_ENABLED,
@@ -281,7 +279,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
-  $volumeNormalizeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
   // ミュート状態の復元 + ボタン視覚状態の同期。
   // ミュート ON でもスライダー値は last gain 位置のまま表示する（pushVolumeNow 側で muted=true を渡すと
@@ -522,9 +519,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]) {
       $volumeAntiClipToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED].newValue === true;
     }
-    if (changes[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]) {
-      $volumeNormalizeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED].newValue === true;
-    }
     if (changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]) {
       $volumeNightModeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED].newValue === true;
     }
@@ -654,7 +648,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await pushVolumeNow(VolumeBooster.DEFAULT);
   });
 
-  // 自動歪み防止 / 自動音量正規化 / ナイトモード: storage に保存 + 現在 gain を再送信して即時反映。
+  // 自動歪み防止 / ナイトモード: storage に保存 + 現在 gain を再送信して即時反映。
   // ブースト中なら offscreen の compressor パラメータが書き換わり、UNITY (100%) なら次回ブースト時に有効。
   // cancelVolumePush() を先頭で呼ぶのは、debounce タイマー (120ms) が古いトグル状態のまま
   // 発火するレースを防ぐため。storage.set は fire-and-forget で OK（pushVolumeNow は DOM
@@ -668,12 +662,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
   bindVolumeSubToggle($volumeAntiClipToggle, StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED);
-  bindVolumeSubToggle($volumeNormalizeToggle, StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED);
   bindVolumeSubToggle($volumeNightModeToggle, StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED);
 
   // ミュートボタン: クリックで volumeMuted を toggle、storage 保存、現在 gain を再 push して即時反映。
   // ミュート ON でもスライダー値 / サブトグル設定は保持され、UNITY release 条件で AudioContext を解放しない。
-  // 5 storage key の他のキーと同様、popup 直書き経路（normalizeSettings を経由しない）。
+  // 音量ブースター直書きキー群と同様、popup 直書き経路（normalizeSettings を経由しない）。
   $volumeMuteBtn.addEventListener("click", () => {
     if (!$volumeBoosterToggle.checked) return;
     cancelVolumePush();
@@ -1296,11 +1289,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     // popup クローズ後の orphan await から戻ったときに DOM が detached になっている
     // ケースは storage 書き込みも副作用ゼロ路に倒して終了 (/rere B1-S2-1)。
     if (!document.body?.isConnected) return;
-    // 音量関連 6 キーを storage に永続化 (popup 復元 + background の autoApplyVolumeBooster 用)。
+    // 音量関連キー (last gain + サブトグル 2 + ミュート) を storage に永続化 (popup 復元 + background の autoApplyVolumeBooster 用)。
     chrome.storage.local.set({
       [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped,
       [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
-      [StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED]: $volumeNormalizeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
     }).catch(logStorageError("volume-pushVolumeNow"));
@@ -1319,7 +1311,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           tabId: tab.id,
           gain: clamped,
           antiClip: $volumeAntiClipToggle.checked,
-          normalize: $volumeNormalizeToggle.checked,
           nightMode: $volumeNightModeToggle.checked,
           muted: volumeMuted,
         },
@@ -1372,7 +1363,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeRow.classList.toggle("volume-disabled", off);
     $volumeSlider.disabled = off;
     $volumeAntiClipToggle.disabled = off;
-    $volumeNormalizeToggle.disabled = off;
     $volumeNightModeToggle.disabled = off;
     if ($volumeMuteBtn) $volumeMuteBtn.disabled = off;
   }
