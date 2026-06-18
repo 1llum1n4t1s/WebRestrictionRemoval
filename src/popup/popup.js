@@ -295,14 +295,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
   // イコライザの復元 + UI 構築 + イベントバインド（buildEqUi/bindEqEvents/syncEqUi/updateEqPanelState は function 宣言で hoist 済み）。
-  $volumeEqToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
-  eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
-  eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
-  eqPreset = VolumeBooster.normalizeEqPreset(stored[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]);
-  buildEqUi();
-  bindEqEvents();
-  syncEqUi();
-  updateEqPanelState();
+  // try/catch で全体を囲み、EQ 初期化で何かが落ちても後続の初期化 (クリーナーアコーディオン構築 / featureInputs ループ 等)
+  // が止まらないように守る。EQ DOM 要素 ($volumeEqToggle 等) が万一欠落していてもタブナビゲーション・他機能は健全に保つ。
+  if ($volumeEqToggle && $volumeEqPreset && $volumeEqSliders && $volumeEqPanel) {
+    try {
+      $volumeEqToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
+      eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
+      eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
+      eqPreset = VolumeBooster.normalizeEqPreset(stored[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]);
+      buildEqUi();
+      bindEqEvents();
+      syncEqUi();
+      updateEqPanelState();
+    } catch (err) {
+      console.warn("[Vuora] EQ init failed (popup continues without EQ):", err);
+    }
+  } else {
+    console.warn("[Vuora] EQ DOM elements missing — popup HTML may be stale, skipping EQ init");
+  }
   // ミュート状態の復元 + ボタン視覚状態の同期。
   // ミュート ON でもスライダー値は last gain 位置のまま表示する（pushVolumeNow 側で muted=true を渡すと
   // background → offscreen が gainNode を 0 にランプし、ユーザーが意図したスライダー値は state.lastSetPercent に保持される）。
@@ -803,8 +813,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     }).catch(logStorageError("volume-eq"));
   }
 
-  /** master ON かつ EQ ON のときのみパネルを操作可能にし、それ以外は dim + disabled にする。 */
+  /** master ON かつ EQ ON のときのみパネルを操作可能にし、それ以外は dim + disabled にする。
+   * EQ DOM 未取得時 (stale HTML 等) は no-op で安全側に倒す。 */
   function updateEqPanelState() {
+    if (!$volumeEqToggle || !$volumeEqPanel || !$volumeEqPreset) return;
     const active = $volumeBoosterToggle.checked && $volumeEqToggle.checked;
     $volumeEqPanel.classList.toggle("eq-disabled", !active);
     $volumeEqPreset.disabled = !active;
@@ -1531,7 +1543,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeSlider.disabled = off;
     $volumeAntiClipToggle.disabled = off;
     $volumeNightModeToggle.disabled = off;
-    $volumeEqToggle.disabled = off;
+    if ($volumeEqToggle) $volumeEqToggle.disabled = off;
     updateEqPanelState();
     if ($volumeMuteBtn) $volumeMuteBtn.disabled = off;
   }
