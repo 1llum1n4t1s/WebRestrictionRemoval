@@ -47,7 +47,7 @@ Mouse-following circular magnifier. 3-step zoom / variable lens size. Uses `tabs
 EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).
 
 🔹 Volume Booster (Chrome edition only)
-The Volume Booster captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not support, so **the Volume Booster is unavailable on the Firefox edition** (the popup's audio section is hidden automatically). On Chrome / Edge it works on all sites (including EME-protected video such as Netflix / Prime Video) with 0–300% amplification, auto distortion guard, night mode, and mute (open the popup to operate it).
+The Volume Booster captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not support, so **the Volume Booster is unavailable on the Firefox edition** (the popup's audio section is hidden automatically). On Chrome / Edge it works on all sites (including EME-protected video such as Netflix / Prime Video) with 0–300% amplification, auto distortion guard, night mode, mute, and a 10-band graphic equalizer with presets (open the popup to operate it).
 
 ■ Privacy
 Fully local execution; zero external network calls. Only `browser.storage.local` is used (no sync / no cloud). See docs/privacy-policy.md for details.
