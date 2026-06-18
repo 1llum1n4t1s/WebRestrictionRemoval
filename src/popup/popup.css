@@ -2342,6 +2342,15 @@ body {
   flex: 1 1 0;
   min-width: 0;
 }
+/* プリアンプ列は周波数バンドより長いラベル ("プリアンプ" / "Preamp") を持つので
+ * 列幅を 1.7× に広げてラベル ellipsis を回避。Foobar/Winamp 系 EQ と同じく
+ * バンド列との視覚的分離も入れる (右側に細い区切り線 + 余白)。 */
+.eq-col--preamp {
+  flex: 1.7 1.7 0;
+  padding-right: 6px;
+  margin-right: 4px;
+  border-right: 1px solid color-mix(in srgb, var(--rog-red) 25%, transparent);
+}
 .eq-slider {
   writing-mode: vertical-lr;
   direction: rtl;

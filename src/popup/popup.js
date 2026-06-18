@@ -773,10 +773,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  /** 1 列 (縦スライダー + ラベル) を生成して $volumeEqSliders に追加、input 要素を返す。 */
+  /** 1 列 (縦スライダー + ラベル) を生成して $volumeEqSliders に追加、input 要素を返す。
+   * preamp は周波数バンド (32 / 64 / 1K 等) より長いラベル ("プリアンプ" / "Preamp") を持つので、
+   * `eq-col--preamp` クラスを付けて CSS で列幅を広めにし、ellipsis でラベルが切れないようにする
+   * (添付画像の Foobar/Winamp 系 EQ と同じく preamp とバンドを視覚的に分離する装飾も併用)。 */
   function createEqColumn(labelText, idSuffix, min, max, value) {
     const col = document.createElement("div");
-    col.className = "eq-col";
+    col.className = idSuffix === "preamp" ? "eq-col eq-col--preamp" : "eq-col";
     const input = document.createElement("input");
     input.type = "range";
     input.className = "eq-slider";
@@ -789,6 +792,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const label = document.createElement("span");
     label.className = "eq-col-label";
     label.textContent = labelText;
+    label.title = labelText;
     col.appendChild(input);
     col.appendChild(label);
     $volumeEqSliders.appendChild(col);
