@@ -26,7 +26,6 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`volumeBoosterEnabled`** (boolean): Volume Booster master toggle. Default OFF.
 - **`volumeBoosterLastGain`** (number, 0–300): Volume Booster slider position (%). Default 100.
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` acting as a fast limiter) is enabled. Default OFF.
-- **`volumeBoosterNormalizeEnabled`** (boolean): whether the Volume Booster's "Auto Volume Normalization" sub-toggle is enabled. Implemented with `AnalyserNode` short-window RMS measurement plus an auto `GainNode` (no `DynamicsCompressor` is used). Default OFF.
 - **`volumeBoosterNightModeEnabled`** (boolean): whether the Volume Booster's "Night Mode" sub-toggle (a `DynamicsCompressor` that compresses dynamic range for night listening) is enabled. Default OFF.
 - **`volumeBoosterMutedEnabled`** (boolean): the Volume Booster mute toggle. When ON, the `GainNode` is ramped to 0 while the slider value and sub-toggle settings are preserved (the AudioContext is kept alive so unmute can restore the volume instantly). Default OFF.
 - **`loupeEnabled`** (boolean): Loupe master toggle. Default OFF.
@@ -48,7 +47,7 @@ The Volume Booster's current per-tab gain value is held only in the offscreen do
 
 ## Tab audio access
 
-When the Volume Booster slider is set to a value other than 100%, or when one of Auto Distortion Guard / Auto Volume Normalization / Night Mode is enabled (even at 100%), the Extension uses the `chrome.tabCapture` API to obtain the active tab's audio stream and processes it through an `AudioContext` in the offscreen document for normalization, compression, and amplification before re-output. Audio data is never sent externally and is never recorded or stored. The stream is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles OFF, or when the Extension is disabled.
+When the Volume Booster slider is set to a value other than 100%, or when one of Auto Distortion Guard / Night Mode is enabled (even at 100%), the Extension uses the `chrome.tabCapture` API to obtain the active tab's audio stream and processes it through an `AudioContext` in the offscreen document for compression and amplification before re-output. Audio data is never sent externally and is never recorded or stored. The stream is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles OFF, or when the Extension is disabled.
 
 ## Tab screen (screenshot) access
 
@@ -89,7 +88,7 @@ When the connection-monitor sub-feature is OFF, when the YouTube cleaner master 
 - **activeTab**: used to access information about the current tab (e.g. determining the target tab for the Volume Booster) when the user changes settings via the popup.
 - **storage**: used to save and restore the keys listed in "Data stored locally" on the device.
 - **offscreen**: used to host an offscreen document (extension context) so the Volume Booster's `AudioContext` can be maintained outside the Service Worker lifecycle.
-- **tabCapture**: used to capture the active tab's audio stream for amplification, normalization, compression, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute is enabled at 100%. No recording, storage, or external transmission is performed.
+- **tabCapture**: used to capture the active tab's audio stream for amplification, compression, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute is enabled at 100%. No recording, storage, or external transmission is performed.
 - **`<all_urls>` host permission**: used by the Loupe feature to call `chrome.tabs.captureVisibleTab` against the active tab and display the visible region as a magnified JPEG image in a circular lens. The `activeTab` permission alone is sometimes revoked early after the popup closes or when SPA pages trigger internal navigations, which blocks the capture. The `<all_urls>` host permission ensures the Loupe runs reliably. Captured images are held as Blob URLs locally and released with `URL.revokeObjectURL` as soon as the lens DOM is removed. No external transmission or storage is performed. Note: this extension already injects content scripts on all http(s) sites for DOM/CSS-only operations, so adding the `<all_urls>` host permission does not change the effective access scope.
 
 ## Notable changes through v1.0.18 (already applied)
@@ -100,7 +99,7 @@ The Instagram cleaner (`instagramCleanerEnabled` / `instagramCleanerFeatures`) w
 
 The YouTube Shorts removal feature was integrated as a YouTube cleaner sub-feature `searchFixerFeatures.removeShorts`, and the legacy `ytShortsRemovalEnabled` storage key was removed. On update, users with the legacy key set to `true` have it automatically migrated to `searchFixerFeatures.removeShorts = true` and `searchFixerEnabled = true` before the legacy key is removed, so Shorts removal continues to work.
 
-Since v1.0.18, a "Hide comments" sub-feature has been added to the YouTube cleaner (`searchFixerFeatures.hideComments`), the Volume Booster has gained Auto Distortion Guard / Auto Volume Normalization / Night Mode sub-toggles (`volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled`), and an `EyeDropper` API based color picker has been added (`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash`). All new keys default to OFF or to safe-side defaults; site behavior is unaffected until the user interacts with them.
+Since v1.0.18, a "Hide comments" sub-feature has been added to the YouTube cleaner (`searchFixerFeatures.hideComments`), the Volume Booster has gained Auto Distortion Guard / Night Mode sub-toggles (`volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled`), and an `EyeDropper` API based color picker has been added (`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash`). All new keys default to OFF or to safe-side defaults; site behavior is unaffected until the user interacts with them.
 
 ## Contact
 

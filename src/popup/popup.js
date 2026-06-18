@@ -1278,7 +1278,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * 最新設定を再適用) が参照する。100% かつ全サブトグル OFF かつミュート OFF のときは background 側で
    * release されるため、ここではただ送るだけでよい。
    *
-   * antiClip / normalize / nightMode / muted は現在のトグル状態を都度読み取るため、
+   * antiClip / nightMode / muted は現在のトグル状態を都度読み取るため、
    * トグルだけ変えて gain は据え置く操作も「pushVolumeNow(現在値)」で全反映できる。
    */
   async function pushVolumeNow(value) {

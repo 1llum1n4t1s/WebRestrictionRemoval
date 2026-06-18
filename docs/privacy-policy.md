@@ -28,7 +28,6 @@
 - **`volumeBoosterEnabled`**（真偽値）: 音量ブースターのマスタートグル。デフォルト OFF。
 - **`volumeBoosterLastGain`**（数値・0〜300）: 音量ブースターのスライダー位置（%）。デフォルト 100。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（高速リミッタとして動作する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
-- **`volumeBoosterNormalizeEnabled`**（真偽値）: 音量ブースターのサブトグル「自動音量正規化」（`AnalyserNode` で短時間 RMS を測定し `GainNode` のゲインを自動調整する方式。`DynamicsCompressor` は使用しません）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNightModeEnabled`**（真偽値）: 音量ブースターのサブトグル「ナイトモード」（夜間視聴向けにダイナミックレンジを圧縮する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterMutedEnabled`**（真偽値）: 音量ブースターのミュートトグル。ON のときスライダー値・サブトグル設定を保持したまま `GainNode` を 0 にランプして消音します（AudioContext は維持され、解除時に高速復帰）。デフォルト OFF。
 - **`loupeEnabled`**（真偽値）: ルーペ機能のマスタートグル。デフォルト OFF。
@@ -50,7 +49,7 @@
 
 ## タブ音声へのアクセス
 
-「音量ブースター」のスライダーが 100% 以外の値に設定されている場合、または 100% のままでも自動歪み防止 / 自動音量正規化 / ナイトモードのいずれかを有効にした場合のみ、`chrome.tabCapture` API でアクティブタブの音声ストリームを取得し、オフスクリーン ドキュメント内の `AudioContext` で音量補正・圧縮・増幅を行って再出力します。音声データは外部に送信されず、録音・保存も一切行いません。タブを閉じる、スライダーを 100% に戻して全サブトグルを OFF にする、または拡張機能を無効化すると即座にストリームは解放されます。
+「音量ブースター」のスライダーが 100% 以外の値に設定されている場合、または 100% のままでも自動歪み防止 / ナイトモードのいずれかを有効にした場合のみ、`chrome.tabCapture` API でアクティブタブの音声ストリームを取得し、オフスクリーン ドキュメント内の `AudioContext` で増幅・圧縮を行って再出力します。音声データは外部に送信されず、録音・保存も一切行いません。タブを閉じる、スライダーを 100% に戻して全サブトグルを OFF にする、または拡張機能を無効化すると即座にストリームは解放されます。
 
 ## タブ画面（スクリーンキャプチャ）へのアクセス
 
@@ -91,7 +90,7 @@ YouTube クリーナーのサブ機能「接続モニター」（`searchFixerFea
 - **activeTab**: ポップアップで設定を変更した際、現在のタブ情報（音量ブースターの対象タブ判定など）にアクセスするために使用します。
 - **storage**: 上記「ローカルに保存するデータ」の各キーを端末内に保存・復元するために使用します。
 - **offscreen**: 音量ブースターの `AudioContext` を Service Worker のライフサイクル外で維持するために、オフスクリーン ドキュメント（extension コンテキスト）を利用します。
-- **tabCapture**: 音量ブースターのスライダーが 100% 以外の値に設定されている場合、または 100% のままでも自動歪み防止 / 自動音量正規化 / ナイトモード / ミュートのいずれかが有効な場合に、アクティブタブの音声ストリームを取得して `AudioContext` で音量補正・圧縮・増幅・消音を行うために使用します。録音・保存・外部送信は一切行いません。
+- **tabCapture**: 音量ブースターのスライダーが 100% 以外の値に設定されている場合、または 100% のままでも自動歪み防止 / ナイトモード / ミュートのいずれかが有効な場合に、アクティブタブの音声ストリームを取得して `AudioContext` で増幅・圧縮・消音を行うために使用します。録音・保存・外部送信は一切行いません。
 - **`<all_urls>` ホスト権限**: ルーペ機能で `chrome.tabs.captureVisibleTab` によりアクティブタブの可視領域を JPEG 静止画として取得し、円形レンズに拡大表示するために使用します。`activeTab` 権限のみでは、ポップアップを閉じた後 / SPA ページで内部 navigation が発生した後に grant が早期失効してキャプチャがブロックされる事例があるため、ルーペ機能を確実に動作させる目的で追加しています。取得した静止画は端末内の Blob URL として保持され、レンズ DOM 撤去と同時に `URL.revokeObjectURL` で解放されます。外部送信・保存は一切行いません。なお本拡張機能は既に content_scripts として全 http(s) サイトに DOM/CSS 操作のスクリプトを注入しており、`<all_urls>` ホスト権限の追加でアクセス可能になる範囲は実質変わりません。
 
 ## v1.0.18 までの主な変更点（適用済み）
@@ -102,7 +101,7 @@ Instagram クリーナー機能（`instagramCleanerEnabled` / `instagramCleanerF
 
 YouTube Shorts 削除機能は YouTube クリーナーのサブ機能 `searchFixerFeatures.removeShorts` として統合されました。これに伴い旧 `ytShortsRemovalEnabled` ストレージキーも削除されています。アップデート時、旧キーが `true` だったユーザーは `searchFixerFeatures.removeShorts = true` および `searchFixerEnabled = true` に自動転写されてから旧キーが削除されるため、Shorts 削除動作は継続されます。
 
-v1.0.18 以降、YouTube クリーナーに「コメント欄非表示」サブ機能（`searchFixerFeatures.hideComments`）が追加され、音量ブースターには自動歪み防止 / 自動音量正規化 / ナイトモードの各サブトグル（`volumeBoosterAntiClipEnabled` / `volumeBoosterNormalizeEnabled` / `volumeBoosterNightModeEnabled` キー）と、`EyeDropper` API ベースのカラーピッカー機能（`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash` キー）も追加されています。これらの新規キーはすべてデフォルト OFF または安全側のデフォルト値で、ユーザーが操作するまでサイト挙動には一切影響しません。
+v1.0.18 以降、YouTube クリーナーに「コメント欄非表示」サブ機能（`searchFixerFeatures.hideComments`）が追加され、音量ブースターには自動歪み防止 / ナイトモードの各サブトグル（`volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` キー）と、`EyeDropper` API ベースのカラーピッカー機能（`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash` キー）も追加されています。これらの新規キーはすべてデフォルト OFF または安全側のデフォルト値で、ユーザーが操作するまでサイト挙動には一切影響しません。
 
 ## お問い合わせ
 
