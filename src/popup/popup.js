@@ -748,6 +748,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       trebleBoost: "volumeEqPresetTreble",
       vocal: "volumeEqPresetVocal",
       loudness: "volumeEqPresetLoudness",
+      eargasm: "volumeEqPresetEargasm",
+      eargasmKai: "volumeEqPresetEargasmKai",
+      perfect: "volumeEqPresetPerfect",
+      perfectKai: "volumeEqPresetPerfectKai",
       [VolumeBooster.EQ_PRESET_CUSTOM]: "volumeEqPresetCustom",
     };
     $volumeEqPreset.textContent = "";

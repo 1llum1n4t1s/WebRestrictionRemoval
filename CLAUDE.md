@@ -62,7 +62,7 @@ pnpm run build                # アイコン + スクリーンショット一括
 pnpm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 pnpm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
 pnpm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 24 globalThis 定数列挙 (actions.js 21 + ScanRunner + AudioPipeline + CleanerCore、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-pnpm test                     # Node.js 標準 test runner（syntax-check.test.js が src/**/*.js 全 23 ファイル構文 check + actions.test.js が FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 5 キー + EQ 定数・clamp・プリセット + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 + 撤去済み機能 drift 検知（自動音量正規化を含む）を含む、合計 119 ケース）
+pnpm test                     # Node.js 標準 test runner（syntax-check.test.js が src/**/*.js 全 23 ファイル構文 check + actions.test.js が FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 5 キー + EQ 定数・clamp・プリセット (eargasm/eargasmKai/perfect/perfectKai 値固定 drift 検知含む) + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 + 撤去済み機能 drift 検知（自動音量正規化を含む）を含む、合計 120 ケース）
 powershell -ExecutionPolicy Bypass -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -83,7 +83,7 @@ pnpm test
 
 内訳:
 - `test/syntax-check.test.js` が `src/**/*.js` 全 23 ファイルを `vm.compileFunction` で動的列挙 + 構文 check（content_scripts 追加・削除の手動 drift 防御）
-- `test/actions.test.js` が `globalThis` 21 個公開 / FEATURES 件数 / Loupe 純粋関数 / extractHandleFromHref Unicode 境界値 / SettingsSchema 整合 / **撤去済み機能 drift 検知（自動音量正規化を含む）** / **EQ 定数・clamp 関数・プリセット境界値** 等 95 ケースをアサート
+- `test/actions.test.js` が `globalThis` 21 個公開 / FEATURES 件数 / Loupe 純粋関数 / extractHandleFromHref Unicode 境界値 / SettingsSchema 整合 / **撤去済み機能 drift 検知（自動音量正規化を含む）** / **EQ 定数・clamp 関数・プリセット境界値・コミュニティ 4 プリセット (eargasm/eargasmKai/perfect/perfectKai) 値固定** 等 96 ケースをアサート
 
 Lint は ESLint v10 flat config:
 

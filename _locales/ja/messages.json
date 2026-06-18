@@ -55,6 +55,10 @@
   "volumeEqPresetTreble": { "message": "高音強調" },
   "volumeEqPresetVocal": { "message": "ボーカル" },
   "volumeEqPresetLoudness": { "message": "ラウドネス" },
+  "volumeEqPresetEargasm": { "message": "イヤガズムエクスプロージョン" },
+  "volumeEqPresetEargasmKai": { "message": "イヤガズムエクスプロージョン 改" },
+  "volumeEqPresetPerfect": { "message": "パーフェクト" },
+  "volumeEqPresetPerfectKai": { "message": "パーフェクト 改" },
   "volumeEqPresetCustom": { "message": "カスタム" },
 
   "videoGammaMaster": { "message": "動画ガンマ補正" },

@@ -1059,6 +1059,21 @@ const VolumeBooster = Object.freeze({
   /**
    * 同梱プリセット。各値は EQ_BANDS と同順の 10 バンド gain (dB)。
    * popup のドロップダウンから選択でき、手動でスライダーを動かすと "custom" に切り替わる。
+   *
+   * コミュニティプリセット (eargasm / eargasmKai / perfect / perfectKai) の出典:
+   * - eargasm: Spotify ユーザー間で世界的に有名な "Eargasm Explosion"。iTunes / eqMac 10 バンド
+   *   原典 (dacci gist, iyusuke.jp 他)。perfect の 4kHz バンドだけを +9 → +4 に下げた派生として
+   *   2014 年頃に登場 (日本発、SoraNews24 が英語圏に紹介)。
+   * - eargasmKai: SONY Android WALKMAN NW-A100 シリーズ向けの「Eargasm Explosion 改」
+   *   (楽天ブログ hisat 氏、2021-12-04)。低域 +10 / 超高域 +10 のドンシャリ強化型。
+   *   NW-A100 の 31/62Hz は Vuora の 32/64Hz と同一バンドの別表記なので直接マッピング。
+   * - perfect: 2004 年頃から iTunes 10 バンド EQ で「完璧過ぎる最強の EQ 設定」として広まった
+   *   preset (hints.macworld.com 2004, methodshop.com)。eargasm と 4kHz バンド (+9 vs +4) のみ
+   *   異なる原典。ゆろさん判断で iTunes 10 バンド原典を採用 (Spotify 6 バンド補間版は不採用)。
+   * - perfectKai: perfect を全帯域 -6dB した派生 (minkara スバルフォレスター記事 / musicfab.ne.jp
+   *   ガイドで値完全一致)。「カーブ形状維持 + スピーカー負担軽減」狙い。
+   *
+   * 出典の詳細・補間方法・調査経緯は memory-bank / PR #27 の deep-research 結果 (wnhg9pt91) 参照。
    */
   EQ_PRESETS: Object.freeze({
     flat: Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -1066,6 +1081,10 @@ const VolumeBooster = Object.freeze({
     trebleBoost: Object.freeze([0, 0, 0, 0, 0, 0, 2, 4, 5, 6]),
     vocal: Object.freeze([-2, -1, 0, 2, 3, 3, 2, 1, 0, -1]),
     loudness: Object.freeze([5, 4, 2, 0, -1, -1, 0, 2, 4, 5]),
+    eargasm: Object.freeze([3, 6, 9, 7, 6, 5, 7, 4, 11, 8]),
+    eargasmKai: Object.freeze([10, 10, 10, 6, 5, 4, 6, 3, 9, 10]),
+    perfect: Object.freeze([3, 6, 9, 7, 6, 5, 7, 9, 11, 8]),
+    perfectKai: Object.freeze([-3, 0, 3, 1, 0, -1, 1, 3, 5, 2]),
   }),
   /** 1 バンドの gain を EQ_GAIN_MIN..MAX に clamp し整数化。不正値は EQ_GAIN_DEFAULT。 */
   clampEqGain(v) {

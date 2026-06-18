@@ -55,6 +55,10 @@
   "volumeEqPresetTreble": { "message": "Treble Boost" },
   "volumeEqPresetVocal": { "message": "Vocal" },
   "volumeEqPresetLoudness": { "message": "Loudness" },
+  "volumeEqPresetEargasm": { "message": "Eargasm Explosion" },
+  "volumeEqPresetEargasmKai": { "message": "Eargasm Explosion Kai" },
+  "volumeEqPresetPerfect": { "message": "Perfect" },
+  "volumeEqPresetPerfectKai": { "message": "Perfect Kai" },
   "volumeEqPresetCustom": { "message": "Custom" },
 
   "videoGammaMaster": { "message": "Video Gamma" },

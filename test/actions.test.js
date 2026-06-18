@@ -162,6 +162,21 @@ test("VolumeBooster.EQ_PRESETS: 各プリセットが 10 バンド分 + 全値�
   }
 });
 
+test("VolumeBooster.EQ_PRESETS: コミュニティ 4 プリセット (eargasm / eargasmKai / perfect / perfectKai) が同梱済み", () => {
+  // deep-research (wnhg9pt91) で値確定。drift 検知用に値を固定。
+  // 値変更時は出典 (CLAUDE.md / PR #27) と整合させること。
+  assert.deepEqual(G.VolumeBooster.EQ_PRESETS.eargasm, [3, 6, 9, 7, 6, 5, 7, 4, 11, 8]);
+  assert.deepEqual(G.VolumeBooster.EQ_PRESETS.eargasmKai, [10, 10, 10, 6, 5, 4, 6, 3, 9, 10]);
+  assert.deepEqual(G.VolumeBooster.EQ_PRESETS.perfect, [3, 6, 9, 7, 6, 5, 7, 9, 11, 8]);
+  assert.deepEqual(G.VolumeBooster.EQ_PRESETS.perfectKai, [-3, 0, 3, 1, 0, -1, 1, 3, 5, 2]);
+  // perfect と eargasm は 4kHz バンドのみが異なる派生関係 (perfect: +9, eargasm: +4)。
+  const perfectKai = G.VolumeBooster.EQ_PRESETS.perfectKai;
+  const perfect = G.VolumeBooster.EQ_PRESETS.perfect;
+  for (let i = 0; i < 10; i += 1) {
+    assert.equal(perfectKai[i], perfect[i] - 6, `perfectKai[${i}] は perfect[${i}] - 6 のはず (全帯域 -6dB 派生)`);
+  }
+});
+
 test("VolumeBooster.normalizeEqPreset: 既知/custom はそのまま、未知は default(flat)", () => {
   assert.equal(G.VolumeBooster.normalizeEqPreset("bassBoost"), "bassBoost");
   assert.equal(G.VolumeBooster.normalizeEqPreset(G.VolumeBooster.EQ_PRESET_CUSTOM), "custom");
