@@ -564,9 +564,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     // syncEqUi がドラッグ中のスライダー値を上書きする self-write feedback (カクつき) を防ぐ。
     // EQ_GAINS / EQ_PREAMP は popup からのみ変更されるため他経路反映の必要性も低い。
     // EQ_PRESET は離散値で feedback 連続性問題がないため、select の表示のみ同期する。
+    // ただし別 popup でプリセット変更が起きた場合、こちらの popup 内 eqGains / eqPreamp は
+    // 旧 custom 値のまま残るため、次の pushVolumeNow で古い gain が送信されて音が戻る事故が起きる。
+    // → preset 変更を受信したら eqGains を preset 値に、eqPreamp を中立 (= preset 適用時挙動と一致)
+    // に揃えて UI と memory state の整合を保つ (custom 時は何もしない)。
     if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] && $volumeEqPreset) {
       eqPreset = VolumeBooster.normalizeEqPreset(changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET].newValue);
       $volumeEqPreset.value = eqPreset;
+      const presetGains = VolumeBooster.eqPresetGains(eqPreset);
+      if (presetGains) {
+        eqGains = presetGains.slice();
+        eqPreamp = VolumeBooster.EQ_PREAMP_DEFAULT;
+        syncEqUi();
+      }
     }
     if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
       volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
@@ -771,8 +781,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
     VolumeBooster.EQ_BANDS.forEach((freq, i) => {
       const label = freq >= 1000 ? `${freq / 1000}K` : String(freq);
+      // 防御的: eqGains[i] が undefined (将来のバンド数変更 / 配列長不足) でもスライダー初期値が
+      // "undefined" 文字列にならないよう EQ_GAIN_DEFAULT (= 0) フォールバック。
+      const initial = eqGains[i] ?? VolumeBooster.EQ_GAIN_DEFAULT;
       eqBandSliders.push(
-        createEqColumn(label, `band-${i}`, VolumeBooster.EQ_GAIN_MIN, VolumeBooster.EQ_GAIN_MAX, eqGains[i]),
+        createEqColumn(label, `band-${i}`, VolumeBooster.EQ_GAIN_MIN, VolumeBooster.EQ_GAIN_MAX, initial),
       );
     });
   }
@@ -833,13 +846,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const s of eqBandSliders) s.disabled = !active;
   }
 
-  /** スライダー手動操作時: プリセットを custom に切替 + storage 永続化 + debounce push。 */
+  /** スライダー手動操作時 (input 連続発火): プリセットを custom に切替 + debounce push のみ。
+   * storage 書き込み (persistEq) は change イベント (ドラッグ終了) に集約してディスク I/O を平準化。 */
   function markEqCustom() {
     eqPreset = VolumeBooster.EQ_PRESET_CUSTOM;
     $volumeEqPreset.value = VolumeBooster.EQ_PRESET_CUSTOM;
-    persistEq();
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     scheduleVolumePush(v);
+  }
+
+  /** スライダードラッグ終了時 (change 発火): debounce push をキャンセルして即時 push + storage 永続化。
+   * popup が close 寸前にドラッグ終了したケースで 120ms debounce が破棄されて値が伝わらない事故を防ぐ
+   * (メイン音量スライダーと同じ input + change 二段構成)。 */
+  function flushEqCustom() {
+    cancelVolumePush();
+    persistEq();
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+    pushVolumeNow(v).catch(logVolumeError("eq-slider"));
   }
 
   /** EQ トグル / プリセット / スライダーのイベントをバインドする (buildEqUi 後に 1 回だけ呼ぶ)。 */
@@ -856,6 +879,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const presetGains = VolumeBooster.eqPresetGains(eqPreset);
       if (presetGains) {
         eqGains = presetGains;
+        // プリセット選択時はプリアンプも 0dB に戻す。preamp 操作は markEqCustom 経由で
+        // preset を custom にする方向なので、preset を選び直したらプリアンプも仕様上中立に
+        // 戻すのが UI 期待挙動 (preset 名が表示 = preset 状態のみ effective、という対応関係)。
+        eqPreamp = VolumeBooster.EQ_PREAMP_DEFAULT;
         syncEqUi();
       }
       cancelVolumePush();
@@ -867,11 +894,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       eqPreamp = VolumeBooster.clampEqPreamp(Number(eqPreampSlider.value));
       markEqCustom();
     });
+    eqPreampSlider.addEventListener("change", flushEqCustom);
     eqBandSliders.forEach((slider, i) => {
       slider.addEventListener("input", () => {
         eqGains[i] = VolumeBooster.clampEqGain(Number(slider.value));
         markEqCustom();
       });
+      slider.addEventListener("change", flushEqCustom);
     });
   }
 

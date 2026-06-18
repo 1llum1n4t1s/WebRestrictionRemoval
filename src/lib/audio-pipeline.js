@@ -72,10 +72,14 @@
     state.preampNode.gain.cancelScheduledValues(now);
     state.preampNode.gain.setValueAtTime(state.preampNode.gain.value, now);
     state.preampNode.gain.setTargetAtTime(preampGain, now, tc);
+    // 防御的: state.eqFilters と clamped の長さ不一致 (将来のバンド数変更 / 予期せぬ初期化エラー) で
+    // target が undefined → NaN になり setTargetAtTime が例外を吐く事故を避ける。両配列の最小長で
+    // ループし、clamped[i] が undefined のときは 0dB (素通り) フォールバック。
     const clamped = VolumeBooster.clampEqGains(gains);
-    for (let i = 0; i < state.eqFilters.length; i += 1) {
+    const limit = Math.min(state.eqFilters.length, clamped.length);
+    for (let i = 0; i < limit; i += 1) {
       const f = state.eqFilters[i];
-      const target = on ? clamped[i] : 0;
+      const target = on ? (clamped[i] ?? 0) : 0;
       f.gain.cancelScheduledValues(now);
       f.gain.setValueAtTime(f.gain.value, now);
       f.gain.setTargetAtTime(target, now, tc);

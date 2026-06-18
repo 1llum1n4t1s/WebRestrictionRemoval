@@ -436,8 +436,9 @@ async function autoApplyVolumeBooster(tabId) {
   const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
   const muted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
   const eqEnabled = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
-  const eqGains = stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS];
-  const eqPreamp = stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP];
+  // gain と一貫させて offscreen への送信前にクランプ (audio-pipeline で再クランプされる二重防御)。
+  const eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
+  const eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
   await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqEnabled, eqGains, eqPreamp);
 }
 

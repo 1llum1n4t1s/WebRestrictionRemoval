@@ -2390,7 +2390,7 @@ body {
 .eq-col-label {
   font-size: 9px;
   letter-spacing: -0.2px;
-  color: color-mix(in srgb, currentColor 65%, transparent);
+  color: color-mix(in srgb, currentcolor 65%, transparent);
   /* プリアンプ列のラベル ("プリアンプ") が周波数バンドラベル ("32"/"1K" など) より長いため、
    * 列幅 (flex:1 配分の ~36-40px) を超えた場合は ellipsis で省略してレイアウト崩れを防ぐ。 */
   width: 100%;
