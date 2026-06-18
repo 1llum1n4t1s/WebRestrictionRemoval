@@ -18,27 +18,30 @@
  * tabId → AudioState の Map。AudioContext は close するまで音声を増幅し続けるため
  * release 時に必ず close する。
  *
- * AudioState の構造（ノードチェーン: source → nightModeNode → gainNode → antiClipNode → destination）:
+ * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → antiClipNode → destination）:
  *   - ctx: AudioContext
  *   - gainNode: GainNode（ユーザースライダーの 0-300% ブースト）
+ *   - preampNode: GainNode（イコライザのプリアンプ、dB→倍率。EQ OFF 時は unity 1.0）
+ *   - eqFilters: BiquadFilterNode[10]（10 バンド peaking イコライザ、EQ OFF 時は全 0dB でフラット = 素通り）
  *   - nightModeNode: DynamicsCompressorNode（ゲーム配信向けナイトモード圧縮、OFF 時はバイパス設定）
  *   - antiClipNode: DynamicsCompressorNode（自動歪み防止 / リミッタ、OFF 時はバイパス設定）
  *   - stream: MediaStream
  *
- * ナイトモード / 自動歪み防止の compressor は常時チェーン接続し、OFF 時は ratio:1 のバイパス設定にする。
+ * イコライザ (preamp + 10 バンド) / ナイトモード / 自動歪み防止は常時チェーン接続し、OFF 時は
+ * それぞれ unity gain / 0dB / ratio:1 のバイパス設定にする (ノード抜き差しによる無音・プチノイズを回避)。
  */
 const audioStates = new Map();
-/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, nightModeNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
+/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, preampNode: GainNode, eqFilters: BiquadFilterNode[], nightModeNode: DynamicsCompressorNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
 const audioInitPromises = new Map();
 
 /**
  * DSP コア関数は src/lib/audio-pipeline.js に集約 (globalThis.AudioPipeline)。
  * 旧 MES 経路 (volume-booster.js) との物理コピー drift 解消が当初の抽出動機。MES 経路 +
- * 自動音量正規化の撤去後は applyCompressorPreset のみが残る。
- * applyCompressorPreset は DynamicsCompressorNode に preset を適用する。機能 OFF 時は
- * VolumeBooster.COMPRESSOR_BYPASS（ratio:1）を渡してパススルー化する。
+ * 自動音量正規化の撤去後は compressor preset 適用 / イコライザ適用 / dB→gain 変換が残る。
+ * applyCompressorPreset は DynamicsCompressorNode に preset を適用 (OFF 時は COMPRESSOR_BYPASS)、
+ * applyEqualizer は preampNode + eqFilters[10] の gain を ramp で更新する。
  */
-const { applyCompressorPreset } = AudioPipeline;
+const { applyCompressorPreset, applyEqualizer } = AudioPipeline;
 
 /**
  * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。
@@ -49,9 +52,12 @@ const { applyCompressorPreset } = AudioPipeline;
  * @param {boolean} antiClip 自動歪み防止 ON/OFF
  * @param {boolean} nightMode ナイトモード圧縮 ON/OFF
  * @param {boolean} muted ミュート ON/OFF（true なら gainPercent によらず 0 にランプ、lastSetPercent は保持）
+ * @param {boolean} eqEnabled イコライザ ON/OFF
+ * @param {number[]} eqGains イコライザ 10 バンド gain (dB, VolumeBooster.EQ_BANDS と同順)
+ * @param {number} eqPreamp イコライザのプリアンプ (dB)
  * @returns {Promise<{ok: boolean, gain?: number, error?: string}>}
  */
-async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, muted) {
+async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, muted, eqEnabled, eqGains, eqPreamp) {
   try {
     if (!Number.isInteger(tabId) || tabId <= 0) {
       return { ok: false, error: "invalid-tab-id" };
@@ -117,6 +123,7 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       state.antiClipNode,
       antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
     );
+    applyEqualizer(state, eqEnabled, eqGains, eqPreamp);
     return { ok: true, gain: clamped };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
@@ -161,13 +168,30 @@ async function createAudioState(tabId, streamId) {
     }
     const source = ctx.createMediaStreamSource(stream);
     const gainNode = ctx.createGain();
-    // ノード順序: ナイトモード（コンプ）→ ブースト（gain）→ 自動歪み防止（リミッタ）の直列接続。
-    // ナイトモードで瞬間的な大小差を先に狭め、gain でブーストし、最後に anti-clip でピークを抑える。
+    // イコライザ: プリアンプ GainNode + 10 バンド peaking フィルタ。初期は素通り (preamp 1.0 / 全 0dB)。
+    const preampNode = ctx.createGain();
+    const eqFilters = VolumeBooster.EQ_BANDS.map((freq) => {
+      const f = ctx.createBiquadFilter();
+      f.type = "peaking";
+      f.frequency.value = freq;
+      f.Q.value = VolumeBooster.EQ_Q;
+      f.gain.value = 0;
+      return f;
+    });
+    // ノード順序: イコライザ（preamp → 10 バンド peaking）→ ナイトモード（コンプ）→ ブースト（gain）
+    // → 自動歪み防止（リミッタ）の直列接続。EQ で整音 → ナイトモードで大小差を狭め → gain でブースト
+    // → anti-clip でピークを抑える、というマスタリング順の配置。
     const nightModeNode = ctx.createDynamicsCompressor();
     const antiClipNode = ctx.createDynamicsCompressor();
     applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
     applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
-    source.connect(nightModeNode);
+    source.connect(preampNode);
+    let eqTail = preampNode;
+    for (const f of eqFilters) {
+      eqTail.connect(f);
+      eqTail = f;
+    }
+    eqTail.connect(nightModeNode);
     nightModeNode.connect(gainNode);
     gainNode.connect(antiClipNode);
     antiClipNode.connect(ctx.destination);
@@ -177,6 +201,8 @@ async function createAudioState(tabId, streamId) {
     const state = {
       ctx,
       gainNode,
+      preampNode,
+      eqFilters,
       nightModeNode,
       antiClipNode,
       stream,
@@ -303,7 +329,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       msg.gain,
       msg.antiClip,
       msg.nightMode,
-      msg.muted
+      msg.muted,
+      msg.eqEnabled,
+      msg.eqGains,
+      msg.eqPreamp
     ).then(sendResponse);
     return true;
   }

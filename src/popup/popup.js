@@ -172,6 +172,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeHint = document.getElementById("volumeHint");
   const $volumeAntiClipToggle = document.getElementById("volumeAntiClipToggle");
   const $volumeNightModeToggle = document.getElementById("volumeNightModeToggle");
+  const $volumeEqToggle = document.getElementById("volumeEqToggle");
+  const $volumeEqPreset = document.getElementById("volumeEqPreset");
+  const $volumeEqSliders = document.getElementById("volumeEqSliders");
+  const $volumeEqPanel = document.getElementById("volumeEqPanel");
+  // イコライザの状態（復元時に stored から代入、buildEqUi で UI を生成）
+  let eqGains = VolumeBooster.clampEqGains([]);
+  let eqPreamp = VolumeBooster.EQ_PREAMP_DEFAULT;
+  let eqPreset = VolumeBooster.EQ_PRESET_DEFAULT;
+  const eqBandSliders = [];
+  let eqPreampSlider = null;
   const $volumeMuteBtn = document.getElementById("volumeMuteBtn");
   const $volumeMuteIcon = $volumeMuteBtn?.querySelector(".volume-mute-icon");
   const $featureCategories = document.getElementById("featureCategories");
@@ -242,6 +252,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
+    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
+    StorageKeys.VOLUME_BOOSTER_EQ_PRESET,
     StorageKeys.VIDEO_GAMMA_ENABLED,
     StorageKeys.VIDEO_GAMMA_VALUE,
     StorageKeys.VIDEO_FILL_ENABLED,
@@ -280,6 +294,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
+  // イコライザの復元 + UI 構築 + イベントバインド（buildEqUi/bindEqEvents/syncEqUi/updateEqPanelState は function 宣言で hoist 済み）。
+  $volumeEqToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
+  eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
+  eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
+  eqPreset = VolumeBooster.normalizeEqPreset(stored[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]);
+  buildEqUi();
+  bindEqEvents();
+  syncEqUi();
+  updateEqPanelState();
   // ミュート状態の復元 + ボタン視覚状態の同期。
   // ミュート ON でもスライダー値は last gain 位置のまま表示する（pushVolumeNow 側で muted=true を渡すと
   // background → offscreen が gainNode を 0 にランプし、ユーザーが意図したスライダー値は state.lastSetPercent に保持される）。
@@ -522,6 +545,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]) {
       $volumeNightModeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED].newValue === true;
     }
+    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED]) {
+      $volumeEqToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED].newValue === true;
+      updateEqPanelState?.();
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]) {
+      eqGains = VolumeBooster.clampEqGains(changes[StorageKeys.VOLUME_BOOSTER_EQ_GAINS].newValue);
+      syncEqUi?.();
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]) {
+      eqPreamp = VolumeBooster.clampEqPreamp(changes[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP].newValue);
+      syncEqUi?.();
+    }
+    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]) {
+      eqPreset = VolumeBooster.normalizeEqPreset(changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET].newValue);
+      syncEqUi?.();
+    }
     if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
       volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
       updateMuteBtnVisual?.();
@@ -688,6 +727,134 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function applyCompressorTogglePush() {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     await pushVolumeNow(v).catch(logVolumeError("compressor-toggle"));
+  }
+
+  // ===== イコライザ (10 バンドグラフィック EQ) =====
+  // プリセット id → i18n キー対応 (EQ_PRESETS のキー + custom)。
+  const EQ_PRESET_I18N = {
+    flat: "volumeEqPresetFlat",
+    bassBoost: "volumeEqPresetBass",
+    trebleBoost: "volumeEqPresetTreble",
+    vocal: "volumeEqPresetVocal",
+    loudness: "volumeEqPresetLoudness",
+    [VolumeBooster.EQ_PRESET_CUSTOM]: "volumeEqPresetCustom",
+  };
+
+  /** プリセット <select> の option と、プリアンプ + 10 バンドのスライダー列を生成する。 */
+  function buildEqUi() {
+    $volumeEqPreset.textContent = "";
+    const ids = [...Object.keys(VolumeBooster.EQ_PRESETS), VolumeBooster.EQ_PRESET_CUSTOM];
+    for (const id of ids) {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = i18n(EQ_PRESET_I18N[id]) || id;
+      $volumeEqPreset.appendChild(opt);
+    }
+    // プリアンプ + 10 バンド (VolumeBooster.EQ_BANDS 駆動で自動生成)。
+    $volumeEqSliders.textContent = "";
+    eqBandSliders.length = 0;
+    eqPreampSlider = createEqColumn(
+      i18n("volumeEqPreamp"), "preamp",
+      VolumeBooster.EQ_PREAMP_MIN, VolumeBooster.EQ_PREAMP_MAX, eqPreamp,
+    );
+    VolumeBooster.EQ_BANDS.forEach((freq, i) => {
+      const label = freq >= 1000 ? `${freq / 1000}K` : String(freq);
+      eqBandSliders.push(
+        createEqColumn(label, `band-${i}`, VolumeBooster.EQ_GAIN_MIN, VolumeBooster.EQ_GAIN_MAX, eqGains[i]),
+      );
+    });
+  }
+
+  /** 1 列 (縦スライダー + ラベル) を生成して $volumeEqSliders に追加、input 要素を返す。 */
+  function createEqColumn(labelText, idSuffix, min, max, value) {
+    const col = document.createElement("div");
+    col.className = "eq-col";
+    const input = document.createElement("input");
+    input.type = "range";
+    input.className = "eq-slider";
+    input.id = `volumeEq-${idSuffix}`;
+    input.min = String(min);
+    input.max = String(max);
+    input.step = "1";
+    input.value = String(value);
+    input.setAttribute("aria-label", labelText);
+    const label = document.createElement("span");
+    label.className = "eq-col-label";
+    label.textContent = labelText;
+    col.appendChild(input);
+    col.appendChild(label);
+    $volumeEqSliders.appendChild(col);
+    return input;
+  }
+
+  /** 状態 (eqGains / eqPreamp / eqPreset) を UI に反映する。 */
+  function syncEqUi() {
+    if (eqPreampSlider) eqPreampSlider.value = String(eqPreamp);
+    for (let i = 0; i < eqBandSliders.length; i += 1) {
+      eqBandSliders[i].value = String(eqGains[i]);
+    }
+    $volumeEqPreset.value = eqPreset;
+  }
+
+  /** EQ 4 キーを storage に永続化 (master 状態に関係なく保存し、次回 master ON 時に復元できるように)。 */
+  function persistEq() {
+    chrome.storage.local.set({
+      [StorageKeys.VOLUME_BOOSTER_EQ_ENABLED]: $volumeEqToggle.checked,
+      [StorageKeys.VOLUME_BOOSTER_EQ_GAINS]: eqGains.slice(),
+      [StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]: eqPreamp,
+      [StorageKeys.VOLUME_BOOSTER_EQ_PRESET]: eqPreset,
+    }).catch(logStorageError("volume-eq"));
+  }
+
+  /** master ON かつ EQ ON のときのみパネルを操作可能にし、それ以外は dim + disabled にする。 */
+  function updateEqPanelState() {
+    const active = $volumeBoosterToggle.checked && $volumeEqToggle.checked;
+    $volumeEqPanel.classList.toggle("eq-disabled", !active);
+    $volumeEqPreset.disabled = !active;
+    if (eqPreampSlider) eqPreampSlider.disabled = !active;
+    for (const s of eqBandSliders) s.disabled = !active;
+  }
+
+  /** スライダー手動操作時: プリセットを custom に切替 + storage 永続化 + debounce push。 */
+  function markEqCustom() {
+    eqPreset = VolumeBooster.EQ_PRESET_CUSTOM;
+    $volumeEqPreset.value = VolumeBooster.EQ_PRESET_CUSTOM;
+    persistEq();
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+    scheduleVolumePush(v);
+  }
+
+  /** EQ トグル / プリセット / スライダーのイベントをバインドする (buildEqUi 後に 1 回だけ呼ぶ)。 */
+  function bindEqEvents() {
+    $volumeEqToggle.addEventListener("change", () => {
+      cancelVolumePush();
+      persistEq();
+      updateEqPanelState();
+      const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+      pushVolumeNow(v).catch(logVolumeError("eq-toggle"));
+    });
+    $volumeEqPreset.addEventListener("change", () => {
+      eqPreset = VolumeBooster.normalizeEqPreset($volumeEqPreset.value);
+      const presetGains = VolumeBooster.eqPresetGains(eqPreset);
+      if (presetGains) {
+        eqGains = presetGains;
+        syncEqUi();
+      }
+      cancelVolumePush();
+      persistEq();
+      const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+      pushVolumeNow(v).catch(logVolumeError("eq-preset"));
+    });
+    eqPreampSlider.addEventListener("input", () => {
+      eqPreamp = VolumeBooster.clampEqPreamp(Number(eqPreampSlider.value));
+      markEqCustom();
+    });
+    eqBandSliders.forEach((slider, i) => {
+      slider.addEventListener("input", () => {
+        eqGains[i] = VolumeBooster.clampEqGain(Number(slider.value));
+        markEqCustom();
+      });
+    });
   }
 
   for (const input of featureInputs.values()) {
@@ -1313,6 +1480,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           antiClip: $volumeAntiClipToggle.checked,
           nightMode: $volumeNightModeToggle.checked,
           muted: volumeMuted,
+          eqEnabled: $volumeEqToggle.checked,
+          eqGains: eqGains.slice(),
+          eqPreamp,
         },
       });
       if (!document.body?.isConnected) return;
@@ -1364,6 +1534,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeSlider.disabled = off;
     $volumeAntiClipToggle.disabled = off;
     $volumeNightModeToggle.disabled = off;
+    $volumeEqToggle.disabled = off;
+    updateEqPanelState();
     if ($volumeMuteBtn) $volumeMuteBtn.disabled = off;
   }
 

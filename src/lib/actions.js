@@ -137,6 +137,14 @@ const StorageKeys = Object.freeze({
   /** 音量ブースター: ミュート（スライダー値・サブトグル設定は保持したまま gain を 0 にランプ）。
    *  グローバル設定で、ON 中は UNITY release 条件をブロックして AudioContext を維持する。 */
   VOLUME_BOOSTER_MUTED_ENABLED: "volumeBoosterMutedEnabled",
+  /** 音量ブースター: グラフィックイコライザ ON/OFF（10 バンド peaking フィルタ） */
+  VOLUME_BOOSTER_EQ_ENABLED: "volumeBoosterEqEnabled",
+  /** 音量ブースター: イコライザ各バンドの gain 配列 (dB, 10 要素、VolumeBooster.EQ_BANDS と同順) */
+  VOLUME_BOOSTER_EQ_GAINS: "volumeBoosterEqGains",
+  /** 音量ブースター: イコライザのプリアンプ (dB)。各バンド boost によるクリップ補正用 */
+  VOLUME_BOOSTER_EQ_PREAMP: "volumeBoosterEqPreamp",
+  /** 音量ブースター: イコライザの選択中プリセット id（VolumeBooster.EQ_PRESETS のキー or "custom"） */
+  VOLUME_BOOSTER_EQ_PRESET: "volumeBoosterEqPreset",
   /** 動画ガンマ補正: マスタートグル（OFF 時は SVG filter 一切注入せず completely no-op） */
   VIDEO_GAMMA_ENABLED: "videoGammaEnabled",
   // 接続モニターは独立 storage key を持たず、YouTube クリーナーの searchFixerFeatures.connectionMonitor
@@ -1026,6 +1034,81 @@ const VolumeBooster = Object.freeze({
     attack: 0.003,
     release: 0.25,
   }),
+
+  // ===== グラフィックイコライザ (10 バンド peaking) =====
+  /**
+   * イコライザの中心周波数 (Hz)。各バンド ~1 オクターブ間隔。offscreen で
+   * BiquadFilterNode(type:"peaking") を 10 個直列接続し、各 gain をスライダー値 (dB) に設定する。
+   * 正規化 (撤去済み) と違ってフィードバックなしの固定フィルタなので決定論的で安定。
+   */
+  EQ_BANDS: Object.freeze([32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]),
+  EQ_BAND_COUNT: 10,
+  /** 各バンドの gain 範囲 (dB)。BiquadFilterNode.gain は peaking で dB 単位。 */
+  EQ_GAIN_MIN: -12,
+  EQ_GAIN_MAX: 12,
+  EQ_GAIN_DEFAULT: 0,
+  /** プリアンプ (全体ゲイン) 範囲 (dB)。各バンド boost によるクリップを補正する用途。 */
+  EQ_PREAMP_MIN: -12,
+  EQ_PREAMP_MAX: 12,
+  EQ_PREAMP_DEFAULT: 0,
+  /** peaking フィルタの Q。~1 オクターブ間隔 10 バンドの定番値 (√2 ≈ 1.41)。 */
+  EQ_Q: 1.41,
+  /** プリセット未選択 (手動調整) を表す id。EQ_PRESETS には含めない特別値。 */
+  EQ_PRESET_CUSTOM: "custom",
+  EQ_PRESET_DEFAULT: "flat",
+  /**
+   * 同梱プリセット。各値は EQ_BANDS と同順の 10 バンド gain (dB)。
+   * popup のドロップダウンから選択でき、手動でスライダーを動かすと "custom" に切り替わる。
+   */
+  EQ_PRESETS: Object.freeze({
+    flat: Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    bassBoost: Object.freeze([6, 5, 4, 2, 0, 0, 0, 0, 0, 0]),
+    trebleBoost: Object.freeze([0, 0, 0, 0, 0, 0, 2, 4, 5, 6]),
+    vocal: Object.freeze([-2, -1, 0, 2, 3, 3, 2, 1, 0, -1]),
+    loudness: Object.freeze([5, 4, 2, 0, -1, -1, 0, 2, 4, 5]),
+  }),
+  /** 1 バンドの gain を EQ_GAIN_MIN..MAX に clamp し整数化。不正値は EQ_GAIN_DEFAULT。 */
+  clampEqGain(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return VolumeBooster.EQ_GAIN_DEFAULT;
+    if (n < VolumeBooster.EQ_GAIN_MIN) return VolumeBooster.EQ_GAIN_MIN;
+    if (n > VolumeBooster.EQ_GAIN_MAX) return VolumeBooster.EQ_GAIN_MAX;
+    return Math.round(n);
+  },
+  /** プリアンプを EQ_PREAMP_MIN..MAX に clamp し整数化。不正値は EQ_PREAMP_DEFAULT。 */
+  clampEqPreamp(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return VolumeBooster.EQ_PREAMP_DEFAULT;
+    if (n < VolumeBooster.EQ_PREAMP_MIN) return VolumeBooster.EQ_PREAMP_MIN;
+    if (n > VolumeBooster.EQ_PREAMP_MAX) return VolumeBooster.EQ_PREAMP_MAX;
+    return Math.round(n);
+  },
+  /**
+   * 任意の入力を 10 バンドの gain 配列に正規化する。
+   * 配列でなければ全 EQ_GAIN_DEFAULT、長さ不足は補完、超過は切り捨て、各要素 clampEqGain。
+   */
+  clampEqGains(arr) {
+    const src = Array.isArray(arr) ? arr : [];
+    const out = new Array(VolumeBooster.EQ_BAND_COUNT);
+    for (let i = 0; i < VolumeBooster.EQ_BAND_COUNT; i += 1) {
+      out[i] = VolumeBooster.clampEqGain(src[i] ?? VolumeBooster.EQ_GAIN_DEFAULT);
+    }
+    return out;
+  },
+  /** プリセット id を正規化。既知プリセット or CUSTOM のみ許可、未知は EQ_PRESET_DEFAULT。 */
+  normalizeEqPreset(id) {
+    if (id === VolumeBooster.EQ_PRESET_CUSTOM) return VolumeBooster.EQ_PRESET_CUSTOM;
+    return Object.prototype.hasOwnProperty.call(VolumeBooster.EQ_PRESETS, id)
+      ? id
+      : VolumeBooster.EQ_PRESET_DEFAULT;
+  },
+  /** プリセット id から 10 バンド gain 配列 (コピー) を返す。CUSTOM / 未知は null。 */
+  eqPresetGains(id) {
+    if (Object.prototype.hasOwnProperty.call(VolumeBooster.EQ_PRESETS, id)) {
+      return VolumeBooster.EQ_PRESETS[id].slice();
+    }
+    return null;
+  },
 });
 
 /**

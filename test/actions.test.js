@@ -109,6 +109,82 @@ test("撤去済み: 自動音量正規化サブ機能の痕跡が actions.js か
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
 });
 
+// ---------- VolumeBooster: グラフィックイコライザ ----------
+
+test("VolumeBooster.EQ_BANDS: 10 バンド + 中心周波数が固定値", () => {
+  assert.deepEqual(G.VolumeBooster.EQ_BANDS, [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]);
+  assert.equal(G.VolumeBooster.EQ_BAND_COUNT, 10);
+  assert.equal(G.VolumeBooster.EQ_BANDS.length, G.VolumeBooster.EQ_BAND_COUNT);
+});
+
+test("VolumeBooster.clampEqGain: -12..12 に clamp + 整数化、不正値は 0", () => {
+  assert.equal(G.VolumeBooster.clampEqGain(6), 6);
+  assert.equal(G.VolumeBooster.clampEqGain(12), 12);
+  assert.equal(G.VolumeBooster.clampEqGain(-12), -12);
+  assert.equal(G.VolumeBooster.clampEqGain(20), 12);
+  assert.equal(G.VolumeBooster.clampEqGain(-20), -12);
+  assert.equal(G.VolumeBooster.clampEqGain(3.7), 4);
+  assert.equal(G.VolumeBooster.clampEqGain(NaN), 0);
+  assert.equal(G.VolumeBooster.clampEqGain("x"), 0);
+  assert.equal(G.VolumeBooster.clampEqGain(undefined), 0);
+});
+
+test("VolumeBooster.clampEqPreamp: -12..12 に clamp + 整数化、不正値は 0", () => {
+  assert.equal(G.VolumeBooster.clampEqPreamp(0), 0);
+  assert.equal(G.VolumeBooster.clampEqPreamp(15), 12);
+  assert.equal(G.VolumeBooster.clampEqPreamp(-15), -12);
+  assert.equal(G.VolumeBooster.clampEqPreamp(undefined), 0);
+});
+
+test("VolumeBooster.clampEqGains: 10 要素に正規化 (不足補完 / 超過切り捨て / 各要素 clamp)", () => {
+  assert.deepEqual(G.VolumeBooster.clampEqGains([]), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(G.VolumeBooster.clampEqGains(null).length, 10);
+  assert.equal(G.VolumeBooster.clampEqGains("nope").length, 10);
+  // 超過は 10 で切り捨て
+  assert.deepEqual(
+    G.VolumeBooster.clampEqGains([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  );
+  // 不足は 0 補完 + 各要素 clamp
+  assert.deepEqual(G.VolumeBooster.clampEqGains([99, -99]), [12, -12, 0, 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test("VolumeBooster.EQ_PRESETS: 各プリセットが 10 バンド分 + 全値が範囲内", () => {
+  assert.ok("flat" in G.VolumeBooster.EQ_PRESETS, "flat プリセットは必須");
+  for (const [id, gains] of Object.entries(G.VolumeBooster.EQ_PRESETS)) {
+    assert.equal(gains.length, 10, `preset ${id} は 10 要素であるべき`);
+    for (const g of gains) {
+      assert.ok(
+        g >= G.VolumeBooster.EQ_GAIN_MIN && g <= G.VolumeBooster.EQ_GAIN_MAX,
+        `preset ${id} の値 ${g} が EQ_GAIN_MIN..MAX 内であるべき`,
+      );
+    }
+  }
+});
+
+test("VolumeBooster.normalizeEqPreset: 既知/custom はそのまま、未知は default(flat)", () => {
+  assert.equal(G.VolumeBooster.normalizeEqPreset("bassBoost"), "bassBoost");
+  assert.equal(G.VolumeBooster.normalizeEqPreset(G.VolumeBooster.EQ_PRESET_CUSTOM), "custom");
+  assert.equal(G.VolumeBooster.normalizeEqPreset("bogus"), G.VolumeBooster.EQ_PRESET_DEFAULT);
+  assert.equal(G.VolumeBooster.normalizeEqPreset(undefined), G.VolumeBooster.EQ_PRESET_DEFAULT);
+});
+
+test("VolumeBooster.eqPresetGains: 既知はコピー配列 (元を破壊しない)、custom/未知は null", () => {
+  const g = G.VolumeBooster.eqPresetGains("flat");
+  assert.deepEqual(g, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  g[0] = 99; // 返り値はコピーなので元の EQ_PRESETS は不変
+  assert.equal(G.VolumeBooster.EQ_PRESETS.flat[0], 0);
+  assert.equal(G.VolumeBooster.eqPresetGains("custom"), null);
+  assert.equal(G.VolumeBooster.eqPresetGains("bogus"), null);
+});
+
+test("StorageKeys.VOLUME_BOOSTER_EQ_*: イコライザ 4 キーが揃っている", () => {
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_EQ_ENABLED, "volumeBoosterEqEnabled");
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_EQ_GAINS, "volumeBoosterEqGains");
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_EQ_PREAMP, "volumeBoosterEqPreamp");
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_EQ_PRESET, "volumeBoosterEqPreset");
+});
+
 // ---------- VideoGamma ----------
 
 test("VideoGamma.clampValue: 範囲内の値はそのまま、範囲外は clamp、不正値は DEFAULT", () => {

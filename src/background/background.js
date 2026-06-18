@@ -115,6 +115,10 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
+    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
+    StorageKeys.VOLUME_BOOSTER_EQ_PRESET,
     StorageKeys.VIDEO_GAMMA_ENABLED,
     StorageKeys.VIDEO_GAMMA_VALUE,
     StorageKeys.VIDEO_FILL_ENABLED,
@@ -173,6 +177,19 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] = false;
+  }
+  // イコライザ: OFF / 全バンド 0dB / プリアンプ 0dB / プリセット flat で初期化（OFF なので素通り）
+  if (!(StorageKeys.VOLUME_BOOSTER_EQ_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] = false;
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_EQ_GAINS in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_EQ_GAINS] = VolumeBooster.clampEqGains([]);
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_EQ_PREAMP in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP] = VolumeBooster.EQ_PREAMP_DEFAULT;
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_EQ_PRESET in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] = VolumeBooster.EQ_PRESET_DEFAULT;
   }
   // 動画ガンマ補正: master OFF / 値 1.0 で初期化（インストール直後は完全に無処理）
   if (!(StorageKeys.VIDEO_GAMMA_ENABLED in stored)) {
@@ -267,7 +284,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       request.data?.gain,
       request.data?.antiClip,
       request.data?.nightMode,
-      request.data?.muted
+      request.data?.muted,
+      request.data?.eqEnabled,
+      request.data?.eqGains,
+      request.data?.eqPreamp
     )
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
@@ -398,6 +418,9 @@ async function autoApplyVolumeBooster(tabId) {
       StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
       StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
       StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
+      StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
     ]);
     // fetch 中に onChanged が cache を invalidate していたら、この fetch 結果は stale。
     // cache 代入をスキップし、再帰呼び出しで fresh fetch を試みる (cacheSeqId は invalidate 側で進む)。
@@ -412,19 +435,26 @@ async function autoApplyVolumeBooster(tabId) {
   const antiClip = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
   const muted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
-  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted);
+  const eqEnabled = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
+  const eqGains = stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS];
+  const eqPreamp = stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP];
+  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqEnabled, eqGains, eqPreamp);
 }
 
 // ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
 chrome.storage.onChanged.addListener((changes) => {
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効、設定変化も無視
-  // 5 キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
+  // 音量関連キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
+  // (EQ_PRESET は popup の表示状態のみで boost には EQ_GAINS が効くため監視不要)
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN in changes ||
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes
+    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_EQ_GAINS in changes ||
+    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP in changes
   ) {
     cachedVolumeSettings = null;
     // /rere F-003: 進行中の autoApplyVolumeBooster の await が stale な fetch 結果で
@@ -943,7 +973,7 @@ async function isVolumeBoosterActive() {
  * offscreen 側で各 compressor のパラメータを切り替える。両 OFF 時もチェーンには残し
  * ratio:1 のバイパス設定にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqEnabled, eqGains, eqPreamp) {
   // P2-#13: tabId は popup origin（SenderCheck.isFromPopup で検証済み）から渡されるが、
   // popup の中では `getActiveHttpTab()` 経由で active tab の id を入れて送ってくる。
   // popup CSP (`script-src 'self'`) で外部スクリプトが popup 内で動くことは事実上不可能なため、
@@ -957,16 +987,18 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted) {
   const antiClipFlag = antiClip === true;
   const nightModeFlag = nightMode === true;
   const mutedFlag = muted === true;
+  const eqActiveFlag = eqEnabled === true;
 
-  // スライダーが等倍位置 (100%) かつ全サブトグル OFF かつミュート OFF のときだけ release → リソース返却。
-  // 100% でも自動歪み防止 / ナイトモードのいずれかが ON なら compressor を効かせる必要があり、
-  // ミュート ON なら gain を 0 にランプし続ける必要があるため、いずれの場合も AudioContext を維持して通常経路に進む
-  // （gain は 1.0x または 0 にランプ、compressor は preset 通り適用）。
+  // スライダーが等倍位置 (100%) かつ全サブトグル OFF かつミュート OFF かつイコライザ OFF のときだけ
+  // release → リソース返却。100% でも自動歪み防止 / ナイトモード / イコライザのいずれかが ON なら
+  // 処理を効かせる必要があり、ミュート ON なら gain を 0 にランプし続ける必要があるため、いずれの場合も
+  // AudioContext を維持して通常経路に進む（gain は 1.0x または 0 にランプ、各処理は設定通り適用）。
   if (
     clamped === VolumeBooster.UNITY &&
     !antiClipFlag &&
     !nightModeFlag &&
-    !mutedFlag
+    !mutedFlag &&
+    !eqActiveFlag
   ) {
     await releaseVolumeBoosterTab(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
@@ -991,6 +1023,9 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted) {
         antiClip: antiClipFlag,
         nightMode: nightModeFlag,
         muted: mutedFlag,
+        eqEnabled: eqActiveFlag,
+        eqGains,
+        eqPreamp,
       });
     } catch (err) {
       // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー。
@@ -1045,6 +1080,9 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted) {
       antiClip: antiClipFlag,
       nightMode: nightModeFlag,
       muted: mutedFlag,
+      eqEnabled: eqActiveFlag,
+      eqGains,
+      eqPreamp,
     });
     // P2-#19: 成功時のみローカルキャッシュに登録。失敗（offscreen エラー / no-response）の場合は
     // ブースト中状態にならないため Set には追加しない。
