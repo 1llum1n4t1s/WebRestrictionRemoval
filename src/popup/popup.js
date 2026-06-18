@@ -549,17 +549,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       $volumeEqToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED].newValue === true;
       updateEqPanelState?.();
     }
-    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]) {
-      eqGains = VolumeBooster.clampEqGains(changes[StorageKeys.VOLUME_BOOSTER_EQ_GAINS].newValue);
-      syncEqUi?.();
-    }
-    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]) {
-      eqPreamp = VolumeBooster.clampEqPreamp(changes[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP].newValue);
-      syncEqUi?.();
-    }
-    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]) {
+    // EQ_GAINS / EQ_PREAMP はメイン音量スライダー (LAST_GAIN) と同じく onChanged 同期から除外する:
+    // スライダードラッグ中、自身の persistEq 書き込みが storage.onChanged で同 popup に戻り、
+    // syncEqUi がドラッグ中のスライダー値を上書きする self-write feedback (カクつき) を防ぐ。
+    // EQ_GAINS / EQ_PREAMP は popup からのみ変更されるため他経路反映の必要性も低い。
+    // EQ_PRESET は離散値で feedback 連続性問題がないため、select の表示のみ同期する。
+    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] && $volumeEqPreset) {
       eqPreset = VolumeBooster.normalizeEqPreset(changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET].newValue);
-      syncEqUi?.();
+      $volumeEqPreset.value = eqPreset;
     }
     if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
       volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
