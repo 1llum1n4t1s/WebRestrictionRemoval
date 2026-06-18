@@ -737,18 +737,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ===== イコライザ (10 バンドグラフィック EQ) =====
-  // プリセット id → i18n キー対応 (EQ_PRESETS のキー + custom)。
-  const EQ_PRESET_I18N = {
-    flat: "volumeEqPresetFlat",
-    bassBoost: "volumeEqPresetBass",
-    trebleBoost: "volumeEqPresetTreble",
-    vocal: "volumeEqPresetVocal",
-    loudness: "volumeEqPresetLoudness",
-    [VolumeBooster.EQ_PRESET_CUSTOM]: "volumeEqPresetCustom",
-  };
-
   /** プリセット <select> の option と、プリアンプ + 10 バンドのスライダー列を生成する。 */
   function buildEqUi() {
+    // プリセット id → i18n キー対応 (EQ_PRESETS のキー + custom)。
+    // 関数内に inline する: 関数本体は呼出時評価なので、`const` 宣言が popup.js 後方にあっても
+    // TDZ を踏まずに済む (buildEqUi は復元フローで DOMContentLoaded 前半で呼ばれる)。
+    const EQ_PRESET_I18N = {
+      flat: "volumeEqPresetFlat",
+      bassBoost: "volumeEqPresetBass",
+      trebleBoost: "volumeEqPresetTreble",
+      vocal: "volumeEqPresetVocal",
+      loudness: "volumeEqPresetLoudness",
+      [VolumeBooster.EQ_PRESET_CUSTOM]: "volumeEqPresetCustom",
+    };
     $volumeEqPreset.textContent = "";
     const ids = [...Object.keys(VolumeBooster.EQ_PRESETS), VolumeBooster.EQ_PRESET_CUSTOM];
     for (const id of ids) {
