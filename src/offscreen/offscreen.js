@@ -37,11 +37,11 @@ const audioInitPromises = new Map();
 /**
  * DSP コア関数は src/lib/audio-pipeline.js に集約 (globalThis.AudioPipeline)。
  * 旧 MES 経路 (volume-booster.js) との物理コピー drift 解消が当初の抽出動機。MES 経路 +
- * 自動音量正規化の撤去後は compressor preset 適用 / イコライザ適用 / dB→gain 変換が残る。
- * applyCompressorPreset は DynamicsCompressorNode に preset を適用 (OFF 時は COMPRESSOR_BYPASS)、
- * applyEqualizer は preampNode + eqFilters[10] の gain を ramp で更新する。
+ * 自動音量正規化の撤去後は compressor preset 適用 / イコライザ適用 / dB→gain 変換 /
+ * EQ チェーン構築が残る。createEqChain は preampNode + 10 バンド BiquadFilterNode を構築して
+ * 直列接続済みのチェーン (head/tail 付き) を返す (EQ DSP の構築と更新を同一モジュールに集約)。
  */
-const { applyCompressorPreset, applyEqualizer } = AudioPipeline;
+const { applyCompressorPreset, applyEqualizer, createEqChain } = AudioPipeline;
 
 /**
  * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。
@@ -168,16 +168,9 @@ async function createAudioState(tabId, streamId) {
     }
     const source = ctx.createMediaStreamSource(stream);
     const gainNode = ctx.createGain();
-    // イコライザ: プリアンプ GainNode + 10 バンド peaking フィルタ。初期は素通り (preamp 1.0 / 全 0dB)。
-    const preampNode = ctx.createGain();
-    const eqFilters = VolumeBooster.EQ_BANDS.map((freq) => {
-      const f = ctx.createBiquadFilter();
-      f.type = "peaking";
-      f.frequency.value = freq;
-      f.Q.value = VolumeBooster.EQ_Q;
-      f.gain.value = 0;
-      return f;
-    });
+    // イコライザ: AudioPipeline.createEqChain で preamp + 10 バンド peaking を直列構築 (head/tail 付き)。
+    // 初期は素通り (preamp 1.0 / 全バンド 0dB)。DSP 構築と更新 (applyEqualizer) を同一モジュールに集約。
+    const eqChain = createEqChain(ctx);
     // ノード順序: イコライザ（preamp → 10 バンド peaking）→ ナイトモード（コンプ）→ ブースト（gain）
     // → 自動歪み防止（リミッタ）の直列接続。EQ で整音 → ナイトモードで大小差を狭め → gain でブースト
     // → anti-clip でピークを抑える、というマスタリング順の配置。
@@ -185,13 +178,8 @@ async function createAudioState(tabId, streamId) {
     const antiClipNode = ctx.createDynamicsCompressor();
     applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
     applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
-    source.connect(preampNode);
-    let eqTail = preampNode;
-    for (const f of eqFilters) {
-      eqTail.connect(f);
-      eqTail = f;
-    }
-    eqTail.connect(nightModeNode);
+    source.connect(eqChain.head);
+    eqChain.tail.connect(nightModeNode);
     nightModeNode.connect(gainNode);
     gainNode.connect(antiClipNode);
     antiClipNode.connect(ctx.destination);
@@ -201,8 +189,8 @@ async function createAudioState(tabId, streamId) {
     const state = {
       ctx,
       gainNode,
-      preampNode,
-      eqFilters,
+      preampNode: eqChain.preampNode,
+      eqFilters: eqChain.eqFilters,
       nightModeNode,
       antiClipNode,
       stream,

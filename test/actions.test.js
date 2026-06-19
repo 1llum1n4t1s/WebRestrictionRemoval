@@ -200,6 +200,26 @@ test("StorageKeys.VOLUME_BOOSTER_EQ_*: イコライザ 4 キーが揃ってい�
   assert.equal(G.StorageKeys.VOLUME_BOOSTER_EQ_PRESET, "volumeBoosterEqPreset");
 });
 
+test("VolumeBooster.EQ_PRESET_I18N_KEYS: 全プリセット + custom を網羅 (popup の表示文言 drift 検知)", () => {
+  // EQ_PRESETS の全 id + EQ_PRESET_CUSTOM に対して i18n キーが定義されているはず。
+  // popup.js の buildEqUi が VolumeBooster.EQ_PRESET_I18N_KEYS[id] を参照するので、
+  // 新しい preset を EQ_PRESETS に追加したら必ず本マップも更新する (drift 検知)。
+  const expectedIds = [...Object.keys(G.VolumeBooster.EQ_PRESETS), G.VolumeBooster.EQ_PRESET_CUSTOM];
+  for (const id of expectedIds) {
+    const key = G.VolumeBooster.EQ_PRESET_I18N_KEYS[id];
+    assert.ok(
+      typeof key === "string" && key.startsWith("volumeEqPreset"),
+      `EQ_PRESET_I18N_KEYS[${id}] が volumeEqPreset* で始まる文字列であるべき (got ${key})`,
+    );
+  }
+  // 余計なキーが混入していないこと
+  assert.equal(
+    Object.keys(G.VolumeBooster.EQ_PRESET_I18N_KEYS).length,
+    expectedIds.length,
+    "EQ_PRESET_I18N_KEYS のキー数は EQ_PRESETS + custom と一致するはず",
+  );
+});
+
 // ---------- VideoGamma ----------
 
 test("VideoGamma.clampValue: 範囲内の値はそのまま、範囲外は clamp、不正値は DEFAULT", () => {

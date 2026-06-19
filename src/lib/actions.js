@@ -1086,6 +1086,23 @@ const VolumeBooster = Object.freeze({
     perfect: Object.freeze([3, 6, 9, 7, 6, 5, 7, 9, 11, 8]),
     perfectKai: Object.freeze([-3, 0, 3, 1, 0, -1, 1, 3, 5, 2]),
   }),
+  /**
+   * プリセット id → i18n キーの対応表。`EQ_PRESETS` の全キー + `EQ_PRESET_CUSTOM` を網羅。
+   * popup の dropdown 構築でラベル表示に使う (旧実装は popup.js 側 const で TDZ workaround が
+   * 必要だったが、データの正しい在処はプリセット定義と同じ actions.js)。
+   */
+  EQ_PRESET_I18N_KEYS: Object.freeze({
+    flat: "volumeEqPresetFlat",
+    bassBoost: "volumeEqPresetBass",
+    trebleBoost: "volumeEqPresetTreble",
+    vocal: "volumeEqPresetVocal",
+    loudness: "volumeEqPresetLoudness",
+    eargasm: "volumeEqPresetEargasm",
+    eargasmKai: "volumeEqPresetEargasmKai",
+    perfect: "volumeEqPresetPerfect",
+    perfectKai: "volumeEqPresetPerfectKai",
+    custom: "volumeEqPresetCustom",
+  }),
   /** 1 バンドの gain を EQ_GAIN_MIN..MAX に clamp し整数化。不正値は EQ_GAIN_DEFAULT。 */
   clampEqGain(v) {
     const n = Number(v);

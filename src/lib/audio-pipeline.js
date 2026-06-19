@@ -86,9 +86,36 @@
     }
   }
 
+  /**
+   * EQ チェーン (preampNode + 10 バンド peaking BiquadFilterNode) を ctx 上で構築する。
+   * caller (offscreen.js) は head/tail を見て上下のノードに connect するだけで済むよう、
+   * チェーン構築の DSP 知識を applyEqualizer と同じファイルに集約する。
+   *
+   * @param {AudioContext} ctx
+   * @returns {{preampNode: GainNode, eqFilters: BiquadFilterNode[], head: AudioNode, tail: AudioNode}}
+   */
+  function createEqChain(ctx) {
+    const preampNode = ctx.createGain();
+    const eqFilters = VolumeBooster.EQ_BANDS.map((freq) => {
+      const f = ctx.createBiquadFilter();
+      f.type = "peaking";
+      f.frequency.value = freq;
+      f.Q.value = VolumeBooster.EQ_Q;
+      f.gain.value = 0;
+      return f;
+    });
+    let tail = preampNode;
+    for (const f of eqFilters) {
+      tail.connect(f);
+      tail = f;
+    }
+    return { preampNode, eqFilters, head: preampNode, tail };
+  }
+
   globalThis.AudioPipeline = Object.freeze({
     dbToGain,
     applyCompressorPreset,
     applyEqualizer,
+    createEqChain,
   });
 })();

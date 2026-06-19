@@ -295,24 +295,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
   // イコライザの復元 + UI 構築 + イベントバインド（buildEqUi/bindEqEvents/syncEqUi/updateEqPanelState は function 宣言で hoist 済み）。
-  // try/catch で全体を囲み、EQ 初期化で何かが落ちても後続の初期化 (クリーナーアコーディオン構築 / featureInputs ループ 等)
-  // が止まらないように守る。EQ DOM 要素 ($volumeEqToggle 等) が万一欠落していてもタブナビゲーション・他機能は健全に保つ。
-  if ($volumeEqToggle && $volumeEqPreset && $volumeEqSliders && $volumeEqPanel) {
-    try {
-      $volumeEqToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
-      eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
-      eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
-      eqPreset = VolumeBooster.normalizeEqPreset(stored[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]);
-      buildEqUi();
-      bindEqEvents();
-      syncEqUi();
-      updateEqPanelState();
-    } catch (err) {
-      console.warn("[Vuora] EQ init failed (popup continues without EQ):", err);
-    }
-  } else {
-    console.warn("[Vuora] EQ DOM elements missing — popup HTML may be stale, skipping EQ init");
-  }
+  // 旧実装の防御ラッパー (DOM 存在 if + try/catch) は撤去: $volumeEq* は popup.html 同梱の静的要素で
+  // 常時存在し、TDZ 起因の ReferenceError は EQ_PRESET_I18N_KEYS の actions.js 移設 (/simplify) で根治済み。
+  $volumeEqToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
+  eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
+  eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
+  eqPreset = VolumeBooster.normalizeEqPreset(stored[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]);
+  buildEqUi();
+  bindEqEvents();
+  syncEqUi();
+  updateEqPanelState();
   // ミュート状態の復元 + ボタン視覚状態の同期。
   // ミュート ON でもスライダー値は last gain 位置のまま表示する（pushVolumeNow 側で muted=true を渡すと
   // background → offscreen が gainNode を 0 にランプし、ユーザーが意図したスライダー値は state.lastSetPercent に保持される）。
@@ -563,20 +555,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     // スライダードラッグ中、自身の persistEq 書き込みが storage.onChanged で同 popup に戻り、
     // syncEqUi がドラッグ中のスライダー値を上書きする self-write feedback (カクつき) を防ぐ。
     // EQ_GAINS / EQ_PREAMP は popup からのみ変更されるため他経路反映の必要性も低い。
-    // EQ_PRESET は離散値で feedback 連続性問題がないため、select の表示のみ同期する。
-    // ただし別 popup でプリセット変更が起きた場合、こちらの popup 内 eqGains / eqPreamp は
-    // 旧 custom 値のまま残るため、次の pushVolumeNow で古い gain が送信されて音が戻る事故が起きる。
-    // → preset 変更を受信したら eqGains を preset 値に、eqPreamp を中立 (= preset 適用時挙動と一致)
-    // に揃えて UI と memory state の整合を保つ (custom 時は何もしない)。
-    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] && $volumeEqPreset) {
-      eqPreset = VolumeBooster.normalizeEqPreset(changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET].newValue);
-      $volumeEqPreset.value = eqPreset;
-      const presetGains = VolumeBooster.eqPresetGains(eqPreset);
-      if (presetGains) {
-        eqGains = presetGains.slice();
-        eqPreamp = VolumeBooster.EQ_PREAMP_DEFAULT;
-        syncEqUi();
-      }
+    // EQ_PRESET は離散値で feedback 連続性問題がないため、別 popup でのプリセット変更を受信したら
+    // applyPresetSelection で eqGains / eqPreamp / UI を一括同期する (preset 変更ハンドラと共通経路)。
+    // 同期後の push / persist は他 popup 側で完了済みなのでこちらは状態反映のみ。
+    if (changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET]) {
+      applyPresetSelection(changes[StorageKeys.VOLUME_BOOSTER_EQ_PRESET].newValue);
     }
     if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
       volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
@@ -749,27 +732,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== イコライザ (10 バンドグラフィック EQ) =====
   /** プリセット <select> の option と、プリアンプ + 10 バンドのスライダー列を生成する。 */
   function buildEqUi() {
-    // プリセット id → i18n キー対応 (EQ_PRESETS のキー + custom)。
-    // 関数内に inline する: 関数本体は呼出時評価なので、`const` 宣言が popup.js 後方にあっても
-    // TDZ を踏まずに済む (buildEqUi は復元フローで DOMContentLoaded 前半で呼ばれる)。
-    const EQ_PRESET_I18N = {
-      flat: "volumeEqPresetFlat",
-      bassBoost: "volumeEqPresetBass",
-      trebleBoost: "volumeEqPresetTreble",
-      vocal: "volumeEqPresetVocal",
-      loudness: "volumeEqPresetLoudness",
-      eargasm: "volumeEqPresetEargasm",
-      eargasmKai: "volumeEqPresetEargasmKai",
-      perfect: "volumeEqPresetPerfect",
-      perfectKai: "volumeEqPresetPerfectKai",
-      [VolumeBooster.EQ_PRESET_CUSTOM]: "volumeEqPresetCustom",
-    };
+    // プリセット id → i18n キー対応は actions.js の VolumeBooster.EQ_PRESET_I18N_KEYS が単一情報源。
     $volumeEqPreset.textContent = "";
     const ids = [...Object.keys(VolumeBooster.EQ_PRESETS), VolumeBooster.EQ_PRESET_CUSTOM];
     for (const id of ids) {
       const opt = document.createElement("option");
       opt.value = id;
-      opt.textContent = i18n(EQ_PRESET_I18N[id]) || id;
+      opt.textContent = i18n(VolumeBooster.EQ_PRESET_I18N_KEYS[id]) || id;
       $volumeEqPreset.appendChild(opt);
     }
     // プリアンプ + 10 バンド (VolumeBooster.EQ_BANDS 駆動で自動生成)。
@@ -835,10 +804,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }).catch(logStorageError("volume-eq"));
   }
 
-  /** master ON かつ EQ ON のときのみパネルを操作可能にし、それ以外は dim + disabled にする。
-   * EQ DOM 未取得時 (stale HTML 等) は no-op で安全側に倒す。 */
+  /** master ON かつ EQ ON のときのみパネルを操作可能にし、それ以外は dim + disabled にする。 */
   function updateEqPanelState() {
-    if (!$volumeEqToggle || !$volumeEqPanel || !$volumeEqPreset) return;
     const active = $volumeBoosterToggle.checked && $volumeEqToggle.checked;
     $volumeEqPanel.classList.toggle("eq-disabled", !active);
     $volumeEqPreset.disabled = !active;
@@ -846,8 +813,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const s of eqBandSliders) s.disabled = !active;
   }
 
+  /** プリセット選択を eqGains / eqPreamp / eqPreset 状態に反映し UI 同期する単一情報源ヘルパ。
+   * preset を選び直したらプリアンプも仕様上中立 (0dB) に戻す (preset 名表示 = preset 状態のみ effective)。
+   * custom 選択時 / 未知 id は eqGains を触らない (eqPreset のみ正規化更新)。
+   * 永続化と push は呼び出し側の責務 (本関数は state + UI のみ)。
+   * @param {string} rawPresetId
+   * @returns {boolean} eqGains が preset 値に置き換わった場合 true (= 既知プリセット)
+   */
+  function applyPresetSelection(rawPresetId) {
+    eqPreset = VolumeBooster.normalizeEqPreset(rawPresetId);
+    const presetGains = VolumeBooster.eqPresetGains(eqPreset);
+    if (!presetGains) {
+      // custom / 未知 id: select の表示だけ同期 (eqGains は手動値を維持)
+      $volumeEqPreset.value = eqPreset;
+      return false;
+    }
+    eqGains = presetGains;
+    eqPreamp = VolumeBooster.EQ_PREAMP_DEFAULT;
+    syncEqUi();
+    return true;
+  }
+
+  /** EQ イベント共通の末尾: 進行中の debounce push をキャンセルして persist + 即時 push。
+   * toggle / preset / スライダー change の 3 経路で共有 (markEqCustom は input 連続発火専用で別)。
+   * @param {string} tag logVolumeError 用識別子
+   */
+  function commitEq(tag) {
+    cancelVolumePush();
+    persistEq();
+    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+    pushVolumeNow(v).catch(logVolumeError(tag));
+  }
+
   /** スライダー手動操作時 (input 連続発火): プリセットを custom に切替 + debounce push のみ。
-   * storage 書き込み (persistEq) は change イベント (ドラッグ終了) に集約してディスク I/O を平準化。 */
+   * storage 書き込み (persistEq) は change イベント (ドラッグ終了) で commitEq に集約する。 */
   function markEqCustom() {
     eqPreset = VolumeBooster.EQ_PRESET_CUSTOM;
     $volumeEqPreset.value = VolumeBooster.EQ_PRESET_CUSTOM;
@@ -855,52 +854,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     scheduleVolumePush(v);
   }
 
-  /** スライダードラッグ終了時 (change 発火): debounce push をキャンセルして即時 push + storage 永続化。
-   * popup が close 寸前にドラッグ終了したケースで 120ms debounce が破棄されて値が伝わらない事故を防ぐ
-   * (メイン音量スライダーと同じ input + change 二段構成)。 */
-  function flushEqCustom() {
-    cancelVolumePush();
-    persistEq();
-    const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-    pushVolumeNow(v).catch(logVolumeError("eq-slider"));
-  }
-
   /** EQ トグル / プリセット / スライダーのイベントをバインドする (buildEqUi 後に 1 回だけ呼ぶ)。 */
   function bindEqEvents() {
     $volumeEqToggle.addEventListener("change", () => {
-      cancelVolumePush();
-      persistEq();
       updateEqPanelState();
-      const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-      pushVolumeNow(v).catch(logVolumeError("eq-toggle"));
+      commitEq("eq-toggle");
     });
     $volumeEqPreset.addEventListener("change", () => {
-      eqPreset = VolumeBooster.normalizeEqPreset($volumeEqPreset.value);
-      const presetGains = VolumeBooster.eqPresetGains(eqPreset);
-      if (presetGains) {
-        eqGains = presetGains;
-        // プリセット選択時はプリアンプも 0dB に戻す。preamp 操作は markEqCustom 経由で
-        // preset を custom にする方向なので、preset を選び直したらプリアンプも仕様上中立に
-        // 戻すのが UI 期待挙動 (preset 名が表示 = preset 状態のみ effective、という対応関係)。
-        eqPreamp = VolumeBooster.EQ_PREAMP_DEFAULT;
-        syncEqUi();
-      }
-      cancelVolumePush();
-      persistEq();
-      const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
-      pushVolumeNow(v).catch(logVolumeError("eq-preset"));
+      applyPresetSelection($volumeEqPreset.value);
+      commitEq("eq-preset");
     });
     eqPreampSlider.addEventListener("input", () => {
       eqPreamp = VolumeBooster.clampEqPreamp(Number(eqPreampSlider.value));
       markEqCustom();
     });
-    eqPreampSlider.addEventListener("change", flushEqCustom);
+    eqPreampSlider.addEventListener("change", () => commitEq("eq-slider"));
     eqBandSliders.forEach((slider, i) => {
       slider.addEventListener("input", () => {
         eqGains[i] = VolumeBooster.clampEqGain(Number(slider.value));
         markEqCustom();
       });
-      slider.addEventListener("change", flushEqCustom);
+      slider.addEventListener("change", () => commitEq("eq-slider"));
     });
   }
 
