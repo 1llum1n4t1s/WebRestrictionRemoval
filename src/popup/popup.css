@@ -2287,3 +2287,115 @@ body {
     animation: none !important;
   }
 }
+
+/* ===== イコライザ (10 バンドグラフィック EQ) =====
+ * 音量ブースターのサブ機能。プリアンプ + 10 バンドの縦スライダーを横並びに配置する。
+ * 縦スライダーは writing-mode: vertical-lr + direction: rtl (上端が +12dB)。 */
+.eq-block {
+  margin-top: 8px;
+}
+.eq-panel {
+  margin-top: 8px;
+  padding: 10px 8px 6px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  transition: opacity 0.15s ease;
+}
+.eq-panel.eq-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.eq-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.eq-preset-label {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.eq-preset-select {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--rog-red) 30%, transparent);
+  background: var(--bg-card);
+  color: inherit;
+  cursor: pointer;
+}
+.eq-sliders {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 2px;
+}
+.eq-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* プリアンプ列は周波数バンドより長いラベル ("プリアンプ" / "Preamp") を持つので
+ * 列幅を 1.7× に広げてラベル ellipsis を回避。Foobar/Winamp 系 EQ と同じく
+ * バンド列との視覚的分離も入れる (右側に細い区切り線 + 余白)。 */
+.eq-col--preamp {
+  flex: 1.7 1.7 0;
+  padding-right: 6px;
+  margin-right: 4px;
+  border-right: 1px solid color-mix(in srgb, var(--rog-red) 25%, transparent);
+}
+.eq-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 6px;
+  height: 80px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--rog-red) 18%, transparent),
+    color-mix(in srgb, var(--rog-red) 42%, transparent)
+  );
+  border-radius: 3px;
+  cursor: pointer;
+}
+.eq-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--rog-red);
+  box-shadow: 0 0 5px var(--rog-red-glow), var(--bevel-top);
+  cursor: pointer;
+}
+.eq-slider::-webkit-slider-thumb:hover {
+  background: var(--rog-red-deep);
+  box-shadow: 0 0 7px var(--rog-red-glow-strong);
+}
+.eq-slider::-moz-range-thumb {
+  width: 16px;
+  height: 9px;
+  border: none;
+  border-radius: 3px;
+  background: var(--rog-red);
+}
+.eq-col-label {
+  font-size: 9px;
+  letter-spacing: -0.2px;
+  color: color-mix(in srgb, currentcolor 65%, transparent);
+  /* プリアンプ列のラベル ("プリアンプ") が周波数バンドラベル ("32"/"1K" など) より長いため、
+   * 列幅 (flex:1 配分の ~36-40px) を超えた場合は ellipsis で省略してレイアウト崩れを防ぐ。 */
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

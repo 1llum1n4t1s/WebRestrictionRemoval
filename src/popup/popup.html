@@ -132,6 +132,30 @@
             <span class="switch-track" aria-hidden="true"></span>
           </span>
         </label>
+
+        <!-- イコライザ（10 バンドグラフィック EQ・オプトイン・デフォルト OFF） -->
+        <div class="eq-block" id="volumeEqBlock">
+          <label class="toggle-row toggle-row--sub" id="volumeEqToggleRow">
+            <span class="tr-icon" aria-hidden="true">🎚️</span>
+            <span class="tr-text">
+              <span class="tr-name" data-i18n="volumeEqLabel">イコライザ</span>
+              <span class="tr-desc" data-i18n="volumeEqDesc">10 バンドで周波数ごとに音量を調整。低音・高音の強調やプリセット選択ができます</span>
+            </span>
+            <span class="switch">
+              <input type="checkbox" id="volumeEqToggle" />
+              <span class="switch-track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <div class="eq-panel" id="volumeEqPanel">
+            <div class="eq-preset-row">
+              <label class="eq-preset-label" for="volumeEqPreset" data-i18n="volumeEqPresetLabel">プリセット</label>
+              <select id="volumeEqPreset" class="eq-preset-select"></select>
+            </div>
+            <!-- プリアンプ + 10 バンドのスライダー列は popup.js が VolumeBooster.EQ_BANDS から動的生成 -->
+            <div class="eq-sliders" id="volumeEqSliders" role="group"
+                 data-i18n-attr="aria-label:volumeEqLabel"></div>
+          </div>
+        </div>
       </div>
     </section>
 
