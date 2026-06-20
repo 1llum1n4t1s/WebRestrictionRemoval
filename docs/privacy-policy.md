@@ -26,7 +26,7 @@
 - **`tiktokCleanerEnabled`**（真偽値）: TikTok クリーナー機能の有効/無効。
 - **`tiktokCleanerFeatures`**（オブジェクト）: TikTok クリーナーの 3 個のサブ機能（コメント欄非表示 / おすすめのアカウント非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`volumeBoosterEnabled`**（真偽値）: 音量ブースターのマスタートグル。デフォルト OFF。
-- **`volumeBoosterLastGain`**（数値・0〜300）: 音量ブースターのスライダー位置（%）。デフォルト 100。
+- **`volumeBoosterLastGain`**（数値・0〜600）: 音量ブースターのスライダー位置（%）。デフォルト 100。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（高速リミッタとして動作する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNightModeEnabled`**（真偽値）: 音量ブースターのサブトグル「ナイトモード」（夜間視聴向けにダイナミックレンジを圧縮する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterMutedEnabled`**（真偽値）: 音量ブースターのミュートトグル。ON のときスライダー値・サブトグル設定を保持したまま `GainNode` を 0 にランプして消音します（AudioContext は維持され、解除時に高速復帰）。デフォルト OFF。

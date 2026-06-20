@@ -20,7 +20,7 @@
  *
  * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → antiClipNode → destination）:
  *   - ctx: AudioContext
- *   - gainNode: GainNode（ユーザースライダーの 0-300% ブースト）
+ *   - gainNode: GainNode（ユーザースライダーの 0-600% ブースト）
  *   - preampNode: GainNode（イコライザのプリアンプ、dB→倍率。EQ OFF 時は unity 1.0）
  *   - eqFilters: BiquadFilterNode[10]（10 バンド peaking イコライザ、EQ OFF 時は全 0dB でフラット = 素通り）
  *   - nightModeNode: DynamicsCompressorNode（ゲーム配信向けナイトモード圧縮、OFF 時はバイパス設定）
@@ -48,7 +48,7 @@ const { applyCompressorPreset, applyEqualizer, createEqChain } = AudioPipeline;
  *
  * @param {number} tabId 対象タブ ID
  * @param {string} streamId chrome.tabCapture.getMediaStreamId が返した stream ID
- * @param {number} gainPercent 0-300 の整数（％）
+ * @param {number} gainPercent 0-600 の整数（％）
  * @param {boolean} antiClip 自動歪み防止 ON/OFF
  * @param {boolean} nightMode ナイトモード圧縮 ON/OFF
  * @param {boolean} muted ミュート ON/OFF（true なら gainPercent によらず 0 にランプ、lastSetPercent は保持）

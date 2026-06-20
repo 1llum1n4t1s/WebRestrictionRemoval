@@ -128,7 +128,7 @@ const StorageKeys = Object.freeze({
   TIKTOK_CLEANER_FEATURES: "tiktokCleanerFeatures",
   /** 音量ブースター: マスタートグル（OFF 時は全タブの AudioContext を解放しパイプラインをカット。設定値は残す） */
   VOLUME_BOOSTER_ENABLED: "volumeBoosterEnabled",
-  /** 音量ブースター: 保存されたスライダー位置 (0–300%)。マスター ON 時にタブ切替で自動適用される */
+  /** 音量ブースター: 保存されたスライダー位置 (0–600%)。マスター ON 時にタブ切替で自動適用される */
   VOLUME_BOOSTER_LAST_GAIN: "volumeBoosterLastGain",
   /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
@@ -895,14 +895,14 @@ const VolumeBooster = Object.freeze({
   MIN: 0,
   /** デフォルト音量 (%)。100 で原音そのまま（gain 1.0、リソース解放状態）。 */
   DEFAULT: 100,
-  MAX: 300,
+  MAX: 600,
   /** スライダー上の「等倍ライン」。この値ではブースト処理を起動せず AudioContext を解放する。 */
   UNITY: 100,
   /** UI スライダーの内部最小値。実音量 percent とは別に扱い、100% を中央へ置く。 */
   SLIDER_MIN: 0,
   /** UI スライダーの中央/等倍位置。 */
   SLIDER_UNITY: 100,
-  /** UI スライダーの内部最大値。左半分 0..100% / 右半分 100..300% に割り当てる。 */
+  /** UI スライダーの内部最大値。左半分 0..100% / 右半分 100..600% に割り当てる。 */
   SLIDER_MAX: 200,
   STEP: 1,
   /**
@@ -922,13 +922,13 @@ const VolumeBooster = Object.freeze({
   /**
    * スライダー percent (0..MAX) を実 gain 倍率に変換する対数マッピング。
    *
-   * 100% = 1.0x (unity) / MAX% = 3.0x の anchor を維持しつつ、
+   * 100% = 1.0x (unity) / MAX% = 6.0x の anchor を維持しつつ、
    * 100..MAX 区間を「等距離スライダー = 等 dB ステップ」になるよう対数で配分する。
-   * 結果として 100→200 と 200→300 で同じ ~4.8dB ずつ上がるためドラッグ体感が均一化される。
+   * 結果としてスライダー右半分のどこを動かしても同じ dB ずつ上がるためドラッグ体感が均一化される。
    *
    * 0..100 区間（attenuation）は使用頻度が低いため線形のまま (percent/100)。
    *
-   * 例: percentToGain(200) ≈ 1.73x (+4.8dB), percentToGain(300) = 3.0x (+9.5dB)
+   * 例: percentToGain(200) ≈ 1.43x (+3.1dB), percentToGain(600) = 6.0x (+15.6dB)
    */
   percentToGain(percent) {
     const p = VolumeBooster.clampValue(percent);
@@ -953,8 +953,8 @@ const VolumeBooster = Object.freeze({
     return Math.round(VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY));
   },
   /**
-   * UI スライダー位置 (0..200) を実音量 percent (0..300) に変換する。
-   * 100% を中央へ置くため、下げる側は 0..100、上げる側は 100..300 に分ける。
+   * UI スライダー位置 (0..200) を実音量 percent (0..MAX) に変換する。
+   * 100% を中央へ置くため、下げる側は 0..100、上げる側は 100..MAX に分ける。
    */
   sliderPositionToPercent(position) {
     const n = Number(position);
@@ -969,7 +969,7 @@ const VolumeBooster = Object.freeze({
       VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY)
     );
   },
-  /** 実音量 percent (0..300) から UI スライダー位置 (0..200) を復元する。 */
+  /** 実音量 percent (0..MAX) から UI スライダー位置 (0..200) を復元する。 */
   percentToSliderPosition(percent) {
     const p = VolumeBooster.clampValue(percent);
     if (p <= VolumeBooster.UNITY) return p;

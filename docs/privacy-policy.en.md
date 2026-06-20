@@ -24,7 +24,7 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`tiktokCleanerEnabled`** (boolean): whether the TikTok cleaner is enabled.
 - **`tiktokCleanerFeatures`** (object): on/off state of each of the 3 TikTok cleaner sub-features (Hide comments / Hide suggested accounts / Image download button).
 - **`volumeBoosterEnabled`** (boolean): Volume Booster master toggle. Default OFF.
-- **`volumeBoosterLastGain`** (number, 0–300): Volume Booster slider position (%). Default 100.
+- **`volumeBoosterLastGain`** (number, 0–600): Volume Booster slider position (%). Default 100.
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` acting as a fast limiter) is enabled. Default OFF.
 - **`volumeBoosterNightModeEnabled`** (boolean): whether the Volume Booster's "Night Mode" sub-toggle (a `DynamicsCompressor` that compresses dynamic range for night listening) is enabled. Default OFF.
 - **`volumeBoosterMutedEnabled`** (boolean): the Volume Booster mute toggle. When ON, the `GainNode` is ramped to 0 while the slider value and sub-toggle settings are preserved (the AudioContext is kept alive so unmute can restore the volume instantly). Default OFF.

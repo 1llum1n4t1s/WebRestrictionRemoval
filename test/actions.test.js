@@ -39,7 +39,8 @@ test("VolumeBooster.percentToGain: 0/100/MAX のアンカー値が正しい", ()
 });
 
 test("VolumeBooster.percentToGain → gainToPercent round-trip (整数 0..MAX)", () => {
-  for (const pct of [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]) {
+  // MAX 追従ループ。逆関数なので整数 percent は厳密復元される。
+  for (let pct = 0; pct <= G.VolumeBooster.MAX; pct += 25) {
     const gain = G.VolumeBooster.percentToGain(pct);
     const back = G.VolumeBooster.gainToPercent(gain);
     assert.equal(back, pct, `pct=${pct} round-trip got ${back} (gain=${gain})`);
@@ -54,11 +55,16 @@ test("VolumeBooster.gainToPercent: 不正値は MIN", () => {
 });
 
 test("VolumeBooster slider ↔ percent round-trip (整数 0..MAX)", () => {
-  for (const pct of [0, 25, 50, 75, 100, 150, 200, 250, 300]) {
+  // 100..MAX 区間を slider 100..200 (100 段) にマップするので、percent 1 段あたりの
+  // slider 解像度に応じて round 誤差を許容する (MAX 連動)。
+  const sliderStep =
+    (G.VolumeBooster.MAX - G.VolumeBooster.UNITY) /
+    (G.VolumeBooster.SLIDER_MAX - G.VolumeBooster.SLIDER_UNITY);
+  const tol = Math.ceil(sliderStep / 2) + 1;
+  for (let pct = 0; pct <= G.VolumeBooster.MAX; pct += 25) {
     const pos = G.VolumeBooster.percentToSliderPosition(pct);
     const back = G.VolumeBooster.sliderPositionToPercent(pos);
-    // 100..300 区間は線形 100..200 にマップされるので 1〜2 単位の round 誤差を許容
-    assert.ok(Math.abs(back - pct) <= 2, `pct=${pct} round-trip got ${back} via pos=${pos}`);
+    assert.ok(Math.abs(back - pct) <= tol, `pct=${pct} round-trip got ${back} via pos=${pos}`);
   }
 });
 
