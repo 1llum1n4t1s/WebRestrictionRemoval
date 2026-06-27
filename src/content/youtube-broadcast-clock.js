@@ -357,7 +357,9 @@
     buildOverlay();
     attachOverlayToPlayer();
     lastRenderAt = 0;
-    scheduleRender();
+    // 初回は同期描画して placeholder「—」→時刻の一瞬の幅変化を防ぐ（showClock は
+    // broadcastInfo 確定後にのみ呼ばれるので render() は即座に時刻を描ける）。
+    render();
   }
 
   function hideClock() {
