@@ -1,0 +1,99 @@
+/*
+ * YouTube 配信アーカイブの配信時刻オーバーレイ HUD
+ *
+ * プレーヤー (#movie_player) 内左上に absolute 配置するオーバーレイ。
+ * ROG クリムゾン + ガンメタル基調背景に半透明黒で動画上にも視認性を確保する。
+ * 接続モニター HUD (__cpa-cm-overlay) はデフォルト右上なので、本 HUD は左上に置いて
+ * デフォルト位置の衝突を避ける（どちらもドラッグで移動可能）。
+ *
+ * 動作対象は **`*://*.youtube.com/*` の top frame のみ**。content script から動的に
+ * `<div class="__cpa-bc-overlay">` を inject するため、CSS は always loaded だが
+ * セレクタが他要素に副作用を与えないよう完全名前空間化 (__cpa-bc-) してある。
+ */
+
+.__cpa-bc-overlay {
+  /* 親 (#movie_player) は position:relative なので absolute 配置で左上に出る */
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2147483646; /* YouTube player 内最上層、ただし ytp 右クリックメニューより 1 低い保険 */
+
+  /* ガンメタル基調背景 + 半透明黒で動画上の視認性確保 */
+  background: linear-gradient(180deg, rgba(20, 22, 26, 0.92), rgba(12, 14, 18, 0.92));
+  color: #f0f0f2;
+  border: 1px solid rgba(184, 8, 40, 0.5);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+
+  /* user-select 抑止 + ドラッグ中のテキスト選択防止 */
+  user-select: none;
+  -webkit-user-select: none;
+
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+
+.__cpa-bc-overlay.__cpa-bc-dragging {
+  /* ドラッグ中はトランジション無効化してマウス追従を即時に */
+  transition: none;
+  cursor: grabbing;
+}
+
+/* ハンドル: アイコン + ラベル（ドラッグ可能） */
+.__cpa-bc-handle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ff7a8a;
+}
+.__cpa-bc-handle:active {
+  cursor: grabbing;
+}
+
+.__cpa-bc-icon {
+  font-size: 9px;
+  line-height: 1;
+  filter: saturate(1.2);
+}
+
+.__cpa-bc-label {
+  white-space: nowrap;
+}
+
+/* 時刻表示: 等幅・大きめで動画上でも読みやすく
+ * yyyy/MM/dd　hh:mm:ss を等幅フォントで描画し、秒など桁が変わっても文字幅・全体幅が
+ * 一切揺れないようにする（継承フォントだと tabular-nums が効かず幅が変動するため等幅必須）。
+ * box-sizing:border-box + min-width + text-align:center で、初期「—」やフォントロード差が
+ * あっても枠サイズを固定する。 */
+.__cpa-bc-time {
+  box-sizing: border-box;
+  min-width: 14em;
+  padding: 5px 10px 6px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Cascadia Code", Consolas, "Roboto Mono", "DejaVu Sans Mono", monospace;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: #f4f4f6;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* 高 DPI / フルスクリーン時もそのまま機能。フルスクリーンに入ると movie_player 自体が
+   :fullscreen 疑似クラスでフルスクリーンになるため overlay も追従して左上に出る */
+:fullscreen .__cpa-bc-overlay,
+:-webkit-full-screen .__cpa-bc-overlay {
+  top: 24px;
+  left: 24px;
+}

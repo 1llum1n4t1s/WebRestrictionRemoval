@@ -5,7 +5,7 @@
  * v9 で flat config が標準化されたため、`.eslintrc.*` 系は廃止。
  *
  * 設計方針:
- * - `src/` の IIFE + globalThis 公開 24 定数 (actions.js 21 + 共通モジュール 3: ScanRunner /
+ * - `src/` の IIFE + globalThis 公開 25 定数 (actions.js 22 + 共通モジュール 3: ScanRunner /
  *   AudioPipeline / CleanerCore) を明示列挙 (no-implicit-globals 違反を防ぎつつ、
  *   actions.js が公開する定数を読み取り専用 global として承認する)
  * - `scripts/` / `webstore/generate-screenshots.js` は Node ESM/CJS 環境
@@ -36,6 +36,7 @@ const ACTIONS_GLOBALS = {
   VideoFill: "readonly",
   Loupe: "readonly",
   ConnectionMonitor: "readonly",
+  BroadcastClock: "readonly",
   ColorPicker: "readonly",
   PopupTabs: "readonly",
   // /rere B1-007/B2-I002/D-002 + B1-004/B2-I001/D-001 で追加した共通モジュール
