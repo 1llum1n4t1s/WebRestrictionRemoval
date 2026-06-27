@@ -45,11 +45,11 @@ test("VolumeBooster.percentToGain: 表示% = 実倍率 で線形（150%=1.5x 等
   assert.equal(G.VolumeBooster.percentToGain(150), 1.5);
   assert.equal(G.VolumeBooster.percentToGain(200), 2.0);
   assert.equal(G.VolumeBooster.percentToGain(300), 3.0);
-  assert.equal(G.VolumeBooster.percentToGain(450), 4.5);
+  assert.equal(G.VolumeBooster.percentToGain(250), 2.5);
   // 逆関数も 実倍率 → 表示% で線形一致
   assert.equal(G.VolumeBooster.gainToPercent(1.5), 150);
   assert.equal(G.VolumeBooster.gainToPercent(2.0), 200);
-  assert.equal(G.VolumeBooster.gainToPercent(6.0), 600);
+  assert.equal(G.VolumeBooster.gainToPercent(3.0), 300);
 });
 
 test("VolumeBooster.percentToGain → gainToPercent round-trip (整数 0..MAX)", () => {

@@ -128,7 +128,7 @@ const StorageKeys = Object.freeze({
   TIKTOK_CLEANER_FEATURES: "tiktokCleanerFeatures",
   /** 音量ブースター: マスタートグル（OFF 時は全タブの AudioContext を解放しパイプラインをカット。設定値は残す） */
   VOLUME_BOOSTER_ENABLED: "volumeBoosterEnabled",
-  /** 音量ブースター: 保存されたスライダー位置 (0–600%)。マスター ON 時にタブ切替で自動適用される */
+  /** 音量ブースター: 保存されたスライダー位置 (0–300%)。マスター ON 時にタブ切替で自動適用される */
   VOLUME_BOOSTER_LAST_GAIN: "volumeBoosterLastGain",
   /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
@@ -895,14 +895,14 @@ const VolumeBooster = Object.freeze({
   MIN: 0,
   /** デフォルト音量 (%)。100 で原音そのまま（gain 1.0、リソース解放状態）。 */
   DEFAULT: 100,
-  MAX: 600,
+  MAX: 300,
   /** スライダー上の「等倍ライン」。この値ではブースト処理を起動せず AudioContext を解放する。 */
   UNITY: 100,
   /** UI スライダーの内部最小値。実音量 percent とは別に扱い、100% を中央へ置く。 */
   SLIDER_MIN: 0,
   /** UI スライダーの中央/等倍位置。 */
   SLIDER_UNITY: 100,
-  /** UI スライダーの内部最大値。左半分 0..100% / 右半分 100..600% に割り当てる。 */
+  /** UI スライダーの内部最大値。左半分 0..100% / 右半分 100..300% に割り当てる。 */
   SLIDER_MAX: 200,
   STEP: 1,
   /**
@@ -923,7 +923,7 @@ const VolumeBooster = Object.freeze({
    * スライダー percent (0..MAX) を実 gain 倍率に変換する線形マッピング。
    *
    * 「表示 % = 実音量倍率」を一致させる: 100% = 1.0x / 150% = 1.5x / 200% = 2.0x /
-   * MAX(600)% = 6.0x。単純に percent / 100 を返すだけ。
+   * MAX(300)% = 3.0x。単純に percent / 100 を返すだけ。
    *
    * 旧実装は 100..MAX を対数（等 dB ステップ）で配分してドラッグ体感を均一化していたが、
    * 表示 % と実倍率が乖離し「150% なのに約 1.2 倍」とユーザーに誤読される問題があったため
