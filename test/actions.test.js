@@ -38,6 +38,20 @@ test("VolumeBooster.percentToGain: 0/100/MAX のアンカー値が正しい", ()
   assert.equal(G.VolumeBooster.percentToGain(G.VolumeBooster.MAX), G.VolumeBooster.MAX / 100);
 });
 
+// 表示% = 実倍率 の線形一致（対数マッピング撤去の回帰防止、ゆろさん指摘 2026-06-27）。
+// 旧実装は 150% で約 1.196 倍・200% で約 1.43 倍と乖離していた。
+test("VolumeBooster.percentToGain: 表示% = 実倍率 で線形（150%=1.5x 等）", () => {
+  assert.equal(G.VolumeBooster.percentToGain(125), 1.25);
+  assert.equal(G.VolumeBooster.percentToGain(150), 1.5);
+  assert.equal(G.VolumeBooster.percentToGain(200), 2.0);
+  assert.equal(G.VolumeBooster.percentToGain(300), 3.0);
+  assert.equal(G.VolumeBooster.percentToGain(450), 4.5);
+  // 逆関数も 実倍率 → 表示% で線形一致
+  assert.equal(G.VolumeBooster.gainToPercent(1.5), 150);
+  assert.equal(G.VolumeBooster.gainToPercent(2.0), 200);
+  assert.equal(G.VolumeBooster.gainToPercent(6.0), 600);
+});
+
 test("VolumeBooster.percentToGain → gainToPercent round-trip (整数 0..MAX)", () => {
   // MAX 追従ループ。逆関数なので整数 percent は厳密復元される。
   for (let pct = 0; pct <= G.VolumeBooster.MAX; pct += 25) {

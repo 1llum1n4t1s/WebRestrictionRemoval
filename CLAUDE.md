@@ -561,7 +561,7 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 
 **オーディオ路の不変条件**:
 - **ノード順序は `source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → antiClipNode → destination` に固定** — EQ プリアンプ → 10 バンド peaking フィルタ → ナイトモードでダイナミックレンジを狭め、手動 gain でブーストし、後段に limiter (anti-clip) を置く。gain を先頭に置かず compressor の後段に置くことで「EQ → 圧縮 → 増幅 → リミット」のマスタリング順を保つ。
-- **gain は対数マッピング + `setTargetAtTime` ramp** — UI スライダーは内部値 0..200、実音量は左端 0% / 中央 100% / 右端 600%。100..600 区間の実 gain は `VolumeBooster.percentToGain()` で対数変換し、等距離 = 等 dB ステップにする。`gainNode.gain` への直接 `.value =` 代入はサンプル境界の不連続でクリック発生 → 必ず `cancelScheduledValues` → `setValueAtTime(現在値, now)` → `setTargetAtTime(target, now, RAMP_TIME_CONSTANT)` の三点セットで ramp 経由（`RAMP_TIME_CONSTANT = 0.015` で 3τ ≈ 45ms 95% 到達、popup の 120ms debounce より十分短い）。
+- **gain は線形マッピング + `setTargetAtTime` ramp** — UI スライダーは内部値 0..200、実音量は左端 0% / 中央 100% / 右端 600%。実 gain は `VolumeBooster.percentToGain()` で `percent / 100` に線形変換する（**表示 % = 実音量倍率**: 150% = 1.5x / 200% = 2.0x / 600% = 6.0x）。旧実装は 100..600 を対数で等 dB 配分していたが「150% なのに約 1.2 倍」と表示が実倍率と乖離する問題があり線形化した（ゆろさん指摘 2026-06-27）。スライダー位置 → 表示 % の変換（`sliderPositionToPercent`）は中央 = 等倍を保つため従来どおり。`gainNode.gain` への直接 `.value =` 代入はサンプル境界の不連続でクリック発生 → 必ず `cancelScheduledValues` → `setValueAtTime(現在値, now)` → `setTargetAtTime(target, now, RAMP_TIME_CONSTANT)` の三点セットで ramp 経由（`RAMP_TIME_CONSTANT = 0.015` で 3τ ≈ 45ms 95% 到達、popup の 120ms debounce より十分短い）。
 - **DynamicsCompressor は disconnect ではなく BYPASS preset で OFF** — ナイトモード / 自動歪み防止のサブトグル OFF 時にノードを disconnect/reconnect すると AudioContext のグラフが切れて一瞬無音になりプチノイズが乗る。`COMPRESSOR_BYPASS`（`ratio:1`、threshold/knee 中立）を `applyCompressorPreset` で当てれば素通り化が無音ゼロで実現（切替頻度が低くアタックが速い 1〜50ms ため `setTargetAtTime` 不要、`.value =` 直接代入で十分）。
 - **イコライザも disconnect ではなく 0dB / unity gain で OFF** — EQ OFF 時に BiquadFilterNode 群を disconnect/reconnect すると compressor と同様に音切れが起きる。`applyEqualizer(state, false, ...)` で preampNode.gain = unity (1.0)、eqFilters[i].gain = 0dB (素通り) に ramp で戻すことで、チェーン上は常時接続のままバイパス。手動操作中のスライダーでも周波数特性の連続変化が ramp で段差なし。**固定フィルタでフィードバック無し**（撤去した自動音量正規化と違って測定 → 補正ループがない）ため決定論的に安定。
 - **volumeGetGain は `state.lastSetPercent` を返す** — `gain.value` はランプ中で目標値と一致しないため、ユーザーが最後に指定した整数 percent を保持して round-trip 誤差ゼロを担保。`gainToPercent(gain.value)` 経由だと使えない。
@@ -583,7 +583,8 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 | Version | 変更内容 | 動機 / 棄却された alternative |
 |---|---|---|
 | v1.0.x | DynamicsCompressor のサブトグル OFF で `disconnect/reconnect` 経路 | **棄却**: 一瞬無音化 + プチノイズ。`COMPRESSOR_BYPASS` preset (`ratio:1`、threshold/knee 中立) で素通り化に置換 → 切替頻度低 + アタック速 (1-50ms) のため `.value =` 直接代入で十分 |
-| (基盤) | gain ramp は対数マッピング + `setTargetAtTime` 3 点セット | `gainNode.gain.value = X` 直接代入はサンプル境界の不連続でクリック音発生 → 必ず `cancelScheduledValues` → `setValueAtTime(現在値)` → `setTargetAtTime(target, now, τ)` の三点セット。`RAMP_TIME_CONSTANT = 0.015` で 3τ ≈ 45ms 95% 到達 (popup の 120ms debounce より短い) |
+| (基盤) | gain ramp は `setTargetAtTime` 3 点セット | `gainNode.gain.value = X` 直接代入はサンプル境界の不連続でクリック音発生 → 必ず `cancelScheduledValues` → `setValueAtTime(現在値)` → `setTargetAtTime(target, now, τ)` の三点セット。`RAMP_TIME_CONSTANT = 0.015` で 3τ ≈ 45ms 95% 到達 (popup の 120ms debounce より短い) |
+| 2026-06-27 | `percentToGain` を対数 → 線形化 (`percent / 100`) | **棄却した対数**: 100..600 を等 dB 配分し「等距離スライダー = 等 dB」でドラッグ体感を均一化していたが、表示 % と実倍率が乖離し「150% なのに約 1.2 倍」とユーザー誤読 (ゆろさん指摘)。**表示 % = 実倍率 (150%=1.5x) の直感性を優先**して線形化。スライダー位置 → 表示 % (`sliderPositionToPercent`) は中央 = 等倍を維持するので操作感は不変。逆関数 `gainToPercent` も `gain × 100` に線形化 |
 
 > 自動音量正規化 (EMA / silence gate 二重判定 / dead zone / 非対称 ramp 等の AGC チューニング) は v1.0.38 / v1.0.39 / 2026-06-07 と何度も調整したが、リアルタイム AGC として実用水準に届かず機能ごと撤去した (2026-06-19)。詳細な経緯と棄却した alternative は §撤去済み機能と教訓「自動音量正規化」を参照。
 

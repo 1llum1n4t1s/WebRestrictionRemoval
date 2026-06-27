@@ -920,37 +920,28 @@ const VolumeBooster = Object.freeze({
     return Math.round(n);
   },
   /**
-   * スライダー percent (0..MAX) を実 gain 倍率に変換する対数マッピング。
+   * スライダー percent (0..MAX) を実 gain 倍率に変換する線形マッピング。
    *
-   * 100% = 1.0x (unity) / MAX% = 6.0x の anchor を維持しつつ、
-   * 100..MAX 区間を「等距離スライダー = 等 dB ステップ」になるよう対数で配分する。
-   * 結果としてスライダー右半分のどこを動かしても同じ dB ずつ上がるためドラッグ体感が均一化される。
+   * 「表示 % = 実音量倍率」を一致させる: 100% = 1.0x / 150% = 1.5x / 200% = 2.0x /
+   * MAX(600)% = 6.0x。単純に percent / 100 を返すだけ。
    *
-   * 0..100 区間（attenuation）は使用頻度が低いため線形のまま (percent/100)。
-   *
-   * 例: percentToGain(200) ≈ 1.43x (+3.1dB), percentToGain(600) = 6.0x (+15.6dB)
+   * 旧実装は 100..MAX を対数（等 dB ステップ）で配分してドラッグ体感を均一化していたが、
+   * 表示 % と実倍率が乖離し「150% なのに約 1.2 倍」とユーザーに誤読される問題があったため
+   * 線形に統一した（ゆろさん指摘 2026-06-27）。スライダー UI は sliderPositionToPercent 側で
+   * 中央 = 等倍 (100%)・左で減衰・右で増幅の配置を維持しているので操作感は変わらない。
    */
   percentToGain(percent) {
-    const p = VolumeBooster.clampValue(percent);
-    if (p === VolumeBooster.UNITY) return 1;
-    if (p < VolumeBooster.UNITY) return p / 100;
-    const maxDb = 20 * Math.log10(VolumeBooster.MAX / 100);
-    const t = (p - VolumeBooster.UNITY) / (VolumeBooster.MAX - VolumeBooster.UNITY);
-    return Math.pow(10, (t * maxDb) / 20);
+    return VolumeBooster.clampValue(percent) / 100;
   },
   /**
    * percentToGain の逆関数。実 gain 倍率からスライダー上の整数 percent を復元する。
+   * 線形マッピングなので gain × 100 を四捨五入して 0..MAX にクランプするだけ。
    * popup syncCurrentTabVolume などで AudioContext 内の現在 gain を表示値に戻すときに使う。
    */
   gainToPercent(gain) {
     const g = Number(gain);
     if (!Number.isFinite(g) || g <= 0) return VolumeBooster.MIN;
-    if (g <= 1) return Math.round(g * 100);
-    const maxGain = VolumeBooster.MAX / 100;
-    if (g >= maxGain) return VolumeBooster.MAX;
-    const maxDb = 20 * Math.log10(maxGain);
-    const t = (20 * Math.log10(g)) / maxDb;
-    return Math.round(VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY));
+    return VolumeBooster.clampValue(Math.round(g * 100));
   },
   /**
    * UI スライダー位置 (0..200) を実音量 percent (0..MAX) に変換する。
