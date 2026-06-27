@@ -37,8 +37,8 @@
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/lib/actions.js", "src/content/youtube-connection-monitor.js"],
-      "css": ["src/content/youtube-connection-monitor.css"],
+      "js": ["src/lib/actions.js", "src/content/youtube-connection-monitor.js", "src/content/youtube-broadcast-clock.js"],
+      "css": ["src/content/youtube-connection-monitor.css", "src/content/youtube-broadcast-clock.css"],
       "run_at": "document_idle",
       "all_frames": false
     },

@@ -280,6 +280,10 @@ const SearchFixerFeatures = Object.freeze([
   // 拡張機能内で唯一の外部 fetch（Google generate_204 / Cloudflare cdn-cgi/trace への RTT 計測のみ）。
   // 実装は専用 content script youtube-connection-monitor.js（純粋ロジックは ConnectionMonitor namespace）。
   Object.freeze({ key: "connectionMonitor", category: "watch_page" }),
+  // 配信時刻オーバーレイ: 配信アーカイブ (過去ライブの VOD) 再生中に、その瞬間が実際に配信
+  // されていた時刻 (yyyy/MM/dd　hh:mm:ss) をプレーヤー内 HUD に重ねる。純粋ロジックは
+  // BroadcastClock namespace、実装は専用 content script youtube-broadcast-clock.js。
+  Object.freeze({ key: "broadcastClock", category: "watch_page" }),
   Object.freeze({ key: "redirectShortsUrl", category: "watch_page" }),
   Object.freeze({ key: "searchGrid", category: "search_only" }),
   Object.freeze({ key: "removeShortsChip", category: "search_only" }),
@@ -1657,6 +1661,114 @@ const ConnectionMonitor = Object.freeze({
 });
 
 /**
+ * @readonly YouTube 配信アーカイブの「配信時刻オーバーレイ」定数 + 純粋関数。
+ *
+ * ライブ配信のアーカイブ（過去のライブを VOD 化したもの）を再生中、その瞬間が「実際に
+ * 配信されていた時刻」をプレーヤー内 HUD に重ねて表示する独自実装。配信開始時刻
+ * （liveBroadcastDetails.startTimestamp）に再生位置（video.currentTime）を加算して算出する。
+ *
+ * データ取得: content script（isolated world）からは MAIN world の ytInitialPlayerResponse を
+ * 直接読めないため、`/watch?v=<id>` を same-origin fetch して HTML 内の liveBroadcastDetails を
+ * 正規表現で抽出する（search-fixer.js の /feed/channels 取得と同型の same-origin 認証 fetch、
+ * credentials:"same-origin" + redirect:"manual"。外部送信ゼロの方針内＝自オリジンへの取得のみ）。
+ *
+ * 対象: liveBroadcastDetails を持ち、かつ配信終了済み（isLiveNow !== true）のアーカイブのみ。
+ * 通常動画・配信中のライブ・プレミア公開待ちには表示しない。
+ *
+ * 精度の限界: currentTime=0 が配信開始ちょうどに対応する線形マッピング前提のため、配信途中の
+ * 回線断・再接続や編集カットがあるアーカイブでは、その地点以降に実時刻がずれる（原理的限界で
+ * どんな実装でも避けられない）。
+ *
+ * 純粋関数（extractVideoId / parseLiveBroadcastDetails / computeBroadcastEpochMs / formatTimestamp）
+ * は test/actions.test.js で境界値テストする。
+ */
+const BroadcastClock = Object.freeze({
+  /** 配信情報（startMs / endMs / isLiveNow）の sessionStorage cache prefix（videoId 単位）。
+   *  HTML fetch を動画ごと 1 回に抑える。負例（通常動画＝配信由来でない）も `{ none: true }` で cache する */
+  CACHE_PREFIX: "__cpa_bc_info_v1::",
+
+  /** オーバーレイ位置（ドラッグ後の座標）の localStorage キー */
+  LS_KEY_OVERLAY_POS: "__cpa_bc_overlay_pos",
+
+  /** HUD 再描画の最小間隔（時刻表示は秒粒度なので 250ms で十分） */
+  RENDER_THROTTLE_MS: 250,
+
+  /**
+   * URL / location（search や pathname）から YouTube videoId（11 文字）を抽出する純粋関数。
+   * `/watch?v=<id>` と `/live/<id>` の両形式に対応。取れなければ null。
+   * @param {string} input location.search / location.pathname / 完全 URL いずれも可
+   * @returns {string|null}
+   */
+  extractVideoId(input) {
+    if (typeof input !== "string" || input.length === 0) return null;
+    const liveM = input.match(/\/live\/([A-Za-z0-9_-]{11})(?:[/?#&]|$)/);
+    if (liveM) return liveM[1];
+    const vM = input.match(/[?&]v=([A-Za-z0-9_-]{11})(?:[&#]|$)/);
+    if (vM) return vM[1];
+    return null;
+  },
+
+  /**
+   * watch ページの HTML から liveBroadcastDetails を抽出する純粋関数。
+   *
+   * liveBroadcastDetails はフラットなオブジェクト
+   * （`{"isLiveNow":false,"startTimestamp":"...","endTimestamp":"..."}`）なので、
+   * nested brace を含まない `[^{}]*` で 1 ブロックを安全に切り出せる。
+   *
+   * @param {string} html
+   * @returns {{ startMs:number, endMs:(number|null), isLiveNow:boolean } | null}
+   *   startTimestamp が取れない（＝配信由来でない通常動画）ときは null。
+   */
+  parseLiveBroadcastDetails(html) {
+    if (typeof html !== "string" || html.length === 0) return null;
+    const block = html.match(/"liveBroadcastDetails"\s*:\s*\{[^{}]*\}/);
+    if (!block) return null;
+    const seg = block[0];
+    const startM = seg.match(/"startTimestamp"\s*:\s*"([^"]+)"/);
+    if (!startM) return null;
+    const startMs = Date.parse(startM[1]);
+    if (!Number.isFinite(startMs)) return null;
+    const endM = seg.match(/"endTimestamp"\s*:\s*"([^"]+)"/);
+    const endMs = endM ? Date.parse(endM[1]) : NaN;
+    const isLiveNow = /"isLiveNow"\s*:\s*true/.test(seg);
+    return {
+      startMs,
+      endMs: Number.isFinite(endMs) ? endMs : null,
+      isLiveNow,
+    };
+  },
+
+  /**
+   * 配信開始 epoch(ms) と再生位置(sec) から、その瞬間の実時刻 epoch(ms) を返す純粋関数。
+   * @param {number} startMs 配信開始時刻（epoch ms）
+   * @param {number} currentTimeSec 再生位置（秒）。非有限・負値は 0 とみなす
+   * @returns {number|null} startMs が非有限なら null
+   */
+  computeBroadcastEpochMs(startMs, currentTimeSec) {
+    if (!Number.isFinite(startMs)) return null;
+    const t = Number.isFinite(currentTimeSec) && currentTimeSec > 0 ? currentTimeSec : 0;
+    return startMs + t * 1000;
+  },
+
+  /**
+   * epoch(ms) を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・ローカルタイム）
+   * に整形する純粋関数。非有限値 / Invalid Date は空文字を返す。
+   * @param {number} epochMs
+   * @returns {string}
+   */
+  formatTimestamp(epochMs) {
+    if (!Number.isFinite(epochMs)) return "";
+    const d = new Date(epochMs);
+    if (Number.isNaN(d.getTime())) return "";
+    const p = (n, w = 2) => String(n).padStart(w, "0");
+    return (
+      `${p(d.getFullYear(), 4)}/${p(d.getMonth() + 1)}/${p(d.getDate())}` +
+      `　${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    );
+  },
+});
+
+/**
  * @readonly カラーピッカー（独自実装）の定数。
  *
  * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
@@ -1785,6 +1897,7 @@ const PopupTabs = Object.freeze({
   globalThis.VideoFill = VideoFill;
   globalThis.Loupe = Loupe;
   globalThis.ConnectionMonitor = ConnectionMonitor;
+  globalThis.BroadcastClock = BroadcastClock;
   globalThis.ColorPicker = ColorPicker;
   globalThis.PopupTabs = PopupTabs;
 })();

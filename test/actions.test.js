@@ -701,7 +701,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 21 個の定数を公開する", () => {
+test("actions.js は globalThis に 22 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -722,6 +722,7 @@ test("actions.js は globalThis に 21 個の定数を公開する", () => {
     "VideoFill",
     "Loupe",
     "ConnectionMonitor",
+    "BroadcastClock",
     "ColorPicker",
     "PopupTabs",
   ];
@@ -899,7 +900,7 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 31, "SearchFixer.FEATURES は 31 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 32, "SearchFixer.FEATURES は 32 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 11, "InstagramCleaner.FEATURES は 11 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });
@@ -1051,6 +1052,85 @@ test("接続モニターは SearchFixer.FEATURES の connectionMonitor サブ機
   assert.equal(G.Actions.APPLY_CONNECTION_MONITOR_CS, undefined, "旧 action は撤去済みのはず");
   // ConnectionMonitor namespace（純粋ロジック）は引き続き公開されている
   assert.equal(typeof G.ConnectionMonitor.classify, "function");
+});
+
+// 配信時刻オーバーレイ（broadcastClock）は YouTube クリーナーの watch_page サブ機能。
+test("配信時刻オーバーレイは SearchFixer.FEATURES の broadcastClock サブ機能に統合されている", () => {
+  const bc = G.SearchFixer.FEATURES.find((f) => f.key === "broadcastClock");
+  assert.ok(bc, "SearchFixer.FEATURES に broadcastClock が存在する必要がある");
+  assert.equal(bc.category, "watch_page", "broadcastClock は watch_page カテゴリ");
+  assert.equal(G.SearchFixer.mergeFeatures({}).broadcastClock, false, "未設定はオプトイン OFF");
+  assert.equal(G.SearchFixer.mergeFeatures({ broadcastClock: true }).broadcastClock, true);
+});
+
+test("BroadcastClock.extractVideoId: /watch?v= と /live/ の両形式 + 境界", () => {
+  const E = G.BroadcastClock.extractVideoId;
+  assert.equal(E("?v=dQw4w9WgXcQ"), "dQw4w9WgXcQ");
+  assert.equal(E("?v=dQw4w9WgXcQ&t=10s"), "dQw4w9WgXcQ", "後続パラメータがあっても 11 文字を抽出");
+  assert.equal(E("/watch?list=PLxx&v=dQw4w9WgXcQ"), "dQw4w9WgXcQ", "v が先頭でなくても抽出");
+  assert.equal(E("/live/dQw4w9WgXcQ"), "dQw4w9WgXcQ", "/live/ 直アクセス");
+  assert.equal(E("/live/dQw4w9WgXcQ?feature=share"), "dQw4w9WgXcQ");
+  assert.equal(E("/results?search_query=foo"), null, "videoId なしは null");
+  assert.equal(E("?v=short"), null, "11 文字未満は null");
+  assert.equal(E(""), null);
+  assert.equal(E(null), null);
+  assert.equal(E(undefined), null);
+});
+
+test("BroadcastClock.parseLiveBroadcastDetails: アーカイブ / ライブ中 / 通常動画", () => {
+  const P = G.BroadcastClock.parseLiveBroadcastDetails;
+
+  // アーカイブ（配信終了済み）
+  const archive = P(
+    'x{"liveBroadcastDetails":{"isLiveNow":false,"startTimestamp":"2024-01-05T09:00:00+09:00","endTimestamp":"2024-01-05T11:00:00+09:00"}}y'
+  );
+  assert.ok(archive, "アーカイブは抽出できる");
+  assert.equal(archive.isLiveNow, false);
+  assert.equal(archive.startMs, Date.parse("2024-01-05T09:00:00+09:00"));
+  assert.equal(archive.endMs, Date.parse("2024-01-05T11:00:00+09:00"));
+
+  // 配信中ライブ（endTimestamp なし）
+  const live = P('{"liveBroadcastDetails":{"isLiveNow":true,"startTimestamp":"2024-01-05T09:00:00Z"}}');
+  assert.ok(live);
+  assert.equal(live.isLiveNow, true);
+  assert.equal(live.endMs, null, "endTimestamp 無しは null");
+
+  // 通常動画（liveBroadcastDetails なし）→ null
+  assert.equal(P('{"videoDetails":{"videoId":"abc"}}'), null);
+  // startTimestamp なし → null
+  assert.equal(P('{"liveBroadcastDetails":{"isLiveNow":false}}'), null);
+  // 異常入力
+  assert.equal(P(""), null);
+  assert.equal(P(null), null);
+  assert.equal(P(undefined), null);
+});
+
+test("BroadcastClock.computeBroadcastEpochMs: start + currentTime、負値/非有限の扱い", () => {
+  const C = G.BroadcastClock.computeBroadcastEpochMs;
+  assert.equal(C(1000, 5), 6000, "5 秒で +5000ms");
+  assert.equal(C(1000, 0), 1000);
+  assert.equal(C(1000, -3), 1000, "負値は 0 扱い");
+  assert.equal(C(1000, NaN), 1000, "非有限は 0 扱い");
+  assert.equal(C(NaN, 5), null, "startMs 非有限は null");
+  assert.equal(C(undefined, 5), null);
+});
+
+test("BroadcastClock.formatTimestamp: yyyy/MM/dd　hh:mm:ss（全桁ゼロ埋め・全角スペース・24 時間制）", () => {
+  const F = G.BroadcastClock.formatTimestamp;
+  // ローカルタイムで Date を組んで TZ 非依存にする（formatTimestamp は getFullYear 等を使う）
+  // ゼロ埋め検証: 1 桁の月/日/時/分/秒がすべて 2 桁ゼロ埋めされる
+  assert.equal(F(new Date(2024, 0, 5, 9, 3, 7).getTime()), "2024/01/05　09:03:07");
+  // 24 時間制検証: 午後 11 時台が 23 になる（12 時間制 / AM・PM ではない）
+  assert.equal(F(new Date(2024, 11, 31, 23, 59, 59).getTime()), "2024/12/31　23:59:59");
+  // 正午 / 真夜中
+  assert.equal(F(new Date(2025, 5, 27, 0, 0, 0).getTime()), "2025/06/27　00:00:00");
+  assert.equal(F(new Date(2025, 5, 27, 12, 0, 0).getTime()), "2025/06/27　12:00:00");
+  // 区切りは全角スペース（U+3000）
+  assert.ok(F(new Date(2024, 0, 1, 1, 1, 1).getTime()).includes("　"));
+  // 非有限値 / Invalid は空文字
+  assert.equal(F(NaN), "");
+  assert.equal(F(Infinity), "");
+  assert.equal(F("x"), "");
 });
 
 // ConnectionMonitor.median: 集計の中央値計算が正しく動くこと（baseline 計算で使う純粋関数）。
