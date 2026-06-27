@@ -16,7 +16,7 @@
 
 本拡張機能は、以下の設定データをユーザーの端末内（`chrome.storage.local`）にのみ保存します。
 
-- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・接続モニターを含む 31 サブ機能の親）の有効/無効。
+- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・接続モニターを含む 32 サブ機能の親）の有効/無効。
 - **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 31 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張 / 接続モニター）の個別 ON/OFF 状態。
 - **`searchFixerGridItems`**（数値）: YouTube ホームグリッドの列数指定（0=自動 / 4 / 5 / 6）。
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。

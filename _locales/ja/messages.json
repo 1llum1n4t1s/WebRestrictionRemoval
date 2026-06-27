@@ -135,7 +135,7 @@
   "amazonMerchantInfoAriaUnknown": { "message": "販売元未確定" },
 
   "searchFixerMaster": { "message": "YouTube クリーナー" },
-  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 30 サブ機能を一括管理" },
+  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 32 サブ機能を一括管理" },
 
   "instagramCleanerMaster": { "message": "Instagram クリーナー" },
   "instagramCleanerMasterDesc": { "message": "Reels / Explore / Stories などの冗長 UI を一括非表示" },

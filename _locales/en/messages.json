@@ -136,7 +136,7 @@
   "amazonMerchantInfoAriaUnknown": { "message": "Seller unverified" },
 
   "searchFixerMaster": { "message": "YouTube cleaner" },
-  "searchFixerMasterDesc": { "message": "Manage 30 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
+  "searchFixerMasterDesc": { "message": "Manage 32 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, and more." },
 
   "instagramCleanerMaster": { "message": "Instagram cleaner" },
   "instagramCleanerMasterDesc": { "message": "Hide redundant UI such as Reels, Explore, and Stories in one toggle." },

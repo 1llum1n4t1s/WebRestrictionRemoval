@@ -11,13 +11,13 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 
 | Feature | Description |
 |---------|-------------|
-| 🧹 **YouTube cleaner** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor and more — **31 sub-features** |
+| 🧹 **YouTube cleaner** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) and more — **32 sub-features** |
 | 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
 | 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + image download (**11 sub-features**) |
 | 🎵 **TikTok cleaner** | Hide comments / suggested accounts + image download (**3 sub-features**) |
-| 🔊 **Volume Booster** | Amplify tab audio 0–600%. Distortion guard / night mode / mute + **10-band graphic equalizer (with presets)** |
+| 🔊 **Volume Booster** | Amplify tab audio 0–300%. Distortion guard / night mode / mute + **10-band graphic equalizer (with presets)** |
 | 🎞️ **Video Gamma** | Adjust `<video>` brightness via slider (center 1.0 = no correction, left for darker, right for brighter) |
 | 🖥️ **Remove video black bars** | Removes letterbox/pillarbox bars on ultrawide screens (zoom or stretch mode) |
 | 🔍 **Loupe** | Cursor-following circular magnifier — perfect for pausing a video and inspecting fine details |
@@ -45,7 +45,7 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 1. Click the toolbar icon to open the popup.
 2. **Turn ON only the master toggles you need** (everything is OFF by default).
-3. Tune each feature in the popup (YouTube cleaner's 31 sub-features, Volume Booster slider, etc.).
+3. Tune each feature in the popup (YouTube cleaner's 32 sub-features, Volume Booster slider, etc.).
 4. Settings are persisted across sessions.
 
 ### Popup tabs
@@ -75,7 +75,7 @@ See the [Privacy Policy](docs/privacy-policy.en.md) for details.
 | `activeTab` | Manipulate the active tab from the popup (Volume Booster, Loupe, etc.) |
 | `storage` | Persist settings (`chrome.storage.local`) |
 | `offscreen` | Keeps the Volume Booster's AudioContext / GainNode chain alive outside the Service Worker |
-| `tabCapture` | Captures tab audio for the Volume Booster to amplify 0–600% (all sites) |
+| `tabCapture` | Captures tab audio for the Volume Booster to amplify 0–300% (all sites) |
 | `host_permissions: <all_urls>` | Lets the Loupe keep capturing the screen after popup auto-close / SPA navigation. Effective access scope is the same as the existing content_scripts injection into all http(s) pages |
 
 ---

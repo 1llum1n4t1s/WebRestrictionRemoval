@@ -16,7 +16,7 @@ Vuora (Firefox 版)
 
 ■ Firefox 版で利用できる機能
 
-🔹 YouTube クリーナー (31 サブ機能)
+🔹 YouTube クリーナー (32 サブ機能)
 検索結果のノイズ除去 / Shorts 削除 (5 サブ機能) / 動画ページ整形 / コメント欄非表示 / ライブチャット非表示 / グリッド列数調整 / 登録チャンネル拡張 (subs feed をグリッド化 + lazy thumbnail) / ライブ配信の接続モニター など、YouTube の冗長 UI を細かく制御。
 
 🔹 Amazon 定期おトク便 月別合計
@@ -47,7 +47,7 @@ Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Not
 EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`browser.storage.local` のみで外部送信ゼロ。
 
 🔹 音量ブースター（Chrome 版のみ）
-音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 はこの API に未対応のため、**Firefox 版では音量ブースターは利用できません**（popup のオーディオ欄も自動的に非表示になります）。Chrome / Edge 版では全サイト（Netflix / Prime Video 等の EME 保護動画も含む）で 0〜600% の音量補正・自動歪み防止・ナイトモード・ミュート・10 バンドグラフィックイコライザ (プリセット同梱) が利用できます（popup を開いて操作）。
+音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 はこの API に未対応のため、**Firefox 版では音量ブースターは利用できません**（popup のオーディオ欄も自動的に非表示になります）。Chrome / Edge 版では全サイト（Netflix / Prime Video 等の EME 保護動画も含む）で 0〜300% の音量補正・自動歪み防止・ナイトモード・ミュート・10 バンドグラフィックイコライザ (プリセット同梱) が利用できます（popup を開いて操作）。
 
 ■ プライバシー
 すべてローカル実行・外部送信ゼロ。`browser.storage.local` のみ使用 (sync なし、クラウド同期なし)。プライバシーポリシーは docs/privacy-policy.md を参照。

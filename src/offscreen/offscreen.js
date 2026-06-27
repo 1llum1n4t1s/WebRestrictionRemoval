@@ -20,7 +20,7 @@
  *
  * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → antiClipNode → destination）:
  *   - ctx: AudioContext
- *   - gainNode: GainNode（ユーザースライダーの 0-600% ブースト）
+ *   - gainNode: GainNode（ユーザースライダーの 0-300% ブースト）
  *   - preampNode: GainNode（イコライザのプリアンプ、dB→倍率。EQ OFF 時は unity 1.0）
  *   - eqFilters: BiquadFilterNode[10]（10 バンド peaking イコライザ、EQ OFF 時は全 0dB でフラット = 素通り）
  *   - nightModeNode: DynamicsCompressorNode（ゲーム配信向けナイトモード圧縮、OFF 時はバイパス設定）

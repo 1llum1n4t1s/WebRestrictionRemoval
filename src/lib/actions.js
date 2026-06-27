@@ -105,7 +105,7 @@ const Offscreen = Object.freeze({
 
 /** @readonly ストレージキー */
 const StorageKeys = Object.freeze({
-  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 30 サブ機能の親） */
+  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 32 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -1796,7 +1796,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube クリーナー (30 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
+ * YouTube クリーナー (32 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
