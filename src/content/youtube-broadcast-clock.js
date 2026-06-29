@@ -315,8 +315,12 @@
     if (!overlayEl || !overlayTimeEl || !trackedVideo || !broadcastInfo) return;
     const epoch = BroadcastClock.computeBroadcastEpochMs(broadcastInfo.startMs, trackedVideo.currentTime);
     const text = BroadcastClock.formatTimestamp(epoch);
-    if (text && overlayTimeEl.textContent !== text) {
-      overlayTimeEl.textContent = text;
+    // 等幅フォント (Cascadia Mono / Code 等) は全角スペース U+3000 を可視グリフ (点線枠) で
+    // 描画してしまうため、表示直前に半角スペース 2 つへ置換する。formatTimestamp の純粋関数
+    // 仕様 (全角スペース区切り、test/actions.test.js で固定アサート) はそのまま維持する。
+    const display = text.replace(/　/g, "  ");
+    if (display && overlayTimeEl.textContent !== display) {
+      overlayTimeEl.textContent = display;
     }
   }
 
