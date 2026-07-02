@@ -2,17 +2,17 @@
 Firefox AMO 掲載情報（日本語版）
 ※ Chrome Web Store 用は webstore/store-listing.txt を参照
 ※ 英語版は webstore/store-listing.firefox.en.txt を参照
-※ Firefox 版は音量ブースター非対応 (Chrome 専用 = chrome.tabCapture 未対応のため)。その他 10 カテゴリは全て利用可能
+※ Firefox 版は全 11 カテゴリ利用可能。音量ブースターは Firefox 専用のページ内音声処理 (MediaElementSource) で動作 (DRM 保護動画サイトを除く)
 ============================================================
 
 ■ 名前
 Vuora (Firefox 版)
 
 ■ 概要 (250 文字以内)
-閲覧中ページの見やすさ・聞きやすさをローカルで整える Firefox 拡張機能。10 カテゴリの補助機能（YouTube クリーナー・Amazon 定期おトク便合計・Amazon ランキング移動・Amazon 販売元バッジ・Instagram/TikTok クリーナー・動画ガンマ補正・動画の黒帯除去・ルーペ・カラーピッカー）を統合。音量ブースターは Chrome 版限定（Firefox は chrome.tabCapture 未対応のため）。すべてデフォルト OFF のオプトイン方針、外部送信ゼロ。
+閲覧中ページの見やすさ・聞きやすさをローカルで整える Firefox 拡張機能。11 カテゴリの補助機能（YouTube クリーナー・Amazon 定期おトク便合計・Amazon ランキング移動・Amazon 販売元バッジ・Instagram/TikTok クリーナー・音量ブースター・動画ガンマ補正・動画の黒帯除去・ルーペ・カラーピッカー）を統合。音量ブースターは DRM 保護動画サイトを除く全サイトで利用可能。すべてデフォルト OFF のオプトイン方針。
 
 ■ 説明 (16,000 文字以内)
-日々の Web 閲覧を快適にする 10 カテゴリの補助機能を統合した拡張機能です（音量ブースターは Chrome 版限定）。
+日々の Web 閲覧を快適にする 11 カテゴリの補助機能を統合した拡張機能です。
 
 ■ Firefox 版で利用できる機能
 
@@ -46,8 +46,8 @@ Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Not
 🔹 カラーピッカー (popup タブ)
 EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`browser.storage.local` のみで外部送信ゼロ。
 
-🔹 音量ブースター（Chrome 版のみ）
-音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 はこの API に未対応のため、**Firefox 版では音量ブースターは利用できません**（popup のオーディオ欄も自動的に非表示になります）。Chrome / Edge 版では全サイト（Netflix / Prime Video 等の EME 保護動画も含む）で 0〜300% の音量補正・自動歪み防止・ナイトモード・ミュート・10 バンドグラフィックイコライザ (プリセット同梱) が利用できます（popup を開いて操作）。
+🔹 音量ブースター
+0〜300% の音量補正・自動歪み防止・ナイトモード・ミュート・10 バンドグラフィックイコライザ (プリセット同梱)。Firefox 版は専用のページ内音声処理 (MediaElementSource) で動作し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。制約: DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）では仕様上利用できません（動画は普通に再生されます）。音声はページ内で処理され、録音・保存・外部送信は一切行いません。
 
 ■ プライバシー
 すべてローカル実行・外部送信ゼロ。`browser.storage.local` のみ使用 (sync なし、クラウド同期なし)。プライバシーポリシーは docs/privacy-policy.md を参照。

@@ -240,6 +240,76 @@ test("VolumeBooster.EQ_PRESET_I18N_KEYS: 全プリセット + custom を網羅 (
   );
 });
 
+// ---------- VolumeBooster: Firefox 専用 MES 経路 ----------
+// EME_HOSTS / isEmeHost / classifyMesSource は volume-booster-mes.js (manifest.firefox.json
+// のみから注入される Firefox 専用 content script) が使う。Chrome の tabCapture 経路は
+// これらを一切参照しない (Chrome 側への影響ゼロの単一情報源はこの制約)。
+
+test("VolumeBooster.isEmeHost: EME 多用サイトの hostname 判定 (Firefox MES 経路)", () => {
+  // 代表的な EME ホスト (サブドメイン込み) は true
+  assert.equal(G.VolumeBooster.isEmeHost("netflix.com"), true);
+  assert.equal(G.VolumeBooster.isEmeHost("www.netflix.com"), true);
+  assert.equal(G.VolumeBooster.isEmeHost("WWW.NETFLIX.COM"), true, "大文字も小文字化して判定");
+  assert.equal(G.VolumeBooster.isEmeHost("www.amazon.co.jp"), true);
+  assert.equal(G.VolumeBooster.isEmeHost("tv.apple.com"), true);
+  assert.equal(G.VolumeBooster.isEmeHost("abema.tv"), true);
+  // 非 EME サイト / suffix を偽装したドメインは false (`(^|\.)` アンカーで防御)
+  assert.equal(G.VolumeBooster.isEmeHost("example.com"), false);
+  assert.equal(G.VolumeBooster.isEmeHost("evilnetflix.com"), false);
+  assert.equal(G.VolumeBooster.isEmeHost("netflix.com.evil.example"), false);
+  assert.equal(G.VolumeBooster.isEmeHost("apple.com"), false, "tv.apple.com のみが対象");
+  // 不正入力は false
+  assert.equal(G.VolumeBooster.isEmeHost(""), false);
+  assert.equal(G.VolumeBooster.isEmeHost(null), false);
+  assert.equal(G.VolumeBooster.isEmeHost(undefined), false);
+  assert.equal(G.VolumeBooster.isEmeHost(123), false);
+});
+
+test("VolumeBooster.classifyMesSource: blob/data/crossorigin 属性付きは safe、same-origin は probe", () => {
+  const page = "https://example.com/watch";
+  // MSE (blob:) とインライン (data:) は taint しない → 即 attach 可
+  assert.equal(G.VolumeBooster.classifyMesSource("blob:https://example.com/uuid-1234", null, page), "safe");
+  assert.equal(G.VolumeBooster.classifyMesSource("data:audio/mp3;base64,AAAA", null, page), "safe");
+  // same-origin http(s) は URL 上安全に見えるが、currentSrc はリダイレクト前 URL のため
+  // same-origin → cross-origin redirect 配信の taint を probe で確認してから attach する
+  assert.equal(G.VolumeBooster.classifyMesSource("https://example.com/media/a.mp4", null, page), "probe");
+  assert.equal(G.VolumeBooster.classifyMesSource("/media/a.mp4", null, page), "probe", "相対 URL は pageHref 基準で解決");
+  // crossorigin 属性付きは redirect 先も含め CORS 検証済みリソースしか再生されない → probe 不要で safe
+  assert.equal(G.VolumeBooster.classifyMesSource("https://example.com/media/a.mp4", "anonymous", page), "safe");
+});
+
+test("VolumeBooster.classifyMesSource: cross-origin は crossorigin 属性の有無で分岐", () => {
+  const page = "https://example.com/watch";
+  // CORS 未検証の cross-origin は attach すると無音化するため unsafe
+  assert.equal(G.VolumeBooster.classifyMesSource("https://cdn.other.example/a.mp4", null, page), "unsafe");
+  // crossorigin 属性付きは CORS 検証済みリソースしか再生されないため safe
+  assert.equal(G.VolumeBooster.classifyMesSource("https://cdn.other.example/a.mp4", "anonymous", page), "safe");
+  assert.equal(G.VolumeBooster.classifyMesSource("https://cdn.other.example/a.mp4", "use-credentials", page), "safe");
+  // crossorigin の未知値は unsafe 側に倒す
+  assert.equal(G.VolumeBooster.classifyMesSource("https://cdn.other.example/a.mp4", "", page), "unsafe");
+  // scheme 差 (http vs https) も cross-origin
+  assert.equal(G.VolumeBooster.classifyMesSource("http://example.com/a.mp4", null, page), "unsafe");
+  // サブドメイン差も cross-origin
+  assert.equal(G.VolumeBooster.classifyMesSource("https://media.example.com/a.mp4", null, page), "unsafe");
+});
+
+test("VolumeBooster.classifyMesSource: 空 src は pending、不正 URL / 未知 scheme は unsafe", () => {
+  const page = "https://example.com/watch";
+  // ソース未確定 → attach 保留 (loadedmetadata / loadstart で再評価)
+  assert.equal(G.VolumeBooster.classifyMesSource("", null, page), "pending");
+  assert.equal(G.VolumeBooster.classifyMesSource(null, null, page), "pending");
+  assert.equal(G.VolumeBooster.classifyMesSource(undefined, null, page), "pending");
+  // URL として解決不能 / 未知 scheme は安全側で unsafe
+  assert.equal(G.VolumeBooster.classifyMesSource("https://[invalid", null, page), "unsafe");
+  assert.equal(G.VolumeBooster.classifyMesSource("ftp://example.com/a.mp4", null, page), "unsafe");
+  assert.equal(G.VolumeBooster.classifyMesSource("javascript:void(0)", null, page), "unsafe");
+  // pageHref が不正なときは throw せず安全側で unsafe に倒れる
+  // (URL コンストラクタは base を先にパースするため絶対 URL でも失敗する。
+  //  実運用では pageHref = location.href で常に valid なので到達しない防御枝)
+  assert.equal(G.VolumeBooster.classifyMesSource("https://cdn.other.example/a.mp4", null, "not a url"), "unsafe");
+  assert.equal(G.VolumeBooster.classifyMesSource("https://cdn.other.example/a.mp4", "anonymous", "not a url"), "unsafe");
+});
+
 // ---------- VideoGamma ----------
 
 test("VideoGamma.clampValue: 範囲内の値はそのまま、範囲外は clamp、不正値は DEFAULT", () => {

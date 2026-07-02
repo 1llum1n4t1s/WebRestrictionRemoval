@@ -6,14 +6,17 @@
  * /rere B1-004 / B2-I001 / D-001 修正で抽出した共通モジュール。
  * 当初は旧 MES 経路 (content script) と offscreen.js (tabCapture 経路) で同じ DSP 関数群を
  * 物理コピーで保持しており、その drift 解消が抽出動機だった。
- * **MES 経路 + 自動音量正規化は撤去済み** のため現在の caller は offscreen.js のみ。
- * 提供するのは dB→gain 変換 / compressor preset 適用 / グラフィックイコライザ適用の 3 関数。
- * 共有モジュール構造は Firefox MV3 が tabCapture / offscreen に catch-up したときの再利用に
- * 備えて維持している (globalThis.AudioPipeline 公開定数の 1 つとしてカウント済み)。
+ * 現在の caller は 2 つ:
+ *   - offscreen.js — Chrome の tabCapture 経路 (Chrome では唯一の音量ブースター経路)
+ *   - volume-booster-mes.js — Firefox 専用 MES 経路 (manifest.firefox.json のみから注入。
+ *     2026-07-02 に Firefox 専用パイプラインとして復活。「Firefox catch-up に備えて共有
+ *     モジュール構造を維持する」判断がここで活きた)
+ * 提供するのは dB→gain 変換 / compressor preset 適用 / EQ チェーン構築 / EQ 適用の 4 関数
+ * (自動音量正規化の normalizer 関数群は撤去済み)。
  *
  * 値定数は actions.js の `VolumeBooster` を経由 (既存集約場所)。
  *
- * 二重ロード許容: offscreen.html で個別ロードされても
+ * 二重ロード許容: offscreen.html / manifest content_scripts で個別ロードされても
  * `__cpaAudioPipelineLoaded` ガードで 2 回目以降は即 return する (actions.js と同じパターン)。
  */
 

@@ -37,7 +37,7 @@ Search for **"Vuora"** on the [Chrome Web Store](https://chrome.google.com/webst
 
 Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
-> On Firefox the **Volume Booster is unavailable** (Chrome-only). It captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not implement (the popup's audio section is hidden automatically). All other 10 features work as on Chrome.
+> **All 11 features work on Firefox.** The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. The only limitation: it has no effect on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally.
 
 ---
 
@@ -87,7 +87,7 @@ See the [Privacy Policy](docs/privacy-policy.en.md) for details.
 | **A setting doesn't take effect** | Close and re-open the popup. If still failing, reload the extension via 🔄 |
 | **YouTube sidebar still shows Shorts** | Check that all 4 Shorts sub-toggles (shelf / chip / sidebar / button) under the YouTube cleaner are individually ON |
 | **Volume Booster has no effect (Chrome)** | Boost starts the moment you open the popup on the active tab (user gesture required — works on all sites including EME video like Netflix). Open the popup while the video is playing and adjust the volume. Boosted tabs show a "This tab is being shared" banner (a tabCapture behavior) |
-| **Volume Booster missing (Firefox)** | The Firefox edition has no Volume Booster (`chrome.tabCapture` is unsupported, so it is Chrome-only). The popup's audio section is hidden |
+| **Volume Booster has no effect (Firefox)** | The Firefox edition uses in-page processing (MediaElementSource) and applies to all tabs automatically without opening the popup. On DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) it cannot work by design — those videos still play normally. If a change does not take effect, reload the page |
 
 ---
 

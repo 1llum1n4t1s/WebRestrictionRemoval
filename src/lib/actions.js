@@ -1030,6 +1030,113 @@ const VolumeBooster = Object.freeze({
     release: 0.25,
   }),
 
+  // ===== Firefox 専用 MES (MediaElementSource) 経路 =====
+  /**
+   * EME (DRM) 動画を多用するサイトの hostname ブラックリスト (Firefox MES 経路専用)。
+   *
+   * これらのサイトでは MediaElementSource 経路 (content script の volume-booster-mes.js) を
+   * 起動しない。理由: `createMediaElementSource(video)` で video の音声経路を AudioContext に
+   * redirect すると、EME 保護動画は復号後の音声 sample を AudioContext に流さない仕様
+   * (Chrome / Firefox 共通) のため、結果として **動画の音そのものが完全無音化** する副作用がある。
+   *
+   * Chrome には tabCapture フォールバックがあるが、Firefox MV3 は tabCapture 未対応なので
+   * これらのサイトでは音量ブースターは効かない (動画の音は普通に出る)。
+   *
+   * このリストにないサイトでも runtime で EME を検出した場合 (`mediaKeys` / `encrypted` event) は
+   * volume-booster-mes.js が attach 回避 / detach する fallback がある。完璧な保護は
+   * ホスト名ブラックリストのみなので、追加要望があったら hostname を確認して RegExp を追加すること。
+   *
+   * 履歴: v1.0.33 の MES 経路 (Chrome + Firefox 両対応、URL 分岐あり) 用に導入 → v1.0.35 で
+   * MES 経路ごと撤去 → 2026-07-02 に Firefox 専用パイプラインとして復活 (Chrome は tabCapture 一本のまま)。
+   */
+  EME_HOSTS: Object.freeze([
+    /(^|\.)netflix\.com$/,
+    /(^|\.)primevideo\.com$/,
+    // Amazon Prime Video は amazon.co.jp / amazon.com の `/gp/video/` 配下に統合されているため
+    // 親ドメイン全体を入れる。Amazon ランキング機能 (amazon-ranking-jump.js) と同居するが、
+    // ランキングは商品ページ DOM 操作 + 外部送信ゼロなので衝突しない (volume-booster-mes だけ EME skip)。
+    /(^|\.)amazon\.co\.jp$/,
+    /(^|\.)amazon\.com$/,
+    /(^|\.)dazn\.com$/,
+    /(^|\.)disneyplus\.com$/,
+    /(^|\.)hulu\.com$/,
+    /(^|\.)hulu\.jp$/,
+    /(^|\.)tv\.apple\.com$/,
+    /(^|\.)abema\.tv$/,
+    /(^|\.)unext\.jp$/,
+    /(^|\.)tver\.jp$/,
+    /(^|\.)nhk-ondemand\.jp$/,
+    /(^|\.)spotify\.com$/,
+    /(^|\.)fod\.fujitv\.co\.jp$/,
+    /(^|\.)spoox\.jp$/,
+  ]),
+
+  /**
+   * hostname が EME_HOSTS のいずれかに該当するか判定する純粋関数 (Firefox MES 経路専用)。
+   * volume-booster-mes.js が起動時に `location.hostname` を渡して MES 起動を skip する。
+   *
+   * @param {string|null|undefined} hostname `location.hostname` または URL から抽出した hostname
+   * @returns {boolean} true なら EME 多用サイトで MES 経路を使わない
+   */
+  isEmeHost(hostname) {
+    if (typeof hostname !== "string" || hostname.length === 0) return false;
+    const lower = hostname.toLowerCase();
+    for (const re of VolumeBooster.EME_HOSTS) {
+      if (re.test(lower)) return true;
+    }
+    return false;
+  },
+
+  /**
+   * MES attach 可否のためのメディアソース安全性分類 (Firefox MES 経路専用の純粋関数)。
+   *
+   * cross-origin かつ CORS 未検証のメディアに MediaElementSource を繋ぐと、Web Audio 仕様で
+   * 例外ではなく **出力が無音になる** (site の音が消えたように見える最悪の failure mode)。
+   * さらに Firefox では一度 attach した要素は `ctx.close()` でも直接出力に復帰しないため、
+   * 誤 attach は「ページ再読み込みまで無音」になり得る。attach 前の分類で徹底的に防ぐ。
+   * - `"safe"`: 即 attach してよい。blob: / data: (MSE・インラインは taint しない)、または
+   *   `crossorigin` 属性付き http(s) (CORS 検証を通ったリソースしか再生されない = リダイレクト先も
+   *   含めて taint し得ない)
+   * - `"probe"`: same-origin http(s) かつ crossorigin 属性なし。URL 上は安全に見えるが、HTML 仕様上
+   *   `currentSrc` は**リダイレクト前の URL** を返すため、same-origin → cross-origin redirect 配信
+   *   (メディアプロキシ / presigned CDN 等) だと opaque taint で無音化する。caller が
+   *   `redirect: "manual"` の same-origin HEAD probe で opaqueredirect でないことを確認してから
+   *   attach する (probe 失敗 / redirect 検出時は attach しない = 音は普通に出る fail-safe)
+   * - `"pending"`: ソース未確定 (currentSrc が空)。loadedmetadata / loadstart で再評価する
+   * - `"unsafe"`: cross-origin かつ CORS 未検証。attach すると無音化するため skip
+   *
+   * `srcObject` (MediaStream 等) は URL を持たないため本関数の対象外で、caller が別途 safe 扱いする。
+   *
+   * @param {string|null|undefined} currentSrc `media.currentSrc`
+   * @param {string|null|undefined} crossOrigin `media.crossOrigin` ("anonymous" / "use-credentials" / null)
+   * @param {string} pageHref `location.href` (相対 URL 解決 + same-origin 判定基準)
+   * @returns {"safe"|"probe"|"pending"|"unsafe"}
+   */
+  classifyMesSource(currentSrc, crossOrigin, pageHref) {
+    if (typeof currentSrc !== "string" || currentSrc === "") return "pending";
+    let url;
+    try {
+      url = new URL(currentSrc, pageHref);
+    } catch {
+      return "unsafe";
+    }
+    if (url.protocol === "blob:" || url.protocol === "data:") return "safe";
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      // crossorigin 属性付きは CORS 検証済みリソースしか再生されない (redirect 先も含む) ため
+      // same-origin / cross-origin を問わず safe
+      if (crossOrigin === "anonymous" || crossOrigin === "use-credentials") return "safe";
+      let pageOrigin = null;
+      try {
+        pageOrigin = new URL(pageHref).origin;
+      } catch {
+        // pageHref 不正時は same-origin 判定不能 → 安全側で unsafe に倒す
+      }
+      if (pageOrigin !== null && url.origin === pageOrigin) return "probe";
+      return "unsafe";
+    }
+    return "unsafe";
+  },
+
   // ===== グラフィックイコライザ (10 バンド peaking) =====
   /**
    * イコライザの中心周波数 (Hz)。各バンド ~1 オクターブ間隔。offscreen で

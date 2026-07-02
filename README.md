@@ -37,7 +37,7 @@
 
 [addons.mozilla.org](https://addons.mozilla.org/) で **「Vuora」** を検索してインストール。
 
-> Firefox 版では**音量ブースターは利用できません**（Chrome 専用）。音量ブースターはタブ音声を捕獲する `chrome.tabCapture` API を使いますが、Firefox MV3 が未対応のためです（popup のオーディオ欄も自動的に非表示になります）。それ以外の 10 機能はすべて利用可能。
+> Firefox 版でも **全 11 機能が利用できます**。音量ブースターは Firefox 専用のページ内音声処理（MediaElementSource）で動作し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。制約は 1 つだけ: DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）では音量ブースターは効きません（動画は普通に再生されます）。
 
 ---
 
@@ -87,7 +87,7 @@
 | **設定したのに効かない** | popup を一度閉じて開き直す。それでもダメなら拡張機能を 🔄 リロード |
 | **YouTube のサイドバーから Shorts が消えない** | YouTube クリーナー > Shorts サブ機能 4 つ (棚 / チップ / サイドバー / ボタン) が個別 ON か確認 |
 | **音量ブースターが効かない (Chrome)** | 音量ブースターは popup を開いた瞬間にアクティブタブで boost 開始します (user gesture 必須・Netflix 等の EME 動画含む全サイト共通)。動画再生中に popup を開いて音量を変えてみてください。ブースト中のタブには「このタブのコンテンツは共有されています」バナーが出ます (tabCapture の仕様) |
-| **音量ブースターが見当たらない (Firefox)** | Firefox 版には音量ブースターがありません (`chrome.tabCapture` 未対応のため Chrome 専用)。popup のオーディオ欄自体が非表示になります |
+| **音量ブースターが効かない (Firefox)** | Firefox 版はページ内音声処理 (MediaElementSource) で動作し、popup を開かなくても全タブに自動適用されます。DRM 保護動画のサイト (Netflix / Prime Video / DAZN / Disney+ 等) では仕様上効きません (動画は普通に再生されます)。設定変更後に効かない場合はページを再読み込みしてください |
 
 ---
 
