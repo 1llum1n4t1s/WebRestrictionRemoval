@@ -193,6 +193,14 @@
     // DRM コンテンツの encrypted event は init segment 処理中 = metadata 確定までに発火する
     // ため、この gate + watchMedia の encrypted 事前検出で「attach 後に DRM 化」の race を潰す。
     if (media.readyState < HTMLMediaElement.HAVE_METADATA) return;
+    // ページがまだ一度もユーザー操作を受けていない場合 (sticky activation 無し) に attach すると、
+    // 新規 AudioContext は suspended のまま resume が保証されず、MEI 等でミュート無しの自動再生が
+    // 許可されているサイトで「既に音が出ている要素」を沈黙させてしまうリスクがある。
+    // Firefox は navigator.userActivation.hasBeenActive を実装済み (Baseline Widely available、
+    // Firefox 119+) なので、未取得の間は attach を保留し、ensureGestureResumeListeners の
+    // pointerdown/keydown (初回操作) で retryPendingAttachments() を通じて再試行する。
+    // `navigator.userActivation` 自体が無い環境では判定せず (フォールバックで現行動作を維持)。
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     const safety = mediaSourceSafety(media);
     if (safety === "safe") {
       doAttach(media);
@@ -205,9 +213,15 @@
   /**
    * same-origin http(s) ソースの redirect probe。HTML 仕様上 currentSrc はリダイレクト前の
    * URL を返すため、same-origin → cross-origin redirect 配信だと opaque taint で無音化する。
-   * `redirect: "manual"` の HEAD で opaqueredirect が返らないことを確認してから attach する。
+   * `redirect: "manual"` で opaqueredirect が返らないことを確認してから attach する。
    * probe 失敗 / redirect 検出時は attach しない (音は普通に出る fail-safe)。
-   * same-origin への HEAD のみなので外部送信ゼロは維持される。
+   * same-origin への 1 バイト Range GET のみなので外部送信ゼロは維持される。
+   *
+   * HEAD ではなく `Range: bytes=0-0` 付き GET を使う理由: サーバー / リバースプロキシが
+   * HEAD と実際のメディア取得 (`<video>`/`<audio>` は Range GET で取得するのが一般的) を
+   * 別ロジックで処理し、HEAD はリダイレクトしないが実 GET は cross-origin CDN にリダイレクトする
+   * ケースがある。実際のメディア要求と同じ method/semantics で probe することで、この不整合による
+   * 誤 safe 判定 (= 無音化) を防ぐ。
    */
   async function probeAndAttach(media) {
     const src = media.currentSrc;
@@ -216,13 +230,14 @@
       ATTACHING.add(media);
       try {
         const res = await fetch(src, {
-          method: "HEAD",
+          method: "GET",
+          headers: { Range: "bytes=0-0" },
           redirect: "manual",
           credentials: "same-origin",
           cache: "no-store",
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
         });
-        // redirect さえしていなければ status は問わない (HEAD 405 等でも taint 判定には無関係)
+        // redirect さえしていなければ status は問わない (206/200/416 等は taint 判定に無関係)
         ok = res.type !== "opaqueredirect";
       } catch {
         ok = false; // 判定不能は attach しない側に倒す
@@ -413,12 +428,28 @@
     });
   }
 
+  /**
+   * sticky activation が無いため attachToMedia でスキップされていた要素を再試行する。
+   * pointerdown/keydown (初回操作) で navigator.userActivation.hasBeenActive が true になった
+   * 直後に呼ぶことで、無音化を避けて保留していた attach を安全なタイミングで実行する。
+   */
+  function retryPendingAttachments() {
+    if (orphaned || !isActive()) return;
+    for (const media of document.querySelectorAll("video, audio")) {
+      if (!STATE.has(media)) attachToMedia(media);
+    }
+  }
+
   function ensureGestureResumeListeners() {
     if (gestureResumeAttached) return;
     gestureResumeAttached = true;
     const opts = { capture: true, passive: true, signal: listenerCtrl.signal };
-    document.addEventListener("pointerdown", resumeSuspendedContexts, opts);
-    document.addEventListener("keydown", resumeSuspendedContexts, opts);
+    const onGesture = () => {
+      resumeSuspendedContexts();
+      retryPendingAttachments();
+    };
+    document.addEventListener("pointerdown", onGesture, opts);
+    document.addEventListener("keydown", onGesture, opts);
   }
 
   /**
@@ -509,12 +540,20 @@
    * DOM から除去された attach 済み要素を、猶予後もまだ切断されたままなら ctx.close で解放する。
    * 即 close しないのは remove → 後で reinsert するプレーヤー (miniplayer 等) の再挿入後が
    * 無音のままになるのを避けるため (Firefox では close 後の復帰手段が無い)。
+   * 猶予経過時点でまだ再生中 (`!paused && !ended`) なら、意図的に detached 状態で保持し続ける
+   * プレーヤー実装の可能性が高いと判断し、close せず猶予を延長する (再スケジュール)。
+   * 再接続されるか、再生が止まる/終わるまで close は保留され続ける。
    */
   function scheduleDetachedCheck(media) {
     if (!STATE.has(media)) return;
     setTimeout(() => {
       if (orphaned) return;
-      if (STATE.has(media) && !media.isConnected) detachFromMedia(media);
+      if (!STATE.has(media) || media.isConnected) return;
+      if (!media.paused && !media.ended) {
+        scheduleDetachedCheck(media);
+        return;
+      }
+      detachFromMedia(media);
     }, DETACH_GRACE_MS);
   }
 
