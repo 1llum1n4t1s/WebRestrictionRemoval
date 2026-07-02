@@ -201,6 +201,12 @@
     // pointerdown/keydown (初回操作) で retryPendingAttachments() を通じて再試行する。
     // `navigator.userActivation` 自体が無い環境では判定せず (フォールバックで現行動作を維持)。
     if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    // 一時停止中の要素はここでは attach しない。多数のプレビュー動画/音声を抱えるフィード
+    // (SNS のタイムライン等) で、まだ再生されてもいない全要素に AudioContext + EQ チェーン
+    // (14 ノード) を割り当てるのは資源浪費であり、Firefox では captured 状態のまま維持コストだけ
+    // かかり続ける。watchMedia が登録する play イベントが実際の再生開始時に evaluateMedia 経由で
+    // 再試行するため、ここで skip しても取りこぼしはない。
+    if (media.paused) return;
     const safety = mediaSourceSafety(media);
     if (safety === "safe") {
       doAttach(media);
@@ -239,6 +245,10 @@
         });
         // redirect さえしていなければ status は問わない (206/200/416 等は taint 判定に無関係)
         ok = res.type !== "opaqueredirect";
+        // Range を無視して本文全体 (200 + フルボディ) を返すサーバーだと、ヘッダ確認後に
+        // 本文を読み捨てないと実際のメディア GET と並行してバックグラウンド転送が続いてしまう。
+        // ヘッダ判定だけで用は済んでいるため、ここで確実に打ち切る。
+        res.body?.cancel().catch(() => {});
       } catch {
         ok = false; // 判定不能は attach しない側に倒す
       } finally {
