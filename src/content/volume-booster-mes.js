@@ -254,16 +254,22 @@
     }
     ATTACHING.add(media);
 
+    // capture (createMediaElementSource) が成立した後に ctx.close() すると、Firefox では
+    // 音声が直接出力に復帰しない (ファイル冒頭の不変条件) ため恒久無音化する。これを避けるため、
+    // capture 前に作れるノードは先に作り、capture (createMediaElementSource) は最後に回す。
+    // capture 成立後の失敗は close せず、source を ctx.destination へ直結する bypass で
+    // 「無処理だが音は出る」状態に逃がす (source が null なら capture 未成立 = close 安全)。
     let ctx = null;
+    let source = null;
     try {
       ctx = new AudioContext();
-      const source = ctx.createMediaElementSource(media);
       const eqChain = createEqChain(ctx);
       const nightModeNode = ctx.createDynamicsCompressor();
       const gainNode = ctx.createGain();
       const antiClipNode = ctx.createDynamicsCompressor();
       applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
       applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
+      source = ctx.createMediaElementSource(media);
       // ノード順序は offscreen.js createAudioState と同一 (EQ → ナイトモード → gain → anti-clip)
       source.connect(eqChain.head);
       eqChain.tail.connect(nightModeNode);
@@ -292,10 +298,19 @@
 
       applyStateSettings(state, currentSettings);
     } catch {
-      // MES attach 失敗 = サイト側 player が自前で MES 済み等。安全側で恒久スキップ
-      // (音は普通に出る)。この時点では capture 未成立なので ctx.close は安全。
+      // MES attach 失敗 = サイト側 player が自前で MES 済み等。安全側で恒久スキップ (音は普通に出る)。
       EME_DETECTED.add(media);
-      if (ctx) ctx.close().catch(() => {});
+      if (ctx && source) {
+        // capture 成立後の失敗: close せず直結 bypass で音を生かす (close は復帰不能なため)。
+        try {
+          source.connect(ctx.destination);
+        } catch {
+          // 直結 bypass も失敗した場合、それ以上の破壊的操作 (close 等) は行わない。
+        }
+      } else if (ctx) {
+        // capture 未成立 (source null): close しても media は影響を受けないため安全。
+        ctx.close().catch(() => {});
+      }
     } finally {
       ATTACHING.delete(media);
     }

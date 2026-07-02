@@ -29,14 +29,14 @@
       "en": ["Vuora"]
     },
     "amo": {
-      "_comment": "Firefox AMO listing は全 11 機能カテゴリ (音量ブースターは Firefox 専用 MES 経路、DRM サイト除く) で構成される (2026-07-02 から)。AMO の drift check では Firefox 用 listing の文言と一致させる。",
+      "_comment": "Firefox AMO listing は全 11 機能カテゴリ (音量ブースターは Firefox 専用 MES 経路、DRM サイト除く) で構成される (2026-07-02 から)。AMO の drift check では Firefox 用 listing の文言と一致させる。summary は 250 字上限のため Amazon 3 機能を圧縮表記しており、description (機能一覧セクション込み) とはキーワードが異なる。ranking 単独を明示 (CodeRabbit 指摘: カテゴリ数だけだと個別機能の脱落を検出できない)。",
       "summary": {
-        "ja": ["11 カテゴリ", "Amazon 販売元"],
-        "en": ["11 categories", "Amazon seller"]
+        "ja": ["11 カテゴリ", "Amazon 販売元", "Amazon ランキング"],
+        "en": ["11 categories", "Amazon totals/ranking/seller"]
       },
       "description": {
-        "ja": ["11 カテゴリ", "Amazon 販売元", "Firefox 142"],
-        "en": ["11 categories", "Amazon seller", "Firefox 142"]
+        "ja": ["11 カテゴリ", "Amazon 販売元", "Amazon ランキング", "Firefox 142"],
+        "en": ["11 categories", "Amazon seller", "jump-to-ranking", "Firefox 142"]
       }
     }
   }

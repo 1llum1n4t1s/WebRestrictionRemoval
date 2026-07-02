@@ -47,7 +47,7 @@ The Extension stores the following settings only on the user's device (`chrome.s
 
 These values are stored only on the device and are never transmitted to any external server.
 
-The Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled.
+**On Chrome**, the Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled. **On Firefox**, the current gain value is held only in the in-page audio pipeline's memory (see "Tab audio access" below) and is likewise never persisted.
 
 ## Tab audio access
 
