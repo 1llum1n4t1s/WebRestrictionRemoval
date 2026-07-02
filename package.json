@@ -2,7 +2,7 @@
   "name": "web-viewing-assist",
   "version": "1.0.45",
   "type": "commonjs",
-  "description": "Chrome extension that bundles the YouTube cleaner, Amazon auto-delivery totals, and a per-tab volume booster.",
+  "description": "Browser extension that bundles the YouTube cleaner, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {
     "ci:install": "pnpm install --frozen-lockfile",
     "generate-icons": "node scripts/generate-icons.js",
