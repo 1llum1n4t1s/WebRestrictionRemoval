@@ -44,7 +44,7 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
   - 画像ダウンロード = Instagram / TikTok 各クリーナーのサブ機能として共通実装（YouTube では未提供）
 - **外部送信ゼロ + 1 例外**: すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で外部送信ゼロ。**例外**: 接続モニター ON 中の YouTube ライブ視聴時のみ 5 秒周期で `https://www.gstatic.com/generate_204` と `https://speed.cloudflare.com/__down?bytes=10` への RTT 計測 fetch（`mode: "no-cors"` + `credentials: "omit"` + `referrerPolicy: "no-referrer"`、レスポンス本文は破棄、識別子・cookie・ユーザーデータは送信せず）。
 - **バージョン管理**: バージョン番号は `/vava` スキル経由でのみ更新する（コード変更コミットで `manifest.json` / `package.json` / `pnpm-lock.yaml` の version フィールドには触らない）。
-- **旧呼称 drift check**: Vuora 改名前の「WEB閲覧アシスト」「Web Viewing Assist」「Web Restriction Removal Helper」が privacy-policy.en.md の `formerly` 表記以外で意図せず残ってないか定期確認:
+- **旧呼称 drift check**: Vuora 改名前の「WEB閲覧アシスト」「Web Viewing Assist」「Web Restriction Removal Helper」が、`docs/privacy-policy.en.md` の `formerly` 表記・`docs/privacy-policy.md` の「旧称:」表記（いずれも意図的な改名履歴の明記）以外で意図せず残ってないか定期確認:
   ```bash
   rtk grep -i "WEB閲覧アシスト\|Web Viewing Assist\|Web Restriction Removal Helper" --exclude-dir=node_modules --exclude=*.lock
   ```
