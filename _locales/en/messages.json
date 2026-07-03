@@ -4,7 +4,7 @@
     "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
   },
   "appDescription": {
-    "message": "Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.",
+    "message": "Browser extension that locally tunes the readability, audio, and continuity of the page you are viewing.",
     "description": "Short description (manifest.description)"
   },
   "defaultTitle": {
@@ -36,6 +36,7 @@
   "volumeBoosterMasterDesc": { "message": "Amplify and shape tab audio. Settings auto-apply on tab switch." },
   "volumeSubLabel": { "message": "Volume Booster" },
   "volumeSubDesc": { "message": "Set the player volume to 100% and adjust here for the best result." },
+  "volumeMesFirefoxNote": { "message": "The Firefox edition boosts audio via in-page processing (MediaElementSource); settings apply to all tabs automatically. DRM-protected video (Netflix, Prime Video, etc.) is not supported." },
   "volumeReset100Btn": { "message": "Reset to 100%" },
   "volumeReset100Aria": { "message": "Reset volume to 100%" },
   "volumeMuteAriaOff": { "message": "Mute" },

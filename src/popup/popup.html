@@ -64,7 +64,8 @@
          role="tabpanel" aria-labelledby="tabTune">
 
     <!-- ===== Audio Group ===== -->
-    <!-- id="audioGroupSection": Firefox 版では音量ブースターが利用不可 (offscreen / tabCapture 未対応) のため popup.js でこのセクション全体を非表示にする -->
+    <!-- id="audioGroupSection": Chrome は tabCapture 経路 / Firefox は MES 経路 (volume-booster-mes.js) で両対応。
+         Firefox では popup.js が #volumeMesNote (DRM サイト非対応の注記) の hidden を外す -->
     <section class="grp" id="audioGroupSection" data-i18n-attr="aria-label:groupAudio" aria-label="オーディオ">
       <h2 class="grp-title">
         <span class="grp-title-text" data-i18n="groupAudio">オーディオ</span>
@@ -90,6 +91,8 @@
           <span class="sub-value" id="volumeValue">100%</span>
         </div>
         <div class="tr-desc" data-i18n="volumeSubDesc">動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです</div>
+        <!-- Firefox (MES 経路) 専用の注記。Chrome では hidden のまま (popup.js が VIA_MES 判定で外す) -->
+        <div class="tr-desc" id="volumeMesNote" data-i18n="volumeMesFirefoxNote" hidden>Firefox 版はページ内音声処理 (MediaElementSource) で動作します。DRM 保護動画 (Netflix / Prime Video 等) では利用できません</div>
         <div class="volume-slider-row">
           <button type="button" id="volumeMuteBtn" class="volume-mute-btn"
                   aria-pressed="false"

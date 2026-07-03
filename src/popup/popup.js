@@ -111,25 +111,40 @@ function applyI18nToDom(root) {
   });
 }
 
-// Firefox 版では offscreen / tabCapture API が未対応のため、音量ブースター機能を完全に隠す。
-// Chrome では chrome.offscreen が存在し、Firefox MV3 では未定義 (2026 時点)。これをガードキーにして
-// audio group section 全体を display:none にし、関連の getElementById 結果が null になっても落ちないようにする。
+// tabCapture → offscreen 経路 (Chrome) が使えるかの判定。Chrome では chrome.offscreen /
+// chrome.tabCapture が存在し、Firefox MV3 では両方とも未定義 (2026 時点)。
 // /rere B1-001 修正: background.js L12 と非対称だった (popup は chrome.offscreen のみ判定)。
-// 将来 Firefox が offscreen だけ実装し tabCapture を未実装で出した場合、popup は音量ブースター
-// UI を表示するが background は volume-booster-unavailable を返す不整合が起きる。両者の判定を
-// 揃えるため tabCapture も検査する。
+// 将来 Firefox が offscreen だけ実装し tabCapture を未実装で出した場合の不整合を避けるため
+// 両者の判定を揃えて tabCapture も検査する。
 const HAS_VOLUME_BOOSTER =
   typeof chrome !== "undefined" &&
   typeof chrome.offscreen !== "undefined" &&
   typeof chrome.tabCapture !== "undefined";
 
+// Gecko (Firefox) 判定: 拡張機能 URL スキームで判定する (moz-extension:// = Gecko)。
+// typeof browser 判定は Chrome 137+ が extension context に browser namespace を露出するため
+// 判別子にならない。webstore/generate-screenshots.js の popup-shim 環境 (chrome スタブ) でも
+// getURL 不在 → catch → false になり、Firefox 専用注記が Chrome ストア素材に写り込まない。
+const IS_GECKO_EXTENSION = (() => {
+  try {
+    return chrome.runtime.getURL("").startsWith("moz-extension://");
+  } catch {
+    return false;
+  }
+})();
+
+// Firefox (tabCapture / offscreen 未対応) では MES (MediaElementSource) 経路で音量ブースターを
+// 提供する。popup は音量関連キーの storage 書き込みだけを行い、全タブに注入された
+// volume-booster-mes.js (manifest.firefox.json 専用 content script) が storage.onChanged で
+// 自動適用する。VOLUME_BOOSTER_SET_GAIN メッセージ送信・active tab 判定は不要。
+const VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER;
+
 document.addEventListener("DOMContentLoaded", async () => {
-  // Firefox 版: オーディオ (音量ブースター) セクションをまるごと非表示にする。
-  // 関連の event listener attach は HAS_VOLUME_BOOSTER フラグで個別に skip しているので、
-  // ここでは UI を消すだけで storage 同期等の他経路は壊れない。
-  if (!HAS_VOLUME_BOOSTER) {
-    const $audioSection = document.getElementById("audioGroupSection");
-    if ($audioSection) $audioSection.style.display = "none";
+  // Firefox 版 (MES 経路): オーディオセクションは表示したまま、MES 経路の制約
+  // (DRM 保護動画では動作しない) を注記する。Chrome では注記を隠したまま (hidden 属性)。
+  if (VOLUME_BOOSTER_VIA_MES) {
+    const $mesNote = document.getElementById("volumeMesNote");
+    if ($mesNote) $mesNote.hidden = false;
   }
 
   // ----- ローカライズ: 静的テキストを最初に置換し、英語環境での FOUT を最小化 -----
@@ -1182,7 +1197,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * セッションという 4 つの静的セクション（各自マスタートグルを持つ）を縦積みしているため、
    * FEATURES ベースの _buildSubTabbedCategories ではなく、既存セクションの表示切替で実装する。
    * サブタブの見た目（.cat-subtabs / .cat-subtab）はクリーナーと共通の CSS を再利用する。
-   * Firefox など音量ブースター非対応環境ではオーディオセクションを除外する。
+   * オーディオセクションは Firefox でも表示する (音量ブースターは MES 経路で提供、2026-07-02)。
    */
   function buildTuneSubTabs() {
     const panel = document.getElementById("panelTune");
@@ -1196,7 +1211,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const entries = defs
       .map((d) => ({ ...d, section: document.getElementById(d.sectionId) }))
-      .filter((d) => d.section && !(d.sectionId === "audioGroupSection" && !HAS_VOLUME_BOOSTER));
+      .filter((d) => d.section);
     if (entries.length === 0) return;
 
     const tablist = document.createElement("div");
@@ -1478,12 +1493,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     // ケースは storage 書き込みも副作用ゼロ路に倒して終了 (/rere B1-S2-1)。
     if (!document.body?.isConnected) return;
     // 音量関連キー (last gain + サブトグル 2 + ミュート) を storage に永続化 (popup 復元 + background の autoApplyVolumeBooster 用)。
-    chrome.storage.local.set({
+    const volumeRecord = {
       [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped,
       [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
-    }).catch(logStorageError("volume-pushVolumeNow"));
+    };
+    if (VOLUME_BOOSTER_VIA_MES) {
+      // Firefox MES 経路はメッセージを送らないため、EQ の live 値 (ドラッグ中含む) も
+      // storage 経由で content script に届ける。Chrome 経路では message payload に載せ、
+      // storage への EQ 永続化は commitEq の persistEq に任せる。self-write feedback 回避の
+      // 非対称設計は維持される (popup 自身は EQ_GAINS / EQ_PREAMP の onChanged 同期をしない)。
+      volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] = $volumeEqToggle.checked;
+      volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_GAINS] = eqGains.slice();
+      volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP] = eqPreamp;
+    }
+    chrome.storage.local.set(volumeRecord).catch(logStorageError("volume-pushVolumeNow"));
+
+    if (VOLUME_BOOSTER_VIA_MES) {
+      // Firefox MES 経路: storage 書き込みが唯一のトリガー。全タブの volume-booster-mes.js が
+      // storage.onChanged で自動適用するため、active tab 取得もメッセージ送信も不要。
+      setVolumeHint("");
+      return;
+    }
 
     // tabCapture 経路 (background → offscreen) で active tab を boost する (全サイト一律)。
     const tab = await getActiveHttpTab();

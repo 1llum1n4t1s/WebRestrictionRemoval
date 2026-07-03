@@ -2,17 +2,17 @@
 Firefox AMO Listing (English)
 ※ For Chrome Web Store, see webstore/store-listing.en.txt
 ※ For Japanese, see webstore/store-listing.firefox.ja.txt
-※ Firefox edition does NOT support Volume Booster (Chrome-only — Firefox lacks chrome.tabCapture). The other 10 categories all work.
+※ All 11 categories work on Firefox. The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource), except on DRM-protected video sites.
 ============================================================
 
 ■ Name
 Vuora (Firefox)
 
 ■ Summary (250 chars max)
-Firefox extension that locally tunes the readability of the page you are viewing. 10 categories of helpers (YouTube Cleaner, Amazon delivery totals, Amazon jump-to-ranking, Amazon seller badge, Instagram/TikTok Cleaners, Video Gamma, Remove video black bars, Loupe, Color Picker). Volume Booster is Chrome-only (Firefox lacks chrome.tabCapture). All default OFF (opt-in). Zero external network calls.
+Locally tunes the pages you view. 11 categories: YouTube Cleaner, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (except DRM video sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 10 categories of features into a single popup (Volume Booster is Chrome-only).
+A productivity helper that bundles 11 categories of features into a single popup.
 
 ■ Features available on Firefox
 
@@ -46,8 +46,8 @@ Mouse-following circular magnifier. 3-step zoom / variable lens size. Uses `tabs
 🔹 Color Picker (popup tab)
 EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).
 
-🔹 Volume Booster (Chrome edition only)
-The Volume Booster captures tab audio via the `chrome.tabCapture` API, which Firefox MV3 does not support, so **the Volume Booster is unavailable on the Firefox edition** (the popup's audio section is hidden automatically). On Chrome / Edge it works on all sites (including EME-protected video such as Netflix / Prime Video) with 0–300% amplification, auto distortion guard, night mode, mute, and a 10-band graphic equalizer with presets (open the popup to operate it).
+🔹 Volume Booster
+0–300% amplification, auto distortion guard, night mode, mute, and a 10-band graphic equalizer with presets. The Firefox edition runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. Limitation: it cannot work on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally. Audio is processed inside the page; nothing is recorded, stored, or transmitted.
 
 ■ Privacy
 Fully local execution; zero external network calls. Only `browser.storage.local` is used (no sync / no cloud). See docs/privacy-policy.md for details.

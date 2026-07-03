@@ -6,9 +6,11 @@ if (typeof importScripts === "function") {
   importScripts("/src/lib/actions.js");
 }
 
-// 音量ブースター機能は offscreen + tabCapture API に依存する (Firefox MV3 未対応)。
-// このフラグで「Chrome ベースで動いてるか」を判定し、Firefox 環境では音量関連の処理を全て skip する。
-// popup.js 側でも同じ判定で UI 自体を非表示にしているので、storage への書き込みも発生しない設計。
+// 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する
+// (Firefox MV3 未対応)。このフラグで「Chrome ベースで動いてるか」を判定し、Firefox 環境では
+// background の音量関連処理を全て skip する。Firefox では代わりに MES 経路
+// (manifest.firefox.json 専用の volume-booster-mes.js) が popup → storage 直書きを
+// storage.onChanged で購読して自動適用するため、background は音量ブースターに一切関与しない。
 const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";
 
 // ---------- 初期化 ----------
@@ -274,8 +276,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
     if (!HAS_VOLUME_BOOSTER) {
-      // Firefox 版では popup UI 自体を非表示にしているのでここに到達するのは想定外だが、
-      // 防御深層として明示的に reject する (例外を吐かず popup の error 表示で安全に終わる)。
+      // Firefox 版の popup は MES 経路 (storage 直書きのみ) で本メッセージを送らないため、
+      // ここに到達するのは想定外だが、防御深層として明示的に reject する
+      // (例外を吐かず popup の error 表示で安全に終わる)。
       sendResponse({ ok: false, error: "volume-booster-unavailable" });
       return true;
     }

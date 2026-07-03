@@ -57,7 +57,7 @@ bash ./zip.sh firefox
 
 生成物:
 - `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (11 機能フル対応、音量ブースターは tabCapture 経路)
-- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (音量ブースター以外の 10 機能。Firefox MV3 は tabCapture / offscreen 未対応のため、音量ブースターは `HAS_VOLUME_BOOSTER` guard で popup の UI ごと非表示)
+- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (11 機能フル対応。音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js` = manifest.firefox.json のみに登録される content script で提供、DRM サイトでは無効。background の tabCapture 経路は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip)
 
 ## ローカル動作確認
 
@@ -104,11 +104,16 @@ Popup (src/popup/popup.{html,js,css})
                         │ storage 更新 +
                         ──APPLY_*_CS──▶ 各 Content Script (src/content/*.js)
 
-[音量ブースター・tabCapture 経路 (全サイト一律・唯一の経路)]
+[音量ブースター・tabCapture 経路 (全サイト一律・Chrome の唯一の経路)]
   Popup ──VOLUME_BOOSTER_SET_GAIN──▶ Background ──▶ Offscreen Document
     │ chrome.tabCapture.getMediaStreamId (popup open = user gesture が必須)
     │ 全サイト一律で boost (Netflix / Prime Video 等 EME 動画も含む)。boost 中タブには
     │ Chrome の「このタブのコンテンツは共有されています」バナーが出る (tabCapture 仕様、抑止不可)
+
+[音量ブースター・MES 経路 (Firefox 専用。manifest.firefox.json のみに登録)]
+  Popup ──音量関連キーを storage 直書き──▶ 全タブの volume-booster-mes.js (storage.onChanged 購読)
+    │ <video>/<audio> ごとに MediaElementSource + 14 ノードチェーン (メッセージレス・user gesture 不要)
+    │ DRM サイト (EME_HOSTS) では無効。Chrome には一切ロードされない
 
 [ルーペ]
   Content Script ──LOUPE_REQUEST_CAPTURE──▶ Background
@@ -121,10 +126,10 @@ Popup (src/popup/popup.{html,js,css})
 |------|------|
 | `src/lib/actions.js` | 単一情報源 (Actions / StorageKeys / SettingsSchema 等を `globalThis` に公開) |
 | `src/lib/scan-runner.js` | rAF + MutationObserver + context invalidation guard の共通ランタイム |
-| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 8 関数 (offscreen.js のみが使用、MES 経路撤去済み) |
+| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 4 関数 (caller は offscreen.js = Chrome と volume-booster-mes.js = Firefox の 2 つ) |
 | `src/background/background.js` | Service Worker (settings 集約 / offscreen 管理 / 音量ブースター制御) |
 | `src/content/*.js` | 各機能の content script |
-| `src/offscreen/` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体・唯一の経路) |
+| `src/offscreen/` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体・Chrome の唯一の経路) |
 | `src/popup/` | popup UI |
 | `_locales/{en,ja}/` | i18n (Chrome i18n API) |
 | `test/actions.test.js` | 純粋関数テスト (77 件、件数 drift 検知 + CI 整合性チェック含む) |
@@ -140,7 +145,7 @@ Popup (src/popup/popup.{html,js,css})
 - **`SenderCheck` で sender 検証必須** — background の各 message handler 冒頭
 - **MutationObserver で DOM 書き戻すときは `ScanRunner.create()` を使う** (rAF coalesce + disconnect→render→takeRecords→observe ガード)
 - **Extension context invalidation guard** — `chrome.runtime?.id` 検知 + observer/timer 停止 + cleanup (PATTERN SYNC は 14 ファイル実装済み)
-- **音量ブースター DSP は `AudioPipeline` 経由** で実装 (tabCapture 一本、現 caller は offscreen.js 単独)
+- **音量ブースター DSP は `AudioPipeline` 経由** で実装 (caller は offscreen.js = Chrome tabCapture 経路 と volume-booster-mes.js = Firefox 専用 MES 経路 の 2 つ)
 
 ## プライバシー方針
 

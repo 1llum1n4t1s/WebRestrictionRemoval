@@ -47,11 +47,13 @@ The Extension stores the following settings only on the user's device (`chrome.s
 
 These values are stored only on the device and are never transmitted to any external server.
 
-The Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled.
+**On Chrome**, the Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled. **On Firefox**, the current gain value is held only in the in-page audio pipeline's memory (see "Tab audio access" below) and is likewise never persisted.
 
 ## Tab audio access
 
 When the Volume Booster slider is set to a value other than 100%, or when one of Auto Distortion Guard / Night Mode / Equalizer is enabled (even at 100%), the Extension uses the `chrome.tabCapture` API to obtain the active tab's audio stream and processes it through an `AudioContext` in the offscreen document for compression, amplification, and frequency-band adjustment before re-output. Audio data is never sent externally and is never recorded or stored. The stream is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles OFF, or when the Extension is disabled.
+
+**The Firefox edition** cannot use `chrome.tabCapture`, so it uses **in-page Web Audio processing (MediaElementSource)** instead. Only while the Volume Booster is active, the audio output of `<video>` / `<audio>` elements in the page is routed through an `AudioContext` inside the same page for amplification, compression, and frequency-band adjustment. Everything stays inside that page (no offscreen document and no tab audio stream capture); audio data is never recorded, stored, or transmitted. Resetting the settings to neutral or turning the master toggle OFF stops all amplification, compression, and frequency adjustment immediately (audio is routed through unchanged); for technical reasons specific to Firefox, the underlying audio pipeline may remain attached in the background with no audible effect until the media element is removed from the page or the page is closed, since detaching it while media keeps playing is not possible in Firefox without interrupting audio output. This processing is not performed on DRM-protected video sites.
 
 ## Tab screen (screenshot) access
 
@@ -91,8 +93,8 @@ When the connection-monitor sub-feature is OFF, when the YouTube cleaner master 
 
 - **activeTab**: used to access information about the current tab (e.g. determining the target tab for the Volume Booster) when the user changes settings via the popup.
 - **storage**: used to save and restore the keys listed in "Data stored locally" on the device.
-- **offscreen**: used to host an offscreen document (extension context) so the Volume Booster's `AudioContext` can be maintained outside the Service Worker lifecycle.
-- **tabCapture**: used to capture the active tab's audio stream for amplification, compression, frequency-band adjustment, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute / equalizer is enabled at 100%. No recording, storage, or external transmission is performed.
+- **offscreen** (Chrome edition only; not present in the Firefox manifest): used to host an offscreen document (extension context) so the Volume Booster's `AudioContext` can be maintained outside the Service Worker lifecycle.
+- **tabCapture** (Chrome edition only; not present in the Firefox manifest): used to capture the active tab's audio stream for amplification, compression, frequency-band adjustment, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute / equalizer is enabled at 100%. No recording, storage, or external transmission is performed.
 - **`<all_urls>` host permission**: used by the Loupe feature to call `chrome.tabs.captureVisibleTab` against the active tab and display the visible region as a magnified JPEG image in a circular lens. The `activeTab` permission alone is sometimes revoked early after the popup closes or when SPA pages trigger internal navigations, which blocks the capture. The `<all_urls>` host permission ensures the Loupe runs reliably. Captured images are held as Blob URLs locally and released with `URL.revokeObjectURL` as soon as the lens DOM is removed. No external transmission or storage is performed. Note: this extension already injects content scripts on all http(s) sites for DOM/CSS-only operations, so adding the `<all_urls>` host permission does not change the effective access scope.
 
 ## Notable changes through v1.0.18 (already applied)

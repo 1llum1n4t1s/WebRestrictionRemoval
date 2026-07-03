@@ -4,7 +4,7 @@
     "description": "拡張機能名 (chrome://extensions およびストア表示)"
   },
   "appDescription": {
-    "message": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整える Chrome 拡張機能。",
+    "message": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整えるブラウザ拡張機能。",
     "description": "拡張機能の短い説明 (manifest.description)"
   },
   "defaultTitle": {
@@ -36,6 +36,7 @@
   "volumeBoosterMasterDesc": { "message": "タブの音声を増幅・補正します。設定はタブ切替で自動適用されます" },
   "volumeSubLabel": { "message": "音量ブースター" },
   "volumeSubDesc": { "message": "動画プレイヤー側の音量は 100% にして、このスライダーで調整するのがおすすめです" },
+  "volumeMesFirefoxNote": { "message": "Firefox 版はページ内音声処理 (MediaElementSource) で動作し、設定は全タブに自動適用されます。DRM 保護動画 (Netflix / Prime Video 等) では利用できません" },
   "volumeReset100Btn": { "message": "100% に戻す" },
   "volumeReset100Aria": { "message": "音量を 100% に戻す" },
   "volumeMuteAriaOff": { "message": "ミュート" },
