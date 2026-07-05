@@ -924,6 +924,24 @@ const VolumeBooster = Object.freeze({
     return Math.round(n);
   },
   /**
+   * UNITY release 判定（音量ブースターが実質無処理な状態か）: gain が UNITY(100%) かつ
+   * 全サブトグル OFF かつミュート OFF かつ EQ OFF なら AudioContext / MES パイプラインを
+   * 解放してよい（100% でもサブトグル / EQ / ミュートのいずれかが ON なら処理を維持）。
+   * background.js（tabCapture 経路の release 早期 return）と volume-booster-mes.js
+   * （Firefox MES 経路の bypass 判定）が同一条件をベタ書きして per-browser drift の温床に
+   * なっていたのを単一情報源化する（/rere D-002）。
+   * settings は {gain, antiClip, nightMode, muted, eqEnabled}（gain は clampValue 済み整数を想定）。
+   */
+  isUnityRelease(settings) {
+    return (
+      settings.gain === VolumeBooster.UNITY &&
+      !settings.antiClip &&
+      !settings.nightMode &&
+      !settings.muted &&
+      !settings.eqEnabled
+    );
+  },
+  /**
    * スライダー percent (0..MAX) を実 gain 倍率に変換する線形マッピング。
    *
    * 「表示 % = 実音量倍率」を一致させる: 100% = 1.0x / 150% = 1.5x / 200% = 2.0x /

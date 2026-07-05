@@ -44,7 +44,7 @@ const listSrcJsFiles = () => {
 
 test("src/**/*.js の全ファイルが構文エラーなくパースできる", async (t) => {
   const files = listSrcJsFiles();
-  // 23 ファイル前後を期待。極端な減少 (例: glob 設定ミスで 0 件) を検知。
+  // 25 ファイル前後を期待。極端な減少 (例: glob 設定ミスで 0 件) を検知。
   if (files.length < 20) {
     throw new Error(
       `src/ 配下の JS ファイル数が想定より少ない: ${files.length} 件 (期待 20+)`

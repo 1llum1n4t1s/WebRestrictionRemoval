@@ -2412,7 +2412,13 @@
   }
 
   function syncSubsGridItemsPerRow() {
-    const items = computeSubsGridItemsPerRow(window.innerWidth);
+    // ホーム列数 (searchFixerGridItems) が 4/5/6 の固定指定なら、ホーム / 検索結果グリッドと
+    // 同じ列数に揃える（3 グリッドの列数統一）。自動 (0) のときだけ viewport 連動で決める。
+    //   注: ホーム / 検索の自動時は html の `--ytd-rich-grid-items-per-row` を参照するが、
+    //   /feed/channels ではこの変数が stale (常に 4) で追従しないため、自動時は自前計算を使う
+    //   (computeSubsGridItemsPerRow の breakpoint は YouTube 標準列数の実測近似なので概ね一致する)。
+    const fixed = gridItems === 4 || gridItems === 5 || gridItems === 6;
+    const items = fixed ? gridItems : computeSubsGridItemsPerRow(window.innerWidth);
     document.documentElement.style.setProperty("--cpa-sfx-subs-items-per-row", String(items));
   }
 

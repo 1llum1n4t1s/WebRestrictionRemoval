@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.0.46",
+  "version": "1.0.47",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -30,15 +30,8 @@
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/lib/actions.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js"],
-      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css"],
-      "run_at": "document_idle",
-      "all_frames": false
-    },
-    {
-      "matches": ["*://*.youtube.com/*"],
-      "js": ["src/lib/actions.js", "src/content/youtube-connection-monitor.js", "src/content/youtube-broadcast-clock.js"],
-      "css": ["src/content/youtube-connection-monitor.css", "src/content/youtube-broadcast-clock.css"],
+      "js": ["src/lib/actions.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-connection-monitor.js", "src/content/youtube-broadcast-clock.js"],
+      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css", "src/content/youtube-connection-monitor.css", "src/content/youtube-broadcast-clock.css"],
       "run_at": "document_idle",
       "all_frames": false
     },

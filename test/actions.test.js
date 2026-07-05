@@ -31,6 +31,25 @@ test("VolumeBooster.clampValue: 範囲内の値はそのまま、範囲外は cl
   assert.equal(G.VolumeBooster.clampValue(undefined), G.VolumeBooster.DEFAULT);
 });
 
+test("VolumeBooster.isUnityRelease: 100%+全OFF のみ true、いずれか ON なら false (/rere D-002 単一情報源)", () => {
+  const U = G.VolumeBooster.UNITY;
+  // gain UNITY + 全サブトグル OFF + ミュート OFF + EQ OFF → release 可
+  assert.equal(
+    G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, muted: false, eqEnabled: false }),
+    true
+  );
+  // gain が UNITY 以外 → 維持
+  assert.equal(
+    G.VolumeBooster.isUnityRelease({ gain: U + 50, antiClip: false, nightMode: false, muted: false, eqEnabled: false }),
+    false
+  );
+  // 各サブトグル / ミュート / EQ が 1 つでも ON → 維持
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: true, nightMode: false, muted: false, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: true, muted: false, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, muted: true, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, muted: false, eqEnabled: true }), false);
+});
+
 test("VolumeBooster.percentToGain: 0/100/MAX のアンカー値が正しい", () => {
   assert.equal(G.VolumeBooster.percentToGain(0), 0);
   assert.equal(G.VolumeBooster.percentToGain(50), 0.5);

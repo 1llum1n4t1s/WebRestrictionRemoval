@@ -102,6 +102,10 @@
   const PROBE_TIMEOUT_MS = 3000;
   // DOM 除去要素を ctx.close するまでの猶予 (remove → reinsert するプレーヤー対策)。
   const DETACH_GRACE_MS = 30_000;
+  // detached だが再生継続中の要素の close 延長回数上限 (30s × 10 = 約 5 分)。
+  // 再挿入プレーヤー対策で猶予延長する設計だが、上限が無いと detached+再生継続の異常系サイトで
+  // AudioContext + 14 ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
+  const DETACH_MAX_RETRIES = 10;
 
   const { applyCompressorPreset, applyEqualizer, createEqChain } = AudioPipeline;
 
@@ -129,20 +133,10 @@
     eqPreamp: VolumeBooster.EQ_PREAMP_DEFAULT,
   });
 
-  /**
-   * UNITY release 判定: gain 100% + 全サブトグル OFF + ミュート OFF + EQ OFF なら処理不要。
-   * background.js setVolumeBoosterGain の release 早期 return と同じ条件 (EQ 込み)。
-   */
-  function isUnityRelease(settings) {
-    return settings.gain === VolumeBooster.UNITY
-      && !settings.antiClip
-      && !settings.nightMode
-      && !settings.muted
-      && !settings.eqEnabled;
-  }
-
+  // UNITY release 判定は VolumeBooster.isUnityRelease に集約（background.js の tabCapture 経路と
+  // 同一条件を単一情報源化。gain 100% + 全サブトグル OFF + ミュート OFF + EQ OFF なら処理不要・/rere D-002）。
   function isActive() {
-    return currentSettings.enabled && !isUnityRelease(currentSettings);
+    return currentSettings.enabled && !VolumeBooster.isUnityRelease(currentSettings);
   }
 
   /**
@@ -554,15 +548,17 @@
    * プレーヤー実装の可能性が高いと判断し、close せず猶予を延長する (再スケジュール)。
    * 再接続されるか、再生が止まる/終わるまで close は保留され続ける。
    */
-  function scheduleDetachedCheck(media) {
+  function scheduleDetachedCheck(media, retries = 0) {
     if (!STATE.has(media)) return;
     setTimeout(() => {
       if (orphaned) return;
       if (!STATE.has(media) || media.isConnected) return;
-      if (!media.paused && !media.ended) {
-        scheduleDetachedCheck(media);
+      if (!media.paused && !media.ended && retries < DETACH_MAX_RETRIES) {
+        scheduleDetachedCheck(media, retries + 1);
         return;
       }
+      // 再接続 / 再生停止で detach、または上限到達で強制 detach。上限到達時は Firefox では音が
+      // 戻らない代償を払うが、detached+再生継続の異常系での無限メモリ保持を防ぐ (/rere C2-M3)。
       detachFromMedia(media);
     }, DETACH_GRACE_MS);
   }

@@ -49,8 +49,8 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 4. Settings are persisted across sessions.
 
 ### Popup tabs
-- **Tune**: 7 master toggles + Volume slider + Gamma / Loupe
-- **YouTube**: 31 YouTube cleaner sub-features
+- **Tune**: 10 master toggles + Volume slider + Gamma / Loupe
+- **YouTube**: 32 YouTube cleaner sub-features
 - **Instagram**: 11 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
 - **Color Picker**: EyeDropper + history

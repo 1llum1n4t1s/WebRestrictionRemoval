@@ -239,7 +239,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     defaults[StorageKeys.POPUP_LAST_TAB] = PopupTabs.TUNE;
   }
   if (Object.keys(defaults).length > 0) {
-    await chrome.storage.local.set(defaults);
+    // defaults 書き込みが reject しても直後の INSTALL_SENTINEL 書き込み（破損検知の要）に
+    // 必ず到達させるため個別に catch する。sentinel 機構が自身の前提（defaults 成功）に
+    // 依存して機能停止するのを防ぐ。失敗理由は [WebViewingAssist] prefix で可視化。
+    await chrome.storage.local.set(defaults).catch((err) => {
+      console.warn("[WebViewingAssist] onInstalled defaults write failed:", err);
+    });
   }
 
   // P0-#3 storage 破損検知: install / update のたびに sentinel を必ず書き込む。
@@ -267,7 +272,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     handleApplySettings(request.data)
       .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
+      .catch((err) => {
+        // storage.set の quota 超過 / notifyContentScripts 失敗等をここで可視化する。
+        // 同ファイル他経路 (createAudioState / ensureOffscreenDocument 等) の
+        // [WebViewingAssist] prefix console.warn パターンに揃え、ユーザー報告時の切り分け材料を残す。
+        console.warn("[WebViewingAssist] handleApplySettings failed:", err);
+        sendResponse({ ok: false, error: String(err?.message ?? err) });
+      });
     return true;
   } else if (request.action === Actions.VOLUME_BOOSTER_SET_GAIN) {
     // popup が user gesture を持つので、popup → background → tabCapture の連鎖で getMediaStreamId が動く。
@@ -522,7 +533,22 @@ async function getActiveTab() {
 // 4 箇所で同じキー集合を手書きしていたため、4 箇所同期失敗 = drift = 永久 OFF バグの温床。
 const APPLY_SETTINGS_KEYS = Object.freeze(SettingsSchema.map((entry) => entry.storageKey));
 
+// APPLY_SETTINGS 直列化キュー (/rere B1-001):
+// popup は change イベントごとにデバウンス無しで即時 apply() するため、複数トグルを
+// 短時間に操作すると handleApplySettings が並行起動する。各呼び出しは独立した
+// storage.set → notifyContentScripts の非同期チェーンで、両者の完了順序が独立に前後すると
+// 「storage の値」と「content script への最終適用」が一時的に食い違う経路があった。
+// 呼び出しを promise チェーンで直列化し、常に受理順に set → notify を完了させる。
+let applySettingsChain = Promise.resolve();
+
 async function handleApplySettings(settings) {
+  const run = applySettingsChain.then(() => applySettingsInner(settings));
+  // チェーンが reject で途切れないよう失敗は握って次段へ繋ぐ (エラー自体は caller が run で受け取る)。
+  applySettingsChain = run.catch(() => {});
+  return run;
+}
+
+async function applySettingsInner(settings) {
   // 既存 storage 値で補完してから normalize: settings に含まれないキーがあっても
   // 「現状の保存値」が引き継がれる。これで partial payload が紛れ込んでも
   // 他キーが false で wipe されないことを保証する (落とし穴 C 修正)。
@@ -997,12 +1023,15 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqE
   // release → リソース返却。100% でも自動歪み防止 / ナイトモード / イコライザのいずれかが ON なら
   // 処理を効かせる必要があり、ミュート ON なら gain を 0 にランプし続ける必要があるため、いずれの場合も
   // AudioContext を維持して通常経路に進む（gain は 1.0x または 0 にランプ、各処理は設定通り適用）。
+  // 判定条件は VolumeBooster.isUnityRelease に集約（Firefox MES 経路と同一条件・/rere D-002）。
   if (
-    clamped === VolumeBooster.UNITY &&
-    !antiClipFlag &&
-    !nightModeFlag &&
-    !mutedFlag &&
-    !eqActiveFlag
+    VolumeBooster.isUnityRelease({
+      gain: clamped,
+      antiClip: antiClipFlag,
+      nightMode: nightModeFlag,
+      muted: mutedFlag,
+      eqEnabled: eqActiveFlag,
+    })
   ) {
     await releaseVolumeBoosterTab(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
