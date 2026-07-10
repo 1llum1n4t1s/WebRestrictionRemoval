@@ -32,6 +32,10 @@
   let features = SearchFixer.mergeFeatures({});
   /** @type {0|4|5|6} ホームグリッド列数（0 = YouTube デフォルト） */
   let gridItems = 0;
+  /** @type {Array<{key: string, name: string}>} 検索結果から除外するチャンネル（channelBlocklist 機能）。
+   *  popup → storage 直書きで管理されるため APPLY_SEARCH_FIXER_CS メッセージには乗らず、
+   *  初期 storage.get + storage.onChanged の 2 経路のみで同期する。 */
+  let blockedChannels = [];
 
   /** @type {MutationObserver|null} 検索ページ用 observer（active=true & 検索ページのとき走らせる） */
   let resultsObserver = null;
@@ -174,11 +178,13 @@
       StorageKeys.SEARCH_FIXER_ENABLED,
       StorageKeys.SEARCH_FIXER_FEATURES,
       StorageKeys.SEARCH_FIXER_GRID_ITEMS,
+      StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
     ])
     .then((stored) => {
       active = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
       features = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
       gridItems = SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]);
+      blockedChannels = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
       onSettingsChanged();
     })
     .catch(() => {});
@@ -207,6 +213,12 @@
     }
     if (StorageKeys.SEARCH_FIXER_GRID_ITEMS in changes) {
       gridItems = SearchFixer.clampGridItems(changes[StorageKeys.SEARCH_FIXER_GRID_ITEMS].newValue);
+      touched = true;
+    }
+    if (StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS in changes) {
+      blockedChannels = SearchFixer.normalizeBlockedChannels(
+        changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS].newValue
+      );
       touched = true;
     }
     if (touched) onSettingsChanged();
@@ -256,6 +268,7 @@
     if (!active) {
       detachResultsObserver();
       clearThumbnailHighlight();
+      removeAllBlockButtons();
       applyHomeGridStyle();      // active=false なら style 要素を撤去するだけ
       applySearchGridStyle();    // 同上
       applyDemoteStyleInjection(); // 同上 + demoted クラス剥がし
@@ -280,8 +293,9 @@
       highlightMismatchedVideos();
     } else {
       detachResultsObserver();
-      // 検索ページから離れた場合、過去に付与した装飾クラスを掃除
+      // 検索ページから離れた場合、過去に付与した装飾クラス / 注入ボタンを掃除
       clearThumbnailHighlight();
+      removeAllBlockButtons();
     }
 
     // `applyWatchPageClasses()` は <html> クラス (__cpa-sfx-hide-comments) も操作するため、
@@ -851,6 +865,111 @@
         });
       } catch {}
     }
+
+    // ===== Pass 4: チャンネルブロックリスト（除去 + 登録ボタン注入） =====
+    applyChannelBlocklist();
+  }
+
+  // ---------- チャンネルブロックリスト ----------
+  /**
+   * YouTube ホームの公式「このチャンネルは表示しない」に相当する機能を検索結果に提供する。
+   *
+   *   1. 登録済みチャンネル（blockedChannels）の動画カード (ytd-video-renderer) /
+   *      チャンネルカード (ytd-channel-renderer) を検索結果から除去
+   *   2. 未登録チャンネルのカードには hover 表示の 🚫 登録ボタンを注入
+   *      （クリックで storage に追記 → storage.onChanged → 本関数の再実行で即時除去）
+   *
+   * 照合キーは `SearchFixer.extractChannelKeyFromHref`（"@handle" 小文字 or "UC..."）。
+   * removeDistractions から呼ばれるため isResultsPage() ゲート済み。機能 OFF 時は
+   * 注入済みボタンを全撤去する（onSettingsChanged の master OFF / ページ離脱経路からも呼ばれる）。
+   */
+  const BLOCK_BTN_CLASS = "__cpa-sfx-block-btn";
+
+  function removeAllBlockButtons() {
+    document.querySelectorAll(`.${BLOCK_BTN_CLASS}`).forEach((el) => el.remove());
+  }
+
+  /** カード内のチャンネルリンク（`ytd-channel-name` 配下の a[href]）から key / name / 注入先を解決する。 */
+  function resolveChannelInfo(renderer) {
+    const channelName = renderer.querySelector("ytd-channel-name");
+    const link = channelName?.querySelector("a[href]") ?? renderer.querySelector("#main-link[href]");
+    const href = link?.getAttribute("href") ?? "";
+    const key = SearchFixer.extractChannelKeyFromHref(href);
+    if (!key) return null;
+    const name = (link?.textContent ?? "").trim() || renderer.querySelector("#text.ytd-channel-name")?.textContent?.trim() || key;
+    // ytd-channel-name を持たないカード (ytd-channel-renderer の一部バリアント等) は
+    // #main-link をボタン挿入のアンカーとして代用する (CodeRabbit 指摘: fallback が無いと
+    // ensureBlockButton の host 解決で早期 return してボタンが注入されない)。
+    return { key, name, channelName: channelName || link };
+  }
+
+  /** 登録ボタンをチャンネル名の隣に注入（既存があれば dataset のみ更新 — SPA の renderer 再利用対応）。 */
+  function ensureBlockButton(renderer, info) {
+    // orphan guard: 新規作成分岐の chrome.i18n.getMessage が context invalidation で throw すると
+    // 呼び出し元 applyChannelBlocklist の forEach が途中停止するため、入口で安全にスキップする。
+    if (!chrome.runtime?.id) return;
+    // ボタンは <a> の外（ytd-channel-name の直後の sibling）に置く。<a> 内に置くと
+    // クリックがナビゲーションと競合する（stopPropagation でも :visited 等の副作用が残る）。
+    const host = info.channelName?.parentElement;
+    if (!host) return;
+    let btn = host.querySelector(`:scope > .${BLOCK_BTN_CLASS}`);
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = BLOCK_BTN_CLASS;
+      btn.textContent = "🚫";
+      btn.title = chrome.i18n.getMessage("sfBlockChannelBtnTitle") || "このチャンネルを検索結果に表示しない";
+      btn.setAttribute("aria-label", btn.title);
+      btn.addEventListener("click", onBlockButtonClick);
+      info.channelName.insertAdjacentElement("afterend", btn);
+    }
+    btn.dataset.cpaChannelKey = info.key;
+    btn.dataset.cpaChannelName = info.name;
+  }
+
+  /** 登録ボタン click: storage の現在値を再取得してから追記する（popup 側と同じ stale 化 race 防御）。 */
+  async function onBlockButtonClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!chrome.runtime?.id) return; // orphan 化後は何もしない
+    const btn = e.currentTarget;
+    const key = btn?.dataset?.cpaChannelKey;
+    const name = btn?.dataset?.cpaChannelName || key;
+    if (!key) return;
+    try {
+      const stored = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS);
+      const list = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
+      if (list.some((c) => c.key === key)) return; // 既登録（別カードの同チャンネル等）
+      if (list.length >= SearchFixer.BLOCKED_CHANNELS_MAX) return; // 上限到達時は静かに no-op
+      list.push({ key, name });
+      await chrome.storage.local.set({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: list });
+      // 除去自体は storage.onChanged → onSettingsChanged → 本 pass 再実行で行われる
+    } catch {}
+  }
+
+  function applyChannelBlocklist() {
+    if (!f("channelBlocklist")) {
+      removeAllBlockButtons();
+      return;
+    }
+    const blockedSet = new Set(blockedChannels.map((c) => c.key));
+    try {
+      document
+        .querySelectorAll(
+          "#primary ytd-item-section-renderer ytd-video-renderer, " +
+          "#primary .ytd-two-column-search-results-renderer ytd-channel-renderer"
+        )
+        .forEach((renderer) => {
+          if (!renderer.isConnected) return;
+          const info = resolveChannelInfo(renderer);
+          if (!info) return;
+          if (blockedSet.has(info.key)) {
+            renderer.remove();
+            return;
+          }
+          ensureBlockButton(renderer, info);
+        });
+    } catch {}
   }
 
   // ---------- フィードページ（ホーム / 登録 / 急上昇）の動画フィルタ ----------
@@ -898,9 +1017,11 @@
   function purgeFeedDistractions() {
     if (!isFeedPage()) return;
 
-    // 「その他のトピック」セクションは独立した DOM (ytd-rich-section-renderer) で
-    // yt-lockup-view-model 配下の判定とは別ロジック。先に処理しておく。
-    if (f("removeTopicsSection")) {
+    // ホームのおすすめセクション群（「その他のトピック」「ニュース速報」「ゲームルーム」）は
+    // 独立した DOM (ytd-rich-section-renderer) で yt-lockup-view-model 配下の判定とは
+    // 別ロジック。先に処理しておく。旧 removeTopicsSection / removeBreakingNewsSection を
+    // 統合した単一トグル removeFeedSections で一括制御する。
+    if (f("removeFeedSections")) {
       // ChromeMCP 実機検証で確認した DOM 構造:
       //   ytd-rich-section-renderer (style-scope ytd-rich-grid-renderer)
       //     └ ytd-chips-shelf-with-video-shelf-renderer
@@ -932,12 +1053,11 @@
           }
         }
       }
-    }
 
-    // 「ニュース速報」セクションも独立 DOM (ytd-rich-section-renderer)。
-    // 内側 renderer 種別はトピックスとは異なる可能性があるため has() で限定せず、
-    // section title に出現する固有文字列「ニュース速報」/「Breaking news」のみで識別する。
-    if (f("removeBreakingNewsSection")) {
+      // 「ニュース速報」「ゲームルーム」セクションも独立 DOM (ytd-rich-section-renderer)。
+      // 内側 renderer 種別はトピックスとは異なる可能性があるため has() で限定せず、
+      // section title に出現する固有文字列のみで識別する（英語の "Game Room" は推定表記、
+      // 動かなかったら実 DOM の表記に追従する）。
       const sections = document.querySelectorAll("ytd-rich-section-renderer");
       for (const section of sections) {
         if (!section.isConnected) continue;
@@ -949,7 +1069,10 @@
           "#title, yt-formatted-string"
         );
         const titleText = title?.textContent ?? "";
-        if (titleText.includes("ニュース速報") || titleText.includes("Breaking news")) {
+        if (
+          titleText.includes("ニュース速報") || titleText.includes("Breaking news") ||
+          titleText.includes("ゲームルーム") || titleText.includes("Game Room")
+        ) {
           section.remove();
         }
       }
@@ -2991,6 +3114,7 @@
     try { detachLeftnavObservers(); } catch {}
     try { stopSubsGridCardsObserver(); } catch {}
     try { stopSubsGridResizeListener(); } catch {}
+    try { removeAllBlockButtons(); } catch {} // chrome API 非依存、orphan 後も安全
   }
 
   window.addEventListener(

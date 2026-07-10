@@ -237,6 +237,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ttFeatureInputs = new Map();
   /** 動画黒帯除去の表示モード（"zoom" | "stretch"）。モードセグメントのクリックで更新。 */
   let videoFillMode = VideoFill.DEFAULT_MODE;
+  /** @type {Array<{key: string, name: string}>} 検索結果チャンネルブロックリスト（channelBlocklist 管理 UI 用）。
+   *  popup → storage 直書きパターン（APPLY_SETTINGS 非経由）。登録は検索結果ページの 🚫 ボタン、
+   *  popup では一覧表示 + 個別解除のみ提供する。 */
+  let blockedChannels = [];
 
   buildFeatureCategories();
   // menu_ui カテゴリ末尾に挿入された gridItemsSelect を以降の処理で参照する。
@@ -255,6 +259,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
+    StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
     StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
@@ -380,6 +385,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     input.checked = storedFeatures[key] === true;
   }
   $gridItemsSelect.value = String(SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]));
+  blockedChannels = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
+  renderBlockedChannels();
 
   const storedIgFeatures = InstagramCleaner.mergeFeatures(stored[StorageKeys.INSTAGRAM_CLEANER_FEATURES]);
   for (const [key, input] of igFeatureInputs) {
@@ -579,6 +586,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]) {
       volumeMuted = changes[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED].newValue === true;
       updateMuteBtnVisual?.();
+    }
+    // チャンネルブロックリスト: 検索結果ページの 🚫 ボタンから追記されるため、
+    // popup を開いたまま登録された場合も一覧を即時反映する。
+    if (changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]) {
+      blockedChannels = SearchFixer.normalizeBlockedChannels(
+        changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS].newValue
+      );
+      renderBlockedChannels();
     }
     if (changes[StorageKeys.LOUPE_ENABLED]) {
       $loupeToggle.checked = changes[StorageKeys.LOUPE_ENABLED].newValue === true;
@@ -947,6 +962,80 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
+   * 検索結果カテゴリ (search_only) の末尾に挿入する「除外中のチャンネル」管理ブロックを構築する。
+   * データの描画は stored 読込後の renderBlockedChannels() が行う（構築時点では空）。
+   */
+  function _buildBlockedChannelsManager(listEl) {
+    const box = document.createElement("div");
+    box.className = "blocked-box";
+
+    const head = document.createElement("div");
+    head.className = "blocked-head";
+    const title = document.createElement("span");
+    title.className = "blocked-title";
+    title.textContent = i18n("sfBlockedChannelsTitle");
+    const count = document.createElement("span");
+    count.className = "blocked-count";
+    count.id = "blockedChannelsCount";
+    head.append(title, count);
+
+    const items = document.createElement("div");
+    items.className = "blocked-list";
+    items.id = "blockedChannelsList";
+
+    box.append(head, items);
+    listEl.appendChild(box);
+  }
+
+  /** ブロックリスト管理 UI を blockedChannels（正規化済みローカル状態）から再描画する。 */
+  function renderBlockedChannels() {
+    const listEl = document.getElementById("blockedChannelsList");
+    const countEl = document.getElementById("blockedChannelsCount");
+    if (!listEl || !countEl) return;
+    listEl.textContent = "";
+    countEl.textContent = blockedChannels.length > 0 ? `${blockedChannels.length}` : "";
+    if (blockedChannels.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "blocked-empty";
+      empty.textContent = i18n("sfBlockedChannelsEmpty");
+      listEl.appendChild(empty);
+      return;
+    }
+    for (const entry of blockedChannels) {
+      const row = document.createElement("div");
+      row.className = "blocked-row";
+      const name = document.createElement("span");
+      name.className = "blocked-name";
+      name.textContent = entry.name;
+      name.title = entry.key;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "blocked-remove";
+      remove.textContent = i18n("sfBlockedChannelRemove");
+      remove.setAttribute("aria-label", `${i18n("sfBlockedChannelRemove")}: ${entry.name}`);
+      remove.addEventListener("click", () => removeBlockedChannel(entry.key));
+      row.append(name, remove);
+      listEl.appendChild(row);
+    }
+  }
+
+  /** 除外解除。storage 現在値を再取得してから書き戻す（経路 B: popup 内変数 stale 化 race 防御）。 */
+  async function removeBlockedChannel(key) {
+    try {
+      const cur = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS);
+      const list = SearchFixer.normalizeBlockedChannels(cur[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
+      const next = list.filter((c) => c.key !== key);
+      await chrome.storage.local.set({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: next });
+      blockedChannels = next;
+    } catch (err) {
+      // 書き込み失敗時はローカル state を楽観更新しない: storage 上はブロックが残ったまま
+      // 一覧から消えると「解除できたのに検索結果でフィルタされ続ける」不整合になる。
+      logStorageError("blocked-channels-remove")(err);
+    }
+    renderBlockedChannels();
+  }
+
+  /**
    * クリーナー詳細アコーディオンの DOM ビルダー（YouTube クリーナー / Instagram クリーナー / TikTok クリーナー共通）。
    *
    * 構造: `cat` > `cat-head` (アイコン + ラベル) + `cat-list` (各機能のトグル行)。
@@ -1013,6 +1102,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     // （Instagram / TikTok クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
     if (cat.id === "menu_ui") {
       _buildGridItemsRow(list);
+    }
+    // search_only カテゴリの末尾にチャンネルブロックリスト管理ブロックを挿入。
+    // （search_only カテゴリは YouTube クリーナーのみ / データ描画は stored 読込後の renderBlockedChannels）
+    if (cat.id === "search_only") {
+      _buildBlockedChannelsManager(list);
     }
     return list;
   }

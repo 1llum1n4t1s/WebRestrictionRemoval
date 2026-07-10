@@ -61,6 +61,40 @@ chrome.runtime.onInstalled.addListener(async () => {
     await chrome.storage.local.set(migrate).catch(() => {});
   }
 
+  // 旧 removeTopicsSection / removeBreakingNewsSection サブ機能を removeFeedSections に統合。
+  // どちらかが true だったユーザーは新キーへ ON を転写する（新キーが storage 生値で明示設定済みなら尊重）。
+  // 旧キー自体は新 FEATURES に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
+  //
+  // 重要 (Codex P2): 判定は必ず「最初の get の生値 existingFeatures」を基準にする。上の Shorts
+  // migration が走った場合、mergeFeatures 済みの書き込みで旧セクションキーは既に strip され、
+  // removeFeedSections も default false で seed されているため、書き込み後の再取得値で判定すると
+  // (1) hasLegacySectionKeys が常に false になり転写が走らない
+  // (2) seed された false を「ユーザー明示 false」と誤認する
+  // の 2 重の罠がある（Shorts migration 冒頭コメントと同じ existingFeatures 基準の原則）。
+  {
+    const hasLegacySectionKeys =
+      existingFeatures.removeTopicsSection !== undefined ||
+      existingFeatures.removeBreakingNewsSection !== undefined;
+    if (hasLegacySectionKeys) {
+      // 書き込み base は Shorts migration の反映後を尊重したいので storage を再取得する
+      // （取得失敗・欠落時は existingFeatures にフォールバック）。
+      const cur = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_FEATURES).catch(() => ({}));
+      const curFeatures = cur?.[StorageKeys.SEARCH_FIXER_FEATURES];
+      const mergedFeatures = SearchFixer.mergeFeatures(
+        curFeatures && typeof curFeatures === "object" ? curFeatures : existingFeatures
+      );
+      const legacySectionActive =
+        existingFeatures.removeTopicsSection === true ||
+        existingFeatures.removeBreakingNewsSection === true;
+      if (legacySectionActive && existingFeatures.removeFeedSections === undefined) {
+        mergedFeatures.removeFeedSections = true;
+      }
+      await chrome.storage.local
+        .set({ [StorageKeys.SEARCH_FIXER_FEATURES]: mergedFeatures })
+        .catch(() => {});
+    }
+  }
+
   // 廃止キーの削除（v1.0.x 系 + v1.0.17 + v1.0.18 で統合した ytShortsRemovalEnabled）
   // v1.0.x: タブを 4 つに増やしてアコーディオンを廃止したので、開閉状態キーも撤去
   // v1.0.x: 動画フィルタの「適用範囲」セレクタを廃止し常時 feed 動作に固定したので searchFixerScope も撤去
@@ -105,6 +139,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
+    StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
     StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
@@ -143,6 +178,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.SEARCH_FIXER_GRID_ITEMS in stored)) {
     defaults[StorageKeys.SEARCH_FIXER_GRID_ITEMS] = 0;
+  }
+  if (!(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS in stored)) {
+    defaults[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS] = [];
   }
   if (!(StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED in stored)) {
     defaults[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] = false;
