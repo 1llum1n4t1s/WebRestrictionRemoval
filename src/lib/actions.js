@@ -111,6 +111,9 @@ const StorageKeys = Object.freeze({
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
   /** ホームページのリッチグリッド列数（0 = YouTube デフォルト、4/5/6 が選択肢） */
   SEARCH_FIXER_GRID_ITEMS: "searchFixerGridItems",
+  /** 検索結果から除外するチャンネルのリスト（{key, name} 配列。key = "@handle" 小文字 or "UC..." チャンネル ID）。
+   *  popup → storage 直書きパターン（SettingsSchema 非経由、content script は storage.onChanged で購読）。 */
+  SEARCH_FIXER_BLOCKED_CHANNELS: "searchFixerBlockedChannels",
   /** Amazon 定期おトク便ページの月別合計金額表示の有効/無効 */
   AMAZON_DELIVERY_TOTAL_ENABLED: "amazonDeliveryTotalEnabled",
   /** Amazon 商品ページに「この商品が所属するランキングへ移動」ボタンを表示するか（オプトイン・デフォルト OFF） */
@@ -256,8 +259,9 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({ key: "live", category: "video_filter" }),
   Object.freeze({ key: "membersOnly", category: "video_filter" }),
   Object.freeze({ key: "watched", category: "video_filter" }),
-  Object.freeze({ key: "removeTopicsSection", category: "video_filter" }),
-  Object.freeze({ key: "removeBreakingNewsSection", category: "video_filter" }),
+  // ホームのおすすめセクション一括除去（「その他のトピック」「ニュース速報」「ゲームルーム」）。
+  // 旧 removeTopicsSection / removeBreakingNewsSection を統合した機能（background の onInstalled で転写）。
+  Object.freeze({ key: "removeFeedSections", category: "video_filter" }),
   // === カテゴリ "search_only": 検索結果（検索結果ページ固有の DOM のみが対象）===
   // shelf / cardList / course / channel / reel / secondary / chapter は検索結果ページ固有の DOM
   // 構造（ytd-shelf-renderer / ytd-channel-renderer 等）に依存。verified / artist は現状検索のみで
@@ -267,6 +271,10 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({ key: "cardList", category: "search_only" }),
   Object.freeze({ key: "course", category: "search_only" }),
   Object.freeze({ key: "channel", category: "search_only" }),
+  // チャンネルブロックリスト: YouTube ホームの公式「このチャンネルは表示しない」に相当する機能が
+  // 検索結果には無いため独自実装。検索結果カードに登録ボタンを注入し、登録済みチャンネルの
+  // 動画 / チャンネルカードを検索結果から除去する。リストは popup で管理（一覧 + 個別解除）。
+  Object.freeze({ key: "channelBlocklist", category: "search_only" }),
   Object.freeze({ key: "reel", category: "search_only" }),
   Object.freeze({ key: "secondary", category: "search_only" }),
   Object.freeze({ key: "verified", category: "search_only" }),
@@ -406,6 +414,62 @@ const SearchFixer = Object.freeze({
     }
     const m = decoded.match(/(@[\p{L}\p{N}._-]{1,60})(?:\/|$|\?|#)/u);
     return m ? m[1] : null;
+  },
+
+  /** チャンネルブロックリストの登録上限。storage 肥大と検索ページの照合コストの上限を兼ねる。 */
+  BLOCKED_CHANNELS_MAX: 500,
+
+  /**
+   * チャンネルリンク href からブロックリスト照合用のチャンネルキーを抽出する（純粋関数）。
+   *
+   *   - "/@handle" 形式 → "@handle" を **小文字化** して返す（YouTube ハンドルは大文字小文字を
+   *     区別しないため、照合キーは常に小文字で正規化する。extractHandleFromHref の Unicode 対応
+   *     をそのまま利用し、日本語ハンドルにも対応）
+   *   - "/channel/UCxxxx" 形式 → "UCxxxx" をそのまま返す（チャンネル ID は case-sensitive）
+   *   - どちらでもない（動画リンク / null / 空文字）→ null
+   *
+   * @param {string|null|undefined} href チャンネルへのリンク href
+   * @returns {string|null} 照合キー（"@handle" 小文字 or "UC..."）または null
+   */
+  extractChannelKeyFromHref(href) {
+    if (!href) return null;
+    const handle = SearchFixer.extractHandleFromHref(href);
+    if (handle) return handle.toLowerCase();
+    const m = String(href).match(/\/channel\/(UC[\w-]{10,64})(?:\/|$|\?|#)/);
+    return m ? m[1] : null;
+  },
+
+  /**
+   * storage から読んだブロックリスト値を正規化する（純粋関数）。
+   *
+   * 期待形式: [{ key: "@handle" | "UC...", name: "表示名" }, ...]
+   *   - 配列以外 / 壊れた値 → []
+   *   - key が空文字 / 非 string / 128 文字超のエントリは捨てる
+   *   - key は "@..." なら小文字化して正規化（extractChannelKeyFromHref と対称）
+   *   - name は string 以外 / 空なら key を表示名として代用、100 文字で切り詰め
+   *   - key 重複は先勝ちで dedupe、BLOCKED_CHANNELS_MAX 件で打ち切り
+   *
+   * @param {unknown} value storage 生値
+   * @returns {Array<{key: string, name: string}>} 正規化済みリスト（常に新規配列）
+   */
+  normalizeBlockedChannels(value) {
+    if (!Array.isArray(value)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const entry of value) {
+      if (out.length >= SearchFixer.BLOCKED_CHANNELS_MAX) break;
+      if (!entry || typeof entry !== "object") continue;
+      let key = typeof entry.key === "string" ? entry.key.trim() : "";
+      if (!key || key.length > 128) continue;
+      if (key.startsWith("@")) key = key.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      let name = typeof entry.name === "string" ? entry.name.trim() : "";
+      if (!name) name = key;
+      if (name.length > 100) name = name.slice(0, 100);
+      out.push({ key, name });
+    }
+    return out;
   },
 });
 

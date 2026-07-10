@@ -644,6 +644,78 @@ test("SearchFixer.extractHandleFromHref: ASCII / Unicode / URL encoded / 不正�
   assert.equal(G.SearchFixer.extractHandleFromHref("/@bad%ZZ%fail"), null);
 });
 
+test("SearchFixer.extractChannelKeyFromHref: @handle 小文字化 / UC チャンネル ID / 非チャンネル URL", () => {
+  // @handle は小文字化して正規化（YouTube ハンドルは case-insensitive）
+  assert.equal(G.SearchFixer.extractChannelKeyFromHref("/@SomeChannel"), "@somechannel");
+  assert.equal(G.SearchFixer.extractChannelKeyFromHref("/@ABC/videos"), "@abc");
+  // Unicode ハンドル（URL encoded 経由）も extractHandleFromHref 経由で取れる
+  assert.equal(
+    G.SearchFixer.extractChannelKeyFromHref("/%40%E3%82%80%E3%82%81%E3%81%84"),
+    "@むめい"
+  );
+  // /channel/UC... はチャンネル ID をそのまま返す（case-sensitive）
+  assert.equal(
+    G.SearchFixer.extractChannelKeyFromHref("/channel/UCAbCdEfGhIjKlMnOpQrStUv"),
+    "UCAbCdEfGhIjKlMnOpQrStUv"
+  );
+  assert.equal(
+    G.SearchFixer.extractChannelKeyFromHref("/channel/UCAbCdEfGhIjKlMnOpQrStUv/videos?x=1"),
+    "UCAbCdEfGhIjKlMnOpQrStUv"
+  );
+  // 非チャンネル URL / 空値は null
+  assert.equal(G.SearchFixer.extractChannelKeyFromHref("/watch?v=abc"), null);
+  assert.equal(G.SearchFixer.extractChannelKeyFromHref("/channel/XX123"), null);
+  assert.equal(G.SearchFixer.extractChannelKeyFromHref(null), null);
+  assert.equal(G.SearchFixer.extractChannelKeyFromHref(""), null);
+});
+
+test("SearchFixer.normalizeBlockedChannels: 壊れた値 / dedupe / 上限 / name フォールバック", () => {
+  // 配列以外は []
+  assert.deepEqual(G.SearchFixer.normalizeBlockedChannels(null), []);
+  assert.deepEqual(G.SearchFixer.normalizeBlockedChannels("x"), []);
+  assert.deepEqual(G.SearchFixer.normalizeBlockedChannels({ key: "@a" }), []);
+  // 正常エントリ + name 欠落は key で代用
+  assert.deepEqual(
+    G.SearchFixer.normalizeBlockedChannels([
+      { key: "@Abc", name: "Abc Channel" },
+      { key: "UCAbCdEfGhIjKl", name: "" },
+    ]),
+    [
+      { key: "@abc", name: "Abc Channel" }, // @handle は小文字化
+      { key: "UCAbCdEfGhIjKl", name: "UCAbCdEfGhIjKl" }, // UC ID は保持 + name 代用
+    ]
+  );
+  // key 重複（大文字小文字違い含む）は先勝ち dedupe、壊れたエントリは捨てる
+  assert.deepEqual(
+    G.SearchFixer.normalizeBlockedChannels([
+      { key: "@abc", name: "first" },
+      { key: "@ABC", name: "second" },
+      { key: "", name: "empty" },
+      { key: 123, name: "not string" },
+      null,
+      "garbage",
+    ]),
+    [{ key: "@abc", name: "first" }]
+  );
+  // name は 100 文字で切り詰め / key 128 文字超は捨てる
+  const longName = "n".repeat(200);
+  const normalized = G.SearchFixer.normalizeBlockedChannels([
+    { key: "@long", name: longName },
+    { key: "@" + "k".repeat(200), name: "too long key" },
+  ]);
+  assert.equal(normalized.length, 1);
+  assert.equal(normalized[0].name.length, 100);
+  // BLOCKED_CHANNELS_MAX 件で打ち切り
+  const many = Array.from({ length: G.SearchFixer.BLOCKED_CHANNELS_MAX + 50 }, (_, i) => ({
+    key: `@ch${i}`,
+    name: `ch${i}`,
+  }));
+  assert.equal(
+    G.SearchFixer.normalizeBlockedChannels(many).length,
+    G.SearchFixer.BLOCKED_CHANNELS_MAX
+  );
+});
+
 test("SearchFixer.FEATURES: 旧 removeShorts は 4 機能に解体され Shorts カテゴリは廃止", () => {
   // 旧キー removeShorts は存在せず、4 機能に分離されている
   const removeShorts = G.SearchFixer.FEATURES.find((f) => f.key === "removeShorts");
@@ -670,16 +742,23 @@ test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only 
   assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only"]);
 });
 
-test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/membersOnly/watched + removeShortsShelf + removeTopicsSection + removeBreakingNewsSection", () => {
+test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/membersOnly/watched + removeShortsShelf + removeFeedSections", () => {
   const expectedVideoFilterKeys = [
     "playlist", "mix", "shortsBtn", "live", "membersOnly", "watched",
-    "removeShortsShelf", "removeTopicsSection", "removeBreakingNewsSection",
+    "removeShortsShelf", "removeFeedSections",
   ];
   for (const key of expectedVideoFilterKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
     assert.ok(feature, `feature ${key} exists`);
     assert.equal(feature.category, "video_filter", `${key} is in video_filter`);
   }
+});
+
+test("SearchFixer.FEATURES: 旧 removeTopicsSection / removeBreakingNewsSection は removeFeedSections に統合済み (drift 検知)", () => {
+  assert.equal(G.SearchFixer.FEATURES.find((f) => f.key === "removeTopicsSection"), undefined);
+  assert.equal(G.SearchFixer.FEATURES.find((f) => f.key === "removeBreakingNewsSection"), undefined);
+  assert.equal(Object.hasOwn(G.SearchFixer.DEFAULT_FEATURES, "removeTopicsSection"), false);
+  assert.equal(Object.hasOwn(G.SearchFixer.DEFAULT_FEATURES, "removeBreakingNewsSection"), false);
 });
 
 test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only にまとめられている", () => {
@@ -689,6 +768,7 @@ test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only に
     "demoteUnmatched", "highlightThumb",
     "searchGrid",
     "removeShortsChip",
+    "channelBlocklist",
   ];
   for (const key of expectedSearchOnlyKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);

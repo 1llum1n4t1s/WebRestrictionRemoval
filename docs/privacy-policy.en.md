@@ -17,6 +17,7 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 32 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
 - **`searchFixerFeatures`** (object): on/off state of each of the 32 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
+- **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) the user has blocked from search results via the channel-blocklist feature. Stored only on-device; never transmitted.
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
 - **`amazonRankingJumpEnabled`** (boolean): whether the "Go to this product's ranking" button on Amazon product pages is enabled. Default OFF.
 - **`instagramCleanerEnabled`** (boolean): whether the Instagram cleaner is enabled.
