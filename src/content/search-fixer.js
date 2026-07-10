@@ -897,7 +897,10 @@
     const key = SearchFixer.extractChannelKeyFromHref(href);
     if (!key) return null;
     const name = (link?.textContent ?? "").trim() || renderer.querySelector("#text.ytd-channel-name")?.textContent?.trim() || key;
-    return { key, name, channelName };
+    // ytd-channel-name を持たないカード (ytd-channel-renderer の一部バリアント等) は
+    // #main-link をボタン挿入のアンカーとして代用する (CodeRabbit 指摘: fallback が無いと
+    // ensureBlockButton の host 解決で早期 return してボタンが注入されない)。
+    return { key, name, channelName: channelName || link };
   }
 
   /** 登録ボタンをチャンネル名の隣に注入（既存があれば dataset のみ更新 — SPA の renderer 再利用対応）。 */
