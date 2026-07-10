@@ -64,18 +64,29 @@ chrome.runtime.onInstalled.addListener(async () => {
   // 旧 removeTopicsSection / removeBreakingNewsSection サブ機能を removeFeedSections に統合。
   // どちらかが true だったユーザーは新キーへ ON を転写する（新キーが storage 生値で明示設定済みなら尊重）。
   // 旧キー自体は新 FEATURES に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
-  // 上の Shorts migration が SEARCH_FIXER_FEATURES を書き換えている可能性があるため storage を再取得する。
+  //
+  // 重要 (Codex P2): 判定は必ず「最初の get の生値 existingFeatures」を基準にする。上の Shorts
+  // migration が走った場合、mergeFeatures 済みの書き込みで旧セクションキーは既に strip され、
+  // removeFeedSections も default false で seed されているため、書き込み後の再取得値で判定すると
+  // (1) hasLegacySectionKeys が常に false になり転写が走らない
+  // (2) seed された false を「ユーザー明示 false」と誤認する
+  // の 2 重の罠がある（Shorts migration 冒頭コメントと同じ existingFeatures 基準の原則）。
   {
-    const cur = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_FEATURES).catch(() => ({}));
-    const rawFeatures = cur?.[StorageKeys.SEARCH_FIXER_FEATURES];
     const hasLegacySectionKeys =
-      rawFeatures && typeof rawFeatures === "object" &&
-      (rawFeatures.removeTopicsSection !== undefined || rawFeatures.removeBreakingNewsSection !== undefined);
+      existingFeatures.removeTopicsSection !== undefined ||
+      existingFeatures.removeBreakingNewsSection !== undefined;
     if (hasLegacySectionKeys) {
-      const mergedFeatures = SearchFixer.mergeFeatures(rawFeatures);
+      // 書き込み base は Shorts migration の反映後を尊重したいので storage を再取得する
+      // （取得失敗・欠落時は existingFeatures にフォールバック）。
+      const cur = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_FEATURES).catch(() => ({}));
+      const curFeatures = cur?.[StorageKeys.SEARCH_FIXER_FEATURES];
+      const mergedFeatures = SearchFixer.mergeFeatures(
+        curFeatures && typeof curFeatures === "object" ? curFeatures : existingFeatures
+      );
       const legacySectionActive =
-        rawFeatures.removeTopicsSection === true || rawFeatures.removeBreakingNewsSection === true;
-      if (legacySectionActive && rawFeatures.removeFeedSections === undefined) {
+        existingFeatures.removeTopicsSection === true ||
+        existingFeatures.removeBreakingNewsSection === true;
+      if (legacySectionActive && existingFeatures.removeFeedSections === undefined) {
         mergedFeatures.removeFeedSections = true;
       }
       await chrome.storage.local
