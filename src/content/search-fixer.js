@@ -905,6 +905,9 @@
 
   /** 登録ボタンをチャンネル名の隣に注入（既存があれば dataset のみ更新 — SPA の renderer 再利用対応）。 */
   function ensureBlockButton(renderer, info) {
+    // orphan guard: 新規作成分岐の chrome.i18n.getMessage が context invalidation で throw すると
+    // 呼び出し元 applyChannelBlocklist の forEach が途中停止するため、入口で安全にスキップする。
+    if (!chrome.runtime?.id) return;
     // ボタンは <a> の外（ytd-channel-name の直後の sibling）に置く。<a> 内に置くと
     // クリックがナビゲーションと競合する（stopPropagation でも :visited 等の副作用が残る）。
     const host = info.channelName?.parentElement;

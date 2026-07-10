@@ -1028,8 +1028,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       await chrome.storage.local.set({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: next });
       blockedChannels = next;
     } catch (err) {
+      // 書き込み失敗時はローカル state を楽観更新しない: storage 上はブロックが残ったまま
+      // 一覧から消えると「解除できたのに検索結果でフィルタされ続ける」不整合になる。
       logStorageError("blocked-channels-remove")(err);
-      blockedChannels = blockedChannels.filter((c) => c.key !== key);
     }
     renderBlockedChannels();
   }
