@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (ChatGPT) and other coding agents working in this repository.
 
 ## Project Overview
 
@@ -8,7 +8,7 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
 
 ### 機能カウント早見表（単一情報源）
 
-本文で出てくる「N 機能」「N サブ機能」「N マスタートグル」の数字はすべて以下の単一情報源を参照する。CI で drift 検知される値のみここに書く（CLAUDE.md 内 drift 防止）。
+本文で出てくる「N 機能」「N サブ機能」「N マスタートグル」の数字はすべて以下の単一情報源を参照する。CI で drift 検知される値のみここに書く（AGENTS.md 内 drift 防止）。
 
 | カウント名 | 値 | 単一情報源（drift 検知元） |
 |---|---|---|
@@ -450,11 +450,11 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
 | `test/actions.test.js` | 純粋関数テスト: globalThis 22 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 32 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
-| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.claude/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
+| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.codex/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
 | `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要。`/vava` Step 8.7-B (CWS drift check) からも自動参照される |
-| `vava.config.json` | `/vava` スキル (`~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |
-| `~/.claude/skills/vava/scripts/check-store-listing.mjs` | ストア掲載 listing drift チェッカー (汎用版、スキル側集約)。CWS は公開ページ (`chromewebstore.google.com/detail/<id>`) を fetch して `<meta>` から name / description / version を抽出、AMO は API v5 `GET /addons/addon/{slug}/?lang=all` で取得。drift 判定キーワードは CWD の `vava.config.json` の `driftKeywords.{cws,amo}.{ja,en}` から取得 (未設定なら drift チェックをスキップ)。`--cws` / `--amo` で対象選択可。`/vava` Step 8.7-B から自動実行 |
-| `~/.claude/skills/vava/scripts/update-amo-listing.mjs` | Firefox AMO listing 自動 push (汎用版、スキル側集約、API v5 `PATCH /addons/addon/{slug}/`)。name / summary / description / homepage / support_url / categories / privacy_policy を CWD の `vava.config.json` で指定された listing / privacy ファイルから構築して送信。**summary は 250 chars 拒否されるため 249 に truncate / description と privacy_policy は `<` `>` を `&lt;` `&gt;` に pre-escape する (AMO の HTML allowlist に `<video>` `<feComponentTransfer>` 等の技術タグが無く HTTP 406 で silent reject されるため、ReplaceFontSelect 知見ベース)**。screenshots は API 不対応で Dashboard 手動。`~/.amo_token` 2 行構成 (ISSUER / SECRET) から JWT HS256 生成。`/vava` Step 8.7-A から自動実行 |
+| `vava.config.json` | `/vava` スキル (`~/.codex/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |
+| `~/.codex/skills/vava/scripts/check-store-listing.mjs` | ストア掲載 listing drift チェッカー (汎用版、スキル側集約)。CWS は公開ページ (`chromewebstore.google.com/detail/<id>`) を fetch して `<meta>` から name / description / version を抽出、AMO は API v5 `GET /addons/addon/{slug}/?lang=all` で取得。drift 判定キーワードは CWD の `vava.config.json` の `driftKeywords.{cws,amo}.{ja,en}` から取得 (未設定なら drift チェックをスキップ)。`--cws` / `--amo` で対象選択可。`/vava` Step 8.7-B から自動実行 |
+| `~/.codex/skills/vava/scripts/update-amo-listing.mjs` | Firefox AMO listing 自動 push (汎用版、スキル側集約、API v5 `PATCH /addons/addon/{slug}/`)。name / summary / description / homepage / support_url / categories / privacy_policy を CWD の `vava.config.json` で指定された listing / privacy ファイルから構築して送信。**summary は 250 chars 拒否されるため 249 に truncate / description と privacy_policy は `<` `>` を `&lt;` `&gt;` に pre-escape する (AMO の HTML allowlist に `<video>` `<feComponentTransfer>` 等の技術タグが無く HTTP 406 で silent reject されるため、ReplaceFontSelect 知見ベース)**。screenshots は API 不対応で Dashboard 手動。`~/.amo_token` 2 行構成 (ISSUER / SECRET) から JWT HS256 生成。`/vava` Step 8.7-A から自動実行 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
 ## Important Patterns
@@ -803,7 +803,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 
 ### FEATURES 件数アサートテスト (/rere v1.0.28 確立)
 `test/actions.test.js` の **「FEATURES 件数の固定アサート」テスト** がドキュメント整合性の単一情報源。
-- 件数を増減する場合は **同時に**: (1) FEATURES 配列に追加、(2) アサート値更新、(3) CLAUDE.md / README / docs/privacy-policy.md / webstore/store-listing.txt / popup.html コメント / actions.js 内コメント の数値を全部更新
+- 件数を増減する場合は **同時に**: (1) FEATURES 配列に追加、(2) アサート値更新、(3) AGENTS.md / README / docs/privacy-policy.md / webstore/store-listing.txt / popup.html コメント / actions.js 内コメント の数値を全部更新
 - 1 つでも update 漏れると `pnpm test` で fail → CI で drift を検知できる
 - 過去に 22 / 25 / 26 / 29 が混在した状態が再発しないようにこのテストで防御
 
@@ -873,7 +873,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 
 #### 11. captureVisibleTab 2fps 制限 (D-008 / V2 downgrade) `[settled 2026-06-06: 「動画一時停止用途」と明示的設計選択]`
 - 場所: ルーペ動画拡大時の視覚的遅延
-- 状態: CLAUDE.md で「動画一時停止用途」と明示的設計選択
+- 状態: AGENTS.md で「動画一時停止用途」と明示的設計選択
 - 議題: 将来「リアルタイム動画拡大」UX を追加するなら HTMLVideoElement.captureStream + canvas drawImage への hybrid 設計を検討
 
 ### 撤去済み機能と教訓
@@ -912,4 +912,4 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 #### 撤去パターン共通の不変条件
 - **`onInstalled` で legacy storage key を必ず削除**: 廃止キーを残すと storage に dead value が永遠に残る + 将来 同名キーを再利用する場合に「OFF 化したつもりが ON で復元される」事故源。撤去時は必ず `onInstalled` の legacy 削除リストに追加。
 - **`test/actions.test.js` に drift 検知アサート追加**: 撤去機能の定数・アクション・FEATURES エントリが actions.js から完全消去されていることをテストで物理確認。CI で再発防止。
-- **CLAUDE.md からの参照削除は本セクション 1 箇所に集約**: 本文の他箇所 (Project Overview / Key Files / Important Patterns) は撤去機能に言及しない。教訓だけは「→ §撤去済み機能と教訓」リンクで本セクションを参照する。
+- **AGENTS.md からの参照削除は本セクション 1 箇所に集約**: 本文の他箇所 (Project Overview / Key Files / Important Patterns) は撤去機能に言及しない。教訓だけは「→ §撤去済み機能と教訓」リンクで本セクションを参照する。

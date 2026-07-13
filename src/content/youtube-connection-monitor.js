@@ -668,6 +668,9 @@
     if (!overlayEl) return;
     const collapsed = overlayEl.classList.toggle(ROOT_COLLAPSED_CLASS);
     writeLocal(ConnectionMonitor.LS_KEY_OVERLAY_COLLAPSED, collapsed);
+    // 展開直後は renderDetail() の折りたたみ早期 return で止まっていた詳細セクションを
+    // 即座に最新化する（次の sample tick まで最大 1 秒待たせない）
+    if (!collapsed) render();
   }
 
   function onDragStart(ev) {
@@ -727,11 +730,20 @@
     const result = computeVerdict();
     const verdict = result.verdict;
 
-    overlayEl.setAttribute(VERDICT_ATTR, verdict);
+    // 値が変化したときだけ DOM を書き換える（#movie_player 直下での無駄な
+    // MutationRecord 発生を避ける。YouTube 本体は自身の DOM 変化を「操作があった」
+    // 判定の一部に使っている可能性があり、無条件 setAttribute/textContent の
+    // 毎秒発火がプレイヤーコントロールの意図しない再表示に繋がるリスクがあるため）
+    if (overlayEl.getAttribute(VERDICT_ATTR) !== verdict) {
+      overlayEl.setAttribute(VERDICT_ATTR, verdict);
+    }
 
     const emoji = VERDICT_EMOJI[verdict] || "❔";
     const label = i18n(VERDICT_MSG_KEY[verdict] || "cmVerdictUnknown", "—");
-    overlayVerdictEl.textContent = `${emoji} ${label}`;
+    const verdictText = `${emoji} ${label}`;
+    if (overlayVerdictEl.textContent !== verdictText) {
+      overlayVerdictEl.textContent = verdictText;
+    }
 
     const lastSample = samples[samples.length - 1] || {};
     // 帯域は動画 chunk の実測 throughput median を優先 (navigator.connection.downlink は bucket 化された
@@ -751,15 +763,21 @@
         : result.googleRttMedian;
     const rttText = formatMs(compactRtt);
     const bufLabel = i18n("cmBufferingPerMinute", "バッファ {0} 回 / 1 分").replace("{0}", String(result.bufferingCount));
-    overlayMetricEl.textContent = `${bufLabel} · ${downlinkText} · ${rttText}`;
+    const metricText = `${bufLabel} · ${downlinkText} · ${rttText}`;
+    if (overlayMetricEl.textContent !== metricText) {
+      overlayMetricEl.textContent = metricText;
+    }
 
     renderDetail(result);
   }
 
   /** 詳細セクション 3 種を更新（経路 RTT 個別 / 直近 buffering 履歴 / 帯域 60 秒統計） */
   function renderDetail(result) {
-    // 折りたたみ時は CSS で hidden なので描画コスト低い。要素未構築なら no-op
     if (!overlayPathRttEl || !overlayBufferLogEl || !overlayBwEl) return;
+    // 折りたたみ時は CSS で hidden なので、DOM 書き換え自体をスキップする（描画コスト削減に加え、
+    // #movie_player 直下での不要な MutationRecord 発生も抑える）。展開時は次の render() 呼び出し
+    // (最大 RENDER_THROTTLE_MS 後) で最新状態に追いつく。
+    if (overlayEl.classList.contains(ROOT_COLLAPSED_CLASS)) return;
 
     // (1) 経路 RTT 個別: Google / Cloudflare それぞれの median と sample 数
     const gN = googleRttSamples.length;
@@ -770,17 +788,25 @@
     const cText = cN === 0
       ? i18n("cmDetailNotMeasured", "未計測")
       : i18n("cmPathRttEntry", "{0} ({1} 回)").replace("{0}", formatMs(result.cloudflareRttMedian)).replace("{1}", String(cN));
-    overlayPathRttEl.value.textContent = `Google: ${gText}\nCloudflare: ${cText}`;
-    overlayPathRttEl.value.style.whiteSpace = "pre-line";
+    const pathRttText = `Google: ${gText}\nCloudflare: ${cText}`;
+    if (overlayPathRttEl.value.textContent !== pathRttText) {
+      overlayPathRttEl.value.textContent = pathRttText;
+      overlayPathRttEl.value.style.whiteSpace = "pre-line";
+    }
 
     // (2) 直近 buffering 履歴: 新しい順に最大 5 件、相対時刻
-    clearChildren(overlayBufferLogEl);
+    // 相対時刻表示 (formatRelativeTime) は経過時間そのものが毎秒変わるため差分チェックの効果は薄いが、
+    // 「バッファ無し」の空状態が続くケースだけは再構築を省略できる。
     if (bufferingEvents.length === 0) {
-      const li = document.createElement("li");
-      li.className = "__cpa-cm-detail-empty";
-      li.textContent = i18n("cmBufferLogEmpty", "直近 1 分はバッファ無し");
-      overlayBufferLogEl.appendChild(li);
+      if (overlayBufferLogEl.childElementCount !== 1 || !overlayBufferLogEl.firstElementChild?.classList.contains("__cpa-cm-detail-empty")) {
+        clearChildren(overlayBufferLogEl);
+        const li = document.createElement("li");
+        li.className = "__cpa-cm-detail-empty";
+        li.textContent = i18n("cmBufferLogEmpty", "直近 1 分はバッファ無し");
+        overlayBufferLogEl.appendChild(li);
+      }
     } else {
+      clearChildren(overlayBufferLogEl);
       const now = Date.now();
       const recent = bufferingEvents.slice(-5).reverse();
       for (const ev of recent) {
@@ -796,13 +822,14 @@
     // navigator.connection.downlink (粗い概算) ではなく PerformanceObserver 経由の実測値を使う。
     // throughput サンプル無いとき (動画読み込み開始直後・広告中等) は「未計測」を出す
     const ts = computeThroughputStats();
-    if (!ts) {
-      overlayBwEl.value.textContent = i18n("cmDetailNotMeasured", "未計測");
-    } else {
-      overlayBwEl.value.textContent = i18n("cmBwStat", "最小 {0} / 平均 {1} / 最大 {2}")
-        .replace("{0}", formatMbps(ts.min))
-        .replace("{1}", formatMbps(ts.avg))
-        .replace("{2}", formatMbps(ts.max));
+    const bwText = !ts
+      ? i18n("cmDetailNotMeasured", "未計測")
+      : i18n("cmBwStat", "最小 {0} / 平均 {1} / 最大 {2}")
+          .replace("{0}", formatMbps(ts.min))
+          .replace("{1}", formatMbps(ts.avg))
+          .replace("{2}", formatMbps(ts.max));
+    if (overlayBwEl.value.textContent !== bwText) {
+      overlayBwEl.value.textContent = bwText;
     }
   }
 

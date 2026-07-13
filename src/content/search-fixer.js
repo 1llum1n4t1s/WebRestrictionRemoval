@@ -889,9 +889,24 @@
     document.querySelectorAll(`.${BLOCK_BTN_CLASS}`).forEach((el) => el.remove());
   }
 
+  /**
+   * ytd-video-renderer はレスポンシブ切替用に `ytd-channel-name` を複数 (非表示バリアント込み) 保持
+   * している実機確認済みの罠がある。素朴な querySelector は文書順で先に現れる非表示側を掴んでしまい、
+   * ensureBlockButton の挿入先がその非表示コンテナ内になってボタンが永久に見えなくなる。
+   * `offsetParent !== null`（自身 or 祖先が display:none だと null になる）で実際に描画されている
+   * 要素を選び、全滅時のみ先頭にフォールバックする。
+   */
+  function pickVisibleChannelName(renderer) {
+    const candidates = renderer.querySelectorAll("ytd-channel-name");
+    for (const el of candidates) {
+      if (el.offsetParent !== null) return el;
+    }
+    return candidates[0] ?? null;
+  }
+
   /** カード内のチャンネルリンク（`ytd-channel-name` 配下の a[href]）から key / name / 注入先を解決する。 */
   function resolveChannelInfo(renderer) {
-    const channelName = renderer.querySelector("ytd-channel-name");
+    const channelName = pickVisibleChannelName(renderer);
     const link = channelName?.querySelector("a[href]") ?? renderer.querySelector("#main-link[href]");
     const href = link?.getAttribute("href") ?? "";
     const key = SearchFixer.extractChannelKeyFromHref(href);
