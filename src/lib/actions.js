@@ -137,6 +137,8 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
   /** 音量ブースター: ナイトモード（ゲーム配信用途） */
   VOLUME_BOOSTER_NIGHT_MODE_ENABLED: "volumeBoosterNightModeEnabled",
+  /** 音量ブースター: 壁ドン対策モード（highpass フィルタで低音をカットし、壁・床への振動伝達を抑える） */
+  VOLUME_BOOSTER_BASS_CUT_ENABLED: "volumeBoosterBassCutEnabled",
   /** 音量ブースター: ミュート（スライダー値・サブトグル設定は保持したまま gain を 0 にランプ）。
    *  グローバル設定で、ON 中は UNITY release 条件をブロックして AudioContext を維持する。 */
   VOLUME_BOOSTER_MUTED_ENABLED: "volumeBoosterMutedEnabled",
@@ -994,13 +996,14 @@ const VolumeBooster = Object.freeze({
    * background.js（tabCapture 経路の release 早期 return）と volume-booster-mes.js
    * （Firefox MES 経路の bypass 判定）が同一条件をベタ書きして per-browser drift の温床に
    * なっていたのを単一情報源化する（/rere D-002）。
-   * settings は {gain, antiClip, nightMode, muted, eqEnabled}（gain は clampValue 済み整数を想定）。
+   * settings は {gain, antiClip, nightMode, bassCut, muted, eqEnabled}（gain は clampValue 済み整数を想定）。
    */
   isUnityRelease(settings) {
     return (
       settings.gain === VolumeBooster.UNITY &&
       !settings.antiClip &&
       !settings.nightMode &&
+      !settings.bassCut &&
       !settings.muted &&
       !settings.eqEnabled
     );
@@ -1110,6 +1113,25 @@ const VolumeBooster = Object.freeze({
     ratio: 1,
     attack: 0.003,
     release: 0.25,
+  }),
+  /**
+   * 壁ドン対策モード用 highpass フィルタプリセット（BiquadFilterNode type:"highpass"）。
+   * カットオフ 150Hz は、壁・床を伝って隣室に響きやすいサブベース〜低音域（ドスドス感の主因）を
+   * 除去しつつ、ボーカルや楽器の芯（中音域）は残す落としどころ。Q は 0.7071（Butterworth、
+   * カットオフ付近の共振ピークなしで最も自然な減衰特性）で固定。
+   */
+  BASS_CUT_PRESET: Object.freeze({
+    frequency: 150,
+    Q: 0.7071,
+  }),
+  /**
+   * 壁ドン対策モード OFF 時のバイパス設定。highpass のカットオフを 0Hz にすると
+   * 可聴域全体を素通しできる（disconnect/reconnect による音切れを避けるため、
+   * COMPRESSOR_BYPASS と同じ「ノードは繋いだままパラメータで無効化」方式）。
+   */
+  BASS_CUT_BYPASS: Object.freeze({
+    frequency: 0,
+    Q: 0.7071,
   }),
 
   // ===== Firefox 専用 MES (MediaElementSource) 経路 =====

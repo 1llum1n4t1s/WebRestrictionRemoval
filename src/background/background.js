@@ -151,6 +151,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
     StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
@@ -214,6 +215,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] = false;
+  }
+  if (!(StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED in stored)) {
+    defaults[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] = false;
   }
   if (!(StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] = false;
@@ -336,6 +340,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       request.data?.gain,
       request.data?.antiClip,
       request.data?.nightMode,
+      request.data?.bassCut,
       request.data?.muted,
       request.data?.eqEnabled,
       request.data?.eqGains,
@@ -469,6 +474,7 @@ async function autoApplyVolumeBooster(tabId) {
       StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
       StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
       StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+      StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
       StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
       StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
       StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
@@ -486,12 +492,13 @@ async function autoApplyVolumeBooster(tabId) {
   const gain = VolumeBooster.clampValue(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT);
   const antiClip = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
+  const bassCut = stored[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true;
   const muted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
   const eqEnabled = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
   // gain と一貫させて offscreen への送信前にクランプ (audio-pipeline で再クランプされる二重防御)。
   const eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
   const eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
-  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqEnabled, eqGains, eqPreamp);
+  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp);
 }
 
 // ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
@@ -504,6 +511,7 @@ chrome.storage.onChanged.addListener((changes) => {
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN in changes ||
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes ||
+    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_EQ_ENABLED in changes ||
     StorageKeys.VOLUME_BOOSTER_EQ_GAINS in changes ||
@@ -605,7 +613,7 @@ async function applySettingsInner(settings) {
  * `!!` だと truthy 判定されて誤って ON 化されうる。デフォルト OFF 方針を堅持するため、
  * 明示的な `true` のときだけ有効化する。
  *
- * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / NightMode / Muted) は
+ * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / NightMode / BassCut / Muted) は
  * APPLY_SETTINGS の対象外**: popup が VOLUME_BOOSTER_SET_GAIN メッセージで gain と一緒に
  * 渡してくるため、storage.set は popup 側で直接行う。content script への配信も不要なので
  * normalizeSettings / toStorageRecord には含めない。新しい音量関連 storage key を増やすときは
@@ -1038,10 +1046,11 @@ async function isVolumeBoosterActive() {
  * 新規 tabCapture は呼ばない（リソース節約 + chrome:// 等での無駄なエラー回避）。
  *
  * `antiClip` / `nightMode` は popup から渡される DynamicsCompressor 機能フラグで、
- * offscreen 側で各 compressor のパラメータを切り替える。両 OFF 時もチェーンには残し
- * ratio:1 のバイパス設定にするため、トグル切替時に音切れは発生しない。
+ * offscreen 側で各 compressor のパラメータを切り替える。`bassCut`（壁ドン対策モード）は
+ * highpass BiquadFilterNode の機能フラグ。いずれも OFF 時はチェーンに残したままバイパス
+ * 設定（compressor は ratio:1、filter は frequency:0）にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqEnabled, eqGains, eqPreamp) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp) {
   // P2-#13: tabId は popup origin（SenderCheck.isFromPopup で検証済み）から渡されるが、
   // popup の中では `getActiveHttpTab()` 経由で active tab の id を入れて送ってくる。
   // popup CSP (`script-src 'self'`) で外部スクリプトが popup 内で動くことは事実上不可能なため、
@@ -1054,19 +1063,21 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqE
   const clamped = VolumeBooster.clampValue(gain);
   const antiClipFlag = antiClip === true;
   const nightModeFlag = nightMode === true;
+  const bassCutFlag = bassCut === true;
   const mutedFlag = muted === true;
   const eqActiveFlag = eqEnabled === true;
 
   // スライダーが等倍位置 (100%) かつ全サブトグル OFF かつミュート OFF かつイコライザ OFF のときだけ
-  // release → リソース返却。100% でも自動歪み防止 / ナイトモード / イコライザのいずれかが ON なら
-  // 処理を効かせる必要があり、ミュート ON なら gain を 0 にランプし続ける必要があるため、いずれの場合も
-  // AudioContext を維持して通常経路に進む（gain は 1.0x または 0 にランプ、各処理は設定通り適用）。
-  // 判定条件は VolumeBooster.isUnityRelease に集約（Firefox MES 経路と同一条件・/rere D-002）。
+  // release → リソース返却。100% でも自動歪み防止 / ナイトモード / 壁ドン対策 / イコライザのいずれかが
+  // ON なら処理を効かせる必要があり、ミュート ON なら gain を 0 にランプし続ける必要があるため、
+  // いずれの場合も AudioContext を維持して通常経路に進む（gain は 1.0x または 0 にランプ、各処理は
+  // 設定通り適用）。判定条件は VolumeBooster.isUnityRelease に集約（Firefox MES 経路と同一条件・/rere D-002）。
   if (
     VolumeBooster.isUnityRelease({
       gain: clamped,
       antiClip: antiClipFlag,
       nightMode: nightModeFlag,
+      bassCut: bassCutFlag,
       muted: mutedFlag,
       eqEnabled: eqActiveFlag,
     })
@@ -1093,6 +1104,7 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqE
         gain: clamped,
         antiClip: antiClipFlag,
         nightMode: nightModeFlag,
+        bassCut: bassCutFlag,
         muted: mutedFlag,
         eqEnabled: eqActiveFlag,
         eqGains,
@@ -1150,6 +1162,7 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, muted, eqE
       gain: clamped,
       antiClip: antiClipFlag,
       nightMode: nightModeFlag,
+      bassCut: bassCutFlag,
       muted: mutedFlag,
       eqEnabled: eqActiveFlag,
       eqGains,

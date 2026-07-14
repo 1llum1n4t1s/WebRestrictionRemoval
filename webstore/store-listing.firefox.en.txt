@@ -47,7 +47,7 @@ Mouse-following circular magnifier. 3-step zoom / variable lens size. Uses `tabs
 EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stored in `browser.storage.local` only (no external transmission).
 
 🔹 Volume Booster
-0–300% amplification, auto distortion guard, night mode, mute, and a 10-band graphic equalizer with presets. The Firefox edition runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. Limitation: it cannot work on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally. Audio is processed inside the page; nothing is recorded, stored, or transmitted.
+0–300% amplification, auto distortion guard, night mode, wall-thump guard (bass cut), mute, and a 10-band graphic equalizer with presets. The Firefox edition runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. Limitation: it cannot work on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally. Audio is processed inside the page; nothing is recorded, stored, or transmitted.
 
 ■ Privacy
 Fully local execution; zero external network calls. Only `browser.storage.local` is used (no sync / no cloud). See docs/privacy-policy.md for details.

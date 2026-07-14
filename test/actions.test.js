@@ -35,19 +35,27 @@ test("VolumeBooster.isUnityRelease: 100%+全OFF のみ true、いずれか ON �
   const U = G.VolumeBooster.UNITY;
   // gain UNITY + 全サブトグル OFF + ミュート OFF + EQ OFF → release 可
   assert.equal(
-    G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, muted: false, eqEnabled: false }),
+    G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, bassCut: false, muted: false, eqEnabled: false }),
     true
   );
   // gain が UNITY 以外 → 維持
   assert.equal(
-    G.VolumeBooster.isUnityRelease({ gain: U + 50, antiClip: false, nightMode: false, muted: false, eqEnabled: false }),
+    G.VolumeBooster.isUnityRelease({ gain: U + 50, antiClip: false, nightMode: false, bassCut: false, muted: false, eqEnabled: false }),
     false
   );
   // 各サブトグル / ミュート / EQ が 1 つでも ON → 維持
-  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: true, nightMode: false, muted: false, eqEnabled: false }), false);
-  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: true, muted: false, eqEnabled: false }), false);
-  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, muted: true, eqEnabled: false }), false);
-  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, muted: false, eqEnabled: true }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: true, nightMode: false, bassCut: false, muted: false, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: true, bassCut: false, muted: false, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, bassCut: true, muted: false, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, bassCut: false, muted: true, eqEnabled: false }), false);
+  assert.equal(G.VolumeBooster.isUnityRelease({ gain: U, antiClip: false, nightMode: false, bassCut: false, muted: false, eqEnabled: true }), false);
+});
+
+test("VolumeBooster.BASS_CUT_PRESET / BASS_CUT_BYPASS: 壁ドン対策モードの highpass フィルタ値固定 (drift 検知)", () => {
+  assert.equal(G.VolumeBooster.BASS_CUT_PRESET.frequency, 150);
+  assert.equal(G.VolumeBooster.BASS_CUT_PRESET.Q, 0.7071);
+  // BYPASS は frequency:0 で highpass を実質無効化（ノード抜き差しなしのバイパス方式）。
+  assert.equal(G.VolumeBooster.BASS_CUT_BYPASS.frequency, 0);
 });
 
 test("VolumeBooster.percentToGain: 0/100/MAX のアンカー値が正しい", () => {
@@ -110,19 +118,21 @@ test("VolumeBooster.sliderPositionToPercent: SLIDER_UNITY で UNITY", () => {
 
 // ---------- StorageKeys: 音量ブースター系の鍵が揃っているか ----------
 
-test("StorageKeys.VOLUME_BOOSTER_* が 5 キー揃っている（master + lastGain + 2 サブトグル + muted）", () => {
-  // 5 キーいずれかを追加・削除する場合は次を必ず同時更新:
+test("StorageKeys.VOLUME_BOOSTER_* が 6 キー揃っている（master + lastGain + 3 サブトグル + muted）", () => {
+  // 6 キーいずれかを追加・削除する場合は次を必ず同時更新:
   //   - background.js の cachedVolumeSettings 監視リストと onInstalled 初期化
   //   - popup.js の storage.local.get / event handler
   //   - _locales/{en,ja}/messages.json (UI 露出する場合)
-  //   - CLAUDE.md "5 storage key" の数値整合
+  //   - CLAUDE.md "6 storage key" の数値整合
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_LAST_GAIN, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED, "string");
   // 旧仕様の混入チェック (snake_case や大文字小文字違いの誤キー混入を防ぐ)
   assert.equal(G.StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED, "volumeBoosterMutedEnabled");
+  assert.equal(G.StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED, "volumeBoosterBassCutEnabled");
 });
 
 test("撤去済み: 自動音量正規化サブ機能の痕跡が actions.js から完全消去されている", () => {
@@ -143,9 +153,10 @@ test("撤去済み: 自動音量正規化サブ機能の痕跡が actions.js か
     [],
     `VolumeBooster に NORMALIZE_* 定数が残存: ${leftoverNormalizeKeys.join(", ")}`
   );
-  // 音量サブトグルは自動歪み防止 / ナイトモードの 2 つに減った (正規化は撤去)。
+  // 音量サブトグルは自動歪み防止 / ナイトモード / 壁ドン対策モードの 3 つ (正規化は撤去)。
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, "string");
   assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
+  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED, "string");
 });
 
 // ---------- VolumeBooster: グラフィックイコライザ ----------

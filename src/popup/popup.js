@@ -187,6 +187,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeHint = document.getElementById("volumeHint");
   const $volumeAntiClipToggle = document.getElementById("volumeAntiClipToggle");
   const $volumeNightModeToggle = document.getElementById("volumeNightModeToggle");
+  const $volumeBassCutToggle = document.getElementById("volumeBassCutToggle");
   const $volumeEqToggle = document.getElementById("volumeEqToggle");
   const $volumeEqPreset = document.getElementById("volumeEqPreset");
   const $volumeEqSliders = document.getElementById("volumeEqSliders");
@@ -271,6 +272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
     StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
@@ -314,6 +316,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
+  $volumeBassCutToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true;
   // イコライザの復元 + UI 構築 + イベントバインド（buildEqUi/bindEqEvents/syncEqUi/updateEqPanelState は function 宣言で hoist 済み）。
   // 旧実装の防御ラッパー (DOM 存在 if + try/catch) は撤去: $volumeEq* は popup.html 同梱の静的要素で
   // 常時存在し、TDZ 起因の ReferenceError は EQ_PRESET_I18N_KEYS の actions.js 移設 (/simplify) で根治済み。
@@ -569,6 +572,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]) {
       $volumeNightModeToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED].newValue === true;
     }
+    if (changes[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED]) {
+      $volumeBassCutToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED].newValue === true;
+    }
     if (changes[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED]) {
       $volumeEqToggle.checked = changes[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED].newValue === true;
       updateEqPanelState?.();
@@ -732,6 +738,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   bindVolumeSubToggle($volumeAntiClipToggle, StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED);
   bindVolumeSubToggle($volumeNightModeToggle, StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED);
+  bindVolumeSubToggle($volumeBassCutToggle, StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED);
 
   // ミュートボタン: クリックで volumeMuted を toggle、storage 保存、現在 gain を再 push して即時反映。
   // ミュート ON でもスライダー値 / サブトグル設定は保持され、UNITY release 条件で AudioContext を解放しない。
@@ -1586,11 +1593,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // popup クローズ後の orphan await から戻ったときに DOM が detached になっている
     // ケースは storage 書き込みも副作用ゼロ路に倒して終了 (/rere B1-S2-1)。
     if (!document.body?.isConnected) return;
-    // 音量関連キー (last gain + サブトグル 2 + ミュート) を storage に永続化 (popup 復元 + background の autoApplyVolumeBooster 用)。
+    // 音量関連キー (last gain + サブトグル 3 + ミュート) を storage に永続化 (popup 復元 + background の autoApplyVolumeBooster 用)。
     const volumeRecord = {
       [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: clamped,
       [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: $volumeAntiClipToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: $volumeNightModeToggle.checked,
+      [StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED]: $volumeBassCutToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
     };
     if (VOLUME_BOOSTER_VIA_MES) {
@@ -1626,6 +1634,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           gain: clamped,
           antiClip: $volumeAntiClipToggle.checked,
           nightMode: $volumeNightModeToggle.checked,
+          bassCut: $volumeBassCutToggle.checked,
           muted: volumeMuted,
           eqEnabled: $volumeEqToggle.checked,
           eqGains: eqGains.slice(),
@@ -1681,6 +1690,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeSlider.disabled = off;
     $volumeAntiClipToggle.disabled = off;
     $volumeNightModeToggle.disabled = off;
+    $volumeBassCutToggle.disabled = off;
     if ($volumeEqToggle) $volumeEqToggle.disabled = off;
     updateEqPanelState();
     if ($volumeMuteBtn) $volumeMuteBtn.disabled = off;

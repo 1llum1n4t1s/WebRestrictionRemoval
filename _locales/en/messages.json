@@ -47,6 +47,8 @@
   "volumeAntiClipDesc": { "message": "Tame sudden shouts and effect peaks to prevent clipping when boosting." },
   "volumeNightModeLabel": { "message": "Night Mode" },
   "volumeNightModeDesc": { "message": "Gently compress loud voices and explosions so quiet game audio is not buried." },
+  "volumeBassCutLabel": { "message": "Wall-Thump Guard" },
+  "volumeBassCutDesc": { "message": "Cuts deep bass so it won't thump through walls or floors and bother your neighbors." },
   "volumeEqLabel": { "message": "Equalizer" },
   "volumeEqDesc": { "message": "Adjust each frequency band with a 10-band EQ. Boost bass or treble, or pick a preset." },
   "volumeEqPresetLabel": { "message": "Preset" },

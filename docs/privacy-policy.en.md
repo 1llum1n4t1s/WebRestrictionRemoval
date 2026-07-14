@@ -28,6 +28,7 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`volumeBoosterLastGain`** (number, 0–600): Volume Booster slider position (%). Default 100.
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` acting as a fast limiter) is enabled. Default OFF.
 - **`volumeBoosterNightModeEnabled`** (boolean): whether the Volume Booster's "Night Mode" sub-toggle (a `DynamicsCompressor` that compresses dynamic range for night listening) is enabled. Default OFF.
+- **`volumeBoosterBassCutEnabled`** (boolean): whether the Volume Booster's "Wall-Thump Guard" sub-toggle (a `BiquadFilterNode(type:"highpass")` that cuts low bass so it won't rumble through walls or floors) is enabled. Default OFF.
 - **`volumeBoosterMutedEnabled`** (boolean): the Volume Booster mute toggle. When ON, the `GainNode` is ramped to 0 while the slider value and sub-toggle settings are preserved (the AudioContext is kept alive so unmute can restore the volume instantly). Default OFF.
 - **`volumeBoosterEqEnabled`** (boolean): whether the Volume Booster's "10-band graphic equalizer" sub-feature (10 × `BiquadFilterNode(type:"peaking")` + a preamp `GainNode`) is enabled. Default OFF.
 - **`volumeBoosterEqGains`** (number array, 10 elements, each -12 to +12 dB): per-band gain values. Band center frequencies: 32 / 64 / 125 / 250 / 500 / 1K / 2K / 4K / 8K / 16K Hz. Default all 0 dB (flat).

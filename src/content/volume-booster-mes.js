@@ -6,8 +6,8 @@
  * Firefox MV3 は `chrome.tabCapture` / `chrome.offscreen` 未対応のため、Chrome の
  * tabCapture → offscreen 経路が使えない。本 content script は **manifest.firefox.json のみ**
  * から全 http(s) ページの全フレームに注入され、ページ内の `<video>` / `<audio>` 要素へ
- * MediaElementSource + 14 ノードチェーン
- * (`source → preamp → eqFilters[0..9] → nightMode → gain → antiClip → destination`、
+ * MediaElementSource + 15 ノードチェーン
+ * (`source → preamp → eqFilters[0..9] → nightMode → gain → bassCut → antiClip → destination`、
  * offscreen.js の createAudioState と同一順序) を attach して音量を補正する。
  *
  * tabCapture と違い user gesture 不要で、popup を開かなくても storage 変化だけで
@@ -104,17 +104,18 @@
   const DETACH_GRACE_MS = 30_000;
   // detached だが再生継続中の要素の close 延長回数上限 (30s × 10 = 約 5 分)。
   // 再挿入プレーヤー対策で猶予延長する設計だが、上限が無いと detached+再生継続の異常系サイトで
-  // AudioContext + 14 ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
+  // AudioContext + 15 ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
   const DETACH_MAX_RETRIES = 10;
 
-  const { applyCompressorPreset, applyEqualizer, createEqChain } = AudioPipeline;
+  const { applyCompressorPreset, applyFilterPreset, applyEqualizer, createEqChain } = AudioPipeline;
 
-  /** @type {{enabled: boolean, gain: number, antiClip: boolean, nightMode: boolean, muted: boolean, eqEnabled: boolean, eqGains: number[], eqPreamp: number}} */
+  /** @type {{enabled: boolean, gain: number, antiClip: boolean, nightMode: boolean, bassCut: boolean, muted: boolean, eqEnabled: boolean, eqGains: number[], eqPreamp: number}} */
   let currentSettings = {
     enabled: false,
     gain: VolumeBooster.DEFAULT,
     antiClip: false,
     nightMode: false,
+    bassCut: false,
     muted: false,
     eqEnabled: false,
     eqGains: VolumeBooster.clampEqGains([]),
@@ -127,6 +128,7 @@
     gain: VolumeBooster.UNITY,
     antiClip: false,
     nightMode: false,
+    bassCut: false,
     muted: false,
     eqEnabled: false,
     eqGains: VolumeBooster.clampEqGains([]),
@@ -285,15 +287,19 @@
       const eqChain = createEqChain(ctx);
       const nightModeNode = ctx.createDynamicsCompressor();
       const gainNode = ctx.createGain();
+      const bassCutNode = ctx.createBiquadFilter();
+      bassCutNode.type = "highpass";
       const antiClipNode = ctx.createDynamicsCompressor();
       applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
+      applyFilterPreset(bassCutNode, VolumeBooster.BASS_CUT_BYPASS);
       applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
       source = ctx.createMediaElementSource(media);
-      // ノード順序は offscreen.js createAudioState と同一 (EQ → ナイトモード → gain → anti-clip)
+      // ノード順序は offscreen.js createAudioState と同一 (EQ → ナイトモード → gain → 壁ドン対策 → anti-clip)
       source.connect(eqChain.head);
       eqChain.tail.connect(nightModeNode);
       nightModeNode.connect(gainNode);
-      gainNode.connect(antiClipNode);
+      gainNode.connect(bassCutNode);
+      bassCutNode.connect(antiClipNode);
       antiClipNode.connect(ctx.destination);
 
       /** @type {AudioState} */
@@ -304,6 +310,7 @@
         preampNode: eqChain.preampNode,
         eqFilters: eqChain.eqFilters,
         nightModeNode,
+        bassCutNode,
         antiClipNode,
         lastSetPercent: VolumeBooster.UNITY,
         ref: new WeakRef(media),
@@ -354,6 +361,10 @@
     applyCompressorPreset(
       state.antiClipNode,
       settings.antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
+    );
+    applyFilterPreset(
+      state.bassCutNode,
+      settings.bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,
     );
     applyEqualizer(state, settings.eqEnabled === true, settings.eqGains, settings.eqPreamp);
   }
@@ -489,6 +500,7 @@
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
     StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
     StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
     StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
     StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
@@ -510,6 +522,7 @@
         gain: VolumeBooster.clampValue(s[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT),
         antiClip: s[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true,
         nightMode: s[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true,
+        bassCut: s[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true,
         muted: s[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true,
         eqEnabled: s[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true,
         eqGains: VolumeBooster.clampEqGains(s[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]),

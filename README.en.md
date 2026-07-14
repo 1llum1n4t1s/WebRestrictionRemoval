@@ -17,7 +17,7 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
 | 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + image download (**11 sub-features**) |
 | 🎵 **TikTok cleaner** | Hide comments / suggested accounts + image download (**3 sub-features**) |
-| 🔊 **Volume Booster** | Amplify tab audio 0–300%. Distortion guard / night mode / mute + **10-band graphic equalizer (with presets)** |
+| 🔊 **Volume Booster** | Amplify tab audio 0–300%. Distortion guard / night mode / wall-thump guard (bass cut) / mute + **10-band graphic equalizer (with presets)** |
 | 🎞️ **Video Gamma** | Adjust `<video>` brightness via slider (center 1.0 = no correction, left for darker, right for brighter) |
 | 🖥️ **Remove video black bars** | Removes letterbox/pillarbox bars on ultrawide screens (zoom or stretch mode) |
 | 🔍 **Loupe** | Cursor-following circular magnifier — perfect for pausing a video and inspecting fine details |

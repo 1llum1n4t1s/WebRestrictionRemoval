@@ -30,6 +30,7 @@
 - **`volumeBoosterLastGain`**（数値・0〜600）: 音量ブースターのスライダー位置（%）。デフォルト 100。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（高速リミッタとして動作する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterNightModeEnabled`**（真偽値）: 音量ブースターのサブトグル「ナイトモード」（夜間視聴向けにダイナミックレンジを圧縮する `DynamicsCompressor`）の有効/無効。デフォルト OFF。
+- **`volumeBoosterBassCutEnabled`**（真偽値）: 音量ブースターのサブトグル「壁ドン対策モード」（低音をカットし壁・床への振動伝達を抑える `BiquadFilterNode(type:"highpass")`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterMutedEnabled`**（真偽値）: 音量ブースターのミュートトグル。ON のときスライダー値・サブトグル設定を保持したまま `GainNode` を 0 にランプして消音します（AudioContext は維持され、解除時に高速復帰）。デフォルト OFF。
 - **`volumeBoosterEqEnabled`**（真偽値）: 音量ブースターのサブ機能「10 バンドグラフィックイコライザ」（`BiquadFilterNode(type:"peaking")` × 10 + プリアンプ `GainNode`）の有効/無効。デフォルト OFF。
 - **`volumeBoosterEqGains`**（数値配列・10 要素・各 -12〜+12 dB）: イコライザ各バンドの gain。バンド中心周波数は 32 / 64 / 125 / 250 / 500 / 1K / 2K / 4K / 8K / 16K Hz。デフォルトは全 0 dB（フラット）。

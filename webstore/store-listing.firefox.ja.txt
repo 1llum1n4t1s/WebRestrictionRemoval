@@ -47,7 +47,7 @@ Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Not
 EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`browser.storage.local` のみで外部送信ゼロ。
 
 🔹 音量ブースター
-0〜300% の音量補正・自動歪み防止・ナイトモード・ミュート・10 バンドグラフィックイコライザ (プリセット同梱)。Firefox 版は専用のページ内音声処理 (MediaElementSource) で動作し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。制約: DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）では仕様上利用できません（動画は普通に再生されます）。音声はページ内で処理され、録音・保存・外部送信は一切行いません。
+0〜300% の音量補正・自動歪み防止・ナイトモード・壁ドン対策モード（低音カット）・ミュート・10 バンドグラフィックイコライザ (プリセット同梱)。Firefox 版は専用のページ内音声処理 (MediaElementSource) で動作し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。制約: DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）では仕様上利用できません（動画は普通に再生されます）。音声はページ内で処理され、録音・保存・外部送信は一切行いません。
 
 ■ プライバシー
 すべてローカル実行・外部送信ゼロ。`browser.storage.local` のみ使用 (sync なし、クラウド同期なし)。プライバシーポリシーは docs/privacy-policy.md を参照。

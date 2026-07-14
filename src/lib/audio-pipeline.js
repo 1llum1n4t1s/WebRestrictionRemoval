@@ -49,6 +49,17 @@
   }
 
   /**
+   * BiquadFilterNode (type 固定、frequency/Q のみ可変) に preset を適用する。
+   * VolumeBooster.BASS_CUT_PRESET / BASS_CUT_BYPASS のいずれか。applyCompressorPreset と同じ思想:
+   * 切替頻度が低いため ramp 不要で `.value =` 直接代入で十分、BYPASS (frequency:0) で
+   * 素通り化してノードの disconnect/reconnect による音切れを避ける。
+   */
+  function applyFilterPreset(node, preset) {
+    node.frequency.value = preset.frequency;
+    node.Q.value = preset.Q;
+  }
+
+  /**
    * グラフィックイコライザ (10 バンド peaking + プリアンプ) を state に適用する。
    *
    * `state.preampNode` (GainNode) と `state.eqFilters` (BiquadFilterNode[10]) は caller (offscreen)
@@ -118,6 +129,7 @@
   globalThis.AudioPipeline = Object.freeze({
     dbToGain,
     applyCompressorPreset,
+    applyFilterPreset,
     applyEqualizer,
     createEqChain,
   });
