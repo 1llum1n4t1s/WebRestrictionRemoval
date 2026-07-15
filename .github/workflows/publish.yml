@@ -185,7 +185,8 @@ jobs:
             echo "skip_upload=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "::add-mask::${token_response}"
+          # add-mask は1行単位。複数行JSON全体を渡すと2行目以降が通常ログとして露出するため、
+          # 実際の秘密値であるaccess_tokenだけを登録する。
           echo "::add-mask::${access_token}"
           # Items.get で draft の crxVersion + uploadState を取得
           draft_response=$(curl -fsS \
@@ -261,10 +262,8 @@ jobs:
           fi
           # 動的取得した access_token は GitHub Actions の自動マスキング対象外のため、
           # add-mask で明示的にマスク登録して以降のログ出力でも漏洩しないようにする。
-          # token_response は access_token を含む JSON 全体。`set -x` や将来の
-          # デバッグ追加で `echo "$token_response"` が混入した場合に Bearer Token
-          # が平文ログに残るのを防ぐため、access_token と並列でマスク登録する。
-          echo "::add-mask::${token_response}"
+          # add-mask は1行単位なので、複数行のtoken_response全体は渡さない。
+          # JSONを渡すと先頭行しかマスク対象にならず、後続行のaccess_tokenが通常ログへ露出する。
           echo "::add-mask::${access_token}"
 
           # ----- ステップ 1: ZIP を Draft としてアップロード -----
