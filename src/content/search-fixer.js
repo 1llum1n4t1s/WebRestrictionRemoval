@@ -969,21 +969,23 @@
     }
     const blockedSet = new Set(blockedChannels.map((c) => c.key));
     try {
-      document
-        .querySelectorAll(
+      const renderers = document.querySelectorAll(
           "#primary ytd-item-section-renderer ytd-video-renderer, " +
           "#primary .ytd-two-column-search-results-renderer ytd-channel-renderer"
-        )
-        .forEach((renderer) => {
-          if (!renderer.isConnected) return;
-          const info = resolveChannelInfo(renderer);
-          if (!info) return;
-          if (blockedSet.has(info.key)) {
-            renderer.remove();
-            return;
-          }
-          ensureBlockButton(renderer, info);
-        });
+        );
+      // Phase 1 (read): offsetParent を含む可視判定とチャンネル情報解決を全カード分先に完了する。
+      // Phase 2 (write): remove / insert をまとめ、カード単位の layout read/write 交互実行を避ける。
+      const decisions = [];
+      for (const renderer of renderers) {
+        if (!renderer.isConnected) continue;
+        const info = resolveChannelInfo(renderer);
+        if (info) decisions.push({ renderer, info, remove: blockedSet.has(info.key) });
+      }
+      for (const decision of decisions) {
+        if (!decision.renderer.isConnected) continue;
+        if (decision.remove) decision.renderer.remove();
+        else ensureBlockButton(decision.renderer, decision.info);
+      }
     } catch {}
   }
 
@@ -991,12 +993,14 @@
   /**
    * フィードページで yt-lockup-view-model 配下の動画フィルタを実行する。
    *
-   * 判定対象は ChromeMCP 実機検証済みの 5 機能のみ:
+   * 判定対象は ChromeMCP 実機検証済みの 5 機能 + チャンネルブロックリスト:
    *   - shortsBtn: a[href*="/shorts/"] を含むカード
    *   - playlist:  playlist?list= リンク or "N 本の動画" / "N videos" バッジ
    *   - mix:       &list=RD リンク or "ミックスリスト" バッジ
    *   - watched:   .ytThumbnailOverlayProgressBarHostWatchedProgressBar overlay
    *   - live:      バッジテキストが "LIVE" / "PREMIERE" / "ライブ配信中" / "プレミア公開"
+   *   - channelBlocklist: メタデータ内のチャンネル名リンク (`resolveLockupChannelKey`) が
+   *     登録済みチャンネルキーと一致するカード（2026-07-14 追加、検索結果限定から拡張）
    *
    * verified / artist は yt-lockup-view-model 配下のセレクタ未確定で次版持ち越し。
    * shelf / cardList / course / channel / secondary / chapter / reel は検索ページ固有 DOM の
@@ -1028,6 +1032,21 @@
     "メンバー限定",
     "Members only",
   ]);
+
+  /**
+   * yt-lockup-view-model 内のチャンネル名リンクからブロックリスト照合用キーを取り出す（実機確認済み）。
+   * ホーム / フィード系の縦型カードはチャンネル名がメタデータ内で
+   * `a.ytAttributedStringLink[href="/channel/UC..."|"/@handle"]` としてリンク化されているが、
+   * 視聴ページの関連動画欄（コンパクトカード variant）ではプレーンテキストでリンクが無く
+   * 取得不能（null を返し、呼び出し側で安全に skip される）。
+   */
+  function resolveLockupChannelKey(lockup) {
+    const link = lockup.querySelector(
+      '.ytLockupMetadataViewModelMetadata a.ytAttributedStringLink[href^="/channel/"], ' +
+      '.ytLockupMetadataViewModelMetadata a.ytAttributedStringLink[href^="/@"]'
+    );
+    return SearchFixer.extractChannelKeyFromHref(link?.getAttribute("href"));
+  }
 
   function purgeFeedDistractions() {
     if (!isFeedPage()) return;
@@ -1099,7 +1118,13 @@
     const checkMix = f("mix");
     const checkWatched = f("watched");
     const checkMembersOnly = f("membersOnly");
-    if (!(checkShortsBtn || checkLive || checkPlaylist || checkMix || checkWatched || checkMembersOnly)) return;
+    // ブロックリストが空なら Set 構築 / per-lockup 照合を丸ごとスキップ（機能 ON 直後・未登録時の無駄走査防止）。
+    const checkChannelBlocklist = f("channelBlocklist") && blockedChannels.length > 0;
+    if (
+      !(checkShortsBtn || checkLive || checkPlaylist || checkMix || checkWatched ||
+        checkMembersOnly || checkChannelBlocklist)
+    ) return;
+    const blockedSet = checkChannelBlocklist ? new Set(blockedChannels.map((c) => c.key)) : null;
 
     const lockups = document.querySelectorAll("yt-lockup-view-model");
     for (const lockup of lockups) {
@@ -1117,7 +1142,11 @@
       ) {
         shouldRemove = true;
       }
-      // 3. バッジテキスト系（ミックス → プレイリスト → ライブ → メンバー限定の順で判定）
+      // 3. チャンネルブロックリスト（Set 照合は軽量なのでバッジテキスト解析より先に判定）
+      else if (checkChannelBlocklist && blockedSet.has(resolveLockupChannelKey(lockup))) {
+        shouldRemove = true;
+      }
+      // 4. バッジテキスト系（ミックス → プレイリスト → ライブ → メンバー限定の順で判定）
       else if (checkMix || checkPlaylist || checkLive || checkMembersOnly) {
         const badges = Array.from(lockup.querySelectorAll(".ytBadgeShapeHost"));
         const badgeTexts = badges.map((b) => (b.textContent ?? "").trim());

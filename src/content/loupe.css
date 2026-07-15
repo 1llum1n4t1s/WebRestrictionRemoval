@@ -12,7 +12,7 @@
   clip-path: circle(50%) !important;
   border-radius: 50% !important;
 
-  /* 背景画像は JS から inline style で設定（Blob URL） */
+  /* 背景画像は closed Shadow DOM 内の surface へ設定し、host には保持しない */
   background-repeat: no-repeat !important;
 
   /* ホイール・スクロール・クリックをページに pass-through
@@ -26,7 +26,7 @@
   cursor: none !important;
 
   /* GPU コンポジット層に乗せて 60fps 追従を保証 */
-  will-change: left, top, background-position !important;
+  will-change: left, top !important;
 
   /* レンズの細い枠線（accent 色） + 軽い影でオシャレに */
   box-shadow:

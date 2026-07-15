@@ -31,8 +31,13 @@
   /** @type {Record<string, boolean>} 個別機能フラグ（定数定義からマージ済み） */
   let features = InstagramCleaner.mergeFeatures({});
 
-  /** @type {number|null} block_videos / vanity の DOM 監視タイマー */
+  /** @type {number|null} dirty sweep の debounce タイマー */
   let domSweepTimer = null;
+  /** @type {number|null} SPA 取りこぼし防止用の低頻度 fallback タイマー */
+  let domSweepFallbackTimer = null;
+  /** @type {MutationObserver|null} React DOM 変更を dirty 化する単一 observer */
+  let domSweepObserver = null;
+  let domSweepDirty = false;
   /** @type {number|null} URL リダイレクト用ポーリングタイマー */
   let urlGuardTimer = null;
 
@@ -73,7 +78,8 @@
   function onSettingsChanged() {
     applyBodyClasses();
     if (active) {
-      startDomSweep();
+      if (hasSweepFeature()) startDomSweep();
+      else stopDomSweep();
       startUrlGuard();
     } else {
       stopDomSweep();
@@ -123,18 +129,56 @@
   }
 
   // ---------- DOM 監視（block_videos / vanity） ----------
-  // 300ms ポーリングを採用。MutationObserver は Instagram の頻繁な React 再 render で
-  // コールバック発火が爆発的に増えて CPU を食いやすいため、低頻度ポーリングのほうが安定する。
+  // React の大量 mutation は単一 observer で dirty フラグへ集約し、300ms debounce 後に1回だけ走査する。
+  // DOM 静止中の SPA 取りこぼしは5秒 fallbackで補完するが、dirty 時だけ実走査する。
+  const DOM_SWEEP_DEBOUNCE_MS = 300;
+  const DOM_SWEEP_FALLBACK_MS = 5000;
+
+  function hasSweepFeature() {
+    return f("blockVideos") || f("vanity") || f("comments");
+  }
+
+  function markDomSweepDirty() {
+    if (!active || !hasSweepFeature()) return;
+    domSweepDirty = true;
+    if (document.hidden || domSweepTimer !== null) return;
+    domSweepTimer = setTimeout(() => {
+      domSweepTimer = null;
+      if (!domSweepDirty || document.hidden || !active || !hasSweepFeature()) return;
+      domSweepDirty = false;
+      sweepOnce();
+    }, DOM_SWEEP_DEBOUNCE_MS);
+  }
+
   function startDomSweep() {
-    if (domSweepTimer !== null) return;
-    sweepOnce();
-    domSweepTimer = setInterval(sweepOnce, 300);
+    if (!domSweepObserver && document.documentElement) {
+      domSweepObserver = new MutationObserver(markDomSweepDirty);
+      domSweepObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    }
+    if (domSweepFallbackTimer === null) {
+      domSweepFallbackTimer = setInterval(markDomSweepDirty, DOM_SWEEP_FALLBACK_MS);
+    }
+    markDomSweepDirty();
   }
 
   function stopDomSweep() {
-    if (domSweepTimer === null) return;
-    clearInterval(domSweepTimer);
-    domSweepTimer = null;
+    if (domSweepObserver) {
+      domSweepObserver.disconnect();
+      domSweepObserver = null;
+    }
+    if (domSweepTimer !== null) {
+      clearTimeout(domSweepTimer);
+      domSweepTimer = null;
+    }
+    if (domSweepFallbackTimer !== null) {
+      clearInterval(domSweepFallbackTimer);
+      domSweepFallbackTimer = null;
+    }
+    domSweepDirty = false;
   }
 
   function sweepOnce() {
@@ -151,13 +195,11 @@
       stopUrlGuard();
       return;
     }
-    // 3-C5 最適化: タブが非表示のときは DOM スイープをスキップして CPU を節約。
-    // visibility 復帰時は visibilitychange イベントで強制発火しないが、次の 300ms 間隔で
-    // 自動的にスイープが走るため、最大 300ms 遅延の許容範囲内で大幅に低 CPU 化できる。
+    // タブが非表示のときは DOM スイープをスキップして CPU を節約。
+    // dirty は維持し、visibility 復帰時に debounce して処理する。
     if (document.hidden) return;
-    // P2-#14: 全 sweep 機能 OFF なら 10 個の document-wide querySelectorAll をすべてスキップする。
-    // Instagram フィードは記事 50 件 × 各 ~2000 ノード = 10万ノードを 300ms ごとに走査するので
-    // OFF 時のスキップによる省 CPU 効果は大きい。
+    // 全 sweep 機能 OFF なら document-wide querySelectorAll をすべてスキップする。
+    // Instagram フィードは記事 50 件 × 各 ~2000 ノードにもなるため、機能OFF時は走査しない。
     if (!f("blockVideos") && !f("vanity") && !f("comments")) return;
     if (f("blockVideos")) markArticlesContainingVideo();
     if (f("vanity")) markCounterButtons();
@@ -439,7 +481,7 @@
 
   function checkUrlRedirect() {
     // zombie guard (/rere レビュー B1-D3 / D-4 横展開 PATTERN SYNC):
-    // 通常は sweepOnce (300ms) が先に zombie 検知して stopUrlGuard を呼ぶが、
+    // 通常は dirty sweep / fallback が zombie 検知して stopUrlGuard を呼ぶが、
     // urlGuardTimer 単独経路で発火する race を塞ぐ保険として独立ガードを置く。
     if (!chrome.runtime?.id) {
       active = false;
@@ -470,9 +512,12 @@
     }
   }
 
-  // 非表示タブから復帰したら即時 1 回チェック（次の 300ms 周期を待たずにリダイレクト判定）。
+  // 非表示タブから復帰したら URL と dirty DOM を即時再評価する。
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && active) checkUrlRedirect();
+    if (!document.hidden && active) {
+      checkUrlRedirect();
+      markDomSweepDirty();
+    }
   });
 
   // ---------- 機能 OFF 時の cleanup ----------

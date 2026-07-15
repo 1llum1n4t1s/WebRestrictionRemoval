@@ -969,7 +969,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * 検索結果カテゴリ (search_only) の末尾に挿入する「除外中のチャンネル」管理ブロックを構築する。
+   * 動画フィルタカテゴリ (video_filter) の末尾に挿入する「除外中のチャンネル」管理ブロックを構築する。
    * データの描画は stored 読込後の renderBlockedChannels() が行う（構築時点では空）。
    */
   function _buildBlockedChannelsManager(listEl) {
@@ -1110,9 +1110,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (cat.id === "menu_ui") {
       _buildGridItemsRow(list);
     }
-    // search_only カテゴリの末尾にチャンネルブロックリスト管理ブロックを挿入。
-    // （search_only カテゴリは YouTube クリーナーのみ / データ描画は stored 読込後の renderBlockedChannels）
-    if (cat.id === "search_only") {
+    // video_filter カテゴリの末尾にチャンネルブロックリスト管理ブロックを挿入。
+    // channelBlocklist 機能はこのカテゴリに属する（2026-07-14 に search_only から移動、
+    // 検索結果限定からフィードページにも一律適用するよう拡張したため）。
+    // （video_filter カテゴリは YouTube クリーナーのみ / データ描画は stored 読込後の renderBlockedChannels）
+    if (cat.id === "video_filter") {
       _buildBlockedChannelsManager(list);
     }
     return list;

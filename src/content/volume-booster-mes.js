@@ -6,9 +6,10 @@
  * Firefox MV3 は `chrome.tabCapture` / `chrome.offscreen` 未対応のため、Chrome の
  * tabCapture → offscreen 経路が使えない。本 content script は **manifest.firefox.json のみ**
  * から全 http(s) ページの全フレームに注入され、ページ内の `<video>` / `<audio>` 要素へ
- * MediaElementSource + 15 ノードチェーン
- * (`source → preamp → eqFilters[0..9] → nightMode → gain → bassCut → antiClip → destination`、
- * offscreen.js の createAudioState と同一順序) を attach して音量を補正する。
+ * MediaElementSource + 18 処理ノードを attach する。出力は
+ * `source → dryGain → destination` と
+ * `source → preamp → eqFilters[0..9] → nightMode → gain → bassCut[0..1] → antiClip → wetGain → destination`
+ * に分岐し、wet 内の DSP 順序は offscreen.js の createAudioState と一致する。
  *
  * tabCapture と違い user gesture 不要で、popup を開かなくても storage 変化だけで
  * **全タブに自動適用** される (タブ共有バナーも出ない)。
@@ -35,24 +36,25 @@
  *   - attach 判定は三段: ① EME (`EME_HOSTS` 起動 skip + `mediaKeys != null` + `encrypted` event
  *     の事前検出)、② `readyState >= HAVE_METADATA` 待ち (DRM の encrypted event は metadata 確定
  *     までに発火するため、この gate だけで attach 前検出がほぼ確実になる)、③
- *     `VolumeBooster.classifyMesSource` (純粋関数): safe = 即 attach / probe = same-origin HEAD
- *     probe (redirect: "manual") で opaqueredirect でないことを確認してから attach
+ *     `VolumeBooster.classifyMesSource` (純粋関数): safe = 即 attach / probe = same-origin の
+ *     1 バイト Range GET (`redirect: "manual"`) で opaqueredirect でないことを確認してから attach
  *     (same-origin → cross-origin redirect 配信の opaque taint 無音化を予防) / pending = 再評価
- *     待ち / unsafe = 恒久 skip。probe は same-origin への HEAD のみで外部送信ゼロを維持する。
+ *     待ち / unsafe = 恒久 skip。probe は same-origin への 1 バイト Range GET のみで
+ *     外部送信ゼロを維持する。
  *   - `encrypted` event が attach 後に来ても **detach しない** (close しても復帰しないため無意味。
  *     DRM 区間は仕様上無音になるが、graph を維持すれば非 DRM ソースへの切替で自然回復する)。
  *   - master OFF / UNITY release も **detach せずニュートラル設定へ ramp して bypass 維持**。
  *   - orphan 化 (拡張リロード) 時も **close せず bypass 維持** (close すると再生中の音が死ぬ。
- *     bypass なら音はそのまま流れ続ける)。なお Firefox は拡張リロード時に content script sandbox
- *     ごと破棄するため本 guard が走らないケースがあり、その場合 boost 中タブは最後の設定のまま
- *     残る (ページ再読み込みで解消される既知の制約)。
+ *     bypass なら音はそのまま流れ続ける)。Firefox が content script sandbox ごと破棄して guard が
+ *     走らない場合にも、dry/wet 出力 AudioParam へ予約した lease 期限後の automation が
+ *     AudioContext 側で実行され、最大 20 秒程度で旧 graph は自動的に bypass へ戻る。
  *   - `ctx.close()` するのは: DOM から除去され 30 秒再挿入されなかった要素 (資源解放。即 close
  *     すると remove → 後で reinsert するプレーヤーで再挿入後が無音のままになるため猶予を置く) と
  *     pagehide (persisted=false) のみ。
  *   - AudioContext が autoplay policy で suspended のままだと attach 済み要素が無音になるため、
  *     attach 直後 + play / volumechange + document の pointerdown / keydown (user activation
  *     発生点) で resume を試行する。
- *   - storage.onChanged で音量関連 8 キーの変化を監視し、即座に全 state へ反映する
+ *   - storage.onChanged で音量関連 9 キーの変化を監視し、即座に全 state へ反映する
  *     (popup → storage 直書きが唯一のトリガー。メッセージ購読はしない)。
  *   - MutationObserver は「新規 media の発見」(active 時のみ) と「DOM 除去要素の猶予付き解放」の
  *     2 責務。**attach 済み要素が残っている間は master OFF でも切断しない** (切断すると bypass
@@ -83,8 +85,9 @@
   // attach 済み要素の反復用レジストリ (Set<WeakRef<HTMLMediaElement>>)。
   // WeakMap は反復できないため、設定適用 / bypass / teardown はここを回す。
   const ATTACHED = new Set();
-  // EME 検出 / MES attach 例外で attach 不可と判定した要素 (恒久スキップ)。
+  // EME 検出済み要素（期待される安全回避）と、実装上の attach 失敗要素を分離して管理する。
   const EME_DETECTED = new WeakSet();
+  const ATTACH_REJECTED = new WeakSet();
   // attach 試行中フラグ (probe の await 越し二重 attach の race 防止)。
   const ATTACHING = new WeakSet();
   // watchMedia 済み要素 (per-element listener の二重登録防止)。teardown で new WeakSet() に差し替え。
@@ -95,6 +98,38 @@
   let gestureResumeAttached = false;
   // orphan 化を 1 回検知したら以後の処理を全て止める (CPU 浪費ゼロ化)。
   let orphaned = false;
+  let tearingDown = false;
+  // 同一 reason code はページ内で一度だけ出し、大量 media 要素があるページでもログを汚染しない。
+  const REPORTED_DIAGNOSTICS = new Set();
+
+  function reportDiagnosticOnce(reasonCode) {
+    if (REPORTED_DIAGNOSTICS.has(reasonCode)) return;
+    REPORTED_DIAGNOSTICS.add(reasonCode);
+    // URL・要素・例外本文は出力せず、個人情報を含まない固定 reason code のみに限定する。
+    console.warn("[WebViewingAssist] Firefox MES diagnostic:", reasonCode);
+  }
+
+  function resumeContext(ctx) {
+    try {
+      ctx.resume().catch(() => reportDiagnosticOnce("mes-resume-failed"));
+    } catch {
+      reportDiagnosticOnce("mes-resume-failed");
+    }
+  }
+
+  function isRuntimeAvailable() {
+    try {
+      return Boolean(chrome.runtime?.id)
+        && chrome.runtime.getURL("").startsWith("moz-extension://");
+    } catch {
+      return false;
+    }
+  }
+
+  function isInvalidContextError(error) {
+    if (!isRuntimeAvailable()) return true;
+    return /extension context invalidated/i.test(String(error?.message ?? ""));
+  }
 
   // same-origin redirect probe の結果キャッシュ (currentSrc → attach 可否)。
   const PROBE_CACHE = new Map();
@@ -104,10 +139,24 @@
   const DETACH_GRACE_MS = 30_000;
   // detached だが再生継続中の要素の close 延長回数上限 (30s × 10 = 約 5 分)。
   // 再挿入プレーヤー対策で猶予延長する設計だが、上限が無いと detached+再生継続の異常系サイトで
-  // AudioContext + 15 ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
+  // AudioContext + 18処理ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
   const DETACH_MAX_RETRIES = 10;
+  // background tabのtimer throttlingへ余裕を持たせつつ、sandbox消滅後の旧設定残留を短く抑える。
+  // 20秒を超えてtickが遅延した場合はいったんdryへ安全退避し、次の生存確認成功時にwetへ復帰する。
+  const LEASE_HEARTBEAT_MS = 5_000;
+  const LEASE_TIMEOUT_SECONDS = 20;
+  let leaseHeartbeatTimer = null;
+  let leaseHeartbeatGeneration = 0;
+  let leaseHeartbeatCheckInFlight = false;
 
-  const { applyCompressorPreset, applyFilterPreset, applyEqualizer, createEqChain } = AudioPipeline;
+  const {
+    applyCompressorPreset,
+    applyFilterPreset,
+    createBassCutChain,
+    applyEqualizer,
+    createEqChain,
+    connectAudioGraph,
+  } = AudioPipeline;
 
   /** @type {{enabled: boolean, gain: number, antiClip: boolean, nightMode: boolean, bassCut: boolean, muted: boolean, eqEnabled: boolean, eqGains: number[], eqPreamp: number}} */
   let currentSettings = {
@@ -161,7 +210,7 @@
   }
 
   // ============================================================
-  // AudioContext + 14 ノードチェーン構築
+  // AudioContext + 16 DSPノード + dry/wet出力2ノード構築
   // ============================================================
 
   /**
@@ -180,7 +229,11 @@
    */
   function attachToMedia(media) {
     if (!(media instanceof HTMLMediaElement)) return;
-    if (STATE.has(media) || EME_DETECTED.has(media) || ATTACHING.has(media)) return;
+    if (!isRuntimeAvailable()) {
+      teardownOrphan();
+      return;
+    }
+    if (STATE.has(media) || EME_DETECTED.has(media) || ATTACH_REJECTED.has(media) || ATTACHING.has(media)) return;
     if (media.mediaKeys != null) {
       EME_DETECTED.add(media);
       return;
@@ -199,7 +252,7 @@
     if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     // 一時停止中の要素はここでは attach しない。多数のプレビュー動画/音声を抱えるフィード
     // (SNS のタイムライン等) で、まだ再生されてもいない全要素に AudioContext + EQ チェーン
-    // (14 ノード) を割り当てるのは資源浪費であり、Firefox では captured 状態のまま維持コストだけ
+    // (18処理ノード) を割り当てるのは資源浪費であり、Firefox では captured 状態のまま維持コストだけ
     // かかり続ける。watchMedia が登録する play イベントが実際の再生開始時に evaluateMedia 経由で
     // 再試行するため、ここで skip しても取りこぼしはない。
     if (media.paused) return;
@@ -264,11 +317,15 @@
   }
 
   /**
-   * MediaElementSource + 14 ノードチェーンを構築する (安全性判定済みの要素のみ)。
-   * attach 例外 = サイト側 player が自前で MES 済み等。区別できないので恒久スキップ。
+   * MediaElementSource + 16 DSPノード + dry/wet出力GainNodeを構築する。
+   * attach / DSP 例外は期待される EME 回避と分け、固定 reason code で一度だけ記録する。
    */
   function doAttach(media) {
-    if (STATE.has(media) || EME_DETECTED.has(media) || ATTACHING.has(media)) return;
+    if (!isRuntimeAvailable()) {
+      teardownOrphan();
+      return;
+    }
+    if (STATE.has(media) || EME_DETECTED.has(media) || ATTACH_REJECTED.has(media) || ATTACHING.has(media)) return;
     if (media.mediaKeys != null) {
       EME_DETECTED.add(media);
       return;
@@ -282,25 +339,42 @@
     // 「無処理だが音は出る」状態に逃がす (source が null なら capture 未成立 = close 安全)。
     let ctx = null;
     let source = null;
+    let dryBypassConnected = false;
+    let failureStage = "prepare";
     try {
       ctx = new AudioContext();
       const eqChain = createEqChain(ctx);
       const nightModeNode = ctx.createDynamicsCompressor();
       const gainNode = ctx.createGain();
-      const bassCutNode = ctx.createBiquadFilter();
-      bassCutNode.type = "highpass";
+      const bassCutChain = createBassCutChain(ctx);
       const antiClipNode = ctx.createDynamicsCompressor();
+      const dryGainNode = ctx.createGain();
+      const wetGainNode = ctx.createGain();
+      // capture直後から安全なbypassが成立するよう、接続前の初期値はdry=1 / wet=0。
+      dryGainNode.gain.value = 1;
+      wetGainNode.gain.value = 0;
       applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
-      applyFilterPreset(bassCutNode, VolumeBooster.BASS_CUT_BYPASS);
       applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
+      failureStage = "capture";
       source = ctx.createMediaElementSource(media);
-      // ノード順序は offscreen.js createAudioState と同一 (EQ → ナイトモード → gain → 壁ドン対策 → anti-clip)
-      source.connect(eqChain.head);
-      eqChain.tail.connect(nightModeNode);
-      nightModeNode.connect(gainNode);
-      gainNode.connect(bassCutNode);
-      bassCutNode.connect(antiClipNode);
-      antiClipNode.connect(ctx.destination);
+      // dry経路を先に確立する。以降のDSP接続が失敗してもcloseせず音を維持できる。
+      failureStage = "connect";
+      source.connect(dryGainNode);
+      dryGainNode.connect(ctx.destination);
+      dryBypassConnected = true;
+      // wet内のノード順序はoffscreen.jsと同一。最終出力だけwetGainへ接続し、lease失効時は
+      // dry=1 / wet=0へcrossfadeしてDSP全体を確実にbypassする。
+      connectAudioGraph({
+        source,
+        eqChain,
+        nightModeNode,
+        gainNode,
+        bassCutChain,
+        antiClipNode,
+        destination: wetGainNode,
+      });
+      wetGainNode.connect(ctx.destination);
+      failureStage = "register";
 
       /** @type {AudioState} */
       const state = {
@@ -310,8 +384,10 @@
         preampNode: eqChain.preampNode,
         eqFilters: eqChain.eqFilters,
         nightModeNode,
-        bassCutNode,
+        bassCutNodes: bassCutChain.bassCutNodes,
         antiClipNode,
+        dryGainNode,
+        wetGainNode,
         lastSetPercent: VolumeBooster.UNITY,
         ref: new WeakRef(media),
       };
@@ -320,19 +396,40 @@
 
       // autoplay policy で suspended のままだと attach 済み要素が無音になる。
       // ここで失敗しても play / volumechange / user gesture の再試行経路がある。
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      if (ctx.state === "suspended") resumeContext(ctx);
 
-      applyStateSettings(state, currentSettings);
+      failureStage = "settings";
+      applyStateSettings(state, currentSettings, true);
+      syncLeaseHeartbeat();
     } catch {
-      // MES attach 失敗 = サイト側 player が自前で MES 済み等。安全側で恒久スキップ (音は普通に出る)。
-      EME_DETECTED.add(media);
+      // EME の期待された回避とは分離し、実装例外として固定 reason code で一度だけ可視化する。
+      const reasonCode = {
+        prepare: "mes-dsp-prepare-before-capture-failed",
+        capture: "mes-attach-capture-failed",
+        connect: "mes-dsp-connect-after-capture-failed",
+        register: "mes-state-register-failed",
+        settings: "mes-settings-apply-failed",
+      }[failureStage];
+      reportDiagnosticOnce(reasonCode);
+      // graph 接続完了後の登録・設定失敗では直結を足すと二重出力になるため、現状の
+      // ニュートラル graph を維持する。capture 後かつ graph 未完成の失敗だけを直結で救済する。
+      if (failureStage === "register") {
+        ATTACH_REJECTED.add(media);
+        return;
+      }
+      if (failureStage === "settings") return;
+      ATTACH_REJECTED.add(media);
       if (ctx && source) {
-        // capture 成立後の失敗: close せず直結 bypass で音を生かす (close は復帰不能なため)。
-        try {
-          source.connect(ctx.destination);
-        } catch {
-          // 直結 bypass も失敗した場合、それ以上の破壊的操作 (close 等) は行わない。
+        if (!dryBypassConnected) {
+          // capture 成立後の失敗: close せず直結 bypass で音を生かす (close は復帰不能なため)。
+          try {
+            source.connect(ctx.destination);
+          } catch {
+            // 直結 bypass も失敗した場合、それ以上の破壊的操作 (close 等) は行わない。
+            reportDiagnosticOnce("mes-bypass-connect-failed");
+          }
         }
+        // dry bypass 確立後に wet graph だけ失敗した場合も ctx を生かす。
       } else if (ctx) {
         // capture 未成立 (source null): close しても media は影響を受けないため安全。
         ctx.close().catch(() => {});
@@ -343,12 +440,62 @@
   }
 
   /**
-   * gain ramp 三点セット + compressor preset + EQ 適用 (offscreen.js volumeSetGain と同じ更新則)。
-   * 既存ノードのプロパティを書き換えるだけなので AudioContext 再構築は不要、音切れなし。
+   * AudioParamの現在値を時刻nowへ固定して既存automationを取消し、targetへ短くrampする。
+   * lease有効時は、その後ろへ期限時刻からneutralへ戻るrampを予約する。
+   *
+   * イベント順は常に
+   * `anchor/cancel(now) → target ramp(now) → neutral ramp(deadline) → neutral固定(deadline+5τ)`。
+   * heartbeatはdeadline前に同じ順序で予約を置き直すため、正常時のtargetがneutral予約で
+   * 上書きされない。sandbox/timer消滅時だけ最後のneutral予約がAudioContext timeline上で発火する。
    */
-  function applyStateSettings(state, settings) {
+  function scheduleLeasedParam(param, target, neutral, now, withLease) {
+    try {
+      if (typeof param.cancelAndHoldAtTime === "function") {
+        param.cancelAndHoldAtTime(now);
+      } else {
+        const held = param.value;
+        param.cancelScheduledValues(now);
+        param.setValueAtTime(held, now);
+      }
+      param.setTargetAtTime(target, now, VolumeBooster.RAMP_TIME_CONSTANT);
+      if (withLease) {
+        const deadline = now + LEASE_TIMEOUT_SECONDS;
+        param.setTargetAtTime(
+          neutral,
+          deadline,
+          VolumeBooster.RAMP_TIME_CONSTANT,
+        );
+        // setTargetAtTime は漸近するため、5 time constants 後に完全な 0/1 へ固定する。
+        param.setValueAtTime(
+          neutral,
+          deadline + VolumeBooster.RAMP_TIME_CONSTANT * 5,
+        );
+      }
+      return true;
+    } catch {
+      reportDiagnosticOnce("mes-lease-automation-failed");
+      return false;
+    }
+  }
+
+  function scheduleOutputMix(state, active, withLease) {
+    const now = state.ctx.currentTime;
+    // dry/wetは同一time constantで逆方向へ動かし、通常適用・lease失効とも短いcrossfadeにする。
+    // 並列経路が混ざるのはramp中だけで、定常時は必ず片側gain=0となる。
+    const dryOk = scheduleLeasedParam(state.dryGainNode.gain, active ? 0 : 1, 1, now, withLease);
+    const wetOk = scheduleLeasedParam(state.wetGainNode.gain, active ? 1 : 0, 0, now, withLease);
+    if (!dryOk || !wetOk) {
+      // 片側だけ予約されると二重出力または無音になるため、両側を即時bypassへ倒す。
+      scheduleLeasedParam(state.dryGainNode.gain, 1, 1, now, false);
+      scheduleLeasedParam(state.wetGainNode.gain, 0, 0, now, false);
+    }
+  }
+
+  function applyStateSettings(state, settings, withLease = false) {
+    // neutral化はDSP parameter更新より先に出力crossfadeを予約する。後続更新が例外でも旧wet設定は残らない。
+    if (!withLease) scheduleOutputMix(state, false, false);
     const clamped = VolumeBooster.clampValue(settings.gain);
-    const targetGain = settings.muted ? 0 : VolumeBooster.percentToGain(clamped);
+    const targetGain = settings.muted === true ? 0 : VolumeBooster.percentToGain(clamped);
     const now = state.ctx.currentTime;
     state.gainNode.gain.cancelScheduledValues(now);
     state.gainNode.gain.setValueAtTime(state.gainNode.gain.value, now);
@@ -363,10 +510,98 @@
       settings.antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
     );
     applyFilterPreset(
-      state.bassCutNode,
+      state.bassCutNodes,
       settings.bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,
     );
     applyEqualizer(state, settings.eqEnabled === true, settings.eqGains, settings.eqPreamp);
+    // active化はDSP設定完了後にwetへcrossfadeし、未設定graphが一瞬聞こえるのを防ぐ。
+    if (withLease) scheduleOutputMix(state, true, true);
+  }
+
+  function applyStateSettingsSafely(state, settings, withLease) {
+    try {
+      applyStateSettings(state, settings, withLease);
+    } catch {
+      reportDiagnosticOnce("mes-settings-apply-failed");
+      scheduleOutputMix(state, false, false);
+    }
+  }
+
+  function stopLeaseHeartbeat() {
+    leaseHeartbeatGeneration += 1;
+    leaseHeartbeatCheckInFlight = false;
+    if (leaseHeartbeatTimer !== null) {
+      clearInterval(leaseHeartbeatTimer);
+      leaseHeartbeatTimer = null;
+    }
+  }
+
+  function refreshAudioParamLeases() {
+    if (orphaned || !isRuntimeAvailable()) {
+      stopLeaseHeartbeat();
+      if (!orphaned) teardownOrphan();
+      return;
+    }
+    if (leaseHeartbeatCheckInFlight) return;
+    if (!isActive() || ATTACHED.size === 0) {
+      stopLeaseHeartbeat();
+      return;
+    }
+    // runtime.id/getURLだけでなくstorage APIの成功まで確認してからleaseを延長する。
+    // 旧sandboxのtimerだけが生き残った場合、API失敗時に予約を更新せず安全側のneutral化へ委ねる。
+    const requestGeneration = leaseHeartbeatGeneration;
+    leaseHeartbeatCheckInFlight = true;
+    try {
+      chrome.storage.local.get([StorageKeys.VOLUME_BOOSTER_ENABLED], (stored) => {
+        let runtimeError = null;
+        try {
+          runtimeError = chrome.runtime.lastError ?? null;
+        } catch {
+          runtimeError = new Error("extension context invalidated");
+        }
+        if (requestGeneration !== leaseHeartbeatGeneration) return;
+        leaseHeartbeatCheckInFlight = false;
+        if (runtimeError || !isRuntimeAvailable()) {
+          if (isInvalidContextError(runtimeError)) {
+            teardownOrphan();
+          } else {
+            reportDiagnosticOnce("mes-lease-heartbeat-failed");
+            stopLeaseHeartbeat();
+          }
+          return;
+        }
+        if (stored?.[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) {
+          currentSettings = { ...currentSettings, enabled: false };
+          stopLeaseHeartbeat();
+          forEachAttached((media, state) => applyStateSettingsSafely(state, NEUTRAL_SETTINGS, false));
+          return;
+        }
+        if (!isActive() || ATTACHED.size === 0) {
+          stopLeaseHeartbeat();
+          return;
+        }
+        forEachAttached((media, state) => scheduleOutputMix(state, true, true));
+        if (ATTACHED.size === 0) stopLeaseHeartbeat();
+      });
+    } catch (error) {
+      if (requestGeneration !== leaseHeartbeatGeneration) return;
+      leaseHeartbeatCheckInFlight = false;
+      if (isInvalidContextError(error)) {
+        teardownOrphan();
+      } else {
+        reportDiagnosticOnce("mes-lease-heartbeat-failed");
+        stopLeaseHeartbeat();
+      }
+    }
+  }
+
+  function syncLeaseHeartbeat() {
+    if (orphaned || tearingDown || !isActive() || ATTACHED.size === 0) {
+      stopLeaseHeartbeat();
+      return;
+    }
+    if (leaseHeartbeatTimer !== null) return;
+    leaseHeartbeatTimer = setInterval(refreshAudioParamLeases, LEASE_HEARTBEAT_MS);
   }
 
   /**
@@ -385,6 +620,7 @@
     } catch {
       // close 失敗は致命的でない
     }
+    syncLeaseHeartbeat();
     // 非アクティブ + attach 残ゼロなら observer も不要になる
     if (!isActive() && ATTACHED.size === 0) disconnectObserver();
   }
@@ -416,13 +652,13 @@
     media.addEventListener("loadstart", () => evaluateMedia(media), { signal });
     media.addEventListener("play", () => {
       const state = STATE.get(media);
-      if (state && state.ctx.state === "suspended") state.ctx.resume().catch(() => {});
+      if (state && state.ctx.state === "suspended") resumeContext(state.ctx);
       evaluateMedia(media);
     }, { signal });
     // サイト UI での unmute (volumechange) も resume 契機にする (muted autoplay → 手動 unmute 対策)
     media.addEventListener("volumechange", () => {
       const state = STATE.get(media);
-      if (state && state.ctx.state === "suspended") state.ctx.resume().catch(() => {});
+      if (state && state.ctx.state === "suspended") resumeContext(state.ctx);
     }, { signal });
     // EME 事前検出: encrypted は metadata 処理中に発火するため、attach 前なら恒久スキップに
     // できる (これが本命の防御)。attach 後に発火した場合は何もしない — Firefox では detach
@@ -439,7 +675,7 @@
   function resumeSuspendedContexts() {
     if (orphaned) return;
     forEachAttached((media, state) => {
-      if (state.ctx.state === "suspended") state.ctx.resume().catch(() => {});
+      if (state.ctx.state === "suspended") resumeContext(state.ctx);
     });
   }
 
@@ -473,22 +709,27 @@
    */
   function scanAndApply() {
     if (orphaned) return;
+    // 設定適用前に旧heartbeat callbackを失効させ、古いtargetのlease再予約を防ぐ。
+    stopLeaseHeartbeat();
     if (!isActive()) {
+      // 将来leaseを取消し即neutralへ戻す。
       // 既 attach 要素は detach (ctx.close) ではなくニュートラル設定へ ramp して bypass 維持。
       // Firefox では close しても直接出力に復帰しないため、close は「音を殺す」操作にしかならない。
       // 一度も attach していないページでは何も起きない (完全無処理 = デフォルト OFF 方針)。
-      forEachAttached((media, state) => applyStateSettings(state, NEUTRAL_SETTINGS));
+      forEachAttached((media, state) => applyStateSettingsSafely(state, NEUTRAL_SETTINGS, false));
       // observer は「DOM 除去要素の猶予付き解放」のため attach 済みが残る限り維持する
       if (ATTACHED.size === 0) disconnectObserver();
       return;
     }
     ensureObserver();
     ensureGestureResumeListeners();
-    forEachAttached((media, state) => applyStateSettings(state, currentSettings));
+    // active設定適用と同じ同期処理内で必ずleaseを予約し、次heartbeatまでの無保証区間を作らない。
+    forEachAttached((media, state) => applyStateSettingsSafely(state, currentSettings, true));
     for (const media of document.querySelectorAll("video, audio")) {
       watchMedia(media);
       if (!STATE.has(media)) attachToMedia(media);
     }
+    syncLeaseHeartbeat();
   }
 
   // ============================================================
@@ -510,31 +751,46 @@
 
   function loadAndApply() {
     if (orphaned) return;
-    if (!chrome.runtime?.id) {
+    if (!isRuntimeAvailable()) {
       teardownOrphan();
       return;
     }
-    chrome.storage.local.get(WATCHED_KEYS, (s) => {
-      if (chrome.runtime.lastError) return;
-      if (orphaned) return;
-      currentSettings = {
-        enabled: s[StorageKeys.VOLUME_BOOSTER_ENABLED] === true,
-        gain: VolumeBooster.clampValue(s[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT),
-        antiClip: s[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true,
-        nightMode: s[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true,
-        bassCut: s[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true,
-        muted: s[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true,
-        eqEnabled: s[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true,
-        eqGains: VolumeBooster.clampEqGains(s[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]),
-        eqPreamp: VolumeBooster.clampEqPreamp(s[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]),
-      };
-      scanAndApply();
-    });
+    try {
+      chrome.storage.local.get(WATCHED_KEYS, (s) => {
+        let runtimeError = null;
+        try {
+          runtimeError = chrome.runtime.lastError ?? null;
+        } catch {
+          runtimeError = new Error("extension context invalidated");
+        }
+        if (runtimeError || !isRuntimeAvailable()) {
+          if (isInvalidContextError(runtimeError)) teardownOrphan();
+          else reportDiagnosticOnce("mes-storage-read-failed");
+          return;
+        }
+        if (orphaned) return;
+        currentSettings = {
+          enabled: s[StorageKeys.VOLUME_BOOSTER_ENABLED] === true,
+          gain: VolumeBooster.clampValue(s[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT),
+          antiClip: s[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true,
+          nightMode: s[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true,
+          bassCut: s[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true,
+          muted: s[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true,
+          eqEnabled: s[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true,
+          eqGains: VolumeBooster.clampEqGains(s[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]),
+          eqPreamp: VolumeBooster.clampEqPreamp(s[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]),
+        };
+        scanAndApply();
+      });
+    } catch (error) {
+      if (isInvalidContextError(error)) teardownOrphan();
+      else reportDiagnosticOnce("mes-storage-read-failed");
+    }
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (orphaned) return;
-    if (!chrome.runtime?.id) {
+    if (!isRuntimeAvailable()) {
       teardownOrphan();
       return;
     }
@@ -579,7 +835,7 @@
   function ensureObserver() {
     if (observer) return;
     observer = new MutationObserver((records) => {
-      if (!chrome.runtime?.id) {
+      if (!isRuntimeAvailable()) {
         teardownOrphan();
         return;
       }
@@ -628,25 +884,32 @@
    *   false = graph を bypass 維持 (orphan 化: close すると再生中の音が死ぬため)。
    */
   function teardownAll(closeContexts) {
-    disconnectObserver();
-    listenerCtrl.abort();
-    listenerCtrl = new AbortController();
-    gestureResumeAttached = false;
-    watchedMedia = new WeakSet();
-    forEachAttached((media, state) => {
-      if (closeContexts) {
-        detachFromMedia(media);
-      } else {
-        applyStateSettings(state, NEUTRAL_SETTINGS);
-      }
-    });
+    tearingDown = true;
+    stopLeaseHeartbeat();
+    try {
+      disconnectObserver();
+      listenerCtrl.abort();
+      listenerCtrl = new AbortController();
+      gestureResumeAttached = false;
+      watchedMedia = new WeakSet();
+      forEachAttached((media, state) => {
+        if (closeContexts) {
+          detachFromMedia(media);
+        } else {
+          applyStateSettingsSafely(state, NEUTRAL_SETTINGS, false);
+        }
+      });
+    } finally {
+      tearingDown = false;
+    }
   }
 
   /**
    * 拡張機能リロード後の orphan 化検知時の teardown。graph は bypass 維持で残す
    * (Firefox では ctx.close しても音声が直接出力に復帰しない = close は音を殺すだけのため)。
+   * guardが走らずsandboxごと消えた場合も、最後のlease予約がdry=1 / wet=0へ戻す。
    * 後継 content script の attach は MES 二重 attach 例外 → 恒久スキップに落ちるが、
-   * 音は bypass graph 経由で流れ続ける (ページ再読み込みで完全復旧)。
+   * 旧graphは期限後bypassとなり音は流れ続ける (ページ再読み込みで完全復旧)。
    */
   function teardownOrphan() {
     if (orphaned) return;
@@ -655,9 +918,12 @@
   }
 
   window.addEventListener("pagehide", (event) => {
-    // bfcache 凍結 (persisted=true) は listener / state ごと凍結され CPU 消費ゼロ + 復帰で
-    // そのまま継続できるので温存する (video-fill.js と同じ方針)。実破棄のみ資源解放。
-    if (event.persisted) return;
+    // bfcache凍結中はheartbeatを止め、AudioContextが進む環境でもlease期限でneutralへ倒す。
+    // 復帰時はloadAndApplyが最新設定を再適用し、leaseも同じ同期処理内で再開する。
+    if (event.persisted) {
+      stopLeaseHeartbeat();
+      return;
+    }
     teardownAll(true);
   });
 

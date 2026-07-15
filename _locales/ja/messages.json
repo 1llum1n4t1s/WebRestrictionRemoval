@@ -300,7 +300,7 @@
   "feat_sf_channel_label": { "message": "チャンネル紹介カード" },
   "feat_sf_channel_desc": { "message": "検索結果に挟まる「このチャンネル」紹介カード (ytd-channel-renderer) を除去" },
   "feat_sf_channelBlocklist_label": { "message": "チャンネルブロックリスト" },
-  "feat_sf_channelBlocklist_desc": { "message": "登録したチャンネルの動画を検索結果から除去（ホームの公式「このチャンネルは表示しない」の検索結果版）。検索結果のチャンネル名横に表示される 🚫 ボタンで登録、下の一覧から解除" },
+  "feat_sf_channelBlocklist_desc": { "message": "登録したチャンネルの動画を検索結果・ホーム・登録チャンネル・急上昇など YouTube 全体から除去（ホームの公式「このチャンネルは表示しない」の拡張版）。登録は検索結果のチャンネル名横に表示される 🚫 ボタンから、解除は下の一覧から行う" },
   "sfBlockChannelBtnTitle": { "message": "このチャンネルを検索結果に表示しない" },
   "sfBlockedChannelsTitle": { "message": "除外中のチャンネル" },
   "sfBlockedChannelsEmpty": { "message": "除外中のチャンネルはありません。YouTube 検索結果のチャンネル名横に表示される 🚫 ボタンから登録できます。" },

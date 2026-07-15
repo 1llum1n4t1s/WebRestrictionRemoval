@@ -438,47 +438,90 @@
    *   - hostname を ImageDownloader.ALLOWED_HOSTS で検証 → 各サイトの正規 CDN 以外は弾く
    *     （攻撃者注入 `<img>` 経由の代理 fetch 防止）
    *
-   * 並列化 (/rere レビュー C-#4):
+   * 優先順位付き並列化 (/rere レビュー C-#4 / C2-001):
    *   - 旧実装は for 逐次 fetch で最悪 N × RTT 直列。srcset が 3〜5 解像度のとき体感 1〜3 秒遅延。
-   *   - 新実装は全候補を `Promise.allSettled` で同時発射し、最遅 RTT 1 つだけ待つ。
-   *   - **「最大解像度優先」セマンティクスは維持**: 並列発射後、配列順 (= 解像度降順) で先頭の
-   *     fulfilled を採用する。`Promise.any` だと「最速応答」になり低解像度が混入しうるので NG。
+   *   - 全候補を同時発射するが、成功候補より高優先の成否が確定した時点で勝者を返し、
+   *     それより低優先の fetch/blob は個別 AbortController で中止する。
+   *   - **「最大解像度優先」セマンティクスは維持**: 高優先候補が pending の間は低優先候補が
+   *     先に成功しても確定しない。`Promise.any` のような最速応答優先にはしない。
    */
   async function fetchFirstAvailable(urls, signal) {
     const allowed = urls.filter((u) => u && ImageDownloader.isAllowedFetchUrl(host, u));
     if (!allowed.length) return null;
-    const results = await Promise.allSettled(
-      allowed.map(async (url) => {
-        // ユーザー OFF abort signal と個別 timeout を AbortSignal.any で合成。
+    const controllers = allowed.map(() => new AbortController());
+    const states = allowed.map(() => ({ status: "pending", value: null }));
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const makeAbortError = () => {
+        const err = new Error("aborted");
+        err.name = "AbortError";
+        return err;
+      };
+      const finish = (value, error = null) => {
+        if (settled) return;
+        settled = true;
+        if (signal) signal.removeEventListener("abort", onExternalAbort);
+        if (error) reject(error);
+        else resolve(value);
+      };
+      const onExternalAbort = () => {
+        controllers.forEach((controller) => controller.abort());
+        finish(null, makeAbortError());
+      };
+      const evaluate = () => {
+        if (settled) return;
+        if (signal?.aborted) {
+          onExternalAbort();
+          return;
+        }
+
+        const firstPossible = states.findIndex((state) => state.status !== "rejected");
+        if (firstPossible === -1) {
+          finish(null);
+          return;
+        }
+
+        // 先頭から見て最初の成功候補より後ろは、以後どの結果でも勝者にならない。
+        const firstFulfilled = states.findIndex((state) => state.status === "fulfilled");
+        if (firstFulfilled !== -1) {
+          for (let i = firstFulfilled + 1; i < controllers.length; i++) controllers[i].abort();
+        }
+        // 先行候補が全て失敗済みなら最大解像度の勝者が確定。
+        if (states[firstPossible].status === "fulfilled") {
+          finish(states[firstPossible].value);
+        }
+      };
+
+      if (signal?.aborted) {
+        onExternalAbort();
+        return;
+      }
+      if (signal) signal.addEventListener("abort", onExternalAbort, { once: true });
+
+      allowed.forEach((url, index) => {
         const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-        const combinedSignal = signal
-          ? AbortSignal.any([signal, timeoutSignal])
-          : timeoutSignal;
-        const res = await fetch(url, {
+        const combinedSignals = [controllers[index].signal, timeoutSignal];
+        if (signal) combinedSignals.push(signal);
+        fetch(url, {
           credentials: "omit",
           referrerPolicy: "no-referrer",
           redirect: "manual",
-          signal: combinedSignal,
-        });
-        if (res.type === "opaqueredirect") throw new Error("opaqueredirect");
-        if (!res.ok) throw new Error("not ok: " + res.status);
-        const blob = await res.blob();
-        if (!blob || blob.size === 0) throw new Error("empty blob");
-        return { url, blob };
-      })
-    );
-    // 全 fetch 完了後にユーザー abort が立っていれば throw して上位に伝播
-    // (onDownloadClick の signal.aborted ガードと整合)。
-    if (signal && signal.aborted) {
-      const err = new Error("aborted");
-      err.name = "AbortError";
-      throw err;
-    }
-    // 配列順 = 解像度降順なので、先頭の fulfilled を採用 = 最大解像度優先を維持
-    for (const r of results) {
-      if (r.status === "fulfilled") return r.value;
-    }
-    return null;
+          signal: AbortSignal.any(combinedSignals),
+        })
+          .then(async (res) => {
+            if (res.type === "opaqueredirect") throw new Error("opaqueredirect");
+            if (!res.ok) throw new Error("not ok: " + res.status);
+            const blob = await res.blob();
+            if (!blob || blob.size === 0) throw new Error("empty blob");
+            states[index] = { status: "fulfilled", value: { url, blob } };
+          })
+          .catch(() => {
+            states[index] = { status: "rejected", value: null };
+          })
+          .finally(evaluate);
+      });
+    });
   }
 
   function triggerBlobDownload(blob, filename) {

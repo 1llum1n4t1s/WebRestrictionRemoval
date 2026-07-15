@@ -1,8 +1,8 @@
 # Vuora 拡張機能パッケージ生成スクリプト
 # 使い方:
-#   powershell -ExecutionPolicy Bypass -File zip.ps1                    # Chrome + Firefox 両方
-#   powershell -ExecutionPolicy Bypass -File zip.ps1 -Target chrome     # Chrome のみ
-#   powershell -ExecutionPolicy Bypass -File zip.ps1 -Target firefox    # Firefox のみ
+#   pwsh -NoProfile -File zip.ps1                    # Chrome + Firefox 両方
+#   pwsh -NoProfile -File zip.ps1 -Target chrome     # Chrome のみ
+#   pwsh -NoProfile -File zip.ps1 -Target firefox    # Firefox のみ
 #
 # Firefox 版は manifest.firefox.json を manifest.json として同梱し、xpi 拡張子で出力する。
 # 音量ブースター関連 (offscreen / tabCapture) は Firefox MV3 未対応のため除外されている。
@@ -17,8 +17,9 @@ $ErrorActionPreference = "Stop"
 Write-Host "拡張機能パッケージを生成中... (Target: $Target)" -ForegroundColor Cyan
 Write-Host ""
 
-# スクリプトのディレクトリをカレントディレクトリに設定
-$scriptDir = Split-Path -Parent ($MyInvocation.MyCommand.Path ?? $PSCommandPath ?? $PWD)
+# スクリプトのディレクトリをカレントディレクトリに設定。
+# `-File` 実行では MyCommand.Path が必ず得られ、Windows PowerShell 5.1 でも解釈できる。
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ($scriptDir) { Set-Location $scriptDir }
 
 # 依存インストール & アイコン生成

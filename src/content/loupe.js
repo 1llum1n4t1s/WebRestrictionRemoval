@@ -69,7 +69,9 @@
   /** 現在のレンズ直径 px */
   let currentSize = Loupe.SIZE_DEFAULT;
 
-  /** レンズ DOM 要素 */
+  /** ページ DOM に置くレンズホスト（closed Shadow DOM の外側。Blob URL は保持しない） */
+  let lensHostEl = null;
+  /** closed Shadow DOM 内の背景描画要素 */
   let lensEl = null;
 
   /** 倍率バッジ要素 */
@@ -92,14 +94,41 @@
    * 初期位置は画面外 (-9999) で、mousemove が来てから可視位置に更新される。
    */
   function buildLensDOM() {
-    if (lensEl) destroyLensDOM();
+    if (lensHostEl) destroyLensDOM();
 
-    lensEl = document.createElement("div");
-    lensEl.id = Loupe.LENS_ID;
-    lensEl.className = Loupe.CLASS_LENS;
+    lensHostEl = document.createElement("div");
+    lensHostEl.id = Loupe.LENS_ID;
+    lensHostEl.className = Loupe.CLASS_LENS;
     // 初期位置は画面外。mousemove で更新される。
-    lensEl.style.left = "-9999px";
-    lensEl.style.top = "-9999px";
+    lensHostEl.style.left = "-9999px";
+    lensHostEl.style.top = "-9999px";
+
+    // captureVisibleTab の Blob URL は closed Shadow DOM 内の要素にだけ設定する。
+    // ページ JS から取得できる host の属性 / inline style には画像 URL を一切置かない。
+    const shadow = lensHostEl.attachShadow({ mode: "closed" });
+    const style = document.createElement("style");
+    style.textContent = `
+      .surface { position:absolute; inset:0; overflow:hidden; border-radius:50%;
+        background-repeat:no-repeat; pointer-events:none; will-change:background-position; }
+      .${Loupe.CLASS_CROSSHAIR} { position:absolute; top:50%; left:50%;
+        transform:translate(-50%,-50%); width:22px; height:22px; pointer-events:none;
+        background:radial-gradient(circle,rgba(255,255,255,.25) 0%,rgba(255,255,255,0) 60%);
+        border-radius:50%; }
+      .${Loupe.CLASS_CROSSHAIR}::before, .${Loupe.CLASS_CROSSHAIR}::after {
+        content:""; position:absolute; background:rgba(255,255,255,.75); pointer-events:none;
+        box-shadow:0 0 2px rgba(0,0,0,.5); }
+      .${Loupe.CLASS_CROSSHAIR}::before { width:100%; height:1px; top:50%; left:0;
+        transform:translateY(-50%); }
+      .${Loupe.CLASS_CROSSHAIR}::after { width:1px; height:100%; top:0; left:50%;
+        transform:translateX(-50%); }
+      .${Loupe.CLASS_BADGE} { position:absolute; bottom:12%; right:14%; padding:3px 8px;
+        border-radius:10px; background:rgba(0,0,0,.55); color:rgba(255,255,255,.95);
+        font:600 11px/1 system-ui,-apple-system,"Segoe UI","IBM Plex Sans JP",sans-serif;
+        letter-spacing:.04em; text-shadow:0 1px 2px rgba(0,0,0,.6); pointer-events:none;
+        user-select:none; white-space:nowrap; }
+    `;
+    lensEl = document.createElement("div");
+    lensEl.className = "surface";
 
     // クロスヘア（中央 +字）
     const crosshair = document.createElement("div");
@@ -113,12 +142,14 @@
 
     lensEl.appendChild(crosshair);
     lensEl.appendChild(badgeEl);
+    shadow.appendChild(style);
+    shadow.appendChild(lensEl);
 
     applyLensSize();
     applyBackgroundImage();
     applyBadgeText();
 
-    document.body.appendChild(lensEl);
+    document.body.appendChild(lensHostEl);
   }
 
   /**
@@ -127,9 +158,9 @@
    * (暗黙の連鎖呼び出しを避けて副作用を明示化)。
    */
   function applyLensSize() {
-    if (!lensEl) return;
-    lensEl.style.width = `${currentSize}px`;
-    lensEl.style.height = `${currentSize}px`;
+    if (!lensHostEl) return;
+    lensHostEl.style.width = `${currentSize}px`;
+    lensHostEl.style.height = `${currentSize}px`;
   }
 
   /** background-image (Blob URL) + background-size を更新 */
@@ -155,20 +186,21 @@
   /** レンズ位置と background-position を更新（rAF callback で呼ばれる） */
   function applyLensPosition() {
     rafId = null;
-    if (!lensEl || !isActive) return;
+    if (!lensHostEl || !lensEl || !isActive) return;
 
     const r = currentSize / 2;
     const pos = Loupe.computeLensPosition(lastMouseX, lastMouseY, currentSize);
     const bg = Loupe.computeBackgroundPosition(lastMouseX, lastMouseY, currentZoom, r);
 
-    lensEl.style.left = `${pos.left}px`;
-    lensEl.style.top = `${pos.top}px`;
+    lensHostEl.style.left = `${pos.left}px`;
+    lensHostEl.style.top = `${pos.top}px`;
     lensEl.style.backgroundPosition = `${bg.bgX}px ${bg.bgY}px`;
   }
 
   function destroyLensDOM() {
-    if (lensEl) {
-      lensEl.remove();
+    if (lensHostEl) {
+      lensHostEl.remove();
+      lensHostEl = null;
       lensEl = null;
       badgeEl = null;
     }

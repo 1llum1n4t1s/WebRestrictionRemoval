@@ -18,13 +18,13 @@
  * tabId → AudioState の Map。AudioContext は close するまで音声を増幅し続けるため
  * release 時に必ず close する。
  *
- * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNode → antiClipNode → destination）:
+ * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → destination）:
  *   - ctx: AudioContext
  *   - gainNode: GainNode（ユーザースライダーの 0-300% ブースト）
  *   - preampNode: GainNode（イコライザのプリアンプ、dB→倍率。EQ OFF 時は unity 1.0）
  *   - eqFilters: BiquadFilterNode[10]（10 バンド peaking イコライザ、EQ OFF 時は全 0dB でフラット = 素通り）
  *   - nightModeNode: DynamicsCompressorNode（ゲーム配信向けナイトモード圧縮、OFF 時はバイパス設定）
- *   - bassCutNode: BiquadFilterNode（壁ドン対策モード、highpass で低音カット。OFF 時はカットオフ 0Hz で素通り）
+ *   - bassCutNodes: BiquadFilterNode[2]（壁ドン対策モード、highpass 2段で24dB/oct。OFF 時はカットオフ 0Hz で素通り）
  *   - antiClipNode: DynamicsCompressorNode（自動歪み防止 / リミッタ、OFF 時はバイパス設定）
  *   - stream: MediaStream
  *
@@ -32,17 +32,27 @@
  * それぞれ unity gain / 0dB / 0Hz / ratio:1 のバイパス設定にする (ノード抜き差しによる無音・プチノイズを回避)。
  */
 const audioStates = new Map();
-/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, preampNode: GainNode, eqFilters: BiquadFilterNode[], nightModeNode: DynamicsCompressorNode, bassCutNode: BiquadFilterNode, antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
+/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, preampNode: GainNode, eqFilters: BiquadFilterNode[], nightModeNode: DynamicsCompressorNode, bassCutNodes: BiquadFilterNode[], antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
 const audioInitPromises = new Map();
+// RELEASE_ALL 開始時に世代を進め、開始前の getUserMedia 初期化が後から state を復活させるのを防ぐ。
+let audioReleaseGeneration = 0;
+let activeReleaseAllCount = 0;
 
 /**
  * DSP コア関数は src/lib/audio-pipeline.js に集約 (globalThis.AudioPipeline)。
  * 旧 MES 経路 (volume-booster.js) との物理コピー drift 解消が当初の抽出動機。MES 経路 +
  * 自動音量正規化の撤去後は compressor preset 適用 / filter preset 適用 / イコライザ適用 /
- * dB→gain 変換 / EQ チェーン構築が残る。createEqChain は preampNode + 10 バンド BiquadFilterNode を
- * 構築して直列接続済みのチェーン (head/tail 付き) を返す (EQ DSP の構築と更新を同一モジュールに集約)。
+ * dB→gain 変換 / bass cut・EQ チェーン構築が残る。各 create*Chain は直列接続済みのチェーン
+ * (head/tail 付き) を返すため、caller 側に DSP 段数や接続知識を重複させない。
  */
-const { applyCompressorPreset, applyFilterPreset, applyEqualizer, createEqChain } = AudioPipeline;
+const {
+  applyCompressorPreset,
+  applyFilterPreset,
+  createBassCutChain,
+  applyEqualizer,
+  createEqChain,
+  connectAudioGraph,
+} = AudioPipeline;
 
 /**
  * 指定タブの GainNode 値と compressor 設定を反映する。未登録なら getUserMedia → AudioContext を構築する。
@@ -64,6 +74,9 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
     if (!Number.isInteger(tabId) || tabId <= 0) {
       return { ok: false, error: "invalid-tab-id" };
     }
+    if (activeReleaseAllCount > 0) {
+      return { ok: false, error: "release-all-in-progress" };
+    }
 
     let state = audioStates.get(tabId);
     const pending = audioInitPromises.get(tabId);
@@ -76,6 +89,9 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
     }
 
     if (!state) {
+      if (activeReleaseAllCount > 0) {
+        return { ok: false, error: "release-all-in-progress" };
+      }
       if (!streamId || typeof streamId !== "string") {
         return { ok: false, error: "invalid-stream-id" };
       }
@@ -91,7 +107,7 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       // chromeMediaSource: "tab" で getUserMedia するパターン。
       // 旧 Chrome は mandatory ネスト形式のみを受理し、新 Chrome はフラット形式 + mandatory の両方を
       // 受理するが、tab capture の場合は実質 mandatory ネストが必須なので mandatory を先に試す。
-      const initPromise = createAudioState(tabId, streamId);
+      const initPromise = createAudioState(tabId, streamId, audioReleaseGeneration);
       audioInitPromises.set(tabId, initPromise);
       try {
         state = await initPromise;
@@ -126,7 +142,7 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
     );
     applyFilterPreset(
-      state.bassCutNode,
+      state.bassCutNodes,
       bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,
     );
     applyEqualizer(state, eqEnabled, eqGains, eqPreamp);
@@ -136,7 +152,7 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
   }
 }
 
-async function createAudioState(tabId, streamId) {
+async function createAudioState(tabId, streamId, initGeneration) {
   let stream = null;
   try {
     try {
@@ -164,8 +180,8 @@ async function createAudioState(tabId, streamId) {
     // suspended のままだと tabCapture stream は流れているのに destination から音が出ず、
     // タブ音実体がミュート状態に陥り YouTube プレイヤー側もそれを検出してミュート UI を出す。
     // background → offscreen の sendMessage 連鎖は user gesture を保持しているため
-    // resume() は同期的に成功するはず。失敗時は無視（後続の音声処理で
-    // 自然に resume されるケースもある）。
+    // resume() は同期的に成功するはず。失敗時は診断ログを残し、後続の音声処理による
+    // 自然な resume に委ねる。
     if (ctx.state === "suspended") {
       try { await ctx.resume(); } catch (err) {
         // /rere F-001: AudioContext.resume() 失敗は無音化の主因の 1 つ。可視化必須。
@@ -183,18 +199,19 @@ async function createAudioState(tabId, streamId) {
     // 抑える、というマスタリング順の配置（ブースト後段に置くことで、boost 率に関わらず最終出力の
     // 低音が確実にカットされる）。
     const nightModeNode = ctx.createDynamicsCompressor();
-    const bassCutNode = ctx.createBiquadFilter();
-    bassCutNode.type = "highpass";
+    const bassCutChain = createBassCutChain(ctx);
     const antiClipNode = ctx.createDynamicsCompressor();
     applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
-    applyFilterPreset(bassCutNode, VolumeBooster.BASS_CUT_BYPASS);
     applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
-    source.connect(eqChain.head);
-    eqChain.tail.connect(nightModeNode);
-    nightModeNode.connect(gainNode);
-    gainNode.connect(bassCutNode);
-    bassCutNode.connect(antiClipNode);
-    antiClipNode.connect(ctx.destination);
+    connectAudioGraph({
+      source,
+      eqChain,
+      nightModeNode,
+      gainNode,
+      bassCutChain,
+      antiClipNode,
+      destination: ctx.destination,
+    });
 
     // lastSetPercent は volumeGetGain の応答値として使う（gain.value はランプ中で
     // ターゲット値と一致しないため、ユーザーが意図したスライダー位置を保持する）。
@@ -204,7 +221,7 @@ async function createAudioState(tabId, streamId) {
       preampNode: eqChain.preampNode,
       eqFilters: eqChain.eqFilters,
       nightModeNode,
-      bassCutNode,
+      bassCutNodes: bassCutChain.bassCutNodes,
       antiClipNode,
       stream,
       lastSetPercent: VolumeBooster.UNITY,
@@ -213,15 +230,15 @@ async function createAudioState(tabId, streamId) {
     // 後発 resolve した state は audioStates に登録しても release 経路がない。
     // cleanedUp flag をチェックして、立っていれば明示的に stream tracks stop + AudioContext close
     // してから throw する (WebRTC spec: track.stop() 明示呼出が OS リソース解放に必須)。
-    if (cleanedUp) {
+    if (cleanedUp || initGeneration !== audioReleaseGeneration) {
       try { stream.getTracks().forEach((t) => t.stop()); } catch {}
-      try { ctx.close(); } catch {}
-      throw new Error("cleanup-during-init");
+      try { await ctx.close(); } catch {}
+      throw new Error(cleanedUp ? "cleanup-during-init" : "release-all-during-init");
     }
     audioStates.set(tabId, state);
     return state;
   } catch (err) {
-    // /rere F-001: 6 ノードチェーン構築失敗の可視化（getUserMedia / AudioContext / connect 失敗）
+    // /rere F-001: DSP ノードチェーン構築失敗の可視化（getUserMedia / AudioContext / connect 失敗）
     console.warn("[WebViewingAssist] createAudioState failed for tab", tabId, ":", err);
     stream?.getTracks().forEach((t) => t.stop());
     throw err;
@@ -262,17 +279,24 @@ async function volumeReleaseTab(tabId) {
 }
 
 async function volumeReleaseAll() {
-  const ids = Array.from(audioStates.keys());
-  // /rere B2-020 修正: 旧実装は Promise.all で集約していたが volumeReleaseTab 内の try/catch で
-  // 全失敗が握りつぶされていた。allSettled で個別失敗を可視化して観測性を確保する。
-  // Map から audioStates.delete は volumeReleaseTab 側で行うため、最終状態は同一。
-  const results = await Promise.allSettled(ids.map((id) => volumeReleaseTab(id)));
-  for (let i = 0; i < results.length; i++) {
-    if (results[i].status === "rejected") {
-      console.warn("[WebViewingAssist] volumeReleaseAll: tab", ids[i], "failed:", results[i].reason);
+  audioReleaseGeneration += 1;
+  activeReleaseAllCount += 1;
+  try {
+    // state 登録済みだけでなく getUserMedia 初期化中のタブも対象にする。
+    const ids = Array.from(new Set([...audioStates.keys(), ...audioInitPromises.keys()]));
+    // /rere B2-020 修正: 旧実装は Promise.all で集約していたが volumeReleaseTab 内の try/catch で
+    // 全失敗が握りつぶされていた。allSettled で個別失敗を可視化して観測性を確保する。
+    // Map から audioStates.delete は volumeReleaseTab 側で行うため、最終状態は同一。
+    const results = await Promise.allSettled(ids.map((id) => volumeReleaseTab(id)));
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === "rejected") {
+        console.warn("[WebViewingAssist] volumeReleaseAll: tab", ids[i], "failed:", results[i].reason);
+      }
     }
+    return { ok: true };
+  } finally {
+    activeReleaseAllCount -= 1;
   }
-  return { ok: true };
 }
 
 function volumeQueryActive() {

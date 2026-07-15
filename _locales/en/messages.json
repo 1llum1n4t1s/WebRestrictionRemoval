@@ -301,7 +301,7 @@
   "feat_sf_channel_label": { "message": "Channel intro card" },
   "feat_sf_channel_desc": { "message": "Remove the \"This channel\" intro cards (ytd-channel-renderer) injected into search results." },
   "feat_sf_channelBlocklist_label": { "message": "Channel blocklist" },
-  "feat_sf_channelBlocklist_desc": { "message": "Remove videos from blocked channels in search results (a search-results version of Home's official \"Don't recommend channel\"). Register with the 🚫 button next to a channel name in search results; unblock from the list below." },
+  "feat_sf_channelBlocklist_desc": { "message": "Remove videos from blocked channels across all of YouTube — search results, home, subscriptions, trending, and more (an extended version of Home's official \"Don't recommend channel\"). Register with the 🚫 button next to a channel name in search results; unblock from the list below." },
   "sfBlockChannelBtnTitle": { "message": "Hide this channel from search results" },
   "sfBlockedChannelsTitle": { "message": "Blocked channels" },
   "sfBlockedChannelsEmpty": { "message": "No blocked channels yet. Use the 🚫 button next to a channel name in YouTube search results to block one." },

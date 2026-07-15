@@ -431,14 +431,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   // P2-#19: タブが閉じられた時点でブースト中状態は確実に終了するため、ローカルキャッシュから即削除。
   // in-flight の set 処理が後から完了した場合も、removedVolumeBoosterTabIds で再登録を弾く。
   boostedTabIds.delete(tabId);
-  chrome.runtime
-    .sendMessage({
-      target: Offscreen.TARGET,
-      action: Offscreen.ACTION_VOLUME_RELEASE_TAB,
-      tabId,
-    })
-    .catch(() => {})
-    .finally(() => scheduleOffscreenClose());
+  // 同一タブの in-flight SET より後ろへ解放を並べ、古いSETの遅着によるstate復活を防ぐ。
+  releaseVolumeBoosterTab(tabId).catch(() => {});
 });
 
 // ---------- 音量ブースター: マスター ON 時にタブ切替で自動適用 ----------
@@ -530,20 +524,38 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-async function releaseAllVolumeBoosterTabs() {
+function releaseAllVolumeBoosterTabs() {
+  volumeReleaseGeneration += 1;
+  // 前回releaseの後ろへ今回の本体を連結し、実処理開始前にbarrier参照を同期更新する。
+  // これ以降に受信した新世代SETは、このcurrent完了まで進めない。
+  const previousBarrier = volumeReleaseBarrier;
+  const currentBarrier = previousBarrier
+    .catch(() => {})
+    .then(() => releaseAllVolumeBoosterTabsDirect())
+    .catch(() => {});
+  volumeReleaseBarrier = currentBarrier;
+  return currentBarrier;
+}
+
+async function releaseAllVolumeBoosterTabsDirect() {
   // /rere B2-002 修正: SW 再起動直後 hydrate IIFE 未完了 → offscreenState='CLOSED' のまま
   // この関数に到達する race window があった。hydrate 完了を待ってから判定する
   // ことで offscreen 残存 AudioContext のリークを防ぐ。
   await offscreenHydratePromise.catch(() => {});
-  const tabIds = [...boostedTabIds];
-  if (tabIds.length > 0) {
-    await Promise.all(tabIds.map((id) => releaseVolumeBoosterTab(id).catch(() => {})));
-  } else if (offscreenState !== "CLOSED") {
-    // SW 再起動後 boostedTabIds は空だが offscreen に残存 AudioContext があるかもしれない
-    await chrome.runtime
-      .sendMessage({ target: Offscreen.TARGET, action: Offscreen.ACTION_VOLUME_RELEASE_ALL })
-      .catch(() => {});
-    scheduleOffscreenClose();
+  // boostedTabIds は SW 再起動後に部分集合になり得るため、個別 release の対象一覧には使わない。
+  // offscreen の RELEASE_ALL を正として、既知・未知を問わず全 state と初期化中 state を解放する。
+  boostedTabIds.clear();
+  try {
+    const res = await chrome.runtime.sendMessage({
+      target: Offscreen.TARGET,
+      action: Offscreen.ACTION_VOLUME_RELEASE_ALL,
+    });
+    // hydrate の getContexts だけが一時失敗していた場合も、応答があれば実体は OPEN と確定する。
+    if (res?.ok && offscreenState === "CLOSED") offscreenState = "OPEN";
+  } catch {
+    // offscreen 不在なら解放対象も存在しない。
+  } finally {
+    if (offscreenState !== "CLOSED") scheduleOffscreenClose();
   }
 }
 
@@ -810,6 +822,13 @@ let offscreenState = "CLOSED";
 let offscreenCreatingPromise = null;
 let offscreenClosingPromise = null;
 let offscreenIdleTimer = null;
+// SET_GAIN / 再スケジュールのたびに進め、タイマー発火後の await 中 callback も失効させる。
+let offscreenCloseGeneration = 0;
+let activeVolumeSetGainCount = 0;
+// master OFF より前に開始した非同期 SET_GAIN が、全解放後に state を再生成するのを防ぐ。
+let volumeReleaseGeneration = 0;
+// global RELEASE_ALLを直列化し、新世代SETも解放完了後まで待機させるbarrier。
+let volumeReleaseBarrier = Promise.resolve();
 // scheduleOffscreenClose の連続再スケジュール回数（soft tracking 用）。
 // `isVolumeBoosterActive()` が true である限り再スケジュールを継続する設計のため、
 // このカウンタは無限増加防止のリセット境界として機能する（実際の close 停止はしない）。
@@ -828,6 +847,22 @@ let offscreenCloseRescheduleCount = 0;
 const boostedTabIds = new Set();
 /** @type {Set<number>} setVolumeBoosterGain の in-flight 完了より先に閉じられたタブ ID */
 const removedVolumeBoosterTabIds = new Set();
+/** @type {Map<number, Promise<unknown>>} タブ単位のSET/RELEASE受信順キュー */
+const volumeTabOperationQueues = new Map();
+
+function enqueueVolumeTabOperation(tabId, operation) {
+  const previous = volumeTabOperationQueues.get(tabId) ?? Promise.resolve();
+  const current = previous.catch(() => {}).then(operation);
+  volumeTabOperationQueues.set(tabId, current);
+  const cleanup = () => {
+    // 後続operationが登録済みなら、そのPromiseを誤って削除しない。
+    if (volumeTabOperationQueues.get(tabId) === current) {
+      volumeTabOperationQueues.delete(tabId);
+    }
+  };
+  current.then(cleanup, cleanup);
+  return current;
+}
 
 function rememberRemovedVolumeBoosterTab(tabId) {
   if (!Number.isInteger(tabId) || tabId <= 0) return;
@@ -839,7 +874,8 @@ function rememberRemovedVolumeBoosterTab(tabId) {
 
 async function markVolumeBoosterTabActive(tabId) {
   if (removedVolumeBoosterTabIds.has(tabId)) {
-    await releaseVolumeBoosterTab(tabId).catch(() => {});
+    // SET operation自身のキュー内なので、queued wrapperへ戻すと自己deadlockする。
+    await releaseVolumeBoosterTabDirect(tabId).catch(() => {});
     return false;
   }
   boostedTabIds.add(tabId);
@@ -916,18 +952,33 @@ async function ensureOffscreenDocument() {
   // __FIREFOX_STRIP_END__
 }
 
-function scheduleOffscreenClose() {
+function invalidateOffscreenCloseCycle() {
+  offscreenCloseGeneration += 1;
   if (offscreenIdleTimer) clearTimeout(offscreenIdleTimer);
+  offscreenIdleTimer = null;
+}
+
+function scheduleOffscreenClose() {
+  invalidateOffscreenCloseCycle();
+  const closeGeneration = offscreenCloseGeneration;
   offscreenIdleTimer = setTimeout(async () => {
+    if (closeGeneration !== offscreenCloseGeneration) return;
     offscreenIdleTimer = null;
     if (!chrome.offscreen) return;
     // __FIREFOX_STRIP_BEGIN__: Firefox MV3 は chrome.offscreen.closeDocument 未対応のため build 時に削除
     // EC-6 対策: CREATING 中はもちろん、CLOSING 中の二重呼び出しもガードする
     // （await `isVolumeBoosterActive` の最中に別タイマーが発火するケースで二重 close を防ぐ）。
     if (offscreenState === "CREATING" || offscreenState === "CLOSING") return;
+    if (activeVolumeSetGainCount > 0) {
+      scheduleOffscreenClose();
+      return;
+    }
     // 音量ブースト中タブが残っていれば close を再延期する。close すると AudioContext が
     // 解放されて音が一瞬で 100% に戻ってしまうため、ユーザー体験的に NG。
-    if (await isVolumeBoosterActive()) {
+    const active = await isVolumeBoosterActive();
+    // await 中に SET_GAIN や別の schedule が走った callback は、新しい AudioContext を閉じない。
+    if (closeGeneration !== offscreenCloseGeneration) return;
+    if (active) {
       // PERF-11 対策: 通信失敗で `isVolumeBoosterActive` が常に true を返す状況でも、
       // 強制 close はブースト中の音を断つリスクがあるため避けて再スケジュールを継続する。
       // カウンタは「連続再スケジュール回数」を soft tracking する目的で保持し、
@@ -951,6 +1002,7 @@ function scheduleOffscreenClose() {
       scheduleOffscreenClose();
       return;
     }
+    if (closeGeneration !== offscreenCloseGeneration) return;
     // ここまで到達 = boost なし → カウンタリセットして close へ
     offscreenCloseRescheduleCount = 0;
     offscreenState = "CLOSING";
@@ -1051,6 +1103,49 @@ async function isVolumeBoosterActive() {
  * 設定（compressor は ratio:1、filter は frequency:0）にするため、トグル切替時に音切れは発生しない。
  */
 async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp) {
+  activeVolumeSetGainCount += 1;
+  invalidateOffscreenCloseCycle();
+  const operationGeneration = volumeReleaseGeneration;
+  try {
+    return await enqueueVolumeTabOperation(
+      tabId,
+      () => setVolumeBoosterGainImpl(
+        tabId,
+        gain,
+        antiClip,
+        nightMode,
+        bassCut,
+        muted,
+        eqEnabled,
+        eqGains,
+        eqPreamp,
+        operationGeneration,
+      ),
+    );
+  } finally {
+    activeVolumeSetGainCount -= 1;
+    scheduleOffscreenClose();
+  }
+}
+
+async function setVolumeBoosterGainImpl(
+  tabId,
+  gain,
+  antiClip,
+  nightMode,
+  bassCut,
+  muted,
+  eqEnabled,
+  eqGains,
+  eqPreamp,
+  operationGeneration,
+) {
+  // 呼出時点で公開されている最新global releaseを待つ。待機中にさらにreleaseが始まった場合も、
+  // 直後の世代照合でこのoperationを失効させるため、新しいbarrierと並走しない。
+  await volumeReleaseBarrier.catch(() => {});
+  if (operationGeneration !== volumeReleaseGeneration) {
+    return { ok: false, error: "release-all-during-set" };
+  }
   // P2-#13: tabId は popup origin（SenderCheck.isFromPopup で検証済み）から渡されるが、
   // popup の中では `getActiveHttpTab()` 経由で active tab の id を入れて送ってくる。
   // popup CSP (`script-src 'self'`) で外部スクリプトが popup 内で動くことは事実上不可能なため、
@@ -1082,17 +1177,23 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, m
       eqEnabled: eqActiveFlag,
     })
   ) {
-    await releaseVolumeBoosterTab(tabId).catch(() => {});
+    await releaseVolumeBoosterTabDirect(tabId).catch(() => {});
     return { ok: true, gain: VolumeBooster.UNITY };
   }
 
   const ready = await ensureOffscreenDocument();
   if (!ready) return { ok: false, error: "offscreen-unavailable" };
+  if (operationGeneration !== volumeReleaseGeneration) {
+    return { ok: false, error: "release-all-during-set" };
+  }
 
   // 既存 AudioContext があれば streamId は不要（getMediaStreamId をスキップ）。
   // ensureOffscreenDocument が ready=true を返したので offscreen の存在は確定している。
   // getContexts 重複呼び出しを避けるため Direct 版を使う (2-C1 修正)。
   const existing = await getVolumeBoosterGainDirect(tabId);
+  if (operationGeneration !== volumeReleaseGeneration) {
+    return { ok: false, error: "release-all-during-set" };
+  }
   if (Number.isFinite(existing?.gain)) {
     let res;
     try {
@@ -1115,22 +1216,23 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, m
       // silent failure を防ぐため診断ログを残す（実害は fresh 経路で自己修復されるため軽微）。
       console.warn("[WebViewingAssist] existing-path sendMessage failed, falling through:", err);
     }
+    if (operationGeneration !== volumeReleaseGeneration) {
+      if (res?.ok) await releaseVolumeBoosterTabDirect(tabId).catch(() => {});
+      return { ok: false, error: "release-all-during-set" };
+    }
     // EC-2 対策: getVolumeBoosterGain で「state あり」と判定後に audioStates が削除される
     // race（onRemoved や release 経路と同時操作）に対して、offscreen が
     // `invalid-stream-id` を返した場合は fresh 取得経路に自動フォールスルーして自己修復する。
-    // P2-#11: scheduleOffscreenClose は呼出側で 1 回だけ。fresh 取得経路にフォールスルーすると
-    // 末尾 finally で呼ばれるので、ここでは早期 return パスでのみ明示的に呼ぶ。
+    // scheduleOffscreenClose は外側 wrapper の finally で全 return 経路を一括処理する。
     if (res?.ok) {
       // P2-#19: 成功確認後にローカルキャッシュへ追加（既存 state 経路ではすでに add 済みかもしれないが冪等）。
       await markVolumeBoosterTabActive(tabId);
-      scheduleOffscreenClose();
       return res;
     }
     if (res && res.error !== "invalid-stream-id") {
-      scheduleOffscreenClose();
       return res;
     }
-    // res が undefined or invalid-stream-id → fresh 取得経路へ（末尾 finally で 1 回 schedule）
+    // res が undefined or invalid-stream-id → fresh 取得経路へ
   }
 
   // 新規接続: tabCapture から streamId を取得。
@@ -1153,6 +1255,10 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, m
   }
   // __FIREFOX_STRIP_END__
 
+  if (operationGeneration !== volumeReleaseGeneration) {
+    return { ok: false, error: "release-all-during-set" };
+  }
+
   try {
     const res = await chrome.runtime.sendMessage({
       target: Offscreen.TARGET,
@@ -1168,6 +1274,10 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, m
       eqGains,
       eqPreamp,
     });
+    if (operationGeneration !== volumeReleaseGeneration) {
+      if (res?.ok) await releaseVolumeBoosterTabDirect(tabId).catch(() => {});
+      return { ok: false, error: "release-all-during-set" };
+    }
     // P2-#19: 成功時のみローカルキャッシュに登録。失敗（offscreen エラー / no-response）の場合は
     // ブースト中状態にならないため Set には追加しない。
     // /rere B1-006 修正: markVolumeBoosterTabActive が false (= getMediaStreamId 完了後に
@@ -1184,8 +1294,6 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, m
     return res ?? { ok: false, error: "no-response" };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };
-  } finally {
-    scheduleOffscreenClose();
   }
 }
 
@@ -1216,6 +1324,13 @@ async function getVolumeBoosterGainDirect(tabId) {
  * 諦めず sendMessage に fall-through し、受信側不在なら catch で握りつぶす。
  */
 async function releaseVolumeBoosterTab(tabId) {
+  if (!Number.isInteger(tabId) || tabId <= 0) return { ok: true };
+  return await enqueueVolumeTabOperation(tabId, () => releaseVolumeBoosterTabDirect(tabId));
+}
+
+// タブキュー内部専用。SET operation内からqueued wrapperを再入すると自己deadlockするため、
+// UNITY・stale cleanup・タブ閉鎖検出からはこちらを呼ぶ。
+async function releaseVolumeBoosterTabDirect(tabId) {
   if (!Number.isInteger(tabId) || tabId <= 0) return { ok: true };
   // P2-#19: release 経路に入った時点でローカルキャッシュからは確実に外す。offscreen 側の
   // sendMessage が失敗しても次回 setVolumeBoosterGain で正常に再 add されるため、楽観削除で OK。

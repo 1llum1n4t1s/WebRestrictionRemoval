@@ -1,7 +1,7 @@
 # Runbook — Vuora
 
 本拡張機能のユーザー報告対応・リリースロールバック・Day-2 Ops 障害対応の初動ガイド。
-詳細な実装パターンは [CLAUDE.md](../CLAUDE.md) の「Important Patterns」を参照。
+詳細な実装パターンは [AGENTS.md](../AGENTS.md) の「Important Patterns」を参照。
 
 > 本ドキュメントは /rere レビュー F-002 で初版作成。「障害が起きたとき気づける／切り分けられる／復旧できる」観点を集約。
 
@@ -27,7 +27,7 @@
    - 対象タブ URL / Chrome / Edge / Firefox のバージョン
    - 音量ブースタートグル ON か / スライダー値 / サブトグルの状態
    - DevTools (background SW) の console ログ。`[WebViewingAssist]` で grep してもらう
-   - chrome://extensions の「Service Worker」リンクから offscreen.html のログも取得（`[WebViewingAssist]` prefix）
+   - `chrome://inspect/#other` から `chrome-extension://<id>/src/offscreen/offscreen.html` を開き、offscreen のログも取得（`[WebViewingAssist]` prefix）
 2. 切り分けフロー:
    - `AudioContext.resume() failed` のログあり → autoplay policy / user gesture 経路喪失
    - `createAudioState failed` のログあり → getUserMedia / chromeMediaSourceId 失効
@@ -38,7 +38,7 @@
 
 ### 2-B. DOM 機能停止
 
-各サイトの DOM 変更が原因の可能性。CLAUDE.md の各機能セクションで使用 selector を確認:
+各サイトの DOM 変更が原因の可能性。[AGENTS.md](../AGENTS.md) の各機能セクションで使用 selector を確認:
 - YouTube: `ytd-channel-renderer` / `ytd-live-chat-frame` / `ytd-shelf-renderer` 等
 - Instagram: aria-label / role / data-pagelet ベース（難読化 class 非依存）
 - TikTok: `[class*="RightPanelContainer"]` / `[class*="DivCommentListContainer"]`
@@ -46,16 +46,17 @@
 
 確認手順:
 1. ユーザーから「該当ページのスクリーンショット」 + 「DevTools Elements パネルの該当 selector のスクリーンショット」を取得
-2. Instagram は `instagram-cleaner.js:117-125` の selector mismatch detector で `[WebViewingAssist] Instagram selector mismatch...` が出ているか確認
+2. Instagram は `src/content/instagram-cleaner.js` の `runI18nWatchdog()` で selector mismatch の警告が出ているか確認
 3. Amazon / TikTok / search-fixer は現状 selector mismatch detector 未実装（/rere レビュー F-003、将来横展開予定）
-4. selector 修正は CLAUDE.md の各機能セクション + 過去のコミット履歴を参照
+4. selector 修正は [AGENTS.md](../AGENTS.md) の各機能セクション + 過去のコミット履歴を参照
 
 ### 2-C. リリース失敗（publish.yml）
 
 - Chrome publish が fail だが Firefox publish が success → Chrome 側のみ問題（`if: success() || failure()` で独立実行）
-- Chrome 側エラー `ITEM_NOT_UPDATABLE` → 同 version の重複 upload。`/vava` で次の version へ bump して push 再実行
+- Chrome で upload 成功後に Publish API が fail → 同じ release workflow を再実行。pre-flight が同 version の再 upload だけを skip し、Submit for review を再試行する
+- Chrome 側エラー `ITEM_NOT_UPDATABLE` → pre-flight の Items.get が失敗または同 version を識別できず、重複 upload に進んだ可能性。pre-flight ログの `crxVersion` / `uploadState` を確認する
 - Firefox 側エラー `Version * already exists` → 同様
-- 同 version 重複検知は publish.yml では汎用 fail として扱っており、エラーメッセージから判別する（/rere F-005 余地）
+- Chrome の pre-flight は同 version を検知すると upload のみ skip し、review 申請済みか Items.get では確定できないため Publish API は保守的に毎回実行する
 
 #### ロールバック手順
 
@@ -67,7 +68,7 @@
 - AMO Developer Hub → アドオン管理 → 「version 履歴」から旧 version を再公開
 - AMO は version 取り下げが手動申請
 
-**マイグレーション不可逆性に注意**: `background.js` の `onInstalled` (line 65-74) で legacy storage key を `chrome.storage.local.remove` するため、**新 version で削除された key は旧 version に戻しても復元されない**。例:
+**マイグレーション不可逆性に注意**: `src/background/background.js` の `chrome.runtime.onInstalled` listener で legacy storage key を `chrome.storage.local.remove` するため、**新 version で削除された key は旧 version に戻しても復元されない**。例:
 - v1.0.18 で `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` を削除
 - v1.0.27 で `ytShortsRemovalEnabled` を `searchFixerFeatures.removeShorts` に転写してから削除
 
@@ -75,13 +76,15 @@
 
 ### 2-D. storage 破損
 
-- popup 起動時の sentinel チェック（popup.js:236）で `INSTALL_SENTINEL` が消えていれば自動で console.warn + 再書き込み
+- popup 起動時の `src/popup/popup.js` にある `INSTALL_SENTINEL` チェックで、値が消えていれば自動で console.warn + 再書き込み
 - ユーザーから「設定が全部 OFF に戻っている」報告を受けたら sentinel チェックの console.warn を確認してもらう
 - 復旧: ユーザーが該当トグルを再 ON する。`chrome.storage.local` 全体の破損は Chrome 側のバグでない限り起きない
 
 ### 2-E. 拡張機能リロード後の挙動
 
-extension reload / 自動更新で content script が orphan 化する。`chrome.runtime?.id` が undefined になり、MutationObserver / setInterval が止まらず CPU を消費し続けるリスク → CLAUDE.md「PATTERN SYNC」記載の 10 ファイル + early 3 で対策済み。
+extension reload / 自動更新で content script が orphan 化する。`chrome.runtime?.id` が undefined になり、MutationObserver / setInterval が止まらず CPU を消費し続けるリスク → [AGENTS.md](../AGENTS.md)「PATTERN SYNC」記載の対象ファイルで対策済み。
+
+Firefox の音量ブースターは、旧 content script sandbox が即時 cleanup できない場合も、AudioContext timeline に予約した dry/wet lease により最大約 20 秒で通常音量の dry bypass へ戻る。旧 MES は新 sandbox から再制御できないため、ブーストを再開するには対象タブの再読み込みが必要。
 
 ユーザー報告が来たら:
 1. 該当タブを reload してもらう（content script を再注入）
@@ -97,7 +100,7 @@ extension reload / 自動更新で content script が orphan 化する。`chrome
 | YouTube `/feed/channels` | subs グリッドのチャンネルリスト取得失敗 | exponential backoff 2s→60s（`subsListFetchBackoffMs`） |
 | YouTube channel HTML (videoId 抽出) | 該当チャンネルのサムネが mqdefault.jpg にフォールバック → 全失敗で空 | sessionStorage 24h cache でヒット時はネット不要 |
 | Amazon DOM 変更 | 月別合計が表示されない（silent fail） | F-003 余地（DOM mismatch 検知未実装） |
-| Instagram DOM 変更 | 該当機能だけ silent fail | `instagram-cleaner.js:117-125` の detector で console.warn |
+| Instagram DOM 変更 | 該当機能だけ silent fail | `src/content/instagram-cleaner.js` の `runI18nWatchdog()` で console.warn |
 | TikTok DOM 変更 | 該当機能だけ silent fail | F-003 余地（DOM mismatch 検知未実装） |
 | chrome.tabCapture user gesture 要件 | 新規タブで音量ブースター初回適用失敗 | popup を開く操作が user gesture になる |
 | chrome.tabs.captureVisibleTab 2fps 上限 | Loupe で再キャプチャ間隔 500ms に強制 | 仕様内、ユーザー UX 影響軽微 |
@@ -141,7 +144,7 @@ API 経由で送る `<ul>` 等の HTML は `&lt;ul&gt;` としてエスケープ
 1. `src/lib/actions.js` の FEATURES 配列
 2. `_locales/{en,ja}/messages.json` の label/desc
 3. `test/actions.test.js` のアサート値
-4. `CLAUDE.md` の Architecture / Important Patterns / Key Files 記述
+4. `AGENTS.md` の Architecture / Important Patterns / Key Files 記述
 5. `README.md` / `README.en.md` の機能列挙
 6. `docs/privacy-policy.{md,en.md}` の storage 説明
 7. `webstore/store-listing.{,en,firefox.ja,firefox.en}.txt` の機能リスト
@@ -157,4 +160,4 @@ API 経由で送る `<ul>` 等の HTML は `&lt;ul&gt;` としてエスケープ
 
 ### 既知の事故事例
 
-- **新機能追加時の永久 OFF 化バグ防止 (歴史的教訓)**: 過去に `normalizeSettings` / `toStorageRecord` / `notifyContentScripts` / popup の `chrome.storage.local.get` リスト / `APPLY_SETTINGS_KEYS` のいずれかへの追加忘れで、popup から ON にしても storage に書き戻されず永久 OFF 固定になる事故があった。新機能追加時は CLAUDE.md「設計の起点」と「APPLY_SETTINGS 経路の partial payload 防御」の 6 ポイントチェックリストを必ず通す。`test/actions.test.js` の SettingsSchema / popup get list drift 検知で構造的に防御済み。
+- **新機能追加時の永久 OFF 化バグ防止 (歴史的教訓)**: 過去に `normalizeSettings` / `toStorageRecord` / `notifyContentScripts` / popup の `chrome.storage.local.get` リスト / `APPLY_SETTINGS_KEYS` のいずれかへの追加忘れで、popup から ON にしても storage に書き戻されず永久 OFF 固定になる事故があった。新機能追加時は [AGENTS.md](../AGENTS.md)「設計の起点」と「APPLY_SETTINGS 経路の partial payload 防御」の 6 ポイントチェックリストを必ず通す。`test/actions.test.js` の SettingsSchema / popup get list drift 検知で構造的に防御済み。

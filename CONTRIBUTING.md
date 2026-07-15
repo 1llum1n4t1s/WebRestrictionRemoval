@@ -3,7 +3,7 @@
 このドキュメントは **Vuora** に手を入れる開発者向けです。
 利用者向けのインストール手順や機能説明は [README.md](README.md) を参照してください。
 
-LLM (Claude / Codex 等) 向けの詳細な実装規約は [CLAUDE.md](CLAUDE.md) にあります。
+LLM (Claude / Codex 等) 向けの詳細な実装規約は [AGENTS.md](AGENTS.md) にあります。
 本ファイルは「人間の開発者がコードを触るときに必要な最小限の情報」に絞っています。
 
 ---
@@ -43,15 +43,15 @@ pnpm run lint      # ESLint v10 flat config
 
 ```bash
 # Chrome + Firefox 両方
-powershell -ExecutionPolicy Bypass -File zip.ps1                  # Windows
+pwsh -NoProfile -File zip.ps1                                     # Windows
 bash ./zip.sh                                                      # Unix
 
 # Chrome のみ
-powershell -ExecutionPolicy Bypass -File zip.ps1 -Target chrome
+pwsh -NoProfile -File zip.ps1 -Target chrome
 bash ./zip.sh chrome
 
 # Firefox のみ (xpi 出力)
-powershell -ExecutionPolicy Bypass -File zip.ps1 -Target firefox
+pwsh -NoProfile -File zip.ps1 -Target firefox
 bash ./zip.sh firefox
 ```
 
@@ -88,7 +88,7 @@ bash ./zip.sh firefox
 - Chrome: `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN` / `CWS_EXTENSION_ID`
 - Firefox: `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` ([発行ページ](https://addons.mozilla.org/ja/developers/addon/api/key/))
 
-Chrome publish が失敗 (同 version 重複 upload 等) しても Firefox AMO step は `if: success() || failure()` で独立実行されます。両 job の冒頭に **同 version pre-flight check** があり、既に公開済みの version は自動で skip します。
+Chrome publish が失敗しても Firefox AMO step は `if: success() || failure()` で独立実行されます。Chrome は **同 version pre-flight check** で upload 済みなら再 upload だけを skip し、Publish API は毎回実行します（upload 成功後に Submit for review が失敗した run を同 version で再試行可能）。Firefox は既存 version の submission を pre-flight で skip します。
 
 ### バージョンアップ手順
 
@@ -96,7 +96,7 @@ Chrome publish が失敗 (同 version 重複 upload 等) しても Firefox AMO s
 
 ## アーキテクチャ概要
 
-3 つのレイヤが `chrome.runtime` メッセージパッシングで連携します。詳細・各 content script の責務・全データフロー図は [CLAUDE.md](CLAUDE.md) を参照。
+3 つのレイヤが `chrome.runtime` メッセージパッシングで連携します。詳細・各 content script の責務・全データフロー図は [AGENTS.md](AGENTS.md) を参照。
 
 ```text
 Popup (src/popup/popup.{html,js,css})
@@ -112,7 +112,9 @@ Popup (src/popup/popup.{html,js,css})
 
 [音量ブースター・MES 経路 (Firefox 専用。manifest.firefox.json のみに登録)]
   Popup ──音量関連キーを storage 直書き──▶ 全タブの volume-booster-mes.js (storage.onChanged 購読)
-    │ <video>/<audio> ごとに MediaElementSource + 14 ノードチェーン (メッセージレス・user gesture 不要)
+    │ <video>/<audio> ごとに MediaElementSource + 18 処理ノード
+    │ (dryGain + 16 DSP ノード + wetGain、メッセージレス・user gesture 不要)
+    │ 拡張リロード後の旧 graph は 20 秒 lease 失効で dry bypass へ戻る
     │ DRM サイト (EME_HOSTS) では無効。Chrome には一切ロードされない
 
 [ルーペ]
@@ -126,7 +128,7 @@ Popup (src/popup/popup.{html,js,css})
 |------|------|
 | `src/lib/actions.js` | 単一情報源 (Actions / StorageKeys / SettingsSchema 等を `globalThis` に公開) |
 | `src/lib/scan-runner.js` | rAF + MutationObserver + context invalidation guard の共通ランタイム |
-| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 4 関数 (caller は offscreen.js = Chrome と volume-booster-mes.js = Firefox の 2 つ) |
+| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 7 関数 (`dbToGain` / `applyCompressorPreset` / `applyFilterPreset` / `createBassCutChain` / `applyEqualizer` / `createEqChain` / `connectAudioGraph`。caller は offscreen.js = Chrome と volume-booster-mes.js = Firefox の 2 つ) |
 | `src/background/background.js` | Service Worker (settings 集約 / offscreen 管理 / 音量ブースター制御) |
 | `src/content/*.js` | 各機能の content script |
 | `src/offscreen/` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体・Chrome の唯一の経路) |
@@ -138,7 +140,7 @@ Popup (src/popup/popup.{html,js,css})
 
 ## コーディング規約
 
-詳細は [CLAUDE.md](CLAUDE.md) を参照。要点だけ抜粋:
+詳細は [AGENTS.md](AGENTS.md) を参照。要点だけ抜粋:
 
 - **新機能追加は `src/lib/actions.js` から手をつける** (FEATURES 配列 / StorageKeys / Actions が単一情報源)
 - **デフォルト OFF 方針徹底** — 9 マスタートグルすべて初期 OFF

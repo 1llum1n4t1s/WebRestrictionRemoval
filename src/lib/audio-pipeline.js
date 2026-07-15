@@ -11,7 +11,7 @@
  *   - volume-booster-mes.js — Firefox 専用 MES 経路 (manifest.firefox.json のみから注入。
  *     2026-07-02 に Firefox 専用パイプラインとして復活。「Firefox catch-up に備えて共有
  *     モジュール構造を維持する」判断がここで活きた)
- * 提供するのは dB→gain 変換 / compressor preset 適用 / EQ チェーン構築 / EQ 適用の 4 関数
+ * 提供するのは dB→gain 変換 / compressor・filter preset 適用 / bass cut・EQ チェーン構築 / EQ 適用
  * (自動音量正規化の normalizer 関数群は撤去済み)。
  *
  * 値定数は actions.js の `VolumeBooster` を経由 (既存集約場所)。
@@ -49,14 +49,43 @@
   }
 
   /**
-   * BiquadFilterNode (type 固定、frequency/Q のみ可変) に preset を適用する。
+   * 1個以上の BiquadFilterNode (type 固定、frequency/Q のみ可変) に preset を適用する。
    * VolumeBooster.BASS_CUT_PRESET / BASS_CUT_BYPASS のいずれか。applyCompressorPreset と同じ思想:
    * 切替頻度が低いため ramp 不要で `.value =` 直接代入で十分、BYPASS (frequency:0) で
    * 素通り化してノードの disconnect/reconnect による音切れを避ける。
+   * 単一 node も受け付け、旧 caller との互換性を保つ。
    */
-  function applyFilterPreset(node, preset) {
-    node.frequency.value = preset.frequency;
-    node.Q.value = preset.Q;
+  function applyFilterPreset(nodeOrNodes, preset) {
+    const nodes = Array.isArray(nodeOrNodes) ? nodeOrNodes : [nodeOrNodes];
+    for (const node of nodes) {
+      node.frequency.value = preset.frequency;
+      node.Q.value = preset.Q;
+    }
+  }
+
+  /**
+   * 壁ドン対策用 highpass チェーンを構築する。
+   * 2次 Butterworth を BASS_CUT_STAGES 段直列化し、150Hz 未満を 24dB/oct で減衰させる。
+   * caller は head/tail を上下のノードへ接続し、設定変更時は bassCutNodes 全体へ preset を適用する。
+   *
+   * @param {AudioContext} ctx
+   * @returns {{bassCutNodes: BiquadFilterNode[], head: AudioNode, tail: AudioNode}}
+   */
+  function createBassCutChain(ctx) {
+    const bassCutNodes = Array.from({ length: VolumeBooster.BASS_CUT_STAGES }, () => {
+      const node = ctx.createBiquadFilter();
+      node.type = "highpass";
+      return node;
+    });
+    for (let i = 1; i < bassCutNodes.length; i += 1) {
+      bassCutNodes[i - 1].connect(bassCutNodes[i]);
+    }
+    applyFilterPreset(bassCutNodes, VolumeBooster.BASS_CUT_BYPASS);
+    return {
+      bassCutNodes,
+      head: bassCutNodes[0],
+      tail: bassCutNodes[bassCutNodes.length - 1],
+    };
   }
 
   /**
@@ -126,11 +155,37 @@
     return { preampNode, eqFilters, head: preampNode, tail };
   }
 
+  /**
+   * 音量ブースターの最上位 DSP グラフを共通順序で接続する。
+   * 各チェーン内部の接続は createEqChain / createBassCutChain が担当し、本関数は
+   * caller 間で drift しやすい6本の境界接続だけを単一情報源にする。
+   *
+   * @param {{
+   *   source: AudioNode,
+   *   eqChain: {head: AudioNode, tail: AudioNode},
+   *   nightModeNode: AudioNode,
+   *   gainNode: AudioNode,
+   *   bassCutChain: {head: AudioNode, tail: AudioNode},
+   *   antiClipNode: AudioNode,
+   *   destination: AudioNode,
+   * }} graph
+   */
+  function connectAudioGraph(graph) {
+    graph.source.connect(graph.eqChain.head);
+    graph.eqChain.tail.connect(graph.nightModeNode);
+    graph.nightModeNode.connect(graph.gainNode);
+    graph.gainNode.connect(graph.bassCutChain.head);
+    graph.bassCutChain.tail.connect(graph.antiClipNode);
+    graph.antiClipNode.connect(graph.destination);
+  }
+
   globalThis.AudioPipeline = Object.freeze({
     dbToGain,
     applyCompressorPreset,
     applyFilterPreset,
+    createBassCutChain,
     applyEqualizer,
     createEqChain,
+    connectAudioGraph,
   });
 })();

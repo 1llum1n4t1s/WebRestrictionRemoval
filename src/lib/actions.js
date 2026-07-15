@@ -264,6 +264,14 @@ const SearchFixerFeatures = Object.freeze([
   // ホームのおすすめセクション一括除去（「その他のトピック」「ニュース速報」「ゲームルーム」）。
   // 旧 removeTopicsSection / removeBreakingNewsSection を統合した機能（background の onInstalled で転写）。
   Object.freeze({ key: "removeFeedSections", category: "video_filter" }),
+  // チャンネルブロックリスト: YouTube ホームの公式「このチャンネルは表示しない」に相当する機能を
+  // 独自拡張した版。登録は検索結果カードの登録ボタンから行うが、除去自体は検索結果 /
+  // ホーム・登録チャンネル・急上昇等のフィードページ双方の動画カードに一律適用される
+  // （2026-07-14 に検索結果限定から拡張。yt-lockup-view-model はメタデータ内のチャンネル名が
+  // `a.ytAttributedStringLink[href^="/channel/"|"/@"]` としてリンク化されておりキー抽出可能な
+  // ことを実機確認済み。視聴ページの関連動画欄はプレーンテキストでリンクが無いため対象外）。
+  // リストは popup で管理（一覧 + 個別解除）。
+  Object.freeze({ key: "channelBlocklist", category: "video_filter" }),
   // === カテゴリ "search_only": 検索結果（検索結果ページ固有の DOM のみが対象）===
   // shelf / cardList / course / channel / reel / secondary / chapter は検索結果ページ固有の DOM
   // 構造（ytd-shelf-renderer / ytd-channel-renderer 等）に依存。verified / artist は現状検索のみで
@@ -273,10 +281,6 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({ key: "cardList", category: "search_only" }),
   Object.freeze({ key: "course", category: "search_only" }),
   Object.freeze({ key: "channel", category: "search_only" }),
-  // チャンネルブロックリスト: YouTube ホームの公式「このチャンネルは表示しない」に相当する機能が
-  // 検索結果には無いため独自実装。検索結果カードに登録ボタンを注入し、登録済みチャンネルの
-  // 動画 / チャンネルカードを検索結果から除去する。リストは popup で管理（一覧 + 個別解除）。
-  Object.freeze({ key: "channelBlocklist", category: "search_only" }),
   Object.freeze({ key: "reel", category: "search_only" }),
   Object.freeze({ key: "secondary", category: "search_only" }),
   Object.freeze({ key: "verified", category: "search_only" }),
@@ -1115,10 +1119,16 @@ const VolumeBooster = Object.freeze({
     release: 0.25,
   }),
   /**
-   * 壁ドン対策モード用 highpass フィルタプリセット（BiquadFilterNode type:"highpass"）。
+   * 壁ドン対策モード用 highpass フィルタ段数。
+   * 2次 Butterworth を2段直列にして Linkwitz-Riley 4次相当（24dB/oct）にする。
+   * 1段（12dB/oct）ではカットオフ直下の低音が残りやすく、壁・床の振動対策として弱かった。
+   */
+  BASS_CUT_STAGES: 2,
+  /**
+   * 壁ドン対策モード用 highpass フィルタプリセット（各 BiquadFilterNode type:"highpass"）。
    * カットオフ 150Hz は、壁・床を伝って隣室に響きやすいサブベース〜低音域（ドスドス感の主因）を
-   * 除去しつつ、ボーカルや楽器の芯（中音域）は残す落としどころ。Q は 0.7071（Butterworth、
-   * カットオフ付近の共振ピークなしで最も自然な減衰特性）で固定。
+   * 除去しつつ、ボーカルや楽器の芯（中音域）は残す落としどころ。各段の Q は 0.7071
+   * （Butterworth）で固定し、同一段の直列化で共振ピークを作らず減衰だけを急峻にする。
    */
   BASS_CUT_PRESET: Object.freeze({
     frequency: 150,

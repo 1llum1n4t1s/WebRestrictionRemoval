@@ -52,6 +52,7 @@ test("VolumeBooster.isUnityRelease: 100%+全OFF のみ true、いずれか ON �
 });
 
 test("VolumeBooster.BASS_CUT_PRESET / BASS_CUT_BYPASS: 壁ドン対策モードの highpass フィルタ値固定 (drift 検知)", () => {
+  assert.equal(G.VolumeBooster.BASS_CUT_STAGES, 2);
   assert.equal(G.VolumeBooster.BASS_CUT_PRESET.frequency, 150);
   assert.equal(G.VolumeBooster.BASS_CUT_PRESET.Q, 0.7071);
   // BYPASS は frequency:0 で highpass を実質無効化（ノード抜き差しなしのバイパス方式）。
@@ -753,10 +754,10 @@ test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only 
   assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only"]);
 });
 
-test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/membersOnly/watched + removeShortsShelf + removeFeedSections", () => {
+test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/membersOnly/watched + removeShortsShelf + removeFeedSections + channelBlocklist", () => {
   const expectedVideoFilterKeys = [
     "playlist", "mix", "shortsBtn", "live", "membersOnly", "watched",
-    "removeShortsShelf", "removeFeedSections",
+    "removeShortsShelf", "removeFeedSections", "channelBlocklist",
   ];
   for (const key of expectedVideoFilterKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
@@ -779,7 +780,6 @@ test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only に
     "demoteUnmatched", "highlightThumb",
     "searchGrid",
     "removeShortsChip",
-    "channelBlocklist",
   ];
   for (const key of expectedSearchOnlyKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
