@@ -1,6 +1,6 @@
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to Codex (ChatGPT) and other coding agents working in this repository.
+This file provides guidance to Claude Code when working in this repository.
 
 ## Project Overview
 
@@ -8,7 +8,7 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
 
 ### 機能カウント早見表（単一情報源）
 
-本文で出てくる「N 機能」「N サブ機能」「N マスタートグル」の数字はすべて以下の単一情報源を参照する。CI で drift 検知される値のみここに書く（AGENTS.md 内 drift 防止）。
+本文で出てくる「N 機能」「N サブ機能」「N マスタートグル」の数字はすべて以下の単一情報源を参照する。CI で drift 検知される値のみここに書く（CLAUDE.md 内 drift 防止）。
 
 | カウント名 | 値 | 単一情報源（drift 検知元） |
 |---|---|---|
@@ -172,7 +172,7 @@ Service worker。役割:
 ### YouTube Shorts Removal (`src/content/youtube-shorts.js`)
 `*://*.youtube.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に注入。`window === window.top` チェックで埋め込みプレーヤーには注入せず CPU 負荷を抑える。
 
-**5 サブ機能 + 1 グローバル nav**: Shelf / Chip / Sidebar / Redirect / Btn の 5 サブ機能と「ホーム / Shorts / 登録チャンネル」global nav を 1 ファイルで担当。CSS は機能ごとに `__cpa-yt-shorts-hide-shelf` / `__cpa-yt-shorts-hide-chip` / `__cpa-yt-shorts-hide-sidebar` / `__cpa-yt-shorts-redirect-active` クラスを `<html>` に付け外し（per-feature 独立化、Codex P2 指摘で v1.0.18 にて分割済）。
+**5 サブ機能 + 1 グローバル nav**: Shelf / Chip / Sidebar / Redirect / Btn の 5 サブ機能と「ホーム / Shorts / 登録チャンネル」global nav を 1 ファイルで担当。CSS は機能ごとに `__cpa-yt-shorts-hide-shelf` / `__cpa-yt-shorts-hide-chip` / `__cpa-yt-shorts-hide-sidebar` / `__cpa-yt-shorts-redirect-active` クラスを `<html>` に付け外し（per-feature 独立化、Claude Code P2 指摘で v1.0.18 にて分割済）。
 
 **YouTube クリーナーへの統合**: 独立 storage key と独自メッセージは持たず、YouTube クリーナーのサブ機能として動作（`searchFixerFeatures.removeShortsShelf` / `removeShortsChip` / `removeShortsSidebar` / `redirectShortsUrl` / `removeShortsBtn`）。アクティブ判定は `searchFixerEnabled === true` AND 各 features フラグの AND。`APPLY_SEARCH_FIXER_CS` メッセージを search-fixer.js と共に購読する（同一 isolated world で同じメッセージを 2 ファイルが受けて、それぞれの責務に応じて反応する設計）。`storage.onChanged` は片方の key だけ変わった場合に備え、両 key を再取得してから `computeActive()` で判定する（変更されてないキーが undefined になる罠を回避）。
 
@@ -221,7 +221,7 @@ Service worker。役割:
 
 **実装上の不変条件**:
 - `loadedmetadata` を待ってから適用 (videoWidth=0 段階では計算不能)
-- `metaAttached` WeakSet で loadedmetadata listener の二重登録防止 (revertAll() の AbortController abort 時に `new WeakSet()` へ差し替えて detach 済み video 含め一括リセット。旧 DOM マーカー `__cpaVfMetaAttached` は detach 済みを取り残し reinsert+再 ON 時に listener 貼り直し不能になる Codex P2 があり廃止)
+- `metaAttached` WeakSet で loadedmetadata listener の二重登録防止 (revertAll() の AbortController abort 時に `new WeakSet()` へ差し替えて detach 済み video 含め一括リセット。旧 DOM マーカー `__cpaVfMetaAttached` は detach 済みを取り残し reinsert+再 ON 時に listener 貼り直し不能になる Claude Code P2 があり廃止)
 - MutationObserver `subtree: true` で SPA / 遅延追加 video に追従。**detach された video は同期で即 `revertVideo`（element の GC を妨げない）、再適用（`scanAndApply`）は `requestAnimationFrame` で 1 フレーム 1 回に coalesce**（all_frames:true + 高頻度 DOM 変更でのフル走査積み上がりを平準化）。observer は `childList` のみ監視で自前の inline style 書き込みは observe 対象外のため、disconnect→render→takeRecords→observe ガードは不要（無限ループしない）
 - iframe 内 `<video>` (YouTube 埋め込み等) も all_frames:true で対象
 - `pagehide`（`persisted=false` = 実際にドキュメント破棄される遷移のみ）で `disconnectObserver()` + `revertAll()`（= transform 復元 + `metaListenerCtrl.abort()`、teardownOrphan と同じ後始末）。bfcache 凍結（`persisted=true`）は observer も凍結され CPU 消費ゼロ + 復帰でそのまま継続できるので温存する（disconnect すると pageshow 再初期化が無いぶん復帰後に効かなくなるため）
@@ -454,11 +454,11 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
 | `docs/privacy-policy.md` | プライバシーポリシー |
 | `test/actions.test.js` | 純粋関数テスト: globalThis 22 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 32 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
-| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.codex/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
+| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.claude/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
 | `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要。`/vava` Step 8.7-B (CWS drift check) からも自動参照される |
-| `vava.config.json` | `/vava` スキル (`~/.codex/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |
-| `~/.codex/skills/vava/scripts/check-store-listing.mjs` | ストア掲載 listing drift チェッカー (汎用版、スキル側集約)。CWS は公開ページ (`chromewebstore.google.com/detail/<id>`) を fetch して `<meta>` から name / description / version を抽出、AMO は API v5 `GET /addons/addon/{slug}/?lang=all` で取得。drift 判定キーワードは CWD の `vava.config.json` の `driftKeywords.{cws,amo}.{ja,en}` から取得 (未設定なら drift チェックをスキップ)。`--cws` / `--amo` で対象選択可。`/vava` Step 8.7-B から自動実行 |
-| `~/.codex/skills/vava/scripts/update-amo-listing.mjs` | Firefox AMO listing 自動 push (汎用版、スキル側集約、API v5 `PATCH /addons/addon/{slug}/`)。name / summary / description / homepage / support_url / categories / privacy_policy を CWD の `vava.config.json` で指定された listing / privacy ファイルから構築して送信。**summary は 250 chars 拒否されるため 249 に truncate / description と privacy_policy は `<` `>` を `&lt;` `&gt;` に pre-escape する (AMO の HTML allowlist に `<video>` `<feComponentTransfer>` 等の技術タグが無く HTTP 406 で silent reject されるため、ReplaceFontSelect 知見ベース)**。screenshots は API 不対応で Dashboard 手動。`~/.amo_token` 2 行構成 (ISSUER / SECRET) から JWT HS256 生成。`/vava` Step 8.7-A から自動実行 |
+| `vava.config.json` | `/vava` スキル (`~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |
+| `~/.claude/skills/vava/scripts/check-store-listing.mjs` | ストア掲載 listing drift チェッカー (汎用版、スキル側集約)。CWS は公開ページ (`chromewebstore.google.com/detail/<id>`) を fetch して `<meta>` から name / description / version を抽出、AMO は API v5 `GET /addons/addon/{slug}/?lang=all` で取得。drift 判定キーワードは CWD の `vava.config.json` の `driftKeywords.{cws,amo}.{ja,en}` から取得 (未設定なら drift チェックをスキップ)。`--cws` / `--amo` で対象選択可。`/vava` Step 8.7-B から自動実行 |
+| `~/.claude/skills/vava/scripts/update-amo-listing.mjs` | Firefox AMO listing 自動 push (汎用版、スキル側集約、API v5 `PATCH /addons/addon/{slug}/`)。name / summary / description / homepage / support_url / categories / privacy_policy を CWD の `vava.config.json` で指定された listing / privacy ファイルから構築して送信。**summary は 250 chars 拒否されるため 249 に truncate / description と privacy_policy は `<` `>` を `&lt;` `&gt;` に pre-escape する (AMO の HTML allowlist に `<video>` `<feComponentTransfer>` 等の技術タグが無く HTTP 406 で silent reject されるため、ReplaceFontSelect 知見ベース)**。screenshots は API 不対応で Dashboard 手動。`~/.amo_token` 2 行構成 (ISSUER / SECRET) から JWT HS256 生成。`/vava` Step 8.7-A から自動実行 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
 ## Important Patterns
@@ -620,7 +620,7 @@ Chrome の音量ブースターは tabCapture → offscreen の AudioContext 一
 
 **API / 制約**:
 - **Offscreen Document の 1 拡張 1 文書制約** — `reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。新しい用途を追加するときは既存ドキュメントに同居させること。
-- **`minimum_chrome_version: "140"` 固定** — `chrome.runtime.getContexts`（116+）等の new API は **typeof チェックなしで直接呼んで良い**。legacy fallback の `if (typeof chrome.runtime.getContexts !== "function")` 分岐はバグ温床（receiver 不在エラーを active 扱いして 30 秒 cycle 無限再 schedule した Codex P2 指摘あり）なので追加しないこと。
+- **`minimum_chrome_version: "140"` 固定** — `chrome.runtime.getContexts`（116+）等の new API は **typeof チェックなしで直接呼んで良い**。legacy fallback の `if (typeof chrome.runtime.getContexts !== "function")` 分岐はバグ温床（receiver 不在エラーを active 扱いして 30 秒 cycle 無限再 schedule した Claude Code P2 指摘あり）なので追加しないこと。
 
 **DSP preset チューニング履歴** (新規に DSP に触る前に必ず読む。値定数の正は `src/lib/actions.js` `VolumeBooster`、フロー制御の正は `src/lib/audio-pipeline.js`。ナイトモード / 自動歪み防止 preset の調整履歴は actions.js の `NIGHT_MODE_PRESET` / `ANTI_CLIP_PRESET` コメント、壁ドン対策は `BASS_CUT_PRESET` / `BASS_CUT_BYPASS` コメントを参照):
 
@@ -676,7 +676,7 @@ video element に視覚エフェクト (filter / transform) を inline style で
 2. **`loadedmetadata` 待ち** で apply (intrinsic size 不要な video-gamma でも待つ、DRM player の session 取得完了後に効果が当たる挙動に統一)
 3. **`original` WeakMap** で元 inline style (priority 込み) を退避、`revertVideo` で復元 (撤去時の状態保証)
 4. **`metaListenerCtrl` (AbortController)** で listener 一括 abort、`revertAll` で新 AbortController に差し替え
-5. **`metaAttached` (WeakSet)** で二重登録防止、revertAll で `new WeakSet()` に差し替え (detach 済み video も含めた追跡を O(1) 一括リセット、DOM プロパティマーカーだと取り残し発生する Codex 4 巡目 P2 対策)
+5. **`metaAttached` (WeakSet)** で二重登録防止、revertAll で `new WeakSet()` に差し替え (detach 済み video も含めた追跡を O(1) 一括リセット、DOM プロパティマーカーだと取り残し発生する Claude Code 4 巡目 P2 対策)
 6. **MutationObserver(subtree)** で SPA / 遅延追加 video を追従、`removedNodes` 検知時に `isConnected` チェックで非接続 video を即 `revertVideo` (reparent は除外、後続 scanAndApply で再 attach)
 7. **rAF coalesce (`scanRaf`)** で高頻度 mutation を 1 フレーム 1 回に間引き
 8. **`pagehide` (persisted=false)** で teardown、bfcache 凍結 (persisted=true) は observer 凍結で CPU 消費ゼロのため温存
@@ -706,7 +706,7 @@ video element に視覚エフェクト (filter / transform) を inline style で
 **復活禁止の失敗パターン**:
 - `<head>` に `<style>video { effect: ... !important }</style>` を CSS rule 注入する (= 旧 video-gamma 方式): video element の readyState 関係なく一斉適用 → DRM session 取得中に当たって player attestation 干渉する理論的リスク
 - `loadedmetadata` を待たずに即 apply: 同上のリスク。intrinsic size 不要な effect でも待つ
-- DOM プロパティマーカー (`v.__cpaAttached = true`) で listener 二重登録防止: detach 済み video のマーカーが取り残されて reinsert+再 ON 時に listener 再 attach 不能 (= Codex 4 巡目 P2 で実例化)
+- DOM プロパティマーカー (`v.__cpaAttached = true`) で listener 二重登録防止: detach 済み video のマーカーが取り残されて reinsert+再 ON 時に listener 再 attach 不能 (= Claude Code 4 巡目 P2 で実例化)
 
 ### 外部 fetch allowlist 設計 (`ImageDownloader.ALLOWED_HOSTS`)
 画像ダウンロード機能が許可する CDN ホストは `actions.js` の `ImageDownloader.ALLOWED_HOSTS` で regex 配列として宣言する。**任意サブドメインを通す広いパターンは禁止** (`evil.{cdn}.com` を allowlist 通過させて代理 fetch 攻撃面を作る)。
@@ -742,7 +742,7 @@ video element に視覚エフェクト (filter / transform) を inline style で
 - **`aria-label` / `title` は両言語で書く** — YouTube は ja / en で `Shorts` ⇔ `ショート` のように label が変わる。CSS selector で要素を hide する場合、両言語版を併記しないと初期 flash が出る（JS による DOM 削除が走るまで素のまま見える）。
 
 ### マイグレーション
-- **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled` / `keepAliveOrigins` / `keepAliveEnabled` / `keepAliveIntervalMs` / `keepAliveHttpPingEnabled` / `rtxEnhancerEnabled` / `volumeBoosterNormalizeEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。`searchFixerFeatures` オブジェクト内のサブキー統合も同パターン: 旧 `removeTopicsSection` / `removeBreakingNewsSection` → `removeFeedSections` 統合では、storage 生値に旧キーが存在する場合のみ `SearchFixer.mergeFeatures` で書き戻して旧キーを strip し、どちらかが `=== true` かつ新キーが storage 生値で未設定なら新キーへ ON を転写する（新キー明示設定は尊重。判定は必ず storage 生値ベース — merged 側を見ると default seed の false を「ユーザー明示 false」と誤認する Codex P2 の罠）。注: `volumeBoosterEnabled` は過去に廃止→再導入されたキー。legacy 削除リストに含めないこと。`keepAliveOrigins` は v1.0.34 でサイト単位設計→全タブ共通設計に変更時に削除、同時に `keepAliveEnabled` を強制 `false` リセット (UX 把握困難性の解消が目的のクリーンスタート方針、ゆろさん指示)。**「セッション維持」機能と「RTX 動画強化」機能自体は v1.0.39 で完全撤去**、関連 4 キーは `onInstalled` の legacy 削除リストに集約。
+- **`onInstalled` で旧キー削除 + 値転写** — 廃止 storage key（過去例: `copyPasteSettings` / `enabled` / `contextMenuAllowDomains` / `ytShortsRemovalEnabled` / `keepAliveOrigins` / `keepAliveEnabled` / `keepAliveIntervalMs` / `keepAliveHttpPingEnabled` / `rtxEnhancerEnabled` / `volumeBoosterNormalizeEnabled`）は `chrome.storage.local.remove` で取り除く。値の意味が新キーに引き継がれるなら、削除前に転写する（v1.0.18 で `ytShortsRemovalEnabled === true` → `searchFixerFeatures.removeShorts = true` + `searchFixerEnabled = true` を実施）。**動作継続を最優先**で設計する。`searchFixerFeatures` オブジェクト内のサブキー統合も同パターン: 旧 `removeTopicsSection` / `removeBreakingNewsSection` → `removeFeedSections` 統合では、storage 生値に旧キーが存在する場合のみ `SearchFixer.mergeFeatures` で書き戻して旧キーを strip し、どちらかが `=== true` かつ新キーが storage 生値で未設定なら新キーへ ON を転写する（新キー明示設定は尊重。判定は必ず storage 生値ベース — merged 側を見ると default seed の false を「ユーザー明示 false」と誤認する Claude Code P2 の罠）。注: `volumeBoosterEnabled` は過去に廃止→再導入されたキー。legacy 削除リストに含めないこと。`keepAliveOrigins` は v1.0.34 でサイト単位設計→全タブ共通設計に変更時に削除、同時に `keepAliveEnabled` を強制 `false` リセット (UX 把握困難性の解消が目的のクリーンスタート方針、ゆろさん指示)。**「セッション維持」機能と「RTX 動画強化」機能自体は v1.0.39 で完全撤去**、関連 4 キーは `onInstalled` の legacy 削除リストに集約。
 - **新規 storage key は `onInstalled` で必ず初期化** — `volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterBassCutEnabled` / `searchFixerFeatures.hideComments` のような後追いキーは未設定時 `undefined` で UI 側に出るとトグルが表示されない・無効状態になるため、必ず `onInstalled` で `false` (boolean) / `VolumeBooster.DEFAULT` (数値) 初期化する。`normalizeSettings()` 側でも `=== true` 防御的判定を入れる（`!!value` だと storage の落ちた object 値で誤判定が出るため）。
 
 ### APPLY_SETTINGS 経路の partial payload 防御 (v1.0.31 で確立、「いつの間にか OFF」4 経路対策)
@@ -811,7 +811,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 
 ### FEATURES 件数アサートテスト (/rere v1.0.28 確立)
 `test/actions.test.js` の **「FEATURES 件数の固定アサート」テスト** がドキュメント整合性の単一情報源。
-- 件数を増減する場合は **同時に**: (1) FEATURES 配列に追加、(2) アサート値更新、(3) AGENTS.md / README / docs/privacy-policy.md / webstore/store-listing.txt / popup.html コメント / actions.js 内コメント の数値を全部更新
+- 件数を増減する場合は **同時に**: (1) FEATURES 配列に追加、(2) アサート値更新、(3) CLAUDE.md / README / docs/privacy-policy.md / webstore/store-listing.txt / popup.html コメント / actions.js 内コメント の数値を全部更新
 - 1 つでも update 漏れると `pnpm test` で fail → CI で drift を検知できる
 - 過去に 22 / 25 / 26 / 29 が混在した状態が再発しないようにこのテストで防御
 
@@ -881,7 +881,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 
 #### 11. captureVisibleTab 2fps 制限 (D-008 / V2 downgrade) `[settled 2026-06-06: 「動画一時停止用途」と明示的設計選択]`
 - 場所: ルーペ動画拡大時の視覚的遅延
-- 状態: AGENTS.md で「動画一時停止用途」と明示的設計選択
+- 状態: CLAUDE.md で「動画一時停止用途」と明示的設計選択
 - 議題: 将来「リアルタイム動画拡大」UX を追加するなら HTMLVideoElement.captureStream + canvas drawImage への hybrid 設計を検討
 
 ### 撤去済み機能と教訓
@@ -920,4 +920,4 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 #### 撤去パターン共通の不変条件
 - **`onInstalled` で legacy storage key を必ず削除**: 廃止キーを残すと storage に dead value が永遠に残る + 将来 同名キーを再利用する場合に「OFF 化したつもりが ON で復元される」事故源。撤去時は必ず `onInstalled` の legacy 削除リストに追加。
 - **`test/actions.test.js` に drift 検知アサート追加**: 撤去機能の定数・アクション・FEATURES エントリが actions.js から完全消去されていることをテストで物理確認。CI で再発防止。
-- **AGENTS.md からの参照削除は本セクション 1 箇所に集約**: 本文の他箇所 (Project Overview / Key Files / Important Patterns) は撤去機能に言及しない。教訓だけは「→ §撤去済み機能と教訓」リンクで本セクションを参照する。
+- **CLAUDE.md からの参照削除は本セクション 1 箇所に集約**: 本文の他箇所 (Project Overview / Key Files / Important Patterns) は撤去機能に言及しない。教訓だけは「→ §撤去済み機能と教訓」リンクで本セクションを参照する。
