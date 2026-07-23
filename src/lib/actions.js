@@ -355,8 +355,6 @@ const SearchFixer = Object.freeze({
     Object.freeze({ value: 6, messageKey: "grid6Cols" }),
   ]),
 
-  FEED_PATH_PREFIXES: SearchFixerFeedPathPrefixes,
-
   mergeFeatures(stored) {
     const out = { ...SearchFixer.DEFAULT_FEATURES };
     if (stored && typeof stored === "object") {
@@ -1350,13 +1348,13 @@ const VolumeBooster = Object.freeze({
   /** プリセット id を正規化。既知プリセット or CUSTOM のみ許可、未知は EQ_PRESET_DEFAULT。 */
   normalizeEqPreset(id) {
     if (id === VolumeBooster.EQ_PRESET_CUSTOM) return VolumeBooster.EQ_PRESET_CUSTOM;
-    return Object.prototype.hasOwnProperty.call(VolumeBooster.EQ_PRESETS, id)
+    return Object.hasOwn(VolumeBooster.EQ_PRESETS, id)
       ? id
       : VolumeBooster.EQ_PRESET_DEFAULT;
   },
   /** プリセット id から 10 バンド gain 配列 (コピー) を返す。CUSTOM / 未知は null。 */
   eqPresetGains(id) {
-    if (Object.prototype.hasOwnProperty.call(VolumeBooster.EQ_PRESETS, id)) {
+    if (Object.hasOwn(VolumeBooster.EQ_PRESETS, id)) {
       return VolumeBooster.EQ_PRESETS[id].slice();
     }
     return null;
@@ -1392,8 +1390,6 @@ const VideoGamma = Object.freeze({
   SLIDER_STEP: 1,
   /** SVG filter の id（ページ側 CSS と衝突しないよう __cpa- 接頭辞）。 */
   FILTER_ID: "__cpa-video-gamma",
-  /** 注入する style 要素の id（同上）。 */
-  STYLE_ID: "__cpa-video-gamma-style",
   /** 注入する SVG 要素の id（同上）。 */
   SVG_ID: "__cpa-video-gamma-svg",
   clampValue(v) {

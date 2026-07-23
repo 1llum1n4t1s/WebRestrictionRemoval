@@ -117,8 +117,7 @@
     let host = document.getElementById(VideoGamma.SVG_ID);
     const svg = buildSvgFilter(exponent);
     if (host) {
-      while (host.firstChild) host.removeChild(host.firstChild);
-      host.appendChild(svg);
+      host.replaceChildren(svg);
       return;
     }
     host = document.createElement("div");

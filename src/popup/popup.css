@@ -969,7 +969,6 @@ body {
 .range {
   width: 100%;
   appearance: none;
-  -webkit-appearance: none;
   height: 6px;
   /* 左→右の赤→グレーは値の進捗を示す機能的な色分けなので残す (陰影ではない)。 */
   background:
@@ -983,7 +982,6 @@ body {
 
 .range::-webkit-slider-thumb {
   appearance: none;
-  -webkit-appearance: none;
   width: 14px;
   height: 20px;
   border-radius: 0;
@@ -2279,14 +2277,12 @@ body {
   direction: rtl;
   width: 6px;
   height: 80px;
-  -webkit-appearance: none;
   appearance: none;
   background: color-mix(in srgb, var(--rog-red) 28%, transparent);
   border-radius: 3px;
   cursor: pointer;
 }
 .eq-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
   appearance: none;
   width: 16px;
   height: 9px;

@@ -2,8 +2,13 @@
 //
 // ライブ配信のアーカイブ（過去のライブを VOD 化したもの）を再生中、その瞬間が「実際に
 // 配信されていた時刻」を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・
-// ローカルタイム）でプレーヤー内 HUD に重ねて表示する。`*://*.youtube.com/*` の top frame のみで
-// 動作し、配信アーカイブ（liveBroadcastDetails を持ち isLiveNow !== true）のときだけ overlay を出す。
+// ローカルタイム）で HUD 表示する。overlay は body 直下の position:fixed 要素で、ドラッグで
+// 動画の外側を含む viewport 上の任意位置へ移動できる（初期位置はプレーヤー左上付近、位置は
+// localStorage 永続化 + viewport 内へ clamp）。`#movie_player` への attach に依存しないため、
+// プレーヤー DOM の再構築タイミングに関係なく表示できる。`*://*.youtube.com/*` の top frame
+// のみで動作し、配信アーカイブ（liveBroadcastDetails を持ち isLiveNow !== true）のときだけ出す。
+// フルスクリーン中は top layer の :fullscreen 要素配下でないと描画されないため、
+// fullscreenchange で document.fullscreenElement へ reparent する。
 //
 // 有効化は YouTube クリーナーのサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.broadcastClock` の両方 true で activate（独立 storage key は持たず、
@@ -54,6 +59,14 @@
   let broadcastInfo = null;
   /** @type {string | null} fetch 進行中の videoId（重複 fetch 防止） */
   let fetchInFlightVideoId = null;
+  /** same-origin fetch 失敗時の exponential backoff（search-fixer.js の確立パターンと同型:
+   *  2s スタート → 倍々 → 60s 上限、成功で 0 リセット）。失敗は cache しない設計のため、
+   *  高頻度 MutationObserver 経由の rescan が失敗 fetch を無制限に連打するのを構造的に防ぐ。
+   *  配信中ライブ（アーカイブ化待ちで cache しない）への再 fetch もこの backoff で抑制される。 */
+  let fetchBackoffMs = 0;
+  let fetchLastFailedAt = 0;
+  const FETCH_BACKOFF_INITIAL_MS = 2000;
+  const FETCH_BACKOFF_MAX_MS = 60000;
 
   /** @type {MutationObserver | null} DOM 監視（video 出現 / SPA 遷移検知） */
   let mutationObserver = null;
@@ -64,6 +77,8 @@
   let applyQueued = false;
   /** MutationObserver callback の rescan を rAF coalesce するフラグ */
   let rescanScheduled = false;
+  /** window resize の clamp を rAF coalesce するフラグ */
+  let resizeClampScheduled = false;
 
   /** @type {number} 最終 render 時刻（throttle 判定） */
   let lastRenderAt = 0;
@@ -233,24 +248,54 @@
     // ドラッグ
     handle.addEventListener("mousedown", onDragStart, true);
 
-    // 位置: 初期は左上、ユーザーがドラッグした位置があれば復元
+    // 位置: ユーザーがドラッグした位置（viewport 座標）があれば復元。無ければプレーヤー左上
+    // 付近を初期位置にする（プレーヤー未検出時は CSS デフォルトの viewport 左上 12px）。
     const pos = readLocal(BroadcastClock.LS_KEY_OVERLAY_POS);
     if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
       overlayEl.style.left = `${pos.left}px`;
       overlayEl.style.top = `${pos.top}px`;
       overlayEl.style.right = "auto";
+    } else {
+      const rect = findPlayerContainer()?.getBoundingClientRect();
+      if (rect && rect.width > 0) {
+        overlayEl.style.left = `${Math.max(0, rect.left + 12)}px`;
+        overlayEl.style.top = `${Math.max(0, rect.top + 12)}px`;
+        overlayEl.style.right = "auto";
+      }
     }
 
     return overlayEl;
   }
 
-  function attachOverlayToPlayer() {
+  /** overlay の親要素（フルスクリーン中は top layer の :fullscreen 要素配下でないと描画されない） */
+  function currentOverlayHost() {
+    return document.fullscreenElement || document.body || document.documentElement;
+  }
+
+  function attachOverlay() {
     if (!overlayEl) return;
-    const container = findPlayerContainer();
-    if (!container) return;
-    // #movie_player は position:relative なので absolute 配置で安定する
-    if (overlayEl.parentElement !== container) {
-      container.appendChild(overlayEl);
+    const host = currentOverlayHost();
+    if (!host) return;
+    // position:fixed なので親はどこでも座標は viewport 基準。プレーヤー DOM に依存しない
+    if (overlayEl.parentElement !== host) {
+      host.appendChild(overlayEl);
+    }
+    clampOverlayIntoViewport();
+  }
+
+  /** 保存位置がウィンドウリサイズ / フルスクリーン切替で viewport 外に取り残されないよう clamp する */
+  function clampOverlayIntoViewport() {
+    if (!overlayEl) return;
+    const rect = overlayEl.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return; // 未レイアウト
+    const maxLeft = Math.max(0, window.innerWidth - rect.width);
+    const maxTop = Math.max(0, window.innerHeight - rect.height);
+    const left = Math.max(0, Math.min(maxLeft, rect.left));
+    const top = Math.max(0, Math.min(maxTop, rect.top));
+    if (left !== rect.left || top !== rect.top) {
+      overlayEl.style.left = `${left}px`;
+      overlayEl.style.top = `${top}px`;
+      overlayEl.style.right = "auto";
     }
   }
 
@@ -265,8 +310,6 @@
     if (!overlayEl) return;
     if (ev.button !== 0) return;
     const rect = overlayEl.getBoundingClientRect();
-    const parent = overlayEl.parentElement?.getBoundingClientRect();
-    if (!parent) return;
     dragOffsetX = ev.clientX - rect.left;
     dragOffsetY = ev.clientY - rect.top;
     dragging = true;
@@ -278,10 +321,9 @@
 
   function onDragMove(ev) {
     if (!dragging || !overlayEl) return;
-    const parent = overlayEl.parentElement?.getBoundingClientRect();
-    if (!parent) return;
-    const left = Math.max(0, Math.min(parent.width - overlayEl.offsetWidth, ev.clientX - parent.left - dragOffsetX));
-    const top = Math.max(0, Math.min(parent.height - overlayEl.offsetHeight, ev.clientY - parent.top - dragOffsetY));
+    // position:fixed の viewport 座標で clamp。プレーヤーの内外を問わず画面内の任意位置へ置ける
+    const left = Math.max(0, Math.min(window.innerWidth - overlayEl.offsetWidth, ev.clientX - dragOffsetX));
+    const top = Math.max(0, Math.min(window.innerHeight - overlayEl.offsetHeight, ev.clientY - dragOffsetY));
     overlayEl.style.left = `${left}px`;
     overlayEl.style.top = `${top}px`;
     overlayEl.style.right = "auto";
@@ -338,6 +380,22 @@
     rescan();
   }
 
+  /** フルスクリーン切替: overlay を描画可能な host（:fullscreen 要素 / body）へ付け替える */
+  function onFullscreenChange() {
+    if (!active || !overlayEl) return;
+    attachOverlay();
+  }
+
+  /** ウィンドウリサイズ: 保存位置が viewport 外に取り残されないよう rAF coalesce で clamp */
+  function onWindowResize() {
+    if (!active || !overlayEl || resizeClampScheduled) return;
+    resizeClampScheduled = true;
+    requestAnimationFrame(() => {
+      resizeClampScheduled = false;
+      clampOverlayIntoViewport();
+    });
+  }
+
   function attachVideoListeners(video) {
     if (!video) return;
     video.addEventListener("timeupdate", onTimeUpdate, true);
@@ -359,7 +417,7 @@
   function showClock() {
     if (!chrome?.runtime?.id) return;
     buildOverlay();
-    attachOverlayToPlayer();
+    attachOverlay();
     lastRenderAt = 0;
     // 初回は同期描画して placeholder「—」→時刻の一瞬の幅変化を防ぐ（showClock は
     // broadcastInfo 確定後にのみ呼ばれるので render() は即座に時刻を描ける）。
@@ -394,10 +452,12 @@
       return;
     }
 
-    // 動画が変わったら配信情報をリセット
+    // 動画が変わったら配信情報をリセット（backoff も新規動画には持ち越さず即試行させる）
     if (videoId !== currentVideoId) {
       currentVideoId = videoId;
       broadcastInfo = null;
+      fetchBackoffMs = 0;
+      fetchLastFailedAt = 0;
       hideClock();
     }
 
@@ -414,14 +474,24 @@
       return;
     }
 
-    // 配信情報を取得（fetch は videoId 単位で重複防止）
+    // 配信情報を取得（fetch は videoId 単位で重複防止 + 失敗時は backoff 経過まで再試行しない）
     if (fetchInFlightVideoId === videoId) return;
+    if (fetchBackoffMs > 0 && Date.now() - fetchLastFailedAt < fetchBackoffMs) return;
     fetchInFlightVideoId = videoId;
     let info = null;
     try {
       info = await resolveBroadcastInfo(videoId);
     } finally {
       if (fetchInFlightVideoId === videoId) fetchInFlightVideoId = null;
+    }
+    if (info) {
+      fetchBackoffMs = 0;
+    } else {
+      // 一時失敗 / 配信中ライブ（いずれも cache されない）→ 次回試行を指数的に遅らせる
+      fetchLastFailedAt = Date.now();
+      fetchBackoffMs = fetchBackoffMs > 0
+        ? Math.min(fetchBackoffMs * 2, FETCH_BACKOFF_MAX_MS)
+        : FETCH_BACKOFF_INITIAL_MS;
     }
 
     // post-await guard: orphan / 非 active / 動画が変わっていたら破棄
@@ -474,6 +544,8 @@
     } catch {}
 
     document.addEventListener("yt-navigate-finish", onYtNavigateFinish, true);
+    document.addEventListener("fullscreenchange", onFullscreenChange, true);
+    window.addEventListener("resize", onWindowResize, true);
   }
 
   function onYtNavigateFinish() {
@@ -497,6 +569,8 @@
     }
     try {
       document.removeEventListener("yt-navigate-finish", onYtNavigateFinish, true);
+      document.removeEventListener("fullscreenchange", onFullscreenChange, true);
+      window.removeEventListener("resize", onWindowResize, true);
     } catch {}
     // ドラッグ中に master OFF / orphan 化した場合の document リスナー残留を防ぐ
     if (dragging) {

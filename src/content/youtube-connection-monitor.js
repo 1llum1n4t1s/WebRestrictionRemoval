@@ -542,10 +542,10 @@
     return { section, title, value };
   }
 
-  /** 子要素を全削除（Trusted Types を回避するため innerHTML="" は使わない） */
+  /** 子要素を全削除（replaceChildren は innerHTML 非経由で Trusted Types 安全） */
   function clearChildren(el) {
     if (!el) return;
-    while (el.firstChild) el.removeChild(el.firstChild);
+    el.replaceChildren();
   }
 
   /** 経過時間 ms → 「N 秒前 / N 分前」表記（cmBufferLogEntrySec / cmBufferLogEntryMin で i18n） */

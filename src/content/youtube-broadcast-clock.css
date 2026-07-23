@@ -1,7 +1,9 @@
 /*
  * YouTube 配信アーカイブの配信時刻オーバーレイ HUD
  *
- * プレーヤー (#movie_player) 内左上に absolute 配置するオーバーレイ。
+ * body 直下に position:fixed 配置するオーバーレイ。ドラッグで動画の外側を含む viewport 上の
+ * 任意位置へ移動できる（JS 側が初期位置をプレーヤー左上付近の inline style で与え、以後は
+ * localStorage の保存位置を復元 + viewport 内へ clamp する）。
  * ROG クリムゾン + ガンメタル基調背景に半透明黒で動画上にも視認性を確保する。
  * 接続モニター HUD (__cpa-cm-overlay) はデフォルト右上なので、本 HUD は左上に置いて
  * デフォルト位置の衝突を避ける（どちらもドラッグで移動可能）。
@@ -12,11 +14,12 @@
  */
 
 .__cpa-bc-overlay {
-  /* 親 (#movie_player) は position:relative なので absolute 配置で左上に出る */
-  position: absolute;
+  /* body 直下の fixed 配置。座標は viewport 基準で、プレーヤー DOM に依存しない。
+     top/left は通常 JS が inline style で与える（ここは inline 未設定時のフォールバック） */
+  position: fixed;
   top: 12px;
   left: 12px;
-  z-index: 2147483646; /* YouTube player 内最上層、ただし ytp 右クリックメニューより 1 低い保険 */
+  z-index: 2147483646; /* YouTube UI 最上層、ただし ytp 右クリックメニューより 1 低い保険 */
 
   /* ガンメタル基調背景 + 半透明黒で動画上の視認性確保 */
   background: linear-gradient(180deg, rgba(20, 22, 26, 0.92), rgba(12, 14, 18, 0.92));
@@ -31,7 +34,6 @@
 
   /* user-select 抑止 + ドラッグ中のテキスト選択防止 */
   user-select: none;
-  -webkit-user-select: none;
 
   transition: transform 120ms ease-out, opacity 120ms ease-out;
 }
@@ -90,10 +92,6 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-/* 高 DPI / フルスクリーン時もそのまま機能。フルスクリーンに入ると movie_player 自体が
-   :fullscreen 疑似クラスでフルスクリーンになるため overlay も追従して左上に出る */
-:fullscreen .__cpa-bc-overlay,
-:-webkit-full-screen .__cpa-bc-overlay {
-  top: 24px;
-  left: 24px;
-}
+/* フルスクリーン中は JS が overlay を document.fullscreenElement 配下へ reparent する
+   （top layer の :fullscreen 要素配下でないと描画されないため）。position:fixed のまま
+   viewport 座標が維持され、保存位置は fullscreenchange 時に viewport 内へ clamp される */

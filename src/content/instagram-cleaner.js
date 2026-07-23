@@ -123,7 +123,7 @@
       if (document.querySelector(selector)) continue;
       i18nWarned.add(key);
       console.warn(
-        `[Instagram cleaner] 機能 "${key}" のセレクタ "${selector}" が DOM にマッチしません。Instagram の UI 変更でセレクタが古くなっている可能性があります。`
+        `[WebViewingAssist] Instagram クリーナー: 機能 "${key}" のセレクタ "${selector}" が DOM にマッチしません。Instagram の UI 変更でセレクタが古くなっている可能性があります。`
       );
     }
   }

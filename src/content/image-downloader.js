@@ -276,6 +276,24 @@
   }
 
   /**
+   * img → host 要素の cache 付き解決。findHostEl の Instagram 分岐は強制レイアウト /
+   * スタイル再計算（hasOverlayingSibling の getBoundingClientRect + 全 sibling getComputedStyle）
+   * を伴うため、200ms 周期スイープの「src 未変更」高速パスで毎回再実行しない。
+   * cache は「host がまだ document に接続され img を内包している」ときだけ有効とし、
+   * DOM 再構築で構造が変わったら自動的に findHostEl 再計算へフォールバックする
+   * （contains / isConnected はレイアウト誘発なしの安価な判定）。
+   */
+  const hostElCache = new WeakMap();
+  function resolveHostEl(img) {
+    const cached = hostElCache.get(img);
+    if (cached && cached.isConnected && cached.contains(img)) return cached;
+    const el = findHostEl(img);
+    if (el) hostElCache.set(img, el);
+    else hostElCache.delete(img);
+    return el;
+  }
+
+  /**
    * 指定要素に「ほぼ同サイズで重なる absolute/fixed positioned な兄弟」が存在するか判定。
    * Instagram のモーダル投稿ビューが透明クリック overlay を sibling として配置する構造の検出用。
    * 80% 以上の重複面積を「重なっている」と見なす（小さなツールチップ等は誤検出しない）。
@@ -569,7 +587,7 @@
     // host や img のサイズが SPA navigation / lazy load / window resize で変わっているケースに対応。
     // SKIP マーカーが付いてる場合は decorate 対象外なので何もしない。
     if (lastSrc === currentSrc) {
-      const hostElCached = findHostEl(img);
+      const hostElCached = resolveHostEl(img);
       if (hostElCached) {
         const existingBtn = hostElCached.querySelector(`:scope > .${ImageDownloader.BUTTON_CLASS}`);
         if (existingBtn) syncButtonPosition(existingBtn, img);
@@ -586,7 +604,7 @@
       img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] = ImageDownloader.SKIP_MARKER + ":" + currentSrc;
       return;
     }
-    const hostEl = findHostEl(img);
+    const hostEl = resolveHostEl(img);
     if (!hostEl) return;
 
     applyHostPositionClass(hostEl);
@@ -609,7 +627,9 @@
    * ことを確認してから外す（他の img 装飾を巻き込まないため）。
    */
   function detachOverlayForImage(img) {
-    const hostEl = findHostEl(img);
+    // cache 済み host があればそれを優先（button は cache 時点の host に append されているため、
+    // DOM 再構築後に findHostEl が別要素を返しても撤去先を取り違えない）
+    const hostEl = resolveHostEl(img);
     if (!hostEl) return;
     const btn = hostEl.querySelector(`:scope > .${ImageDownloader.BUTTON_CLASS}`);
     if (btn) btn.remove();

@@ -118,7 +118,8 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       }
     }
 
-    // 対数マッピングで実 gain を算出 → setTargetAtTime で 45ms ramp。
+    // 線形マッピング (VolumeBooster.percentToGain = percent / 100) で実 gain を算出
+    // → setTargetAtTime で 45ms ramp。
     // 直接 `.value =` 代入だとプチノイズが乗るため必ず ramp 経由にする。
     // cancelScheduledValues で古いランプ予約を破棄してから現在値を anchor し新しいランプを開始。
     // ミュート ON のときは percentToGain を無視して 0 へランプする。`lastSetPercent` には

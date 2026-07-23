@@ -959,7 +959,10 @@
       list.push({ key, name });
       await chrome.storage.local.set({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: list });
       // 除去自体は storage.onChanged → onSettingsChanged → 本 pass 再実行で行われる
-    } catch {}
+    } catch (err) {
+      // popup 側 (removeBlockedChannel の logStorageError) と同様、書き込み失敗の手がかりを console に残す
+      console.warn("[WebViewingAssist] チャンネルブロックリストの保存に失敗:", err);
+    }
   }
 
   function applyChannelBlocklist() {

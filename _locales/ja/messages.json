@@ -326,7 +326,7 @@
   "feat_sf_connectionMonitor_label": { "message": "ライブ配信の接続モニター" },
   "feat_sf_connectionMonitor_desc": { "message": "YouTube ライブ視聴中にプレーヤー右上 HUD を表示し、クルクル（バッファリング）の原因を「回線 / PC / YouTube / 経路」で切り分けます。経路診断のため Google / Cloudflare の公開エンドポイントへ RTT 計測のみ送信" },
   "feat_sf_broadcastClock_label": { "message": "配信アーカイブに配信時刻を表示" },
-  "feat_sf_broadcastClock_desc": { "message": "ライブ配信のアーカイブを再生中、その瞬間が実際に配信されていた時刻（yyyy/MM/dd　hh:mm:ss）をプレーヤー左上に重ねて表示します。通常動画・配信中のライブには表示されません。配信途中の中断・編集があるアーカイブでは実時刻がずれる場合があります" },
+  "feat_sf_broadcastClock_desc": { "message": "ライブ配信のアーカイブを再生中、その瞬間が実際に配信されていた時刻（yyyy/MM/dd　hh:mm:ss）を画面上に重ねて表示します。オーバーレイはドラッグで動画の外側を含む好きな位置へ移動できます。通常動画・配信中のライブには表示されません。配信途中の中断・編集があるアーカイブでは実時刻がずれる場合があります" },
   "bcOverlayLabel": { "message": "配信時刻" },
   "bcDragHandle": { "message": "ドラッグで移動" },
   "feat_sf_redirectShortsUrl_label": { "message": "Shorts URL を /watch にリダイレクト" },

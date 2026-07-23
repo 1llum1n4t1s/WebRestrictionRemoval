@@ -327,7 +327,7 @@
   "feat_sf_connectionMonitor_label": { "message": "Live stream connection monitor" },
   "feat_sf_connectionMonitor_desc": { "message": "While watching a YouTube live stream, show a HUD in the top-right of the player and classify the cause of buffering (your network / your device / YouTube CDN / network route). For route diagnosis it sends RTT-only probes to public Google / Cloudflare endpoints." },
   "feat_sf_broadcastClock_label": { "message": "Show broadcast time on stream archives" },
-  "feat_sf_broadcastClock_desc": { "message": "While replaying a live-stream archive, overlay the real-world time each moment was originally broadcast (yyyy/MM/dd hh:mm:ss) in the top-left of the player. Not shown for regular videos or ongoing live streams. Accuracy can drift on archives that had mid-stream interruptions or edits." },
+  "feat_sf_broadcastClock_desc": { "message": "While replaying a live-stream archive, overlay the real-world time each moment was originally broadcast (yyyy/MM/dd hh:mm:ss) on screen. Drag the overlay to any position, including outside the video. Not shown for regular videos or ongoing live streams. Accuracy can drift on archives that had mid-stream interruptions or edits." },
   "bcOverlayLabel": { "message": "Broadcast" },
   "bcDragHandle": { "message": "Drag to move" },
   "feat_sf_redirectShortsUrl_label": { "message": "Redirect Shorts URL to /watch" },

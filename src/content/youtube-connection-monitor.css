@@ -37,7 +37,6 @@
 
   /* user-select 抑止 + ドラッグ中のテキスト選択防止 */
   user-select: none;
-  -webkit-user-select: none;
 
   /* 動画と完全に被ったときも視線誘導は最低限 (透明度演出は verdict 別で行う) */
   transition: transform 120ms ease-out, opacity 120ms ease-out;
@@ -221,8 +220,7 @@
 
 /* 高 DPI / フルスクリーン時もそのまま機能。フルスクリーンに入ると movie_player 自体が
    :fullscreen 疑似クラスでフルスクリーンになるため overlay も追従して右上に出る */
-:fullscreen .__cpa-cm-overlay,
-:-webkit-full-screen .__cpa-cm-overlay {
+:fullscreen .__cpa-cm-overlay {
   top: 24px;
   right: 24px;
 }

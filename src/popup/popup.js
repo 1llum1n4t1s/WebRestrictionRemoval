@@ -372,16 +372,39 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(savedGain));
   updateVolumeLabel(savedGain);
   updateVolumeBoosterDimState();
-  // popup open での active tab への自動 push はしない (2026-06-07 修正)。
-  // 「popup 必須＝自動適用なし」設計 (memory: volume-booster-uniform-preference) のとおり、
-  // 未 boost タブへの初回 tabCapture (= 「このタブのコンテンツは共有されています」バナー誘発)
-  // はユーザーの能動操作 (スライダー / サブトグル / ミュート変更) を契機にする。
-  // 旧コード `pushVolumeNow(savedGain)` は「タブ切替で漏れた場合の保証」名目だったが、
-  // active tab が未 boost (例: Amazon 買い物ページ) でも問答無用で tabCapture を呼び、
-  // 再生と無関係なタブで誤バナーが出る原因になっていた。
-  // 既 boost 中タブへの設定追従は (a) background の chrome.tabs.onActivated →
-  // autoApplyVolumeBooster (= boostedTabIds 既登録のみ対象、tabCapture 発動なし) と、
-  // (b) popup のスライダー / トグル操作時の pushVolumeNow が担う。
+  // popup open (= user gesture) での条件付き自動 push (2026-07-23 復活、ゆろさん承認)。
+  // 旧・無条件 push は active tab が未 boost (例: Amazon 買い物ページ) でも問答無用で
+  // tabCapture を呼び、再生と無関係なタブで「このタブのコンテンツは共有されています」の
+  // 誤バナーが出るため 2026-06-07 に撤去した経緯がある。今回は以下 3 条件の AND を満たす
+  // ときだけ push し、誤バナーを構造的に再発させない:
+  //   (1) マスター ON
+  //   (2) 設定が中立でない (!isUnityRelease)。中立なら push しても background の release
+  //       経路で無処理なので送らない
+  //   (3) active tab が音を出している (tab.audible === true) — 動画 / 音楽を再生中のタブ
+  //       だけが対象で、無音の買い物ページ等では従来どおり何も起きない。一時停止中の
+  //       タブも audible=false なので、その場合は従来どおりスライダー等の能動操作が契機
+  // Firefox MES 経路は storage.onChanged で全タブ自動適用されるため popup open push 不要。
+  // 既 boost 中タブへの設定追従は従来どおり background の chrome.tabs.onActivated →
+  // autoApplyVolumeBooster と、popup のスライダー / トグル操作時の pushVolumeNow が担う。
+  if (!VOLUME_BOOSTER_VIA_MES && $volumeBoosterToggle.checked) {
+    const neutral = VolumeBooster.isUnityRelease({
+      gain: savedGain,
+      antiClip: $volumeAntiClipToggle.checked,
+      nightMode: $volumeNightModeToggle.checked,
+      bassCut: $volumeBassCutToggle.checked,
+      muted: volumeMuted,
+      eqEnabled: $volumeEqToggle.checked,
+    });
+    if (!neutral) {
+      getActiveHttpTab()
+        .then((tab) => {
+          if (!tab || tab.audible !== true) return;
+          if (!document.body?.isConnected) return;
+          return pushVolumeNow(savedGain);
+        })
+        .catch(logVolumeError("popup-open"));
+    }
+  }
 
   const storedFeatures = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
   for (const [key, input] of featureInputs) {
@@ -1682,7 +1705,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     // 不明なエラー: ユーザーには汎用メッセージのみ提示し、原文は DevTools console に。
     // raw error text を UI に出すと内部実装が漏れるため意図的に隠す。
-    console.warn("[VolumeBooster] Unknown error:", s);
+    console.warn("[WebViewingAssist popup] Unknown volume error:", s);
     return i18n("volumeErrorUnknown");
   }
 

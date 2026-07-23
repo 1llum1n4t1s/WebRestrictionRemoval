@@ -316,7 +316,6 @@ html.__cpa-sfx-subs-grid #__cpa-sfx-subs-toolbar {
   z-index: 30;
   background: var(--cpa-subs-bg-toolbar, rgba(255, 255, 255, 0.96));
   backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--cpa-subs-divider, rgba(0, 0, 0, 0.1));
   color: var(--cpa-subs-fg-primary, #0f0f0f);
   font-family: "Roboto", "Arial", sans-serif;
