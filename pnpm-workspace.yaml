@@ -3,3 +3,13 @@ allowBuilds:
   puppeteer: true
   sharp: true
   spawn-sync: true
+
+# overrides: web-ext 配下の transitive 脆弱性 3 件をパッチ版へ固定する
+# (脆弱範囲にだけ効く versioned selector で blast radius を最小化)
+#   - adm-zip     GHSA-xcpc-8h2w-3j85 (web-ext>firefox-profile 経由)
+#   - shell-quote GHSA-395f-4hp3-45gv (web-ext>fx-runner 経由)
+#   - fast-uri    GHSA-v2hh-gcrm-f6hx (web-ext>addons-linter>ajv 経由、ajv 互換のため v3 系維持)
+overrides:
+  "adm-zip@<0.6.0": "0.6.0"
+  "shell-quote@<1.8.5": "^1.8.5"
+  "fast-uri@>=3.0.0 <3.1.4": "^3.1.4"
