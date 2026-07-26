@@ -9,7 +9,12 @@ allowBuilds:
 #   - adm-zip     GHSA-xcpc-8h2w-3j85 (web-ext>firefox-profile 経由)
 #   - shell-quote GHSA-395f-4hp3-45gv (web-ext>fx-runner 経由)
 #   - fast-uri    GHSA-v2hh-gcrm-f6hx (web-ext>addons-linter>ajv 経由、ajv 互換のため v3 系維持)
+#   - brace-expansion GHSA-mh99-v99m-4gvg (eslint>minimatch@10 経由)
+#     ※ minimatch@3 が引く 1.1.16 も同 advisory の対象だが、1.x 系に修正版が存在せず
+#       (1.1.16 が最新)、5.0.8 は type:"module" の ESM 専用なので CJS の minimatch@3 に
+#       当てると require で壊れる。よって 5.x 系だけを patch 版へ固定する。
 overrides:
   "adm-zip@<0.6.0": "0.6.0"
   "shell-quote@<1.8.5": "^1.8.5"
   "fast-uri@>=3.0.0 <3.1.4": "^3.1.4"
+  "brace-expansion@>=5.0.0 <5.0.8": "^5.0.8"
