@@ -5,7 +5,7 @@
 // 動作し、`<video>.duration === Infinity` のライブ配信のときだけ計測ループとオーバーレイを
 // 起動する（通常動画では一切介入しない）。
 //
-// 有効化は YouTube クリーナーのサブ機能として制御する: master `searchFixerEnabled` AND
+// 有効化は YouTube 機能拡張のサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.connectionMonitor` の両方 true で activate（独立 storage key は持たず、
 // APPLY_SEARCH_FIXER_CS を search-fixer.js / youtube-shorts.js と共に購読する）。
 //
@@ -987,7 +987,7 @@
   }
 
   // ---------- 設定購読 ----------
-  // 接続モニターは YouTube クリーナーのサブ機能。master `searchFixerEnabled` AND
+  // 接続モニターは YouTube 機能拡張のサブ機能。master `searchFixerEnabled` AND
   // `searchFixerFeatures.connectionMonitor` の両方 true のときだけ activate する
   // (youtube-shorts.js と同じ統合方式)。両キーを毎回再取得するので「片方だけ変わって
   // もう片方が undefined になる」罠を構造的に回避する。

@@ -10,7 +10,7 @@
 // フルスクリーン中は top layer の :fullscreen 要素配下でないと描画されないため、
 // fullscreenchange で document.fullscreenElement へ reparent する。
 //
-// 有効化は YouTube クリーナーのサブ機能として制御する: master `searchFixerEnabled` AND
+// 有効化は YouTube 機能拡張のサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.broadcastClock` の両方 true で activate（独立 storage key は持たず、
 // APPLY_SEARCH_FIXER_CS を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と
 // 共に購読する）。純粋ロジック（videoId 抽出 / HTML パース / 時刻算出 / 整形）は actions.js の
@@ -584,7 +584,7 @@
   }
 
   // ---------- 設定購読 ----------
-  // 配信時刻オーバーレイは YouTube クリーナーのサブ機能。master `searchFixerEnabled` AND
+  // 配信時刻オーバーレイは YouTube 機能拡張のサブ機能。master `searchFixerEnabled` AND
   // `searchFixerFeatures.broadcastClock` の両方 true のときだけ activate する
   // （youtube-connection-monitor.js / youtube-shorts.js と同じ統合方式）。両キーを毎回再取得する
   // ので「片方だけ変わってもう片方が undefined になる」罠を構造的に回避する。

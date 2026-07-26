@@ -17,7 +17,56 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const G = require("./_load-actions");
+
+// ---------- ロケール整合 ----------
+
+/**
+ * FEATURES に機能を足したのに `_locales/{ja,en}/messages.json` のラベル / 説明文を足し忘れると、
+ * popup のアコーディオンに「空のトグル行」だけが出る（2026-07-26 に notebookLmSend で実際に発生）。
+ * popup.js は FEATURES 駆動で行を自動生成するため、i18n キーの欠落は実行時まで気付けない。
+ * ここで機械的に突き合わせて CI で検知する。
+ */
+test("_locales: 全 FEATURES に label / desc が ja / en 両方そろっている（空トグル行の再発防止）", () => {
+  const localeDir = path.join(__dirname, "..", "_locales");
+  const read = (lang) => JSON.parse(fs.readFileSync(path.join(localeDir, lang, "messages.json"), "utf8"));
+  const ja = read("ja");
+  const en = read("en");
+  const groups = [
+    { prefix: "feat_sf_", features: G.SearchFixer.FEATURES },
+    { prefix: "feat_ig_", features: G.InstagramCleaner.FEATURES },
+    { prefix: "feat_tt_", features: G.TikTokCleaner.FEATURES },
+  ];
+  const missing = [];
+  for (const { prefix, features } of groups) {
+    for (const feature of features) {
+      for (const suffix of ["_label", "_desc"]) {
+        const key = `${prefix}${feature.key}${suffix}`;
+        if (!(key in ja)) missing.push(`ja: ${key}`);
+        if (!(key in en)) missing.push(`en: ${key}`);
+      }
+    }
+  }
+  assert.deepEqual(missing, [], `messages.json に不足しているキー:\n  ${missing.join("\n  ")}`);
+});
+
+test("_locales: 全 CATEGORIES にカテゴリ名が ja / en 両方そろっている", () => {
+  const localeDir = path.join(__dirname, "..", "_locales");
+  const read = (lang) => JSON.parse(fs.readFileSync(path.join(localeDir, lang, "messages.json"), "utf8"));
+  const ja = read("ja");
+  const en = read("en");
+  const missing = [];
+  for (const cat of G.SearchFixer.CATEGORIES) {
+    // popup は category id (snake_case) を camelCase 化して `category<CamelId>` を引く。
+    const camel = cat.id.split("_").map((s) => s[0].toUpperCase() + s.slice(1)).join("");
+    const key = `category${camel}`;
+    if (!(key in ja)) missing.push(`ja: ${key}`);
+    if (!(key in en)) missing.push(`en: ${key}`);
+  }
+  assert.deepEqual(missing, [], `messages.json に不足しているカテゴリ名:\n  ${missing.join("\n  ")}`);
+});
 
 // ---------- VolumeBooster ----------
 
@@ -749,9 +798,9 @@ test("SearchFixer.FEATURES: 旧 removeShorts は 4 機能に解体され Shorts 
   assert.equal(redirectShortsUrl.category, "watch_page");
 });
 
-test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only の 4 個", () => {
+test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only / integration の 5 個", () => {
   const ids = G.SearchFixer.CATEGORIES.map((c) => c.id);
-  assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only"]);
+  assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only", "integration"]);
 });
 
 test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/membersOnly/watched + removeShortsShelf + removeFeedSections + channelBlocklist", () => {
@@ -895,7 +944,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 22 個の定数を公開する", () => {
+test("actions.js は globalThis に 23 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -917,12 +966,14 @@ test("actions.js は globalThis に 22 個の定数を公開する", () => {
     "Loupe",
     "ConnectionMonitor",
     "BroadcastClock",
+    "NotebookLm",
     "ColorPicker",
     "PopupTabs",
   ];
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);
   }
+  assert.equal(required.length, 23, "公開定数の件数（ドキュメント整合性の単一情報源）");
 });
 
 test("TikTokCleaner.mergeFeatures: undefined / null / 不正型は default", () => {
@@ -1094,9 +1145,258 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 32, "SearchFixer.FEATURES は 32 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 34, "SearchFixer.FEATURES は 34 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 11, "InstagramCleaner.FEATURES は 11 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
+});
+
+// ---------- 海外チャンネル除外 (hideForeignChannels) の純粋関数 ----------
+
+test("SearchFixer.detectTextOrigin: 自国固有スクリプトで home、別スクリプトで foreign", () => {
+  const d = G.SearchFixer.detectTextOrigin;
+  // 仮名を含めば日本語話者にとって home（漢字が混ざっていても同じ）
+  assert.equal(d("ゆっくり実況プレイ", "ja"), "home");
+  assert.equal(d("カタカナタイトル", "ja"), "home");
+  assert.equal(d("週刊ニュース 第3回", "ja-JP"), "home");
+  // 自国固有でない非ラテンスクリプトは foreign
+  assert.equal(d("한국어 방송", "ja"), "foreign");
+  assert.equal(d("Привет мир", "ja"), "foreign");
+  assert.equal(d("العربية", "ja"), "foreign");
+  assert.equal(d("สวัสดี", "ja"), "foreign");
+  // ラテン文字のみ / 漢字のみ / 記号のみは決め手にならず unknown（about fetch に委ねる）
+  assert.equal(d("Lofi hip hop radio", "ja"), "unknown");
+  assert.equal(d("最新科学解説", "ja"), "unknown");
+  assert.equal(d("2026 / 07 - 26", "ja"), "unknown");
+  // 空 / 非文字列は unknown
+  assert.equal(d("", "ja"), "unknown");
+  assert.equal(d("   ", "ja"), "unknown");
+  assert.equal(d(null, "ja"), "unknown");
+  assert.equal(d("あいうえお", null), "unknown", "自国言語が不明ならスクリプト判定に home 基準が無い");
+  // 韓国語話者から見るとハングルが home、仮名が foreign（対称性）
+  assert.equal(d("한국어 방송", "ko"), "home");
+  assert.equal(d("ゆっくり実況", "ko"), "foreign");
+  // ラテン文字圏は固有スクリプトが無いので常に unknown（非ラテンだけ foreign 判定できる）
+  assert.equal(d("Breaking news tonight", "en"), "unknown");
+  assert.equal(d("ゆっくり実況", "en"), "foreign");
+});
+
+test("SearchFixer.resolveHomeRegion: 地域サブタグ優先 → 言語フォールバック → null", () => {
+  const r = G.SearchFixer.resolveHomeRegion;
+  assert.equal(r(["ja-JP", "ja", "en-US"]), "JP");
+  assert.equal(r(["ja", "en-US"]), "US", "地域サブタグ付きが先に見つかればそれを採用");
+  assert.equal(r(["ja"]), "JP", "地域サブタグが無ければ言語からフォールバック");
+  assert.equal(r(["zh-Hant-TW"]), "TW", "script サブタグ入りでも地域を拾う");
+  assert.equal(r(["en"]), "US");
+  assert.equal(r(["xx"]), null, "未知の言語コードは null");
+  assert.equal(r([]), null);
+  assert.equal(r(null), null);
+  assert.equal(r("ja-JP"), null, "配列以外は null");
+});
+
+test("SearchFixer.parseChannelCountry: aboutChannelViewModel 以降だけを見る（先頭一致の誤爆防止）", () => {
+  const p = G.SearchFixer.parseChannelCountry;
+  const about = (body) => `{"aboutChannelViewModel":{${body}}}`;
+  assert.equal(p(about('"descriptionLabel":{},"country":"アメリカ合衆国"')), "アメリカ合衆国");
+  assert.equal(p(about('"country":"ドイツ"')), "ドイツ");
+  assert.equal(p(about('"country":"C\\u00f4te d\\u2019Ivoire"')), "Côte d’Ivoire", "JSON エスケープを解く");
+  // /rere RC-G: ytcfg 等の視聴者側の国が先行しても、about モデル側の値を採る
+  assert.equal(
+    p(`{"ytcfg":{"country":"JP"}}` + about('"country":"アメリカ合衆国"')),
+    "アメリカ合衆国",
+    "aboutChannelViewModel より前の country は無視する"
+  );
+  assert.equal(p(about('"country":""')), null, "空文字は null");
+  assert.equal(p(about('"countryCode":"JP"')), null, "別キー countryCode には反応しない");
+  assert.equal(p('"country":"アメリカ合衆国"'), null, "aboutChannelViewModel が無ければ null（全体走査しない）");
+  assert.equal(p("国を公開していないチャンネルの HTML"), null);
+  assert.equal(p(""), null);
+  assert.equal(p(null), null);
+});
+
+test("SearchFixer.classifyCountryName: 既知の国名でなければ unknown に倒す（fail-open）", () => {
+  const c = G.SearchFixer.classifyCountryName;
+  const home = new Set(["jp", "日本", "japan"]);
+  const known = new Set(["日本", "japan", "アメリカ合衆国", "united states", "ドイツ", "germany"]);
+  assert.equal(c("日本", home, known), "home");
+  assert.equal(c("Japan", home, known), "home", "大文字小文字を無視");
+  assert.equal(c(" 日本 ", home, known), "home", "前後の空白を無視");
+  assert.equal(c("アメリカ合衆国", home, known), "foreign");
+  assert.equal(c("ドイツ", home, known), "foreign");
+  // /rere RC-H: 照合ロケールがずれて自国名が既知集合に無い場合、foreign ではなく unknown へ
+  assert.equal(
+    c("アメリカ合衆国", new Set(["us", "united states"]), new Set(["united states", "japan"])),
+    "unknown",
+    "既知の国名として解決できない表記は判定不能（= 残す）"
+  );
+  assert.equal(c("Estados Unidos", home, known), "unknown", "第三言語表記は unknown");
+  assert.equal(c("", home, known), "unknown");
+  assert.equal(c("   ", home, known), "unknown");
+  assert.equal(c(null, home, known), "unknown");
+  assert.equal(c("日本", home, null), "home", "既知集合が無くても自国一致は home");
+  assert.equal(c("ドイツ", home, null), "unknown", "既知集合が無ければ foreign 断定しない");
+});
+
+// ---------- NotebookLM 送信の純粋関数 / プロトコル定数 ----------
+
+test("NotebookLm: RPC ID とエンドポイントの値固定（Google 側変更の drift 検知）", () => {
+  assert.equal(G.NotebookLm.ORIGIN, "https://notebooklm.google.com");
+  assert.equal(G.NotebookLm.BATCH_PATH, "/_/LabsTailwindUi/data/batchexecute");
+  assert.equal(G.NotebookLm.RPC_CREATE_NOTEBOOK, "CCqFvf");
+  assert.equal(G.NotebookLm.RPC_ADD_SOURCES, "izAoDd");
+  assert.equal(G.NotebookLm.RPC_LIST_NOTEBOOKS, "wXbhsf");
+  assert.equal(G.NotebookLm.RPC_SOURCE_LIMIT, "ozz5Z");
+  // アカウント選択 UI をメールアドレス表示にするための WIZ キー（取れなくなったら番号表示に退避）
+  assert.equal(G.NotebookLm.ACCOUNT_EMAIL_KEY, "oPEP7c");
+});
+
+// /rere B2-10: 応答パース側だけテストされていて、リクエスト形状（f.req のネスト段数 /
+// at・bl・source-path・rt の付与）は fetch に埋まっていて検証されていなかった。
+// 「200 応答なのに壊れる」故障モードを想定する機能なので、送信側の drift も CI で捕まえる。
+test("NotebookLm.buildRpcRequest: batchexecute のリクエスト形状を固定する", () => {
+  const req = G.NotebookLm.buildRpcRequest({
+    rpcId: "izAoDd",
+    payload: '[[[null]],"nb-1"]',
+    sourcePath: "/notebook/nb-1",
+    bl: "boq_labs_123",
+    at: "AbCd:1234",
+    reqId: 123456,
+  });
+
+  const url = new URL(req.url);
+  assert.equal(url.origin + url.pathname, "https://notebooklm.google.com/_/LabsTailwindUi/data/batchexecute");
+  assert.equal(url.searchParams.get("rpcids"), "izAoDd");
+  assert.equal(url.searchParams.get("source-path"), "/notebook/nb-1");
+  assert.equal(url.searchParams.get("bl"), "boq_labs_123");
+  assert.equal(url.searchParams.get("_reqid"), "123456");
+  assert.equal(url.searchParams.get("rt"), "c");
+  assert.equal(url.searchParams.get("authuser"), null, "既定アカウントでは authuser を付けない");
+
+  const body = new URLSearchParams(req.body);
+  assert.equal(body.get("at"), "AbCd:1234");
+  // f.req は [[[rpcId, payload, null, "generic"]]] の 3 段ネスト。段数が変わると RPC が通らない。
+  assert.deepEqual(
+    JSON.parse(body.get("f.req")),
+    [[["izAoDd", '[[[null]],"nb-1"]', null, "generic"]]]
+  );
+});
+
+test("NotebookLm.buildRpcRequest / buildHomeUrl / buildNotebookUrl: authuser の付与", () => {
+  const req = G.NotebookLm.buildRpcRequest({
+    rpcId: "wXbhsf", payload: "[]", sourcePath: "/", bl: "b", at: "a", reqId: 1, accountIndex: 2,
+  });
+  assert.equal(new URL(req.url).searchParams.get("authuser"), "2");
+
+  assert.equal(G.NotebookLm.buildHomeUrl(0), "https://notebooklm.google.com/");
+  assert.equal(G.NotebookLm.buildHomeUrl(3), "https://notebooklm.google.com/?authuser=3");
+  assert.equal(G.NotebookLm.buildNotebookUrl("nb-1", 0), "https://notebooklm.google.com/notebook/nb-1");
+  assert.equal(
+    G.NotebookLm.buildNotebookUrl("nb-1", 1),
+    "https://notebooklm.google.com/notebook/nb-1?authuser=1",
+    "作成先アカウントを保って開かないと『作ったはずのノートブックが無い』状態になる"
+  );
+});
+
+test("NotebookLm.normalizeAccountIndex: 0〜MAX の整数だけ通す", () => {
+  const n = G.NotebookLm.normalizeAccountIndex;
+  assert.equal(n(0), 0);
+  assert.equal(n(1), 1);
+  assert.equal(n(G.NotebookLm.MAX_ACCOUNT_INDEX), G.NotebookLm.MAX_ACCOUNT_INDEX);
+  assert.equal(n(G.NotebookLm.MAX_ACCOUNT_INDEX + 1), 0, "範囲外は既定アカウントへ");
+  assert.equal(n(-1), 0);
+  assert.equal(n(1.5), 0);
+  assert.equal(n("2"), 2, "select の value は文字列で来る");
+  assert.equal(n("abc"), 0);
+  assert.equal(n(null), 0);
+  assert.equal(n(undefined), 0);
+});
+
+test("NotebookLm.normalizeWatchUrl: videoId を正規化 watch URL に揃える", () => {
+  const n = G.NotebookLm.normalizeWatchUrl;
+  assert.equal(n("/watch?v=dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(
+    n("/watch?v=dQw4w9WgXcQ&list=PLabc&index=3"),
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "list / index を落として同じ動画が重複ソース化しないようにする"
+  );
+  assert.equal(n("https://youtu.be/dQw4w9WgXcQ?t=42"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(n("/shorts/dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(n("/live/dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(n("/playlist?list=PLabc"), null, "動画 ID を含まない URL は null");
+  assert.equal(n("/watch?v=short"), null, "11 文字でない ID は拒否");
+  assert.equal(n(""), null);
+  assert.equal(n(null), null);
+});
+
+test("NotebookLm.buildSourcePayload: YouTube は専用スロット / 重複は除去", () => {
+  const b = G.NotebookLm.buildSourcePayload;
+  const yt = b(["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]);
+  assert.equal(yt.length, 1);
+  assert.equal(yt[0].length, 11, "ソース仕様は 11 要素");
+  assert.deepEqual(yt[0][7], ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"], "YouTube は 8 番目のスロット");
+  assert.equal(yt[0][10], 1, "末尾の 1 が無いとサーバーがソースを無視する");
+  const web = b(["https://example.com/article"]);
+  assert.equal(web[0].length, 11, "ソース仕様は 11 要素");
+  assert.deepEqual(web[0][2], ["https://example.com/article"], "Web サイトは 3 番目のスロット");
+  assert.equal(web[0][10], 1);
+  assert.equal(web[0][7], null, "Web サイトでは YouTube スロットを埋めない");
+  assert.equal(b(["https://a.test/x", "https://a.test/x"]).length, 1, "重複 URL は 1 件に畳む");
+  assert.deepEqual(b([]), []);
+  assert.deepEqual(b(null), []);
+  assert.deepEqual(b([""]), []);
+});
+
+test("NotebookLm.buildRequestOptions: 共通リクエストオプションの形状固定", () => {
+  const o = G.NotebookLm.buildRequestOptions();
+  assert.deepEqual(o, [2, null, null, [1, null, null, null, null, null, null, null, null, null, [1]]]);
+  o[0] = 99;
+  assert.equal(G.NotebookLm.buildRequestOptions()[0], 2, "呼び出しごとに新しい配列を返す");
+});
+
+test("NotebookLm.isYouTubeUrl: ホスト判定の境界値", () => {
+  const y = G.NotebookLm.isYouTubeUrl;
+  assert.equal(y("https://www.youtube.com/watch?v=a"), true);
+  assert.equal(y("https://m.youtube.com/watch?v=a"), true);
+  assert.equal(y("https://youtu.be/a"), true);
+  assert.equal(y("https://youtube.com.evil.test/watch?v=a"), false, "サフィックス偽装を通さない");
+  assert.equal(y("https://example.com/"), false);
+  assert.equal(y("not a url"), false);
+  assert.equal(y(null), false);
+});
+
+test("NotebookLm.extractToken / extractNotebookId: HTML と応答からの抽出", () => {
+  const t = G.NotebookLm.extractToken;
+  assert.equal(t('window.WIZ={"cfb2h":"boq_labs_123","SNlM0e":"AbCd:1234"}', "cfb2h"), "boq_labs_123");
+  assert.equal(t('{"SNlM0e":"AbCd:1234"}', "SNlM0e"), "AbCd:1234");
+  assert.equal(t('{"other":"x"}', "cfb2h"), null);
+  assert.equal(t(null, "cfb2h"), null);
+  assert.equal(t("{}", ""), null);
+
+  const id = G.NotebookLm.extractNotebookId;
+  assert.equal(
+    id('[["wrb.fr",null,"[\\"3f2504e0-4f89-11d3-9a0c-0305e82c3301\\"]"]]'),
+    "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+  );
+  assert.equal(id("no uuid here"), null);
+  assert.equal(id(null), null);
+});
+
+test("NotebookLm.parseNotebookList: batchexecute 応答の正規化と共有ノートブック除外", () => {
+  const rows = [
+    ["My notes", [1, 2, 3], "id-1", "📗", null, [1]],
+    ["", [], "id-2", "", null, [1]],
+    ["Featured", [1], "id-3", "📙", null, [3]],   // 共有・お手本は除外
+    ["Broken", [1], 123, "📕", null, [1]],        // id が文字列でないので除外
+    ["TooShort", [1], "id-5"],                     // 6 要素未満は除外
+  ];
+  const body = ")]}'\n\nX\n" + JSON.stringify([["wrb.fr", null, JSON.stringify([rows])]]);
+  const list = G.NotebookLm.parseNotebookList(body);
+  assert.deepEqual(list, [
+    { id: "id-1", name: "My notes", sources: 3, emoji: "📗" },
+    { id: "id-2", name: "Untitled notebook", sources: 0, emoji: "📔" },
+  ]);
+  assert.deepEqual(G.NotebookLm.parseNotebookList("garbage"), []);
+  assert.deepEqual(G.NotebookLm.parseNotebookList(""), []);
+  assert.deepEqual(G.NotebookLm.parseNotebookList(null), []);
 });
 
 // /rere レビュー B1-002 修正: SettingsSchema が StorageKeys / Actions と整合していることを検証。
@@ -1231,7 +1531,7 @@ test("ImageDownloader.isAllowedFetchUrl: cdninstagram.com は scontent- prefix �
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://attacker.cdninstagram.com/exfil"), false);
 });
 
-// 接続モニターは YouTube クリーナーのサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
+// 接続モニターは YouTube 機能拡張のサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
 // 独立 storage key / action は持たず、SearchFixer.FEATURES の watch_page カテゴリに存在することと、
 // 旧独立キーが完全に撤去されていることを drift 検知する（再導入の事故を CI で防ぐ）。
 test("接続モニターは SearchFixer.FEATURES の connectionMonitor サブ機能に統合されている", () => {
@@ -1248,7 +1548,7 @@ test("接続モニターは SearchFixer.FEATURES の connectionMonitor サブ機
   assert.equal(typeof G.ConnectionMonitor.classify, "function");
 });
 
-// 配信時刻オーバーレイ（broadcastClock）は YouTube クリーナーの watch_page サブ機能。
+// 配信時刻オーバーレイ（broadcastClock）は YouTube 機能拡張の watch_page サブ機能。
 test("配信時刻オーバーレイは SearchFixer.FEATURES の broadcastClock サブ機能に統合されている", () => {
   const bc = G.SearchFixer.FEATURES.find((f) => f.key === "broadcastClock");
   assert.ok(bc, "SearchFixer.FEATURES に broadcastClock が存在する必要がある");

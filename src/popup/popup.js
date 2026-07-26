@@ -202,7 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $volumeMuteIcon = $volumeMuteBtn?.querySelector(".volume-mute-icon");
   const $featureCategories = document.getElementById("featureCategories");
   const $searchFixerPill = document.getElementById("searchFixerPill");
-  // $gridItemsSelect は buildFeatureCategories で menu_ui カテゴリ末尾に動的挿入されるため、
+  // $gridItemsSelect は buildFeatureCategories で menu_ui カテゴリ先頭に動的挿入されるため、
   // ここでは取得せず、buildFeatureCategories の後で参照する。
   const $videoGammaToggle = document.getElementById("videoGammaToggle");
   const $videoGammaRow = document.getElementById("videoGammaRow");
@@ -244,7 +244,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let blockedChannels = [];
 
   buildFeatureCategories();
-  // menu_ui カテゴリ末尾に挿入された gridItemsSelect を以降の処理で参照する。
+  // menu_ui カテゴリ先頭に挿入された gridItemsSelect を以降の処理で参照する。
   // _buildAccordionCategories が cat.id === "menu_ui" のとき _buildGridItemsRow で生成する。
   const $gridItemsSelect = document.getElementById("gridItemsSelect");
   buildGridSelect();
@@ -963,32 +963,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ----- DOM 構築 -----
 
   /**
-   * メニュー/UI カテゴリの末尾に挿入する「ホーム列数」select 行を構築する。
-   * popup.html から static な select-row を取り除き、SearchFixer のカテゴリと整列させて
-   * 動的に menu_ui カテゴリ配下に置く。<select> の options は別途 buildGridSelect が埋める。
+   * メニュー/UI カテゴリの先頭に挿入する「ホーム列数」行を構築する。
+   * 見た目は他のサブ機能トグル行 (`feature-row`) と同じ 1 行レイアウトに揃え、
+   * 右側のコントロールだけ switch ではなく `<select>` にする。
+   * <select> の options は別途 buildGridSelect が埋める。
    */
   function _buildGridItemsRow(listEl) {
-    const row = document.createElement("div");
-    row.className = "select-row";
+    const row = document.createElement("label");
+    row.className = "feature-row feature-row--select";
+    row.setAttribute("for", "gridItemsSelect");
 
-    const label = document.createElement("label");
-    label.className = "select-label";
-    label.setAttribute("for", "gridItemsSelect");
-    const icon = document.createElement("span");
-    icon.className = "select-icon";
-    icon.setAttribute("aria-hidden", "true");
-    icon.textContent = "🔢";
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "select-name";
-    nameSpan.textContent = i18n("gridItemsLabel");
-    label.append(icon, nameSpan);
+    const text = document.createElement("span");
+    text.className = "fr-text";
+
+    const name = document.createElement("span");
+    name.className = "fr-name";
+    name.textContent = i18n("gridItemsLabel");
+    text.appendChild(name);
+
+    const descMessage = i18n("gridItemsDesc");
+    if (descMessage) {
+      const desc = document.createElement("span");
+      desc.className = "fr-desc";
+      desc.textContent = descMessage;
+      text.appendChild(desc);
+    }
 
     const select = document.createElement("select");
     select.id = "gridItemsSelect";
     select.className = "select";
 
-    row.append(label, select);
-    listEl.appendChild(row);
+    row.append(text, select);
+    listEl.insertBefore(row, listEl.firstChild);
   }
 
   /**
@@ -1066,21 +1072,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * クリーナー詳細アコーディオンの DOM ビルダー（YouTube クリーナー / Instagram クリーナー / TikTok クリーナー共通）。
+   * クリーナー詳細アコーディオンの DOM ビルダー（YouTube 機能拡張 / Instagram クリーナー / TikTok クリーナー共通）。
    *
    * 構造: `cat` > `cat-head` (アイコン + ラベル) + `cat-list` (各機能のトグル行)。
    * 各 `feature-row` は 1 行 1 トグル + 説明文の縦積みレイアウト。
    * 各 `<input type="checkbox">` には `id="${idPrefix}${item.key}"` を付与し、
    * `inputMap` (`Map<key, input>`) に登録して呼び出し側で値の収集・復元に使う。
    *
-   * カテゴリ id が "menu_ui" のときは末尾にホーム列数 select 行を動的挿入する。
+   * カテゴリ id が "menu_ui" のときは先頭にホーム列数行を動的挿入する。
    *
    * @param {string} messageKeyPrefix `feat_sf_` / `feat_ig_` / `feat_tt_` のいずれか。
    *   これに `${item.key}_label` / `${item.key}_desc` を後置して messages.json から取得する。
    */
   /**
    * 機能トグル 1 行（ラベル + 説明文 + switch）を構築して inputMap に登録し、`<label>` を返す。
-   * YouTube クリーナーのサブタブ表示 / Instagram / TikTok のスタック表示で共通利用する。
+   * YouTube 機能拡張のサブタブ表示 / Instagram / TikTok のスタック表示で共通利用する。
    */
   function _buildFeatureRow(item, inputMap, idPrefix, messageKeyPrefix) {
     const row = document.createElement("label");
@@ -1120,7 +1126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   /**
    * 1 カテゴリ分の `cat-list`（機能トグル行の集合）を構築して返す。
-   * menu_ui カテゴリのときは末尾にホーム列数 select 行を挿入する。
+   * menu_ui カテゴリのときは先頭にホーム列数行を挿入する。
    */
   function _buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix) {
     const list = document.createElement("div");
@@ -1128,7 +1134,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const item of items) {
       list.appendChild(_buildFeatureRow(item, inputMap, idPrefix, messageKeyPrefix));
     }
-    // menu_ui カテゴリの末尾にホーム列数 select 行を挿入。
+    // menu_ui カテゴリの先頭にホーム列数行を挿入（Shorts サイドバーメニューより上）。
     // （Instagram / TikTok クリーナーには menu_ui カテゴリが無いため呼ばれない / カテゴリ集合次第で安全）
     if (cat.id === "menu_ui") {
       _buildGridItemsRow(list);
@@ -1136,7 +1142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // video_filter カテゴリの末尾にチャンネルブロックリスト管理ブロックを挿入。
     // channelBlocklist 機能はこのカテゴリに属する（2026-07-14 に search_only から移動、
     // 検索結果限定からフィードページにも一律適用するよう拡張したため）。
-    // （video_filter カテゴリは YouTube クリーナーのみ / データ描画は stored 読込後の renderBlockedChannels）
+    // （video_filter カテゴリは YouTube 機能拡張のみ / データ描画は stored 読込後の renderBlockedChannels）
     if (cat.id === "video_filter") {
       _buildBlockedChannelsManager(list);
     }
@@ -1147,7 +1153,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const frag = document.createDocumentFragment();
     for (const cat of categories) {
       const items = features.filter((f) => f.category === cat.id);
-      // menu_ui カテゴリは features が空でもホーム列数 select を含めるため空チェックの除外対象。
+      // menu_ui カテゴリは features が空でもホーム列数行を含めるため空チェックの除外対象。
       if (items.length === 0 && cat.id !== "menu_ui") continue;
 
       const wrap = document.createElement("div");

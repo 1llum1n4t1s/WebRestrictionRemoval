@@ -1425,42 +1425,15 @@ body {
   transform: translateX(16px);
 }
 
+/* switch の代わりに <select> を持つ feature 行（ホーム列数）。
+   他のサブ機能行と同じ 1 行レイアウトのまま、右側コントロールだけ差し替える。 */
+.feature-row--select > .select {
+  margin-top: 1px;
+}
+
 /* ============================================================
- * Select row + select
+ * Select
  * ============================================================ */
-.select-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  background: var(--bg-deep);
-  border: 1px solid var(--rule);
-  border-left: 2px solid var(--rog-red);
-  border-radius: 0;
-  margin-top: 8px;
-}
-
-.select-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--ink);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.select-icon {
-  font-size: 12px;
-}
-
-.select-name {
-  letter-spacing: 0.12em;
-}
-
 .select {
   font-family: var(--font-mono);
   font-size: 11px;

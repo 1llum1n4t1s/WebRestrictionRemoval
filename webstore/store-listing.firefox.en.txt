@@ -9,14 +9,14 @@ Firefox AMO Listing (English)
 Vuora (Firefox)
 
 ■ Summary (250 chars max)
-Locally tunes the pages you view. 11 categories: YouTube Cleaner, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (except DRM video sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
+Locally tunes the pages you view. 11 categories: YouTube Enhancements, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (except DRM video sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
 
 ■ Description (16,000 chars max)
 A productivity helper that bundles 11 categories of features into a single popup.
 
 ■ Features available on Firefox
 
-🔹 YouTube Cleaner (32 sub-features)
+🔹 YouTube Enhancements (34 sub-features)
 Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, subscription channel expansion (subs feed → grid + lazy thumbnail), live-stream connection monitor, and more granular controls for YouTube's verbose UI.
 
 🔹 Amazon Subscribe & Save totals

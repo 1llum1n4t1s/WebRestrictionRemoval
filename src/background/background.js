@@ -53,7 +53,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     const migrate = {
       [StorageKeys.SEARCH_FIXER_FEATURES]: mergedFeatures,
     };
-    // 旧 ytShortsRemovalEnabled === true の人は YouTube クリーナーマスターも ON にしないと
+    // 旧 ytShortsRemovalEnabled === true の人は YouTube 機能拡張マスターも ON にしないと
     // サブ機能が動かない（master 必須）。マイグレーションでは「動作継続」を最優先で master ON。
     if (legacy?.ytShortsRemovalEnabled === true) {
       migrate[StorageKeys.SEARCH_FIXER_ENABLED] = true;
@@ -182,6 +182,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS in stored)) {
     defaults[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS] = [];
+  }
+  if (!(StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX in stored)) {
+    // NotebookLM 送信の送信先 Google アカウント（0 = 既定アカウント / rere D-5）
+    defaults[StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX] = 0;
   }
   if (!(StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED in stored)) {
     defaults[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] = false;
@@ -418,11 +422,406 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })
       .catch((err) => safeRespond({ ok: false, error: String(err?.message ?? err) }));
     return true;
+  } else if (request.action === Actions.NOTEBOOK_LM_LIST) {
+    // NotebookLM のノートブック一覧。YouTube タブの content script 由来のみ受け付ける。
+    if (!isFromYouTubeContentScript(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
+    listNotebookLmNotebooks(request.data?.accountIndex)
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  } else if (request.action === Actions.NOTEBOOK_LM_SEND) {
+    // NotebookLM へのソース追加。YouTube タブの content script 由来のみ受け付ける。
+    if (!isFromYouTubeContentScript(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
+    sendToNotebookLm(request.data)
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  } else if (request.action === Actions.NOTEBOOK_LM_ACCOUNTS) {
+    // ログイン中の Google アカウント一覧。YouTube タブの content script 由来のみ受け付ける。
+    if (!isFromYouTubeContentScript(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
+    listNotebookLmAccounts()
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
   }
   // /rere B1-001 修正: 未知 action は明示的に return false で channel をクローズ。
   // implicit undefined 返しだと将来の handler 追加時に sendResponse 漏れの罠を踏みやすい。
   return false;
 });
+
+// ---------- NotebookLM 送信 (YouTube 機能拡張のサブ機能 notebookLmSend) ----------
+//
+// NotebookLM には公開 API が無いため、Web アプリ自身が使う batchexecute RPC を叩く。
+// content script (youtube.com) から直接呼ぶと cross-origin になるので、host_permissions を
+// 持つ background で実行する（`<all_urls>` 既存のため権限追加は不要）。
+//
+// 認証はユーザーのブラウザにある Google セッション Cookie に依存する（`credentials: "include"`）。
+// 拡張機能は資格情報を読み取らず保存もしない。送るのはユーザーがボタンを押した瞬間の
+// YouTube URL のみで、バックグラウンドでの送信や視聴履歴の収集は行わない。
+//
+// 壊れたときの見立て: RPC ID (actions.js の NotebookLm.RPC_*) は Google の非公開契約であり
+// 予告なく変わる。401/403 ではなく「応答は 200 なのに ID が取れない」形で壊れることが多い。
+
+/**
+ * NotebookLM トップページから build label (`bl`) と XSRF トークン (`at`) を取得する。
+ *
+ * 失敗理由を戻り値で区別する（/rere RC-J）。旧実装は「未ログイン」と「Google が HTML の
+ * トークンキーを変えた」を同じ null に潰していたため、ログイン済みのユーザーに
+ * 「ログインしてください」と表示して原因を誤誘導していた。
+ *
+ * @returns {Promise<{ok: true, bl: string, at: string} | {ok: false, error: string}>}
+ */
+async function fetchNotebookLmTokens(accountIndex) {
+  let res;
+  try {
+    // redirect:"manual" は CLAUDE.md §外部 fetch allowlist 設計の共通必須要件（/rere RC-F）。
+    // 未ログイン時の accounts.google.com へのリダイレクトは opaqueredirect（res.ok === false）
+    // になり not-authorized に落ちるため、認証検出の要件は満たせる。
+    res = await fetch(NotebookLm.buildHomeUrl(accountIndex), {
+      credentials: "include",
+      redirect: "manual",
+      signal: AbortSignal.timeout(NotebookLm.FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    logNotebookLm("token fetch failed", err);
+    return { ok: false, error: "network-failed" };
+  }
+  if (!res.ok) {
+    // opaqueredirect（type === "opaqueredirect"）も status 0 / ok false で来る = 未ログイン。
+    logNotebookLm(`token fetch not ok: status=${res.status} type=${res.type}`);
+    return { ok: false, error: "not-authorized" };
+  }
+  const html = await res.text();
+  const bl = NotebookLm.extractToken(html, "cfb2h");
+  const at = NotebookLm.extractToken(html, "SNlM0e");
+  if (bl && at) return { ok: true, bl, at, accountIndex: NotebookLm.normalizeAccountIndex(accountIndex) };
+  // 200 が返ったのにトークンが取れない = NotebookLM 側の HTML 構造変更が最有力。
+  logNotebookLm(`token extraction failed (cfb2h=${!!bl} SNlM0e=${!!at}) — NotebookLM 側の仕様変更の可能性`);
+  return { ok: false, error: "protocol-changed" };
+}
+
+/**
+ * NotebookLM 系メッセージの sender 検証（/rere RC-P）。
+ *
+ * `SenderCheck.isFromContentScript` は「自拡張の content script か」しか見ない。本拡張は
+ * 全 http(s) サイトに content script を注入しているため、それだけでは「YouTube 由来のみ」
+ * というコメント上の不変条件を実装できていなかった。Google セッション Cookie を使う RPC の
+ * 起点なので、`sender.url` のオリジンまで確認して defense-in-depth を効かせる。
+ */
+function isFromYouTubeContentScript(sender) {
+  if (!SenderCheck.isFromContentScript(sender)) return false;
+  try {
+    const host = new URL(sender.url ?? sender.tab?.url ?? "").hostname.toLowerCase();
+    return host === "youtube.com" || host.endsWith(".youtube.com");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * NotebookLM 連携の診断ログ。テレメトリは持たない方針なので、切り分け材料は
+ * 開発者ツールのコンソールにだけ残す（/rere RC-J）。トークン等の秘密値は出さない。
+ */
+function logNotebookLm(message, err) {
+  if (err) console.warn(`[WebViewingAssist] NotebookLM: ${message}`, err);
+  else console.warn(`[WebViewingAssist] NotebookLM: ${message}`);
+}
+
+/**
+ * batchexecute を 1 回叩いて応答ボディ（テキスト）を返す。
+ *
+ * @param {{bl: string, at: string}} tokens fetchNotebookLmTokens の戻り値
+ * @param {string} rpcId NotebookLm.RPC_* のいずれか
+ * @param {string} payload `f.req` の内側に入れる JSON 文字列
+ * @param {string} sourcePath `source-path` パラメータ（"/" または "/notebook/<id>"）
+ * @returns {Promise<string|null>} 応答ボディ、失敗時 null
+ */
+async function callNotebookLmRpc(tokens, rpcId, payload, sourcePath) {
+  // URL / body の組み立ては純粋関数に切り出してテスト可能にしてある（/rere B2-10）。
+  const { url, body } = NotebookLm.buildRpcRequest({
+    rpcId,
+    payload,
+    sourcePath,
+    bl: tokens.bl,
+    at: tokens.at,
+    reqId: 100000 + Math.floor(Math.random() * 900000),
+    accountIndex: tokens.accountIndex,
+  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      redirect: "manual",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+      // timeout が無いと応答が返らないまま sendResponse が呼ばれず、content script の
+      // 送信ボタンが「送信中…」で固着して再送不能になる（/rere RC-C）。
+      signal: AbortSignal.timeout(NotebookLm.FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    logNotebookLm(`rpc ${rpcId} fetch failed`, err);
+    return null;
+  }
+  // HTTP ステータスを捨てず切り分け材料として残す（/rere RC-J）。
+  if (!res.ok) {
+    logNotebookLm(`rpc ${rpcId} not ok: status=${res.status} type=${res.type}`);
+    return null;
+  }
+  return await res.text();
+}
+
+/**
+ * ログイン中の Google アカウントを `authuser` の小さい順に列挙する（アカウント選択 UI 用）。
+ *
+ * 「アカウント 1」という番号だけでは**どれを選べばいいか分からない**ため、実際のメール
+ * アドレスを出す。値は NotebookLM のトップページ HTML の `oPEP7c` キー（実機で確認）。
+ *
+ * 終了条件が要点: 存在しない `authuser` を指定しても Google はエラーにせず**既定アカウント
+ * の HTML を返す**ので、「既出のメールアドレスが出たら打ち切り」でしか範囲を確定できない。
+ * 1 回の probe が数百 KB の HTML 取得になるため、結果は SW のメモリにキャッシュする
+ * （SW 再起動で消えるだけで、消えても再取得できる）。
+ *
+ * @returns {Promise<{ok: true, accounts: Array<{index: number, email: string}>}
+ *                  | {ok: false, error: string}>}
+ */
+let cachedNotebookLmAccounts = null;
+let inFlightNotebookLmAccounts = null;
+
+/**
+ * 1 アカウント分の probe。**メールアドレスが見つかった時点でストリームを打ち切る**。
+ *
+ * トップページ HTML は 1 件あたり約 330 KB あるが、目的のキーは先頭 10%（約 33 KB）に
+ * 現れる（実測）。全文を読むと 10 アカウント probe で 3 MB を超えるため、逐次デコードして
+ * 見つけ次第 abort する。`extractToken` は閉じ引用符まで要求するので、途中まで読んだ
+ * バッファに対して使っても値が途中で切れることはない。
+ *
+ * @param {number} index `authuser` インデックス
+ * @returns {Promise<{ok: true, email: string} | {ok: false, error: string}>}
+ */
+async function probeNotebookLmAccount(index) {
+  const ctrl = new AbortController();
+  const signal = AbortSignal.any([ctrl.signal, AbortSignal.timeout(NotebookLm.FETCH_TIMEOUT_MS)]);
+  let res;
+  try {
+    res = await fetch(NotebookLm.buildHomeUrl(index), { credentials: "include", redirect: "manual", signal });
+  } catch (err) {
+    logNotebookLm(`account probe ${index} fetch failed`, err);
+    return { ok: false, error: "network-failed" };
+  }
+  // 未ログインは accounts.google.com への opaqueredirect（ok === false）。
+  if (!res.ok) return { ok: false, error: "not-authorized" };
+  const reader = res.body?.getReader?.();
+  if (!reader) {
+    const email = NotebookLm.extractToken(await res.text(), NotebookLm.ACCOUNT_EMAIL_KEY);
+    return email ? { ok: true, email } : { ok: false, error: "protocol-changed" };
+  }
+  const decoder = new TextDecoder();
+  let buf = "";
+  try {
+    while (buf.length < NotebookLm.ACCOUNT_SCAN_MAX_CHARS) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const email = NotebookLm.extractToken(buf, NotebookLm.ACCOUNT_EMAIL_KEY);
+      if (email) return { ok: true, email };
+    }
+  } catch (err) {
+    logNotebookLm(`account probe ${index} read failed`, err);
+    return { ok: false, error: "network-failed" };
+  } finally {
+    // 見つかった時点で残りの転送を止める（見つからなかった場合も接続を残さない）
+    try { ctrl.abort(); } catch { /* 既に完了していれば無視 */ }
+  }
+  logNotebookLm(`account probe ${index}: メールアドレスを取得できません — 仕様変更の可能性`);
+  return { ok: false, error: "protocol-changed" };
+}
+
+async function listNotebookLmAccounts() {
+  if (cachedNotebookLmAccounts) return { ok: true, accounts: cachedNotebookLmAccounts };
+  // 事前取得とパネル表示が重なっても probe は 1 回で済ませる（同時 10 fetch の二重発射を防ぐ）
+  if (inFlightNotebookLmAccounts) return await inFlightNotebookLmAccounts;
+  inFlightNotebookLmAccounts = (async () => {
+    const stored = await chrome.storage.local
+      .get(StorageKeys.NOTEBOOK_LM_ACCOUNTS_CACHE)
+      .catch(() => ({}));
+    const cache = stored?.[StorageKeys.NOTEBOOK_LM_ACCOUNTS_CACHE];
+    if (
+      cache && Array.isArray(cache.accounts) && cache.accounts.length > 0 &&
+      Number.isFinite(cache.at) && Date.now() - cache.at < NotebookLm.ACCOUNTS_CACHE_TTL_MS
+    ) {
+      cachedNotebookLmAccounts = cache.accounts;
+      return { ok: true, accounts: cache.accounts };
+    }
+    // probe は並列。逐次だとアカウント数ぶん RTT が積み上がり、パネルを開いた直後の
+    // セレクタが番号表示のまま待たされる。
+    const probes = await Promise.all(
+      Array.from({ length: NotebookLm.MAX_ACCOUNT_INDEX + 1 }, (_, i) => probeNotebookLmAccount(i))
+    );
+    if (!probes[0].ok && probes[0].error === "not-authorized") return { ok: false, error: "not-authorized" };
+    const accounts = [];
+    const seen = new Set();
+    for (let i = 0; i < probes.length; i++) {
+      const probe = probes[i];
+      if (!probe.ok) break;
+      // 存在しない authuser は既定アカウントの HTML を返す。既出メールが終端の唯一の手がかり。
+      if (seen.has(probe.email)) break;
+      seen.add(probe.email);
+      accounts.push({ index: i, email: probe.email });
+    }
+    if (accounts.length === 0) return { ok: false, error: "protocol-changed" };
+    cachedNotebookLmAccounts = accounts;
+    chrome.storage.local
+      .set({ [StorageKeys.NOTEBOOK_LM_ACCOUNTS_CACHE]: { at: Date.now(), accounts } })
+      .catch(() => {});
+    return { ok: true, accounts };
+  })();
+  try {
+    return await inFlightNotebookLmAccounts;
+  } finally {
+    inFlightNotebookLmAccounts = null;
+  }
+}
+
+/** ノートブック一覧を返す（送信先セレクタ用）。 */
+async function listNotebookLmNotebooks(accountIndex) {
+  const tokens = await fetchNotebookLmTokens(accountIndex);
+  if (!tokens.ok) return { ok: false, error: tokens.error };
+  const text = await callNotebookLmRpc(
+    tokens,
+    NotebookLm.RPC_LIST_NOTEBOOKS,
+    JSON.stringify([null, 1, null, [2]]),
+    "/"
+  );
+  if (text == null) return { ok: false, error: "rpc-failed" };
+  // 応答形式が変わった場合の空配列と「ノートブック 0 件の新規ユーザー」を区別する（/rere RC-J）。
+  // 旧実装はどちらも同じ空パネルになり、故障が正常動作に見えていた。
+  if (NotebookLm.parseBatchPayload(text) == null) {
+    logNotebookLm("notebook list payload unparsable — NotebookLM 側の仕様変更の可能性");
+    return { ok: false, error: "protocol-changed" };
+  }
+  return { ok: true, notebooks: NotebookLm.parseNotebookList(text) };
+}
+
+/**
+ * 1 ノートブックあたりのソース上限を取得する（プラン依存。取れなければ保守的な既定値）。
+ * 定数は actions.js の `NotebookLm` を単一情報源にする（/rere RC-O: 旧実装は同値の
+ * マジックナンバーを background に再掲していて drift 予備軍だった）。
+ */
+async function fetchNotebookLmSourceLimit(tokens) {
+  const text = await callNotebookLmRpc(
+    tokens,
+    NotebookLm.RPC_SOURCE_LIMIT,
+    NotebookLm.SOURCE_LIMIT_PAYLOAD,
+    "/"
+  ).catch(() => null);
+  if (text == null) return NotebookLm.SOURCE_LIMIT_FALLBACK;
+  // Plus 表示 (notebooklm_plus_icon) が無いアカウントのほうが上限が大きい応答を返す。
+  // 判定材料が消えた場合もフォールバック値まで落ちるだけで送信自体は成立する。
+  return text.includes("notebooklm_plus_icon")
+    ? NotebookLm.SOURCE_LIMIT_FALLBACK
+    : NotebookLm.SOURCE_LIMIT_PLUS;
+}
+
+/**
+ * URL 群を NotebookLM に送る。notebookId 未指定なら title でノートブックを新規作成する。
+ *
+ * @param {{urls?: string[], title?: string, notebookId?: string|null}} data
+ * @returns {Promise<{ok: boolean, url?: string, added?: number, skipped?: number, error?: string}>}
+ */
+async function sendToNotebookLm(data) {
+  const urls = Array.isArray(data?.urls) ? data.urls.filter((u) => typeof u === "string" && u !== "") : [];
+  if (urls.length === 0) return { ok: false, error: "no-urls" };
+
+  const accountIndex = NotebookLm.normalizeAccountIndex(data?.accountIndex);
+  const tokens = await fetchNotebookLmTokens(accountIndex);
+  if (!tokens.ok) return { ok: false, error: tokens.error };
+
+  const createdHere = !(typeof data?.notebookId === "string" && data.notebookId !== "");
+  let notebookId = createdHere ? null : data.notebookId;
+  if (!notebookId) {
+    const title = typeof data?.title === "string" && data.title.trim() !== ""
+      ? data.title.trim().slice(0, 120)
+      : "YouTube";
+    const created = await callNotebookLmRpc(
+      tokens,
+      NotebookLm.RPC_CREATE_NOTEBOOK,
+      // 作成側も Web アプリと同じ 4 要素形状（末尾に共通リクエストオプション）に揃える。
+      JSON.stringify([title, null, null, NotebookLm.buildRequestOptions()]),
+      "/"
+    );
+    notebookId = NotebookLm.extractNotebookId(created);
+    if (!notebookId) {
+      logNotebookLm("create: 応答からノートブック ID を取得できません — 仕様変更の可能性");
+      return { ok: false, error: "create-failed" };
+    }
+  }
+
+  // 既存ノートブックを選んだ場合は、その残容量を差し引いてから受理数を決める（/rere RC-O）。
+  // 旧実装は既存ソース数を無視していたため、満杯近くのノートブックでも skipped: 0 と表示していた。
+  const limit = await fetchNotebookLmSourceLimit(tokens);
+  const used = Number.isInteger(data?.existingSources) && data.existingSources > 0 ? data.existingSources : 0;
+  const room = Math.max(0, limit - used);
+  const accepted = urls.slice(0, room);
+  const sources = NotebookLm.buildSourcePayload(accepted);
+  if (sources.length === 0) {
+    return { ok: false, error: "notebook-full", notebookId, url: NotebookLm.buildNotebookUrl(notebookId, accountIndex) };
+  }
+
+  const added = await callNotebookLmRpc(
+    tokens,
+    NotebookLm.RPC_ADD_SOURCES,
+    // 3 番目の共通リクエストオプションが無いとソースが黙って無視される（200 応答なのに
+    // 空のノートブックが開く）。ソース仕様の末尾 `1` と合わせて Web アプリの形状に揃える。
+    JSON.stringify([sources, notebookId, NotebookLm.buildRequestOptions()]),
+    `/notebook/${notebookId}`
+  );
+  // 応答の中身を検証する（/rere RC-D）。batchexecute は失敗時も HTTP 200 + エラーフレームを
+  // 返すため、`res.ok` だけで成功にすると「空のノートブックを開いて成功表示」になる。
+  const addOk = added != null && NotebookLm.parseBatchPayload(added) != null;
+  if (!addOk) {
+    if (added != null) logNotebookLm("add: 200 応答だが payload を解釈できません — 仕様変更の可能性");
+    // 作成済みノートブックの ID を返して再試行で使い回せるようにする（/rere RC-E）。
+    // 返さないと、失敗のたびに空のノートブックが増え続ける。
+    return {
+      ok: false,
+      error: "add-failed",
+      notebookId,
+      createdHere,
+      url: NotebookLm.buildNotebookUrl(notebookId, accountIndex),
+    };
+  }
+
+  // 送信先を開くのは background の仕事にする。content script の `window.open` は送信の
+  // await を跨ぐと transient user activation が切れて popup blocker に弾かれ、代わりの
+  // 「開く」リンクが毎回出てしまう（/rere RC-L の受け皿が常態化していた）。
+  const url = NotebookLm.buildNotebookUrl(notebookId, accountIndex);
+  let opened = false;
+  try {
+    await chrome.tabs.create({ url });
+    opened = true;
+  } catch (err) {
+    logNotebookLm("送信先タブを開けませんでした（content script のリンクに退避）", err);
+  }
+
+  return {
+    ok: true,
+    url,
+    opened,
+    added: sources.length,
+    // 上限で溢れた分は黙って捨てず件数を返し、content script 側でユーザーに伝える。
+    skipped: urls.length - accepted.length,
+  };
+}
 
 // ---------- タブクローズで音量ブーストを解放 ----------
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -709,7 +1108,7 @@ async function notifyContentScripts(s) {
   ];
   if (isYouTubeUrl(url)) {
     // Shorts 削除 (features.removeShorts*) と接続モニター (features.connectionMonitor) はいずれも
-    // YouTube クリーナーのサブ機能として統合されているため、メッセージは APPLY_SEARCH_FIXER_CS のみ。
+    // YouTube 機能拡張のサブ機能として統合されているため、メッセージは APPLY_SEARCH_FIXER_CS のみ。
     // search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js の 3 つが同一 isolated world で
     // この 1 メッセージを購読し、各々の責務に応じて反応する。
     messages.push([{ action: Actions.APPLY_SEARCH_FIXER_CS, data: {

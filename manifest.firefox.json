@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.0.52",
+  "version": "1.0.53",
   "browser_specific_settings": {
     "gecko": {
       "id": "{8b2f6c4e-9a1d-4e8f-b3a7-1c5d9e7f2a4b}",
@@ -42,8 +42,8 @@
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/lib/actions.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-connection-monitor.js", "src/content/youtube-broadcast-clock.js"],
-      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css", "src/content/youtube-connection-monitor.css", "src/content/youtube-broadcast-clock.css"],
+      "js": ["src/lib/actions.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-connection-monitor.js", "src/content/youtube-broadcast-clock.js", "src/content/youtube-notebooklm.js"],
+      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css", "src/content/youtube-connection-monitor.css", "src/content/youtube-broadcast-clock.css", "src/content/youtube-notebooklm.css"],
       "run_at": "document_idle",
       "all_frames": false
     },

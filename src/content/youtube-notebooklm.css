@@ -1,0 +1,218 @@
+/*
+ * YouTube → NotebookLM 送信ボタン
+ *
+ * ボタンは **YouTube のページ内** に挿し込む（参考にした拡張機能と同じ配置）。
+ *   - /watch          … 高評価 / 共有の行 (`#actions`) の先頭、右寄せ
+ *   - /results        … 検索フィルタボタンの隣、左寄せ
+ *   - /playlist・チャンネル … タイトル見出しの行、右寄せ
+ * 見た目は YouTube 純正の tonal ボタンに寄せる。純正クラス名（`yt-spec-button-shape-next--tonal`
+ * 等）に依存すると YouTube の内部変更で崩れるため、クラスは自前で持つ。
+ *
+ * **配色は自前のテーマ変数を持つ**（実機確認で確定 / 2026-07-26）。`--yt-spec-text-primary` などの
+ * YouTube 側トークンは視聴ページの content script スコープでは **未定義**で、単純にフォールバック値を
+ * 書くとライトテーマ色（黒文字）が効いてダークテーマの背景に溶けて見えなくなる。そこで
+ * `html[dark]` を見て自前変数を切り替え、YouTube 側トークンが存在する環境ではそちらを優先する
+ * （参考にした拡張機能も同じ理由で context.css の冒頭に変数を定義している。ただし向こうは `html`
+ *  に直接定義していて YouTube 本体へ影響しうるので、こちらは自分の要素にスコープする）。
+ *
+ * ノートブック選択ポップオーバーは、挿入先の祖先が持つ overflow でクリップされないよう
+ * body 直下の `position: fixed` に置き、座標は JS がボタンの実位置から計算する。
+ * 配色は他の HUD と揃えた ROG クリムゾン + ガンメタル基調。
+ *
+ * 動作対象は **`*://*.youtube.com/*` の top frame のみ**。content script が動的に inject する
+ * 要素だけを対象にするため、セレクタは完全名前空間化 (__cpa-nlm-) してある。
+ */
+
+.__cpa-nlm-root {
+  /* アンカーの兄弟としてページ内に置く。float は JS がページ種別ごとに設定する。 */
+  display: inline-block;
+  margin: 0 8px;
+  vertical-align: middle;
+  font-family: "Roboto", "Arial", system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+
+  /* ライトテーマ既定値。YouTube 側トークンが未定義でも必ず読める色になる。 */
+  --cpa-nlm-fg: #0f0f0f;
+  --cpa-nlm-bg: rgba(0, 0, 0, 0.05);
+  --cpa-nlm-bg-hover: rgba(0, 0, 0, 0.1);
+}
+
+/* YouTube のダークテーマ。`<html dark>` は実機で確認済みの判定材料。 */
+html[dark] .__cpa-nlm-root {
+  --cpa-nlm-fg: #f1f1f1;
+  --cpa-nlm-bg: hsla(0, 0%, 100%, 0.1);
+  --cpa-nlm-bg-hover: hsla(0, 0%, 100%, 0.2);
+}
+
+.__cpa-nlm-root[hidden] {
+  display: none;
+}
+
+/* アンカーの下に 1 行として置くレイアウト（プレイリストの「すべて再生」行の直下）。 */
+.__cpa-nlm-root--row {
+  display: block;
+  margin: 8px 0 0;
+}
+
+.__cpa-nlm-root--row .__cpa-nlm-btn {
+  width: 100%;
+  max-width: none;
+  justify-content: center;
+  text-align: center;
+}
+
+.__cpa-nlm-btn {
+  /* YouTube 純正の tonal ボタン (yt-spec-button-shape-next--tonal) に寄せた見た目 */
+  display: inline-flex;
+  align-items: center;
+  max-width: 340px;
+  height: 36px;
+  padding: 0 16px;
+  /* YouTube 側トークンがあればそちらを優先し、無ければ自前のテーマ変数へ落ちる */
+  background: var(--yt-spec-overlay-button-secondary, var(--cpa-nlm-bg));
+  color: var(--yt-spec-text-primary, var(--cpa-nlm-fg));
+  border: none;
+  border-radius: 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 36px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 120ms ease;
+}
+
+.__cpa-nlm-btn:hover,
+.__cpa-nlm-btn:focus-visible {
+  background: var(--yt-spec-additive-background, var(--cpa-nlm-bg-hover));
+  outline: none;
+}
+
+.__cpa-nlm-panel {
+  position: fixed;
+  /* top / left は JS (positionPanel) がボタンの実座標から設定する */
+  top: 0;
+  left: 0;
+  z-index: 2147483646; /* YouTube UI 最上層、ただし ytp 右クリックメニューより 1 低い保険 */
+  width: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  background: linear-gradient(180deg, rgba(20, 22, 26, 0.98), rgba(12, 14, 18, 0.98));
+  color: #f0f0f2;
+  border: 1px solid rgba(184, 8, 40, 0.5);
+  border-radius: 6px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
+}
+
+.__cpa-nlm-head {
+  padding: 4px 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240, 240, 242, 0.65);
+}
+
+/* 送信先アカウント（authuser）の切替行。マルチログイン環境での誤送信対策（/rere D-5） */
+.__cpa-nlm-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 8px;
+  border-bottom: 1px dashed rgba(240, 240, 242, 0.18);
+  margin-bottom: 4px;
+}
+
+.__cpa-nlm-account-label {
+  flex: 1 1 auto;
+  font-size: 11.5px;
+  color: rgba(240, 240, 242, 0.7);
+}
+
+.__cpa-nlm-account-select {
+  /* メールアドレス表示は長くなるため、パネル幅を押し広げずに縮められるようにする */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 62%;
+  text-overflow: ellipsis;
+  padding: 3px 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #f0f0f2;
+  border: 1px solid rgba(240, 240, 242, 0.25);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.__cpa-nlm-account-select:hover,
+.__cpa-nlm-account-select:focus-visible {
+  border-color: #b80828;
+  outline: none;
+}
+
+.__cpa-nlm-msg {
+  padding: 8px 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(240, 240, 242, 0.8);
+}
+
+.__cpa-nlm-msg--error {
+  color: #ff9aa8;
+}
+
+.__cpa-nlm-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.__cpa-nlm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  /* `<a>` は UA 既定が content-box なので、border-box を明示しないと padding のぶん
+     パネル幅を超えて横スクロールバーが出る（button だけ UA 既定が border-box）。 */
+  box-sizing: border-box;
+  padding: 8px 6px;
+  background: transparent;
+  color: inherit;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.__cpa-nlm-item:hover,
+.__cpa-nlm-item:focus-visible {
+  background: rgba(184, 8, 40, 0.18);
+  outline: none;
+}
+
+.__cpa-nlm-item--new {
+  font-weight: 600;
+  color: #ff8b9c;
+  border-bottom: 1px dashed rgba(240, 240, 242, 0.18);
+  border-radius: 0;
+  margin-bottom: 4px;
+}
+
+.__cpa-nlm-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.__cpa-nlm-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: rgba(240, 240, 242, 0.55);
+  font-variant-numeric: tabular-nums;
+}

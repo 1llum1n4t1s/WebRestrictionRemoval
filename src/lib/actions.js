@@ -18,7 +18,7 @@
 const Actions = Object.freeze({
   /** ポップアップ → background: 設定変更を反映 */
   APPLY_SETTINGS: "applySettings",
-  /** background → YouTube content script: YouTube クリーナー設定を反映（Shorts 削除も含む） */
+  /** background → YouTube content script: YouTube 機能拡張設定を反映（Shorts 削除も含む） */
   APPLY_SEARCH_FIXER_CS: "applySearchFixerCS",
   /** background → Amazon 定期おトク便 content script: 合計金額表示の有効/無効を反映 */
   APPLY_AMAZON_DELIVERY_TOTAL_CS: "applyAmazonDeliveryTotalCS",
@@ -36,7 +36,7 @@ const Actions = Object.freeze({
   APPLY_VIDEO_FILL_CS: "applyVideoFillCS",
   /** background → loupe content script: ルーペ機能の有効/無効を反映 */
   APPLY_LOUPE_CS: "applyLoupeCS",
-  // 接続モニターは YouTube クリーナーのサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
+  // 接続モニターは YouTube 機能拡張のサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
   // 独自 action は持たず APPLY_SEARCH_FIXER_CS を購読する (youtube-shorts.js と同方式)。
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
@@ -44,6 +44,12 @@ const Actions = Object.freeze({
   VOLUME_BOOSTER_RELEASE_TAB: "volumeBoosterReleaseTab",
   /** loupe content script → background: 現在タブのスクリーンキャプチャを要求し、JPEG DataURL を取得する */
   LOUPE_REQUEST_CAPTURE: "loupeRequestCapture",
+  /** youtube-notebooklm content script → background: NotebookLM のノートブック一覧を取得する */
+  NOTEBOOK_LM_LIST: "notebookLmList",
+  /** youtube-notebooklm content script → background: 指定 URL 群を NotebookLM のソースとして追加する */
+  NOTEBOOK_LM_SEND: "notebookLmSend",
+  /** youtube-notebooklm content script → background: ログイン中の Google アカウント一覧を取得する */
+  NOTEBOOK_LM_ACCOUNTS: "notebookLmAccounts",
 });
 
 /**
@@ -105,15 +111,22 @@ const Offscreen = Object.freeze({
 
 /** @readonly ストレージキー */
 const StorageKeys = Object.freeze({
-  /** YouTube クリーナーマスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 32 サブ機能の親） */
+  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 34 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
-  /** YouTube クリーナーの個別機能オン/オフ（オブジェクト） */
+  /** YouTube 機能拡張の個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
   /** ホームページのリッチグリッド列数（0 = YouTube デフォルト、4/5/6 が選択肢） */
   SEARCH_FIXER_GRID_ITEMS: "searchFixerGridItems",
   /** 検索結果から除外するチャンネルのリスト（{key, name} 配列。key = "@handle" 小文字 or "UC..." チャンネル ID）。
    *  popup → storage 直書きパターン（SettingsSchema 非経由、content script は storage.onChanged で購読）。 */
   SEARCH_FIXER_BLOCKED_CHANNELS: "searchFixerBlockedChannels",
+  /** NotebookLM 送信の送信先 Google アカウント（`authuser` インデックス、0 = 既定）。
+   *  content script → storage 直書きパターン（SettingsSchema 非経由）。マルチログイン環境で
+   *  意図しないアカウントへ動画 URL が入るのを防ぐ（/rere D-5）。 */
+  NOTEBOOK_LM_ACCOUNT_INDEX: "notebookLmAccountIndex",
+  /** ログイン中 Google アカウント一覧のキャッシュ（`{at, accounts}`、background 直書き）。
+   *  probe は 1 アカウントあたり数十 KB の取得になるため、TTL 付きで使い回す。 */
+  NOTEBOOK_LM_ACCOUNTS_CACHE: "notebookLmAccountsCache",
   /** Amazon 定期おトク便ページの月別合計金額表示の有効/無効 */
   AMAZON_DELIVERY_TOTAL_ENABLED: "amazonDeliveryTotalEnabled",
   /** Amazon 商品ページに「この商品が所属するランキングへ移動」ボタンを表示するか（オプトイン・デフォルト OFF） */
@@ -152,7 +165,7 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_EQ_PRESET: "volumeBoosterEqPreset",
   /** 動画ガンマ補正: マスタートグル（OFF 時は SVG filter 一切注入せず completely no-op） */
   VIDEO_GAMMA_ENABLED: "videoGammaEnabled",
-  // 接続モニターは独立 storage key を持たず、YouTube クリーナーの searchFixerFeatures.connectionMonitor
+  // 接続モニターは独立 storage key を持たず、YouTube 機能拡張の searchFixerFeatures.connectionMonitor
   // サブ機能として searchFixerEnabled (master) AND で制御する (Shorts 5 サブ機能と同じ統合方式)。
   /** 動画ガンマ補正: ガンマ値（VideoGamma.MIN..MAX、デフォルト 1.0 = 補正なし） */
   VIDEO_GAMMA_VALUE: "videoGammaValue",
@@ -239,7 +252,7 @@ const YouTubeShorts = Object.freeze({
 });
 
 /**
- * @readonly YouTube クリーナーの機能定義と定数（独自実装）。変数名は履歴的に `SearchFixer` を使用。
+ * @readonly YouTube 機能拡張の機能定義と定数（独自実装）。変数名は履歴的に `SearchFixer` を使用。
  *
  * YouTube の検索結果・動画ページ・ホームグリッドの冗長 UI を非表示にするための
  * クライアントサイド DOM/CSS 操作。外部送信ゼロのプライバシー方針。設定は
@@ -272,6 +285,16 @@ const SearchFixerFeatures = Object.freeze([
   // ことを実機確認済み。視聴ページの関連動画欄はプレーンテキストでリンクが無いため対象外）。
   // リストは popup で管理（一覧 + 個別解除）。
   Object.freeze({ key: "channelBlocklist", category: "video_filter" }),
+  // 海外チャンネル除外: 自分の国以外のチャンネルの動画をフィード / 検索結果から除去する。
+  // YouTube 標準の検索フィルタには国の条件が無い（「場所」は動画のジオタグ絞り込みで別物）ため
+  // 独自実装。判定は 2 段のハイブリッド:
+  //   1. 言語ヒューリスティック（純粋関数 detectTextOrigin）— タイトル + チャンネル名の文字種で即決。
+  //      fetch ゼロ。自国固有スクリプト（日本語なら仮名）があれば home、別スクリプトなら foreign。
+  //   2. 1 で決まらない (unknown = ラテン文字のみ / 漢字のみ) カードだけ、チャンネルの
+  //      `/@handle/about` を **同一オリジン** fetch して `"country"` を読む（外部送信ゼロを維持）。
+  //      結果はチャンネル単位で sessionStorage キャッシュ。国非公開チャンネルは判定不能 = 残す
+  //      （fail-open。誤って自国チャンネルを消さないことを優先する）。
+  Object.freeze({ key: "hideForeignChannels", category: "video_filter" }),
   // === カテゴリ "search_only": 検索結果（検索結果ページ固有の DOM のみが対象）===
   // shelf / cardList / course / channel / reel / secondary / chapter は検索結果ページ固有の DOM
   // 構造（ytd-shelf-renderer / ytd-channel-renderer 等）に依存。verified / artist は現状検索のみで
@@ -313,6 +336,12 @@ const SearchFixerFeatures = Object.freeze([
   // ホーム / 登録 / 急上昇等のフィードを隙間なく dense グリッド整列する。列数『自動』のときも
   // 有効化したいユーザー向けのトグル（4/5/6 列を選んだ場合は本トグル OFF でも従来どおりグリッド化）。
   Object.freeze({ key: "homeGrid", category: "menu_ui" }),
+  // === カテゴリ "integration": 外部サービス連携 ===
+  // NotebookLM 送信: 視聴中の動画 / 検索結果 / プレイリスト / チャンネルの動画を Google NotebookLM の
+  // ソースとして追加する。**本拡張で唯一、ユーザー操作を起点にユーザー自身の Google アカウントへ
+  // データ（動画 URL）を送る機能**（接続モニターの RTT 計測と並ぶ外部通信の例外）。実装は専用
+  // content script youtube-notebooklm.js + background の NotebookLm RPC クライアント。
+  Object.freeze({ key: "notebookLmSend", category: "integration" }),
 ]);
 
 const SearchFixerDefaultFeatures = Object.freeze(
@@ -334,6 +363,50 @@ const SearchFixerFeedPathPrefixes = Object.freeze([
   "/feed/library",
 ]);
 
+/**
+ * 海外チャンネル除外の言語ヒューリスティックで使うスクリプト（文字体系）判定。
+ *
+ * ラテン文字は「英語圏 = 自国」とも「英語タイトルを付けた自国チャンネル」とも取れて決め手に
+ * ならないため、home / foreign のどちらにも直結させず unknown 側に倒す（about fetch で確定させる）。
+ * 漢字 (Han) も日本語 / 中国語で共有されるため同じ扱い。
+ */
+const SearchFixerScriptTests = Object.freeze([
+  Object.freeze({ id: "hiragana", re: /\p{Script=Hiragana}/u }),
+  Object.freeze({ id: "katakana", re: /\p{Script=Katakana}/u }),
+  Object.freeze({ id: "hangul", re: /\p{Script=Hangul}/u }),
+  Object.freeze({ id: "cyrillic", re: /\p{Script=Cyrillic}/u }),
+  Object.freeze({ id: "arabic", re: /\p{Script=Arabic}/u }),
+  Object.freeze({ id: "hebrew", re: /\p{Script=Hebrew}/u }),
+  Object.freeze({ id: "thai", re: /\p{Script=Thai}/u }),
+  Object.freeze({ id: "devanagari", re: /\p{Script=Devanagari}/u }),
+  Object.freeze({ id: "greek", re: /\p{Script=Greek}/u }),
+]);
+
+/**
+ * 言語 → 「その言語圏に固有」と見なせるスクリプト。ここに載るスクリプトが本文にあれば home 確定。
+ * 載っていない言語（en / de / fr 等のラテン文字圏）は home 確定に使える固有スクリプトが無いので
+ * 空配列 = 常に unknown 経由で about fetch に回る。
+ */
+const SearchFixerHomeScripts = Object.freeze({
+  ja: Object.freeze(["hiragana", "katakana"]),
+  ko: Object.freeze(["hangul"]),
+  th: Object.freeze(["thai"]),
+  ru: Object.freeze(["cyrillic"]),
+  uk: Object.freeze(["cyrillic"]),
+  ar: Object.freeze(["arabic"]),
+  he: Object.freeze(["hebrew"]),
+  hi: Object.freeze(["devanagari"]),
+  el: Object.freeze(["greek"]),
+});
+
+/** 地域サブタグを持たない言語コードから既定の地域を推定するフォールバック表。 */
+const SearchFixerDefaultRegions = Object.freeze({
+  ja: "JP", ko: "KR", th: "TH", vi: "VN", id: "ID", zh: "CN",
+  en: "US", de: "DE", fr: "FR", es: "ES", pt: "BR", it: "IT",
+  nl: "NL", pl: "PL", ru: "RU", uk: "UA", tr: "TR", ar: "SA",
+  hi: "IN", sv: "SE", no: "NO", da: "DK", fi: "FI", cs: "CZ", el: "GR",
+});
+
 const SearchFixer = Object.freeze({
   FEATURES: SearchFixerFeatures,
 
@@ -343,6 +416,7 @@ const SearchFixer = Object.freeze({
     Object.freeze({ id: "video_filter", icon: "🗑️" }),
     Object.freeze({ id: "watch_page",   icon: "🎬" }),
     Object.freeze({ id: "search_only",  icon: "🔍" }),
+    Object.freeze({ id: "integration",  icon: "🔗" }),
   ]),
 
   DEFAULT_FEATURES: SearchFixerDefaultFeatures,
@@ -474,6 +548,138 @@ const SearchFixer = Object.freeze({
       out.push({ key, name });
     }
     return out;
+  },
+
+  // ---------- 海外チャンネル除外 (hideForeignChannels) ----------
+
+  /** チャンネル国キャッシュ (sessionStorage) の prefix。判定ロジックを変えたら version を上げる。 */
+  FOREIGN_CACHE_PREFIX: "__cpa_ch_country_v1::",
+  /** チャンネル国キャッシュの有効期間。チャンネルの所在国はほぼ変わらないので長め。 */
+  FOREIGN_CACHE_TTL_MS: 7 * 24 * 60 * 60 * 1000,
+  /** about ページ取得の同時実行数。1 ページ 1〜3 MB あるので絞る。 */
+  FOREIGN_FETCH_CONCURRENCY: 2,
+  /**
+   * 1 ページセッションあたりの about 取得の総数上限（/rere RC-I）。
+   * 固有スクリプトを持たない言語圏（en / de / fr 等）では全カードが判定不能になり、
+   * 同時実行数の制限だけでは総転送量を抑えられない。上限に達した分は「判定を保留」
+   * （= 残す）に倒れるので、fail-open の不変条件は保たれる。
+   */
+  FOREIGN_FETCH_SESSION_MAX: 60,
+  /** about 取得のタイムアウト。無いとスロットを永久占有して待ち行列が止まる（/rere RC-C）。 */
+  FOREIGN_FETCH_TIMEOUT_MS: 15000,
+
+  /**
+   * タイトル / チャンネル名の文字種から、そのカードが自国コンテンツか判定する（純粋関数）。
+   *
+   *   - 自国固有スクリプト（`SearchFixerHomeScripts`、日本語なら仮名）を含む → "home"
+   *   - 自国固有ではない非ラテンスクリプト（ハングル / キリル / アラビア等）を含む → "foreign"
+   *   - どちらでもない（ラテン文字のみ / 漢字のみ / 記号・数字のみ / 空）→ "unknown"
+   *
+   * 漢字とラテン文字を決め手にしないのが要点。漢字は日中で共有され、ラテン文字は
+   * 「英語タイトルを付けた自国チャンネル」と区別できないため、誤除外を避けて unknown に倒し、
+   * 呼び出し側の about fetch（国の実データ）に判定を委ねる。
+   *
+   * @param {string|null|undefined} text 判定対象（タイトル + チャンネル名を連結したもの）
+   * @param {string|null|undefined} homeLang 自分の言語（"ja" / "ja-JP" どちらでも可）
+   * @returns {"home"|"foreign"|"unknown"}
+   */
+  detectTextOrigin(text, homeLang) {
+    if (typeof text !== "string" || text.trim() === "") return "unknown";
+    const lang = typeof homeLang === "string" ? homeLang.toLowerCase().split("-")[0] : "";
+    // 自分の言語が不明なら「自国のスクリプト」を定義できないので、全部 unknown に倒す（fail-open）。
+    if (lang === "") return "unknown";
+    const homeScripts = SearchFixerHomeScripts[lang] ?? [];
+    let sawForeign = false;
+    for (const test of SearchFixerScriptTests) {
+      if (!test.re.test(text)) continue;
+      if (homeScripts.includes(test.id)) return "home";
+      sawForeign = true;
+    }
+    return sawForeign ? "foreign" : "unknown";
+  },
+
+  /**
+   * ブラウザの言語設定から自分の国コード（ISO 3166-1 alpha-2）を推定する（純粋関数）。
+   *
+   *   1. 地域サブタグ付きのタグ（"ja-JP"）があれば、その地域を最優先で採用
+   *   2. 無ければ言語コードから `SearchFixerDefaultRegions` でフォールバック（"ja" → "JP"）
+   *   3. どちらも取れなければ null（呼び出し側は機能を no-op にする）
+   *
+   * @param {ReadonlyArray<string>|null|undefined} languages `navigator.languages` 相当
+   * @returns {string|null} 大文字 2 文字の国コード、または null
+   */
+  resolveHomeRegion(languages) {
+    if (!Array.isArray(languages)) return null;
+    const tags = languages.filter((t) => typeof t === "string" && t !== "");
+    for (const tag of tags) {
+      const m = tag.match(/^[a-z]{2,3}-(?:[A-Za-z]{4}-)?([A-Za-z]{2})$/i);
+      if (m) return m[1].toUpperCase();
+    }
+    for (const tag of tags) {
+      const base = tag.toLowerCase().split("-")[0];
+      if (SearchFixerDefaultRegions[base]) return SearchFixerDefaultRegions[base];
+    }
+    return null;
+  },
+
+  /**
+   * チャンネルの about ページ HTML から国名を抽出する（純粋関数）。
+   *
+   * YouTube の `aboutChannelViewModel` は `"country":"アメリカ合衆国"` のように
+   * **表示言語でローカライズされた国名**を持つ（ISO コードではない）。国を公開していない
+   * チャンネルではフィールドごと欠落するため、その場合は null を返して呼び出し側で
+   * 「判定不能 = 残す」に倒す。
+   *
+   * **検索窓を `aboutChannelViewModel` 以降に限定する**（/rere RC-G）。about ページは 1〜3 MB
+   * あり、HTML 全体への先頭一致だと ytcfg 等に含まれる**視聴者側の国**（`"country":"JP"` 形式の
+   * ISO コード等）を先に拾いうる。誤った国名は呼び出し側で `foreign` 確定 → カード除去に
+   * 直結するため、スコープ限定は誤除去を防ぐ実質的な防御になる。
+   *
+   * @param {string|null|undefined} html about ページの HTML
+   * @returns {string|null} 国名（表示言語のまま）または null
+   */
+  parseChannelCountry(html) {
+    if (typeof html !== "string" || html === "") return null;
+    // aboutChannelViewModel が見つからない HTML（別レイアウト / ログイン誘導ページ等）は
+    // 判定材料が無いものとして null を返す（fail-open。全体走査へのフォールバックはしない）。
+    const anchor = html.indexOf("aboutChannelViewModel");
+    if (anchor < 0) return null;
+    const m = html.slice(anchor).match(/"country":"((?:[^"\\]|\\.){1,120})"/);
+    if (!m) return null;
+    let raw = m[1];
+    try {
+      raw = JSON.parse(`"${raw}"`);
+    } catch {
+      // 壊れたエスケープ列は素の文字列にフォールバック（比較で外れれば unknown 側に倒れるだけ）
+    }
+    const name = raw.trim();
+    return name === "" ? null : name;
+  },
+
+  /**
+   * about の国名と自国名エイリアスを突き合わせる（純粋関数）。
+   *
+   * **三値を返すのが要点**（/rere RC-H）。旧実装は `aliases.has(name) ? "home" : "foreign"` の
+   * 二値で、「自国名の表記ゆれで照合できなかった」だけのケースまで `foreign`（= 除去）に
+   * 倒していた。about の国名は **YouTube の UI 言語**でローカライズされるため、ブラウザの
+   * `navigator.languages` と YouTube のアカウント言語設定が違う環境（例: ブラウザ en-US /
+   * YouTube UI 日本語）では自国チャンネルが軒並み除去される破綻があった。
+   *
+   * 対策として「その言語で表現しうる全 region 名の集合」を渡してもらい、**集合に載らない
+   * 国名は `unknown`（= 残す）** に倒す。これで fail-open の不変条件を回復する。
+   *
+   * @param {string|null|undefined} countryName about から抽出した国名
+   * @param {Set<string>|null|undefined} homeAliases 自国を指す表記の集合（小文字化済み）
+   * @param {Set<string>|null|undefined} knownCountries 既知の国名表記の集合（小文字化済み）
+   * @returns {"home"|"foreign"|"unknown"}
+   */
+  classifyCountryName(countryName, homeAliases, knownCountries) {
+    if (typeof countryName !== "string" || countryName.trim() === "") return "unknown";
+    const name = countryName.trim().toLowerCase();
+    if (homeAliases instanceof Set && homeAliases.has(name)) return "home";
+    // 既知の国名として解決できない表記は「自国の別表記かもしれない」ので判定不能に倒す。
+    if (!(knownCountries instanceof Set) || !knownCountries.has(name)) return "unknown";
+    return "foreign";
   },
 });
 
@@ -1977,6 +2183,289 @@ const BroadcastClock = Object.freeze({
 });
 
 /**
+ * @readonly NotebookLM 送信の定数とプロトコル純粋関数。
+ *
+ * YouTube の動画 / 検索結果 / プレイリスト / チャンネルの URL を、ユーザー自身の Google
+ * アカウントの NotebookLM にソースとして追加する。NotebookLM には公開 API が存在しないため、
+ * Web アプリ自身が使う `batchexecute` RPC を利用する（Google の非公開内部エンドポイント）。
+ *
+ * **重要な前提**:
+ *   - RPC ID (`RPC_*`) は Google 側の都合で予告なく変わる。壊れたら「NotebookLM 側の変更」を
+ *     まず疑うこと。UI 自動操作より壊れにくいが、公開契約ではない
+ *   - 認証はユーザーのブラウザに既にある Google セッション Cookie に依存する
+ *     （`credentials: "include"` の cross-origin fetch。拡張は資格情報を保存も送信もしない）
+ *   - 送信されるのは **ユーザーがボタンを押したときの YouTube URL だけ**。視聴履歴の収集や
+ *     バックグラウンド送信は行わない
+ *
+ * トークンはトップページ HTML の埋め込み値を使う: `cfb2h` = build label (`bl` パラメータ)、
+ * `SNlM0e` = XSRF トークン (`at` パラメータ)。
+ */
+const NotebookLm = Object.freeze({
+  /**
+   * NotebookLM Web アプリのオリジン（トークン取得と RPC の宛先）。
+   *
+   * **復活禁止: `notebook.google.com`**。旧オリジンは `notebooklm.google.com` へ 302 する
+   * だけの別ホストで、`redirect:"manual"` 必須の設計では opaqueredirect（`res.ok === false`）
+   * になり、**ログイン済みでも必ず not-authorized**（「ログインしてください」）に落ちていた。
+   */
+  ORIGIN: "https://notebooklm.google.com",
+  /** batchexecute エンドポイント（Web アプリ内部 RPC の入口）。 */
+  BATCH_PATH: "/_/LabsTailwindUi/data/batchexecute",
+  /** ソース仕様（1 ソース分の配列）の要素数。末尾は必ず `1`。 */
+  SOURCE_SPEC_LENGTH: 11,
+  /** ノートブック新規作成。ペイロードは `[title, null, null, options]`、応答から UUID を拾う。 */
+  RPC_CREATE_NOTEBOOK: "CCqFvf",
+  /** ソース追加。ペイロードは `[sources, notebookId, options]`（options 必須）。 */
+  RPC_ADD_SOURCES: "izAoDd",
+  /** ノートブック一覧。ペイロードは `[null, 1, null, [2]]`。 */
+  RPC_LIST_NOTEBOOKS: "wXbhsf",
+  /** プラン判定（1 ノートブックあたりのソース上限を返す）。 */
+  RPC_SOURCE_LIMIT: "ozz5Z",
+  /** RPC_SOURCE_LIMIT の固定ペイロード（Web アプリが送っている値そのまま）。 */
+  SOURCE_LIMIT_PAYLOAD: '[[[[null,"1",627],null,1]]]',
+  /** 上限判定に失敗したときのフォールバック（無料プラン相当の保守的な値）。 */
+  SOURCE_LIMIT_FALLBACK: 50,
+  /** Plus 表示が無いアカウントで採用する上限（background のマジックナンバー再掲を解消）。 */
+  SOURCE_LIMIT_PLUS: 300,
+  /** NotebookLM への各 fetch のタイムアウト（無いと送信ボタンが固着する / rere RC-C）。 */
+  FETCH_TIMEOUT_MS: 20000,
+  /** 一括送信 1 回あたりに DOM から集める URL の上限（暴走防止のハードキャップ）。 */
+  MAX_COLLECT: 300,
+  /** 一覧に表示するノートブックの上限。 */
+  MAX_LIST: 50,
+  /** 選択できる Google アカウント（`authuser`）の最大インデックス。 */
+  MAX_ACCOUNT_INDEX: 9,
+  /**
+   * ログイン中アカウントのメールアドレスが入っている WIZ キー（実機で確認）。
+   * `extractToken(html, ACCOUNT_EMAIL_KEY)` で 1 件だけ取れる。取れなくなったら
+   * 「アカウント N」という番号だけの表示にフォールバックする（機能は止めない）。
+   */
+  ACCOUNT_EMAIL_KEY: "oPEP7c",
+  /**
+   * アカウント probe でメールアドレスを探す最大バイト数（超えたら諦める）。
+   * 実測では `ACCOUNT_EMAIL_KEY` はトップページ HTML の先頭 10%（約 33 KB / 全体 330 KB）に
+   * 現れるため、ストリームを途中で打ち切れば転送量を 1 桁減らせる。
+   */
+  ACCOUNT_SCAN_MAX_CHARS: 262144,
+  /** アカウント一覧キャッシュの有効期間（12 時間）。ログインの増減はこの周期で追従する。 */
+  ACCOUNTS_CACHE_TTL_MS: 12 * 60 * 60 * 1000,
+
+  /**
+   * アカウントインデックス（`authuser`）を正規化する（純粋関数）。
+   * マルチログイン環境では既定アカウント以外で NotebookLM を使っていることがあり、
+   * 指定しないと常に u/0 に解決される（/rere D-5）。
+   *
+   * @param {unknown} value storage / メッセージ由来の生値
+   * @returns {number} 0 〜 MAX_ACCOUNT_INDEX の整数（不正値は 0）
+   */
+  normalizeAccountIndex(value) {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0 || n > NotebookLm.MAX_ACCOUNT_INDEX) return 0;
+    return n;
+  },
+
+  /**
+   * batchexecute への 1 リクエスト分の URL と body を組み立てる（純粋関数）。
+   *
+   * **リクエスト形状をテスト可能にするための切り出し**（/rere B2-10）。応答パース側は
+   * 純粋関数化されていたのに、`f.req` のネスト段数・`at` / `bl` / `source-path` / `rt` の
+   * 付与といった送信側は fetch に埋め込まれていて、リグレッションが CI を素通りしていた。
+   *
+   * @param {{rpcId: string, payload: string, sourcePath: string, bl: string, at: string,
+   *          reqId: number|string, accountIndex?: number}} input
+   * @returns {{url: string, body: string}}
+   */
+  buildRpcRequest(input) {
+    const accountIndex = NotebookLm.normalizeAccountIndex(input?.accountIndex);
+    const params = new URLSearchParams({
+      rpcids: String(input?.rpcId ?? ""),
+      "source-path": String(input?.sourcePath ?? "/"),
+      bl: String(input?.bl ?? ""),
+      // _reqid は Web アプリが付ける連番。値自体に意味はないので範囲内の乱数で足りる。
+      _reqid: String(input?.reqId ?? ""),
+      rt: "c",
+    });
+    // authuser は既定アカウント (0) のときは付けない（Web アプリの挙動に合わせる）。
+    if (accountIndex > 0) params.set("authuser", String(accountIndex));
+    const body = new URLSearchParams({
+      "f.req": JSON.stringify([[[String(input?.rpcId ?? ""), String(input?.payload ?? ""), null, "generic"]]]),
+      at: String(input?.at ?? ""),
+    }).toString();
+    return { url: `${NotebookLm.ORIGIN}${NotebookLm.BATCH_PATH}?${params.toString()}`, body };
+  },
+
+  /**
+   * トークン取得用のトップページ URL を組み立てる（純粋関数）。
+   * @param {number} [accountIndex]
+   */
+  buildHomeUrl(accountIndex) {
+    const n = NotebookLm.normalizeAccountIndex(accountIndex);
+    return n > 0 ? `${NotebookLm.ORIGIN}/?authuser=${n}` : `${NotebookLm.ORIGIN}/`;
+  },
+
+  /**
+   * ノートブックの表示 URL を組み立てる（純粋関数）。
+   * アカウント指定があるときは `authuser` を保って開かないと、既定アカウントで開いて
+   * 「作ったはずのノートブックが無い」状態になる。
+   *
+   * @param {string} notebookId
+   * @param {number} [accountIndex]
+   */
+  buildNotebookUrl(notebookId, accountIndex) {
+    const n = NotebookLm.normalizeAccountIndex(accountIndex);
+    const base = `${NotebookLm.ORIGIN}/notebook/${notebookId}`;
+    return n > 0 ? `${base}?authuser=${n}` : base;
+  },
+
+  /**
+   * ノートブック一覧の応答からノートブック配列を取り出す（純粋関数）。
+   * batchexecute の応答は 1 行目に長さ、以降に JSON 断片が並ぶ独自フレーミングで、
+   * 実データは 4 行目 (index 3) の JSON の `[0][2]` に**文字列として**入れ子になっている。
+   *
+   * @param {string|null|undefined} text 応答ボディ
+   * @returns {unknown[]|null} 内側の配列、または取り出せなければ null
+   */
+  parseBatchPayload(text) {
+    if (typeof text !== "string" || text === "") return null;
+    try {
+      const line = text.split("\n")[3];
+      if (!line) return null;
+      const outer = JSON.parse(line);
+      const inner = outer?.[0]?.[2];
+      if (typeof inner !== "string") return null;
+      const parsed = JSON.parse(inner);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * ノートブック一覧の応答を `{id, name, sources, emoji}` の配列に正規化する（純粋関数）。
+   * 6 番目の要素が `[3, ...]` のエントリは自分のノートブックではない（共有・お手本）ので除外する。
+   *
+   * @param {string|null|undefined} text 応答ボディ
+   * @returns {Array<{id: string, name: string, sources: number, emoji: string}>}
+   */
+  parseNotebookList(text) {
+    const rows = NotebookLm.parseBatchPayload(text)?.[0];
+    if (!Array.isArray(rows)) return [];
+    const out = [];
+    for (const row of rows) {
+      if (out.length >= NotebookLm.MAX_LIST) break;
+      if (!Array.isArray(row) || row.length < 6) continue;
+      const kind = row[5];
+      if (Array.isArray(kind) && kind.length > 0 && kind[0] === 3) continue;
+      const [name, sources, id, emoji] = row;
+      if (typeof id !== "string" || id === "") continue;
+      out.push({
+        id,
+        name: typeof name === "string" && name.trim() !== "" ? name.trim() : "Untitled notebook",
+        sources: Array.isArray(sources) ? sources.length : 0,
+        emoji: typeof emoji === "string" && emoji !== "" ? emoji : "📔",
+      });
+    }
+    return out;
+  },
+
+  /**
+   * ページ HTML に埋め込まれた `"key":"value"` 形式のトークンを取り出す（純粋関数）。
+   * `cfb2h`（build label）と `SNlM0e`（XSRF トークン）の取得に使う。
+   *
+   * @param {string|null|undefined} html ページ HTML
+   * @param {string} key トークンのキー
+   * @returns {string|null}
+   */
+  extractToken(html, key) {
+    if (typeof html !== "string" || typeof key !== "string" || key === "") return null;
+    const m = html.match(new RegExp(`"${key}":"([^"]+)"`));
+    return m ? m[1] : null;
+  },
+
+  /**
+   * ノートブック作成応答から UUID を取り出す（純粋関数）。
+   *
+   * @param {string|null|undefined} text 応答ボディ
+   * @returns {string|null}
+   */
+  extractNotebookId(text) {
+    if (typeof text !== "string") return null;
+    const m = text.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i);
+    return m ? m[0] : null;
+  },
+
+  /**
+   * URL 配列を RPC_ADD_SOURCES のソース配列に変換する（純粋関数）。
+   * YouTube URL は「YouTube ソース」用の 8 番目のスロット、それ以外は「Web サイト」用の
+   * 3 番目のスロットに入れる（NotebookLM 側でソース種別が変わる）。
+   *
+   * **ソース仕様は 11 要素で、末尾（index 10）に `1` が必須**。旧実装は URL スロットまでの
+   * 短い配列（YouTube 8 要素 / Web 3 要素）を送っており、サーバーは 200 + 正常フレームを
+   * 返すのにソースが 1 件も登録されない（＝空のノートブックが開く）状態だった。
+   *
+   * @param {ReadonlyArray<string>|null|undefined} urls
+   * @returns {Array<Array<unknown>>}
+   */
+  buildSourcePayload(urls) {
+    if (!Array.isArray(urls)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const url of urls) {
+      if (typeof url !== "string" || url === "") continue;
+      if (seen.has(url)) continue;
+      seen.add(url);
+      const spec = new Array(NotebookLm.SOURCE_SPEC_LENGTH).fill(null);
+      spec[NotebookLm.isYouTubeUrl(url) ? 7 : 2] = [url];
+      spec[NotebookLm.SOURCE_SPEC_LENGTH - 1] = 1;
+      out.push(spec);
+    }
+    return out;
+  },
+
+  /**
+   * RPC_ADD_SOURCES の 3 番目に付ける共通リクエストオプション（純粋関数）。
+   * NotebookLM の Web アプリが notebook スコープの RPC に必ず付けている capability 宣言で、
+   * これが無いとバックエンドのルーティングが変わりソース追加が黙って無視される。
+   *
+   * @returns {Array<unknown>} 毎回新しい配列（呼び出し側での破壊的変更を持ち越さない）
+   */
+  buildRequestOptions() {
+    return [2, null, null, [1, null, null, null, null, null, null, null, null, null, [1]]];
+  },
+
+  /** URL が YouTube の動画 URL か判定する（純粋関数）。 */
+  isYouTubeUrl(url) {
+    if (typeof url !== "string") return false;
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return host === "youtube.com" || host.endsWith(".youtube.com") || host === "youtu.be";
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * videoId から正規化した watch URL を作る（純粋関数）。
+   * DOM 上の href は `?t=` や `&list=` を伴うことがあり、そのまま送ると NotebookLM 側で
+   * 別ソース扱いになって重複するため、常に `https://www.youtube.com/watch?v=<id>` に揃える。
+   *
+   * @param {string|null|undefined} href `/watch?v=xxx&list=...` などの href
+   * @returns {string|null} 正規化 URL または null
+   */
+  normalizeWatchUrl(href) {
+    if (typeof href !== "string" || href === "") return null;
+    let id = null;
+    const m = href.match(/[?&]v=([\w-]{11})(?:[&#]|$)/);
+    if (m) id = m[1];
+    else {
+      const short = href.match(/(?:youtu\.be\/|\/shorts\/|\/live\/|\/embed\/)([\w-]{11})(?:[/?#]|$)/);
+      if (short) id = short[1];
+    }
+    return id ? `https://www.youtube.com/watch?v=${id}` : null;
+  },
+});
+
+/**
  * @readonly カラーピッカー（独自実装）の定数。
  *
  * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
@@ -2013,7 +2502,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube クリーナー (32 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
+ * YouTube 機能拡張 (34 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
@@ -2106,6 +2595,7 @@ const PopupTabs = Object.freeze({
   globalThis.Loupe = Loupe;
   globalThis.ConnectionMonitor = ConnectionMonitor;
   globalThis.BroadcastClock = BroadcastClock;
+  globalThis.NotebookLm = NotebookLm;
   globalThis.ColorPicker = ColorPicker;
   globalThis.PopupTabs = PopupTabs;
 })();

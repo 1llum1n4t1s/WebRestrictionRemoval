@@ -1,5 +1,5 @@
 /*
- * YouTube クリーナー用 CSS。
+ * YouTube 機能拡張用 CSS。
  *
  * search-fixer.js が要素に付けるクラスへスタイルを当てる責務。
  * 機能 OFF 時は JS 側がクラスを外すため、ここの定義は active 時のみ作用する。

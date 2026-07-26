@@ -11,7 +11,7 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 
 | Feature | Description |
 |---------|-------------|
-| 🧹 **YouTube cleaner** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) and more — **32 sub-features** |
+| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / send to Gemini Notebook and more — **34 sub-features** |
 | 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
@@ -45,12 +45,12 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 1. Click the toolbar icon to open the popup.
 2. **Turn ON only the master toggles you need** (everything is OFF by default).
-3. Tune each feature in the popup (YouTube cleaner's 32 sub-features, Volume Booster slider, etc.).
+3. Tune each feature in the popup (the 34 YouTube Enhancements sub-features, Volume Booster slider, etc.).
 4. Settings are persisted across sessions.
 
 ### Popup tabs
 - **Tune**: 10 master toggles + Volume slider + Gamma / Loupe
-- **YouTube**: 32 YouTube cleaner sub-features
+- **YouTube**: 34 YouTube Enhancements sub-features
 - **Instagram**: 11 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
 - **Color Picker**: EyeDropper + history
@@ -85,7 +85,7 @@ See the [Privacy Policy](docs/privacy-policy.en.md) for details.
 | Symptom | Action |
 |---------|--------|
 | **A setting doesn't take effect** | Close and re-open the popup. If still failing, reload the extension via 🔄 |
-| **YouTube sidebar still shows Shorts** | Check that all 4 Shorts sub-toggles (shelf / chip / sidebar / button) under the YouTube cleaner are individually ON |
+| **YouTube sidebar still shows Shorts** | Check that all 4 Shorts sub-toggles (shelf / chip / sidebar / button) under the YouTube Enhancements are individually ON |
 | **Volume Booster has no effect (Chrome)** | Boost starts the moment you open the popup on the active tab (user gesture required — works on all sites including EME video like Netflix). Open the popup while the video is playing and adjust the volume. Boosted tabs show a "This tab is being shared" banner (a tabCapture behavior) |
 | **Volume Booster has no effect (Firefox)** | The Firefox edition uses in-page processing (MediaElementSource) and applies to all tabs automatically without opening the popup. On DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) it cannot work by design — those videos still play normally. If a change does not take effect, reload the page |
 

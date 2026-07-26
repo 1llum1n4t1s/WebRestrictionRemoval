@@ -18,7 +18,7 @@ An extension that consolidates 11 categories of viewing aids — plus a shared s
 
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
-  In addition, the YouTube cleaner offers 31 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, live-stream connection monitor).
+  In addition, the YouTube Enhancements offers 31 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, live-stream connection monitor).
 
 · 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
   Shows a per-month total on https://www.amazon.co.jp/auto-deliveries.
@@ -156,7 +156,7 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   None of these read, modify, or transmit the page DOM (Video Gamma / Remove video black bars only attach a filter / transform to <video>; they do not read or save video data).
 
   *://*.youtube.com/*:
-  Required for the YouTube cleaner (32 sub-features including Shorts removal, subscriptions enhancements, and the connection monitor). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
+  Required for the YouTube Enhancements (34 sub-features including Shorts removal, subscriptions enhancements, and the connection monitor). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
 
   *://www.amazon.co.jp/auto-deliveries*:
   Required to show a per-month total on the Amazon recurring-delivery page. The script reads `subscription-price` per month and inserts the computed total into the same page. Nothing read is transmitted off-device.

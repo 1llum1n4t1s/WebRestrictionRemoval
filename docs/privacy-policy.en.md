@@ -14,8 +14,8 @@ The Extension does not collect any personal information.
 
 The Extension stores the following settings only on the user's device (`chrome.storage.local`):
 
-- **`searchFixerEnabled`** (boolean): master toggle for the YouTube cleaner (parent of all 32 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
-- **`searchFixerFeatures`** (object): on/off state of each of the 32 YouTube cleaner sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
+- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 34 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
+- **`searchFixerFeatures`** (object): on/off state of each of the 34 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
 - **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored only on-device; never transmitted.
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
@@ -67,15 +67,15 @@ The Extension does not share any data with third parties.
 
 ## Network communication
 
-The Extension does not communicate with any third-party external servers, with the two explicit exceptions listed below.
+The Extension does not communicate with any third-party external servers, with the three explicit exceptions listed below.
 
 ### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
 When the Instagram / TikTok cleaner's "Show download button on images" sub-feature (opt-in, default OFF) is enabled, an image GET is issued only at the moment the user clicks the download button, and only against each site's official CDN (Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`; TikTok: `p<digits>.tiktokcdn.com` / `p<digits>.tiktokcdn-us.com`). These are the same domains the browser already loads via `<img>` tags. The fetch uses `credentials: "omit"` (no cookies), `redirect: "manual"` (blocks redirect-based third-party transmission), and `referrerPolicy: "no-referrer"` (no referrer). Proxy fetches to other origins are blocked by a hostname allowlist (YouTube does not provide this feature). Downloaded images are saved locally via Blob URL + `<a download>` only; nothing is transmitted externally.
 
-### Exception 2: Connection monitor (YouTube cleaner sub-feature)
+### Exception 2: Connection monitor (YouTube Enhancements sub-feature)
 
-When the YouTube cleaner's "Connection monitor" sub-feature (`searchFixerFeatures.connectionMonitor`, opt-in, default OFF) is enabled **and** the user is actively viewing a YouTube live stream, the Extension issues round-trip-time (RTT) measurement fetches to the two public health-check endpoints below every 5 seconds. These measurements feed the in-player HUD that helps the user diagnose buffering causes (their own network / device performance / YouTube CDN / international routing / etc.).
+When the YouTube Enhancements's "Connection monitor" sub-feature (`searchFixerFeatures.connectionMonitor`, opt-in, default OFF) is enabled **and** the user is actively viewing a YouTube live stream, the Extension issues round-trip-time (RTT) measurement fetches to the two public health-check endpoints below every 5 seconds. These measurements feed the in-player HUD that helps the user diagnose buffering causes (their own network / device performance / YouTube CDN / international routing / etc.).
 
 - `https://www.gstatic.com/generate_204` — RTT to a Google edge endpoint
 - `https://speed.cloudflare.com/__down?bytes=10` — RTT to a Cloudflare endpoint (international-route baseline)
@@ -89,7 +89,31 @@ These fetches run with the following privacy controls:
 
 **The only information conveyed to the endpoints is "the fact that Vuora is ON" and "the approximate time the user is viewing a live stream."** No user identifier, cookies, YouTube watch history, channel names, video IDs, or other personal data are transmitted (the user's IP address inevitably reaches the destination server as part of the HTTP request protocol, but this is the same property as any ordinary web browsing). The destination URLs are hard-coded constants in `actions.js` and cannot be changed by any user action or setting (a unit test asserts the URLs are fixed). Both endpoints are public measurement endpoints operated by Google and Cloudflare; the Extension does **not** operate any server of its own.
 
-When the connection-monitor sub-feature is OFF, when the YouTube cleaner master toggle is OFF, or when the user is **not** on a YouTube live stream (e.g. watching a VOD or browsing any other page), **none of these fetches are issued**. Measured RTT values are held only in a content-script-scope memory ring buffer (at most 6 samples / 30 seconds of data) and are not persisted. They are discarded immediately when the master toggle / sub-feature is turned OFF or the overlay is removed.
+When the connection-monitor sub-feature is OFF, when the YouTube Enhancements master toggle is OFF, or when the user is **not** on a YouTube live stream (e.g. watching a VOD or browsing any other page), **none of these fetches are issued**. Measured RTT values are held only in a content-script-scope memory ring buffer (at most 6 samples / 30 seconds of data) and are not persisted. They are discarded immediately when the master toggle / sub-feature is turned OFF or the overlay is removed.
+
+### Exception 3: Send to Gemini Notebook (YouTube Enhancements sub-feature)
+
+When the YouTube Enhancements' "Send to Gemini Notebook" sub-feature (`searchFixerFeatures.notebookLmSend`, opt-in, default OFF) is enabled, the Extension communicates with Google Gemini Notebook (`https://notebooklm.google.com`) as follows.
+
+**Read-only requests** (issued on pages where the send button is shown, so the destination choices are ready before the user opens the popover; no watch data, video URL, or user identifier is ever sent):
+
+- listing the signed-in Google accounts (to label the account selector with e-mail addresses; the result is cached on-device for up to 12 hours), and
+- listing the user's notebooks (to populate the destination choices).
+
+**Requests issued only when the user clicks send and picks a destination**:
+
+- creating a new notebook (when "Create a new notebook" is chosen), and
+- adding the selected YouTube video URLs as sources.
+
+If you are signed in to multiple Google accounts, the destination account can be chosen from the `Google account` row in the popover (the choice is stored on-device as `notebookLmAccountIndex` and never transmitted). By default the primary signed-in account (authuser=0) is used.
+
+**The only information transmitted is the YouTube video URLs the user selected at that moment** (normalized to `https://www.youtube.com/watch?v=...`) **and, when creating a notebook, its title** (derived from the page title or search query). No watch history is collected, no background transmission occurs, and no user identifier is attached. Gemini Notebook is the sole destination; the Extension does not operate any server of its own.
+
+Authentication relies on the Google login session (cookies) already present in the browser. The Extension does not read, store, or forward Google credentials to any destination. If the user is not signed in to Gemini Notebook, the send fails and only a sign-in prompt is shown.
+
+Because Gemini Notebook has no public API, the Extension uses the internal endpoint that the Gemini Notebook web app itself calls. That interface may change without notice at Google's discretion, in which case this feature may temporarily stop working.
+
+When the sub-feature is OFF or the YouTube Enhancements master toggle is OFF, the send button is not rendered and **none of these requests are issued**.
 
 ## Permission usage
 
@@ -105,9 +129,9 @@ The "restriction removal" features ("right-click unblock / text-selection unbloc
 
 The Instagram cleaner (`instagramCleanerEnabled` / `instagramCleanerFeatures`) was added at the same time. Both are default OFF (opt-in); Instagram is unaffected unless the user enables them. Instagram cleaner operations are limited to client-side DOM manipulation and CSS application, with no external transmission.
 
-The YouTube Shorts removal feature was integrated as a YouTube cleaner sub-feature `searchFixerFeatures.removeShorts`, and the legacy `ytShortsRemovalEnabled` storage key was removed. On update, users with the legacy key set to `true` have it automatically migrated to `searchFixerFeatures.removeShorts = true` and `searchFixerEnabled = true` before the legacy key is removed, so Shorts removal continues to work.
+The YouTube Shorts removal feature was integrated as a YouTube Enhancements sub-feature `searchFixerFeatures.removeShorts`, and the legacy `ytShortsRemovalEnabled` storage key was removed. On update, users with the legacy key set to `true` have it automatically migrated to `searchFixerFeatures.removeShorts = true` and `searchFixerEnabled = true` before the legacy key is removed, so Shorts removal continues to work.
 
-Since v1.0.18, a "Hide comments" sub-feature has been added to the YouTube cleaner (`searchFixerFeatures.hideComments`), the Volume Booster has gained Auto Distortion Guard / Night Mode sub-toggles (`volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled`), and an `EyeDropper` API based color picker has been added (`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash`). All new keys default to OFF or to safe-side defaults; site behavior is unaffected until the user interacts with them.
+Since v1.0.18, a "Hide comments" sub-feature has been added to the YouTube Enhancements (`searchFixerFeatures.hideComments`), the Volume Booster has gained Auto Distortion Guard / Night Mode sub-toggles (`volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled`), and an `EyeDropper` API based color picker has been added (`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash`). All new keys default to OFF or to safe-side defaults; site behavior is unaffected until the user interacts with them.
 
 ## Contact
 

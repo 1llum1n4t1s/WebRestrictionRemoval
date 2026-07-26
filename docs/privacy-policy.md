@@ -16,8 +16,8 @@
 
 本拡張機能は、以下の設定データをユーザーの端末内（`chrome.storage.local`）にのみ保存します。
 
-- **`searchFixerEnabled`**（真偽値）: YouTube クリーナー（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・接続モニターを含む 32 サブ機能の親）の有効/無効。
-- **`searchFixerFeatures`**（オブジェクト）: YouTube クリーナーの 32 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張 / 接続モニター）の個別 ON/OFF 状態。
+- **`searchFixerEnabled`**（真偽値）: YouTube 機能拡張（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・接続モニターを含む 34 サブ機能の親）の有効/無効。
+- **`searchFixerFeatures`**（オブジェクト）: YouTube 機能拡張の 34 個のサブ機能（Shorts 削除 / 検索結果ノイズ除去 / 動画属性削除 / ハイライト / 動画ページ整形〈コメント欄非表示・ライブチャット非表示〉/ レイアウト / 登録チャンネル拡張 / 接続モニター）の個別 ON/OFF 状態。
 - **`searchFixerGridItems`**（数値）: YouTube ホームグリッドの列数指定（0=自動 / 4 / 5 / 6）。
 - **`searchFixerBlockedChannels`**（配列）: チャンネルブロックリスト機能で登録したチャンネルの識別子（ハンドルまたはチャンネル ID）と表示名のリスト。登録は検索結果のチャンネル名横に表示されるボタンから行い、登録済みチャンネルの動画は検索結果に加えホーム・登録チャンネル・急上昇等の YouTube フィードページ全体から除去されます。端末内にのみ保存され、外部送信は行いません。
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。
@@ -69,15 +69,15 @@
 
 ## ネットワーク通信
 
-本拡張機能は、以下に明示する 2 つの例外を除き、第三者の外部サーバーへの通信を一切行いません。
+本拡張機能は、以下に明示する 3 つの例外を除き、第三者の外部サーバーへの通信を一切行いません。
 
 ### 例外 1: 画像ダウンロード（Instagram / TikTok クリーナーのサブ機能）
 
 Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `p<数字>.tiktokcdn.com` / `p<数字>.tiktokcdn-us.com`）に対して画像 GET を発行します。これは現にブラウザが `<img>` タグでロードしているドメインと同一であり、`credentials: "omit"` でクッキーは送信せず、`redirect: "manual"` で 302 経由の第三者ドメイン送信を遮断し、`referrerPolicy: "no-referrer"` でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します（YouTube では本機能は提供されません）。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されるのみで、外部送信は一切行いません。
 
-### 例外 2: 接続モニター（YouTube クリーナーのサブ機能）
+### 例外 2: 接続モニター（YouTube 機能拡張のサブ機能）
 
-YouTube クリーナーのサブ機能「接続モニター」（`searchFixerFeatures.connectionMonitor`、オプトイン・デフォルト OFF）を有効化し、かつ YouTube のライブ配信を視聴している間のみ、ライブ配信視聴中のバッファリング原因（自分の回線 / 端末性能 / YouTube CDN / 国際線経路 / etc.）を切り分ける in-player HUD のために、以下 2 つの公開ヘルスチェック endpoint への RTT 計測 fetch を 5 秒周期で発行します。
+YouTube 機能拡張のサブ機能「接続モニター」（`searchFixerFeatures.connectionMonitor`、オプトイン・デフォルト OFF）を有効化し、かつ YouTube のライブ配信を視聴している間のみ、ライブ配信視聴中のバッファリング原因（自分の回線 / 端末性能 / YouTube CDN / 国際線経路 / etc.）を切り分ける in-player HUD のために、以下 2 つの公開ヘルスチェック endpoint への RTT 計測 fetch を 5 秒周期で発行します。
 
 - `https://www.gstatic.com/generate_204` — Google エッジへの到達時間計測
 - `https://speed.cloudflare.com/__down?bytes=10` — Cloudflare（国際線ベースライン）への到達時間計測
@@ -91,7 +91,31 @@ YouTube クリーナーのサブ機能「接続モニター」（`searchFixerFea
 
 **送信される情報は「Vuora が ON であるという事実」と「視聴中のおおよその時刻」のみ**であり、ユーザー識別子・クッキー・YouTube 視聴履歴・チャンネル名・動画 ID・自分の IP アドレス以外の個人データは一切送信されません（IP アドレスは HTTP リクエスト送信時に通信プロトコル上必然的に対向サーバーへ届きますが、これは通常の Web ブラウジング全般と同等の性質です）。送信先 URL は `actions.js` の定数として固定されており、ユーザー操作や設定では変更できません（テストで値固定をアサート済み）。endpoint は Google と Cloudflare が一般公開している計測用エンドポイントであり、Vuora 専用に運用するサーバーは存在しません。
 
-接続モニターサブ機能 OFF 時 / YouTube クリーナーのマスタートグル OFF 時 / YouTube ライブ視聴中以外（VOD 動画視聴中 / 別ページ閲覧中）には、これらの fetch は **一切発行されません**。計測した RTT 値は content script スコープのメモリ ring buffer (最大 6 サンプル / 30 秒分) にのみ保持され、永続化されません。マスター OFF / サブ機能 OFF / overlay 撤去で即座に破棄されます。
+接続モニターサブ機能 OFF 時 / YouTube 機能拡張のマスタートグル OFF 時 / YouTube ライブ視聴中以外（VOD 動画視聴中 / 別ページ閲覧中）には、これらの fetch は **一切発行されません**。計測した RTT 値は content script スコープのメモリ ring buffer (最大 6 サンプル / 30 秒分) にのみ保持され、永続化されません。マスター OFF / サブ機能 OFF / overlay 撤去で即座に破棄されます。
+
+### 例外 3: Gemini Notebook 送信（YouTube 機能拡張のサブ機能）
+
+YouTube 機能拡張のサブ機能「Gemini Notebook 送信」（`searchFixerFeatures.notebookLmSend`、オプトイン・デフォルト OFF）を有効化しているとき、Google の Gemini Notebook（`https://notebooklm.google.com`）に対して以下の通信を行います。
+
+**Gemini Notebook から読み取るだけの通信**（送信ボタンが表示される対象ページで、選択肢を先に用意するために行います。YouTube の視聴内容・動画 URL・ユーザー識別子は一切送信しません）:
+
+- ログイン中の Google アカウント一覧の取得（表示名としてメールアドレスを取り出すため。結果は端末内に最大 12 時間キャッシュします）
+- ノートブック一覧の取得（送信先の選択肢を表示するため）
+
+**ユーザーが送信ボタンを押して送信先を選んだ瞬間にのみ行う通信**:
+
+- ノートブックの新規作成（「新しいノートブックを作成」を選んだとき）
+- ソースの追加（選択した YouTube 動画の URL を送信）
+
+複数の Google アカウントにログインしている場合、送信先アカウントはポップオーバーの「Google アカウント」欄で選べます（選択内容は端末内の `notebookLmAccountIndex` に保存され、外部送信はしません）。既定では通常ログインしているアカウント（authuser=0）が使われます。
+
+**送信される情報は、ユーザーがそのとき選んだ YouTube 動画の URL（`https://www.youtube.com/watch?v=...` 形式に正規化したもの）と、新規作成時のノートブック名（ページタイトルまたは検索語から生成）のみ**です。視聴履歴の収集、バックグラウンドでの自動送信、ユーザー識別子の付与は一切行いません。送信先は Gemini Notebook 以外に存在せず、Vuora 専用に運用するサーバーもありません。
+
+認証にはブラウザに既に保存されている Google のログインセッション（クッキー）を利用します。本拡張機能は Google の認証情報を読み取らず、保存もせず、他のいかなる宛先にも送信しません。Gemini Notebook にログインしていない場合、送信は失敗し、ログインを促す表示のみを行います。
+
+Gemini Notebook には公開 API が存在しないため、通信には Gemini Notebook の Web アプリ自身が使用する内部エンドポイントを利用します。この仕様は Google 側の都合で予告なく変更される場合があり、その際は本機能が一時的に動作しなくなることがあります。
+
+本サブ機能 OFF 時 / YouTube 機能拡張のマスタートグル OFF 時には、送信ボタン自体が表示されず、これらの通信は **一切発行されません**。
 
 ## 権限の使用目的
 
@@ -107,9 +131,9 @@ v1.0.x の旧バージョンが提供していた「右クリック解除 / テ�
 
 Instagram クリーナー機能（`instagramCleanerEnabled` / `instagramCleanerFeatures`）も同時に追加されました。いずれもデフォルト OFF（オプトイン）であり、ユーザーが有効化しない限り Instagram の表示には一切影響しません。Instagram クリーナーの動作はクライアント側の DOM 操作・CSS 適用のみで、外部サーバーへの送信は一切行いません。
 
-YouTube Shorts 削除機能は YouTube クリーナーのサブ機能 `searchFixerFeatures.removeShorts` として統合されました。これに伴い旧 `ytShortsRemovalEnabled` ストレージキーも削除されています。アップデート時、旧キーが `true` だったユーザーは `searchFixerFeatures.removeShorts = true` および `searchFixerEnabled = true` に自動転写されてから旧キーが削除されるため、Shorts 削除動作は継続されます。
+YouTube Shorts 削除機能は YouTube 機能拡張のサブ機能 `searchFixerFeatures.removeShorts` として統合されました。これに伴い旧 `ytShortsRemovalEnabled` ストレージキーも削除されています。アップデート時、旧キーが `true` だったユーザーは `searchFixerFeatures.removeShorts = true` および `searchFixerEnabled = true` に自動転写されてから旧キーが削除されるため、Shorts 削除動作は継続されます。
 
-v1.0.18 以降、YouTube クリーナーに「コメント欄非表示」サブ機能（`searchFixerFeatures.hideComments`）が追加され、音量ブースターには自動歪み防止 / ナイトモードの各サブトグル（`volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` キー）と、`EyeDropper` API ベースのカラーピッカー機能（`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash` キー）も追加されています。これらの新規キーはすべてデフォルト OFF または安全側のデフォルト値で、ユーザーが操作するまでサイト挙動には一切影響しません。
+v1.0.18 以降、YouTube 機能拡張に「コメント欄非表示」サブ機能（`searchFixerFeatures.hideComments`）が追加され、音量ブースターには自動歪み防止 / ナイトモードの各サブトグル（`volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` キー）と、`EyeDropper` API ベースのカラーピッカー機能（`colorPickerHistory` / `colorPickerDefaultFormat` / `colorPickerHexHash` キー）も追加されています。これらの新規キーはすべてデフォルト OFF または安全側のデフォルト値で、ユーザーが操作するまでサイト挙動には一切影響しません。
 
 ## お問い合わせ
 

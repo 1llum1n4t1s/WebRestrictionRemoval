@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * YouTube クリーナー content script（独自実装）。
+ * YouTube 機能拡張 content script（独自実装）。
  *
  * YouTube の検索結果・動画ページ・ホームグリッドの冗長 UI を非表示にするための DOM 操作と
  * CSS 注入を行う。外部送信ゼロ。設定は `chrome.storage.local` の `searchFixerEnabled` (master) /
@@ -269,6 +269,7 @@
       detachResultsObserver();
       clearThumbnailHighlight();
       removeAllBlockButtons();
+      abortForeignCountryFetch(); // 海外チャンネル除外: 待ち行列と in-flight 取得を止める
       applyHomeGridStyle();      // active=false なら style 要素を撤去するだけ
       applySearchGridStyle();    // 同上
       applyDemoteStyleInjection(); // 同上 + demoted クラス剥がし
@@ -296,6 +297,8 @@
       // 検索ページから離れた場合、過去に付与した装飾クラス / 注入ボタンを掃除
       clearThumbnailHighlight();
       removeAllBlockButtons();
+      // 対象外ページへ遷移したら、そのページ由来の about 取得も止める（判定結果は cache に残る）
+      abortForeignCountryFetch();
     }
 
     // `applyWatchPageClasses()` は <html> クラス (__cpa-sfx-hide-comments) も操作するため、
@@ -868,6 +871,9 @@
 
     // ===== Pass 4: チャンネルブロックリスト（除去 + 登録ボタン注入） =====
     applyChannelBlocklist();
+
+    // ===== Pass 5: 海外チャンネル除外 =====
+    applyForeignChannelFilter();
   }
 
   // ---------- チャンネルブロックリスト ----------
@@ -992,6 +998,305 @@
     } catch {}
   }
 
+  // ---------- 海外チャンネル除外 (hideForeignChannels) ----------
+  /**
+   * 「自分の国以外のチャンネル」の動画を検索結果 / フィードから除去する。
+   *
+   * YouTube 標準の検索フィルタには国の条件が存在せず（「場所」は動画のジオタグ絞り込みで別物）、
+   * ホーム等のフィードにはフィルタ UI 自体が無いため独自実装する。判定は 2 段ハイブリッド:
+   *
+   *   1. 言語ヒューリスティック `SearchFixer.detectTextOrigin`（fetch ゼロ・即時）
+   *   2. 1 が unknown のカードだけ、チャンネルの `/@handle/about` を **同一オリジン** fetch して
+   *      `"country"` を読む（外部送信ゼロを維持。結果はチャンネル単位で sessionStorage キャッシュ）
+   *
+   * fail-open 原則: 判定が付かない間 / 国非公開チャンネル / fetch 失敗はすべて「残す」。
+   * 自国チャンネルを誤って消すほうが、海外チャンネルが残るより体験を壊すため。
+   */
+  /** @type {{region: string|null, lang: string, aliases: Set<string>, knownCountries: Set<string>}|null} 自国情報（初回利用時に解決） */
+  let foreignHomeInfo = null;
+  /**
+   * 既知の国名集合を作るための候補コード（AA〜ZZ の 676 通り）。
+   * `Intl` は region コードの列挙 API を持たないため総当たりで引き、`Intl.DisplayNames` が
+   * 変換できたものだけを既知の国名として採用する（未割り当てコードは入力がそのまま返る）。
+   * ハードコードした国コード表を持たずに済み、ICU の更新にも自動追従する。
+   * 生成は getForeignHomeInfo の初回呼び出し 1 回だけ。
+   */
+  const FOREIGN_REGION_CODES = (() => {
+    const out = [];
+    for (let a = 65; a <= 90; a++) {
+      for (let b = 65; b <= 90; b++) out.push(String.fromCharCode(a, b));
+    }
+    return out;
+  })();
+  /** @type {Map<string, "home"|"foreign"|"unknown">} チャンネルキー → 判定結果（メモリキャッシュ） */
+  const foreignOriginCache = new Map();
+  /** @type {Map<string, string>} 未取得チャンネルキー → about ページのパス（fetch 待ち行列） */
+  const foreignFetchQueue = new Map();
+  /** @type {Set<string>} fetch 実行中のチャンネルキー（重複発射防止） */
+  const foreignFetchInFlight = new Set();
+  /** @type {AbortController|null} 進行中の about 取得をまとめて中断するためのコントローラ */
+  let foreignFetchAbort = null;
+  /** このページセッションで消費した about 取得の本数（FOREIGN_FETCH_SESSION_MAX の予算管理） */
+  let foreignFetchBudgetUsed = 0;
+  /** 予算枯渇の警告を 1 回だけ出すためのフラグ（毎スキャンでログを埋めない） */
+  let foreignBudgetExhaustedLogged = false;
+  /** 適用パスの例外を 1 回だけ警告するためのフラグ（同上） */
+  let foreignFilterErrorLogged = false;
+  let foreignRescanScheduled = false;
+
+  /**
+   * 自国の国コードと、照合用の 2 つの集合を解決する。
+   *
+   *   - `aliases`: 自国を指す表記の集合（国コード + 各ロケールでの国名）
+   *   - `knownCountries`: **各ロケールで表現しうる全 region 名**の集合
+   *
+   * `knownCountries` があることで「既知の国名だが自国ではない」= `foreign` と
+   * 「そもそも国名として解決できない」= `unknown`（残す）を分離できる（/rere RC-H）。
+   * about の国名は YouTube の UI 言語でローカライズされ、ブラウザの `navigator.languages` とは
+   * 独立に決まるため、照合ロケールには **`document.documentElement.lang`（YouTube の UI 言語）**
+   * も含める。旧実装は navigator 由来 2 ロケールのみで照合し、外れた場合に `foreign` へ倒して
+   * 自国チャンネルを一括除去する破綻があった。
+   */
+  function getForeignHomeInfo() {
+    if (foreignHomeInfo) return foreignHomeInfo;
+    const languages = Array.isArray(navigator.languages) && navigator.languages.length > 0
+      ? Array.from(navigator.languages)
+      : [navigator.language].filter(Boolean);
+    const region = SearchFixer.resolveHomeRegion(languages);
+    const lang = (languages[0] || "").toLowerCase().split("-")[0];
+    const aliases = new Set();
+    const knownCountries = new Set();
+    if (region) {
+      aliases.add(region.toLowerCase());
+      // YouTube の UI 言語 → ブラウザの言語 → 英語 の順で照合ロケールを集める。
+      const pageLang = document.documentElement.getAttribute("lang");
+      const locales = [pageLang, ...languages, "en"].filter(Boolean);
+      const seenLocale = new Set();
+      for (const locale of locales) {
+        if (seenLocale.has(locale)) continue;
+        seenLocale.add(locale);
+        try {
+          const display = new Intl.DisplayNames([locale], { type: "region" });
+          const homeName = display.of(region);
+          if (homeName) aliases.add(String(homeName).trim().toLowerCase());
+          for (const code of FOREIGN_REGION_CODES) {
+            const name = display.of(code);
+            // Intl.DisplayNames は未知コードで入力をそのまま返すため、変換できた分だけ採用する。
+            if (name && name !== code) knownCountries.add(String(name).trim().toLowerCase());
+          }
+        } catch {
+          // 該当ロケールを持たない環境では他のロケール分のエイリアスで照合する
+        }
+      }
+    }
+    foreignHomeInfo = { region, lang, aliases, knownCountries };
+    return foreignHomeInfo;
+  }
+
+  function readForeignCache(key) {
+    const mem = foreignOriginCache.get(key);
+    if (mem) return mem;
+    try {
+      const raw = sessionStorage.getItem(SearchFixer.FOREIGN_CACHE_PREFIX + key);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || Date.now() - (data.ts || 0) > SearchFixer.FOREIGN_CACHE_TTL_MS) return null;
+      if (data.origin !== "home" && data.origin !== "foreign" && data.origin !== "unknown") return null;
+      foreignOriginCache.set(key, data.origin);
+      return data.origin;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeForeignCache(key, origin) {
+    foreignOriginCache.set(key, origin);
+    try {
+      sessionStorage.setItem(
+        SearchFixer.FOREIGN_CACHE_PREFIX + key,
+        JSON.stringify({ origin, ts: Date.now() })
+      );
+    } catch {
+      // QuotaExceeded はメモリキャッシュだけで動作継続（次セッションで再取得）
+    }
+  }
+
+  /**
+   * カードの判定を返す。未確定のチャンネルは about fetch を予約して "unknown"（= 残す）を返す。
+   *
+   * @param {string|null} key チャンネルキー（"@handle" 小文字 or "UC..."）
+   * @param {string} text タイトル + チャンネル名
+   * @param {string|null} href チャンネルへのリンク href（about ページ URL の組み立てに使う）
+   */
+  function classifyCardOrigin(key, text, href) {
+    const home = getForeignHomeInfo();
+    if (!home.region) return "unknown"; // 自国が特定できない環境では機能を no-op にする
+    const byText = SearchFixer.detectTextOrigin(text, home.lang);
+    if (byText !== "unknown") return byText;
+    if (!key) return "unknown";
+    const cached = readForeignCache(key);
+    if (cached) return cached;
+    enqueueForeignCountryFetch(key, href);
+    return "unknown";
+  }
+
+  /**
+   * about ページ取得を待ち行列に積む（同一チャンネルは 1 回だけ）。
+   * セッション内の総取得数は `FOREIGN_FETCH_SESSION_MAX` で打ち切る（/rere RC-I）。
+   * 固有スクリプトを持たない言語圏（en / de / fr 等）では全カードが判定不能になり、
+   * 1 件 1〜3 MB の about ページを無制限に取りにいく経路があったため上限を設ける。
+   */
+  function enqueueForeignCountryFetch(key, href) {
+    if (foreignFetchInFlight.has(key) || foreignFetchQueue.has(key)) return;
+    if (foreignFetchBudgetUsed >= SearchFixer.FOREIGN_FETCH_SESSION_MAX) {
+      if (!foreignBudgetExhaustedLogged) {
+        foreignBudgetExhaustedLogged = true;
+        console.warn(
+          `[WebViewingAssist] 海外チャンネル除外: about 取得の上限 ${SearchFixer.FOREIGN_FETCH_SESSION_MAX} 件に達したため、以降は判定を保留します（未判定のチャンネルは除外されません）`
+        );
+      }
+      return;
+    }
+    // href から `/@handle` / `/channel/UC...` のパス部分だけを取り出す（クエリや動画パスを混ぜない）。
+    const path = typeof href === "string" ? href.match(/^\/(?:@[^/?#]+|channel\/UC[\w-]+)/)?.[0] : null;
+    if (!path) return;
+    foreignFetchBudgetUsed++;
+    foreignFetchQueue.set(key, path);
+    pumpForeignCountryFetch();
+  }
+
+  /**
+   * 待ち行列を同時実行数の上限まで消化する。
+   * 機能 OFF / orphan 化のときは発射せずキューを捨てる（/rere RC-A: 旧実装は OFF 後も
+   * キューが最後まで排水され、切ったはずの機能が MB 単位の取得を続けていた）。
+   */
+  function pumpForeignCountryFetch() {
+    if (!chrome.runtime?.id || !active || !f("hideForeignChannels")) {
+      abortForeignCountryFetch();
+      return;
+    }
+    while (
+      foreignFetchInFlight.size < SearchFixer.FOREIGN_FETCH_CONCURRENCY &&
+      foreignFetchQueue.size > 0
+    ) {
+      const [key, path] = foreignFetchQueue.entries().next().value;
+      foreignFetchQueue.delete(key);
+      foreignFetchInFlight.add(key);
+      void fetchChannelOrigin(key, path);
+    }
+  }
+
+  /**
+   * 待ち行列を破棄し、進行中の about 取得を中断する（chrome API 非依存なので orphan 後も安全）。
+   * master OFF / サブ機能 OFF / ページ離脱 / orphan 化のすべてから呼ぶ。
+   */
+  function abortForeignCountryFetch() {
+    foreignFetchQueue.clear();
+    try { foreignFetchAbort?.abort(); } catch {}
+    foreignFetchAbort = null;
+  }
+
+  /**
+   * チャンネルの about ページを same-origin fetch して国を判定し、キャッシュに書いて再スキャンする。
+   * search-fixer.js の `/feed/channels` 取得と同じ same-origin 認証 fetch パターン
+   * （`credentials: "same-origin"` + `redirect: "manual"`）。外部 CDN 向けの 4 原則とは別物。
+   *
+   * 判定は 3 値で、**確定できたときだけキャッシュする**（/rere RC-B）。旧実装は fetch 失敗も
+   * 「国非公開の確定 unknown」と同じ値で永続化し、一時的な通信断がそのチャンネルの再判定を
+   * 恒久的に潰していた。
+   */
+  async function fetchChannelOrigin(key, path) {
+    let origin = null;      // null = 未確定（キャッシュしない）
+    try {
+      if (!chrome.runtime?.id) return; // orphan 化後は静かに諦める
+      // タイムアウト必須（/rere RC-C）: signal が無いと応答が返らない fetch が
+      // FOREIGN_FETCH_CONCURRENCY のスロットを永久占有し、待ち行列全体が停止する。
+      if (!foreignFetchAbort) foreignFetchAbort = new AbortController();
+      const res = await fetch(`${path}/about`, {
+        credentials: "same-origin",
+        redirect: "manual",
+        signal: AbortSignal.any([
+          foreignFetchAbort.signal,
+          AbortSignal.timeout(SearchFixer.FOREIGN_FETCH_TIMEOUT_MS),
+        ]),
+      });
+      if (res.ok) {
+        const country = SearchFixer.parseChannelCountry(await res.text());
+        const home = getForeignHomeInfo();
+        // country が null（国非公開）なら "unknown" を確定値としてキャッシュし、再取得を防ぐ。
+        origin = country
+          ? SearchFixer.classifyCountryName(country, home.aliases, home.knownCountries)
+          : "unknown";
+      }
+    } catch {
+      // ネットワークエラー / timeout / opaqueredirect は **未確定**のまま（次の機会に再取得）
+    } finally {
+      foreignFetchInFlight.delete(key);
+      if (origin) writeForeignCache(key, origin);
+      else foreignFetchBudgetUsed--; // 未確定は予算を消費しなかった扱いにして再挑戦を許す
+      pumpForeignCountryFetch();
+      // 判定が確定したカードを取り除くため、次フレームでまとめて再スキャンする
+      if (origin === "foreign") scheduleForeignRescan();
+    }
+  }
+
+  /** fetch 結果を反映する再スキャン。1 フレーム 1 回に coalesce する。 */
+  function scheduleForeignRescan() {
+    if (foreignRescanScheduled) return;
+    foreignRescanScheduled = true;
+    requestAnimationFrame(() => {
+      foreignRescanScheduled = false;
+      if (!chrome.runtime?.id || !active || !f("hideForeignChannels")) return;
+      removeDistractions();
+      purgeFeedDistractions();
+    });
+  }
+
+  /** 検索結果ページ (ytd-video-renderer / ytd-channel-renderer) への適用。 */
+  function applyForeignChannelFilter() {
+    if (!f("hideForeignChannels")) return;
+    try {
+      const renderers = document.querySelectorAll(
+        "#primary ytd-item-section-renderer ytd-video-renderer, " +
+        "#primary .ytd-two-column-search-results-renderer ytd-channel-renderer"
+      );
+      for (const renderer of renderers) {
+        if (!renderer.isConnected) continue;
+        const link = renderer.querySelector('a[href^="/@"], a[href^="/channel/"]');
+        const href = link?.getAttribute("href") ?? null;
+        const key = SearchFixer.extractChannelKeyFromHref(href);
+        const title = renderer.querySelector("#video-title")?.textContent ?? "";
+        const channelName = link?.textContent ?? "";
+        if (classifyCardOrigin(key, `${title} ${channelName}`, href) === "foreign") {
+          renderer.remove();
+        }
+      }
+    } catch (err) {
+      // 破壊的操作（カード除去）を含むパスなので、握り潰すと「効かない」と fail-open が
+      // 区別できなくなる（/rere RC-J）。DOM 変更で壊れた場合の手掛かりを 1 回だけ残す。
+      if (!foreignFilterErrorLogged) {
+        foreignFilterErrorLogged = true;
+        console.warn("[WebViewingAssist] 海外チャンネル除外の適用に失敗:", err);
+      }
+    }
+  }
+
+  /** フィードの yt-lockup-view-model 1 件分の判定（purgeFeedDistractions のループから呼ぶ）。 */
+  function isForeignLockup(lockup) {
+    const link = lockup.querySelector(
+      '.ytLockupMetadataViewModelMetadata a.ytAttributedStringLink[href^="/channel/"], ' +
+      '.ytLockupMetadataViewModelMetadata a.ytAttributedStringLink[href^="/@"]'
+    );
+    const href = link?.getAttribute("href") ?? null;
+    const key = SearchFixer.extractChannelKeyFromHref(href);
+    // タイトルは title 属性 → h3 の順で解決する（カード全体の textContent は使わない。
+    // 「8 か月前」等の相対日付に仮名が混ざり、全カードが自国判定になってしまう罠がある）。
+    const titleEl = lockup.querySelector('a[href*="/watch"][title]');
+    const title = titleEl?.getAttribute("title") ?? lockup.querySelector("h3")?.textContent ?? "";
+    const channelName = link?.textContent ?? "";
+    return classifyCardOrigin(key, `${title} ${channelName}`, href) === "foreign";
+  }
+
   // ---------- フィードページ（ホーム / 登録 / 急上昇）の動画フィルタ ----------
   /**
    * フィードページで yt-lockup-view-model 配下の動画フィルタを実行する。
@@ -1004,6 +1309,8 @@
    *   - live:      バッジテキストが "LIVE" / "PREMIERE" / "ライブ配信中" / "プレミア公開"
    *   - channelBlocklist: メタデータ内のチャンネル名リンク (`resolveLockupChannelKey`) が
    *     登録済みチャンネルキーと一致するカード（2026-07-14 追加、検索結果限定から拡張）
+   *   - hideForeignChannels: 自国以外のチャンネルのカード（`isForeignLockup`。文字種で即決できない
+   *     ものは about ページ取得の完了後に `scheduleForeignRescan` 経由で後追い除去される）
    *
    * verified / artist は yt-lockup-view-model 配下のセレクタ未確定で次版持ち越し。
    * shelf / cardList / course / channel / secondary / chapter / reel は検索ページ固有 DOM の
@@ -1123,9 +1430,10 @@
     const checkMembersOnly = f("membersOnly");
     // ブロックリストが空なら Set 構築 / per-lockup 照合を丸ごとスキップ（機能 ON 直後・未登録時の無駄走査防止）。
     const checkChannelBlocklist = f("channelBlocklist") && blockedChannels.length > 0;
+    const checkForeign = f("hideForeignChannels");
     if (
       !(checkShortsBtn || checkLive || checkPlaylist || checkMix || checkWatched ||
-        checkMembersOnly || checkChannelBlocklist)
+        checkMembersOnly || checkChannelBlocklist || checkForeign)
     ) return;
     const blockedSet = checkChannelBlocklist ? new Set(blockedChannels.map((c) => c.key)) : null;
 
@@ -1149,7 +1457,11 @@
       else if (checkChannelBlocklist && blockedSet.has(resolveLockupChannelKey(lockup))) {
         shouldRemove = true;
       }
-      // 4. バッジテキスト系（ミックス → プレイリスト → ライブ → メンバー限定の順で判定）
+      // 4. 海外チャンネル除外（テキスト判定は軽量、about fetch が要る分は非同期で後追い除去）
+      else if (checkForeign && isForeignLockup(lockup)) {
+        shouldRemove = true;
+      }
+      // 5. バッジテキスト系（ミックス → プレイリスト → ライブ → メンバー限定の順で判定）
       else if (checkMix || checkPlaylist || checkLive || checkMembersOnly) {
         const badges = Array.from(lockup.querySelectorAll(".ytBadgeShapeHost"));
         const badgeTexts = badges.map((b) => (b.textContent ?? "").trim());
@@ -3162,6 +3474,7 @@
     try { stopSubsGridCardsObserver(); } catch {}
     try { stopSubsGridResizeListener(); } catch {}
     try { removeAllBlockButtons(); } catch {} // chrome API 非依存、orphan 後も安全
+    try { abortForeignCountryFetch(); } catch {} // 同上（待ち行列破棄 + in-flight 中断）
   }
 
   window.addEventListener(
