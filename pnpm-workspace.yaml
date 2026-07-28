@@ -4,6 +4,12 @@ allowBuilds:
   sharp: true
   spawn-sync: true
 
+# minimumReleaseAgeExclude: pnpm v11 の「公開直後の版を一定期間使わない」供給網ガードの例外。
+# 更新を明示的に受け入れた版だけが pnpm によって自動追記される（手編集しない）。
+minimumReleaseAgeExclude:
+  - puppeteer-core@25.4.0
+  - puppeteer@25.4.0
+
 # overrides: web-ext 配下の transitive 脆弱性 3 件をパッチ版へ固定する
 # (脆弱範囲にだけ効く versioned selector で blast radius を最小化)
 #   - adm-zip     GHSA-xcpc-8h2w-3j85 (web-ext>firefox-profile 経由)
