@@ -907,7 +907,10 @@ body {
   min-width: 0;
 }
 
-.volume-mute-btn {
+/* ミュートと ± は同じ「スライダー行の小さな装甲ボタン」として共通スタイルを持つ。
+   ± はスライダーの左右に置くので、幅はミュートよりさらに詰めて 26px にする。 */
+.volume-mute-btn,
+.volume-step-btn {
   flex: 0 0 auto;
   width: 30px;
   height: 28px;
@@ -933,13 +936,32 @@ body {
   );
 }
 
-.volume-mute-btn:hover {
+.volume-mute-btn:hover,
+.volume-step-btn:hover {
   border-color: var(--rog-red);
   filter: none;
 }
 
-.volume-mute-btn:active {
+.volume-mute-btn:active,
+.volume-step-btn:active {
   transform: translateY(0.5px);
+}
+
+/* ± ボタン: 記号を等幅・中央寄せで見せる。押しっぱなしでの連続増減は
+   `.range` のキー操作（← →）に任せる方針なので、リピート実装は持たない。 */
+.volume-step-btn {
+  width: 26px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 上限 / 下限に達したボタンは押せないことを見た目でも示す */
+.volume-step-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  border-color: var(--rule);
 }
 
 .volume-mute-btn[aria-pressed="true"] {

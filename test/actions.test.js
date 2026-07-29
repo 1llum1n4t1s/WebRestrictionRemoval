@@ -79,6 +79,25 @@ test("_locales: 全 CATEGORIES にカテゴリ名が ja / en 両方そろって�
 
 // ---------- VolumeBooster ----------
 
+test("VolumeBooster.nudgePercent: ±ボタンの増減と端の clamp", () => {
+  const n = G.VolumeBooster.nudgePercent;
+  const step = G.VolumeBooster.NUDGE_STEP;
+  assert.equal(step, 10, "± ボタンの増減幅（UI ラベルと対の値）");
+  assert.equal(n(100, step), 110);
+  assert.equal(n(100, -step), 90);
+  // 端は clamp されるだけで範囲外へ出ない
+  assert.equal(n(G.VolumeBooster.MAX, step), G.VolumeBooster.MAX);
+  assert.equal(n(G.VolumeBooster.MIN, -step), G.VolumeBooster.MIN);
+  assert.equal(n(295, step), G.VolumeBooster.MAX);
+  assert.equal(n(5, -step), G.VolumeBooster.MIN);
+  // 不正値は現在値 / DEFAULT にフォールバックし、NaN を storage へ流さない
+  assert.equal(n(100, "abc"), 100);
+  assert.equal(n(100, undefined), 100);
+  assert.equal(n("abc", step), G.VolumeBooster.DEFAULT + step);
+  // 端数は整数へ丸める（storage / slider が整数前提のため）
+  assert.equal(n(100, 10.4), 110);
+});
+
 test("VolumeBooster.clampValue: 範囲内の値はそのまま、範囲外は clamp、不正値は DEFAULT", () => {
   assert.equal(G.VolumeBooster.clampValue(150), 150);
   assert.equal(G.VolumeBooster.clampValue(0), G.VolumeBooster.MIN);

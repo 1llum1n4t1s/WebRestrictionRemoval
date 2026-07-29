@@ -198,6 +198,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let eqPreset = VolumeBooster.EQ_PRESET_DEFAULT;
   const eqBandSliders = [];
   let eqPreampSlider = null;
+  const $volumeDownBtn = document.getElementById("volumeDownBtn");
+  const $volumeUpBtn = document.getElementById("volumeUpBtn");
   const $volumeMuteBtn = document.getElementById("volumeMuteBtn");
   const $volumeMuteIcon = $volumeMuteBtn?.querySelector(".volume-mute-icon");
   const $featureCategories = document.getElementById("featureCategories");
@@ -380,6 +382,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     : VolumeBooster.DEFAULT;
   $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(savedGain));
   updateVolumeLabel(savedGain);
+  updateVolumeStepButtons(savedGain);
   updateVolumeBoosterDimState();
   // popup open (= user gesture) での条件付き自動 push (2026-07-23 復活、ゆろさん承認)。
   // 旧・無条件 push は active tab が未 boost (例: Amazon 買い物ページ) でも問答無用で
@@ -755,6 +758,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeSlider.addEventListener("input", () => {
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
     updateVolumeLabel(v);
+    updateVolumeStepButtons(v);
     scheduleVolumePush(v);
   });
   $volumeSlider.addEventListener("change", () => {
@@ -767,8 +771,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     cancelVolumePush();
     $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(VolumeBooster.DEFAULT));
     updateVolumeLabel(VolumeBooster.DEFAULT);
+    updateVolumeStepButtons(VolumeBooster.DEFAULT);
     await pushVolumeNow(VolumeBooster.DEFAULT);
   });
+
+  // ± ボタン: NUDGE_STEP (10%) 刻みで増減する。
+  // **スライダー位置ではなく percent 側で計算する**（中央 100% を境に左右で
+  // 位置→% の割り当てが違うため、位置を ±N しても実音量は 10% 刻みにならない）。
+  $volumeDownBtn?.addEventListener("click", () => nudgeVolume(-VolumeBooster.NUDGE_STEP));
+  $volumeUpBtn?.addEventListener("click", () => nudgeVolume(VolumeBooster.NUDGE_STEP));
 
   // 自動歪み防止 / ナイトモード: storage に保存 + 現在 gain を再送信して即時反映。
   // ブースト中なら offscreen の compressor パラメータが書き換わり、UNITY (100%) なら次回ブースト時に有効。
@@ -1623,6 +1634,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     $volumeValue.textContent = `${v}%`;
   }
 
+  /**
+   * ± ボタンで音量を `delta`% 動かす。
+   * スライダードラッグと同じ経路（ラベル更新 → 即送信）に合わせ、debounce は挟まず
+   * 1 クリック 1 送信にする（連打しても最後の値で収束する）。
+   */
+  function nudgeVolume(delta) {
+    const current = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
+    const next = VolumeBooster.nudgePercent(current, delta);
+    if (next === current) return;  // 端に達していれば何もしない
+    cancelVolumePush();
+    $volumeSlider.value = String(VolumeBooster.percentToSliderPosition(next));
+    updateVolumeLabel(next);
+    updateVolumeStepButtons(next);
+    pushVolumeNow(next).catch(logVolumeError("volume-nudge"));
+  }
+
+  /** 上限 / 下限に達した ± ボタンを無効化する（押しても何も起きない状態を見た目で示す）。 */
+  function updateVolumeStepButtons(percent) {
+    const p = VolumeBooster.clampValue(percent);
+    const masterOff = !$volumeBoosterToggle.checked;
+    if ($volumeDownBtn) $volumeDownBtn.disabled = masterOff || p <= VolumeBooster.MIN;
+    if ($volumeUpBtn) $volumeUpBtn.disabled = masterOff || p >= VolumeBooster.MAX;
+  }
+
   function setVolumeHint(text, isError = false) {
     $volumeHint.textContent = text ?? "";
     $volumeHint.className = isError ? "volume-hint error" : "volume-hint";
@@ -1773,6 +1808,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if ($volumeEqToggle) $volumeEqToggle.disabled = off;
     updateEqPanelState();
     if ($volumeMuteBtn) $volumeMuteBtn.disabled = off;
+    updateVolumeStepButtons(VolumeBooster.sliderPositionToPercent($volumeSlider.value));
   }
 
   /**

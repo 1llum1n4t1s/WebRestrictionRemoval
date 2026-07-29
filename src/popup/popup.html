@@ -107,7 +107,21 @@
                   title="ミュート（音量は保持）">
             <span class="volume-mute-icon" aria-hidden="true">🔊</span>
           </button>
+          <!-- ± ボタンはスライダーの左右に置く（行を増やさず、つまみ操作の延長で押せる位置）。
+               増減幅は VolumeBooster.NUDGE_STEP（10%）。 -->
+          <button type="button" id="volumeDownBtn" class="volume-step-btn"
+                  data-i18n-attr="aria-label:volumeStepDownAria;title:volumeStepDownTitle"
+                  aria-label="音量を 10% 下げる"
+                  title="音量を 10% 下げる">
+            <span aria-hidden="true">−</span>
+          </button>
           <input type="range" id="volumeSlider" class="range" />
+          <button type="button" id="volumeUpBtn" class="volume-step-btn"
+                  data-i18n-attr="aria-label:volumeStepUpAria;title:volumeStepUpTitle"
+                  aria-label="音量を 10% 上げる"
+                  title="音量を 10% 上げる">
+            <span aria-hidden="true">＋</span>
+          </button>
         </div>
         <div class="volume-actions">
           <button type="button" id="volumeResetBtn" class="ghost-btn"

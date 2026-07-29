@@ -40,22 +40,39 @@ html.__cpa-x-right-pane [data-testid="primaryColumn"] div:has(> section) {
   max-width: none !important;
 }
 
+/* ---------- モジュールは「中身」ではなく「枠ごと」消す ----------
+   右ペインの各モジュールは `枠 div（border + 角丸 + 背景）> 中身` の入れ子で、
+   中身（aside / section）だけ display:none にすると **空の枠が残る**（実機で確認 / 2026-07-29）。
+   そのため枠側の div を `:has()` で特定して消す。深さは実機で確認した固定段数で書く。
+
+   **`:has()` は入れ子にできない**（`div:has(> aside:has(...))` は無効セレクタで丸ごと効かない）。
+   条件を重ねたいときは `div:has(...)` + `:not(:has(...))` の形にする（この組み合わせは有効）。 */
+
 /* ---------- トレンドだけ非表示（右ペインは残す） ----------
-   「トレンド」ブロックに加えて「本日のニュース」(news_sidebar) も同じ扱いにする。
-   どちらも“いま話題”の枠で、片方だけ残ると隠した意味が薄いため（実機で確認）。
-   検索ボックスは別要素なので残る。 */
+   「トレンド」ブロックに加えて「本日のニュース」も同じ扱いにする。どちらも“いま話題”の枠で、
+   片方だけ残ると隠した意味が薄いため。ニュースは `news_sidebar` を持たない別インスタンスが
+   描画されることがあるので、記事側の `news_sidebar_article_*` からも枠を特定する。
+   検索ボックスは別モジュールなので残る。 */
 html.__cpa-x-trends [data-testid="sidebarColumn"] section:has([data-testid="trend"]),
-html.__cpa-x-trends [data-testid="sidebarColumn"] [data-testid="news_sidebar"] {
+html.__cpa-x-trends [data-testid="sidebarColumn"] [data-testid="news_sidebar"],
+html.__cpa-x-trends [data-testid="sidebarColumn"] div:has(> div > div > [data-testid^="news_sidebar_article_"]) {
   display: none !important;
 }
 
-/* ---------- 「おすすめユーザー / フォローする候補」だけ非表示 ---------- */
-html.__cpa-x-who-to-follow [data-testid="sidebarColumn"] aside:has([data-testid="UserCell"]) {
+/* ---------- 「おすすめユーザー / フォローする候補」だけ非表示 ----------
+   aside 本体に加えて、それを包む枠 div（2 段）も消す。 */
+html.__cpa-x-who-to-follow [data-testid="sidebarColumn"] aside:has([data-testid="UserCell"]),
+html.__cpa-x-who-to-follow [data-testid="sidebarColumn"] div:has(> aside [data-testid="UserCell"]),
+html.__cpa-x-who-to-follow [data-testid="sidebarColumn"] div:has(> div > aside [data-testid="UserCell"]) {
   display: none !important;
 }
 
 /* ---------- プレミアム（サブスク）の勧誘 ----------
-   右ペインの aside のうち UserCell を含まない方が勧誘カード。左ナビの Premium 項目も併せて隠す。 */
+   右ペインの aside のうち UserCell を含まない方が勧誘カード。こちらも枠 div（2 段）ごと消す。
+   `:not(:has(...))` で「おすすめユーザー側の枠」を巻き込まないようにする（実機で切り分け確認済み）。
+   左ナビの Premium 項目も併せて隠す。 */
+html.__cpa-x-premium [data-testid="sidebarColumn"] div:has(> aside):not(:has([data-testid="UserCell"])),
+html.__cpa-x-premium [data-testid="sidebarColumn"] div:has(> div > aside):not(:has([data-testid="UserCell"])),
 html.__cpa-x-premium [data-testid="sidebarColumn"] aside:not(:has([data-testid="UserCell"])),
 html.__cpa-x-premium header[role="banner"] a[href^="/i/premium"],
 html.__cpa-x-premium [data-testid="premium-hub-tab"],

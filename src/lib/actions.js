@@ -1282,6 +1282,12 @@ const VolumeBooster = Object.freeze({
   SLIDER_MAX: 200,
   STEP: 1,
   /**
+   * ± ボタン 1 回あたりの増減幅（**表示 % = 実音量倍率**なので 10 = 0.1 倍）。
+   * スライダーは中央 100% を境に左右で割り当てが違う（左 0..100% / 右 100..300%）ため、
+   * 増減は「スライダー位置」ではなく **percent 側で計算**して位置へ変換し直す。
+   */
+  NUDGE_STEP: 10,
+  /**
    * gain 変更時の `setTargetAtTime` time constant (秒)。
    * 約 3τ (~45ms) で目標値の 95% に到達する設定。
    * 直接 `.value =` 代入だとサンプル境界で不連続が発生し、クリック/プチノイズの原因になる。
@@ -1356,6 +1362,21 @@ const VolumeBooster = Object.freeze({
     );
   },
   /** 実音量 percent (0..MAX) から UI スライダー位置 (0..200) を復元する。 */
+  /**
+   * 現在の音量 (%) を `delta` だけ動かして範囲内へ収める（純粋関数）。
+   * ± ボタン用。端では clamp されるだけで、範囲外へは出ない。
+   *
+   * @param {unknown} percent 現在値（不正値は DEFAULT 扱い）
+   * @param {unknown} delta 増減量（不正値は 0 扱い＝現在値を維持）
+   * @returns {number} MIN〜MAX に収めた整数 %
+   */
+  nudgePercent(percent, delta) {
+    const base = VolumeBooster.clampValue(percent);
+    const d = Number(delta);
+    if (!Number.isFinite(d)) return base;
+    return VolumeBooster.clampValue(Math.round(base + d));
+  },
+
   percentToSliderPosition(percent) {
     const p = VolumeBooster.clampValue(percent);
     if (p <= VolumeBooster.UNITY) return p;

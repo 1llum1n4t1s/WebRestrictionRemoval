@@ -45,9 +45,16 @@
     "html." + CLS_RIGHT_PANE + ' [data-testid="primaryColumn"] div:has(> section)' +
     "{max-width:none!important;}" +
     "html." + CLS_TRENDS + ' [data-testid="sidebarColumn"] section:has([data-testid="trend"]),' +
-    "html." + CLS_TRENDS + ' [data-testid="sidebarColumn"] [data-testid="news_sidebar"]' +
+    "html." + CLS_TRENDS + ' [data-testid="sidebarColumn"] [data-testid="news_sidebar"],' +
+    "html." + CLS_TRENDS +
+    ' [data-testid="sidebarColumn"] div:has(> div > div > [data-testid^="news_sidebar_article_"])' +
     "{display:none!important;}" +
-    "html." + CLS_WHO_TO_FOLLOW + ' [data-testid="sidebarColumn"] aside:has([data-testid="UserCell"])' +
+    // 中身だけ消すと空の枠が残るため、枠 div（2 段）も一緒に消す（x-cleaner.css と同じ理由）
+    "html." + CLS_WHO_TO_FOLLOW + ' [data-testid="sidebarColumn"] aside:has([data-testid="UserCell"]),' +
+    "html." + CLS_WHO_TO_FOLLOW +
+    ' [data-testid="sidebarColumn"] div:has(> aside [data-testid="UserCell"]),' +
+    "html." + CLS_WHO_TO_FOLLOW +
+    ' [data-testid="sidebarColumn"] div:has(> div > aside [data-testid="UserCell"])' +
     "{display:none!important;}";
 
   __cpaEarlyFramework.setup({

@@ -149,14 +149,18 @@
   }
 
   /** ボタンのラベル（件数入り）を組み立てる。 */
+  /**
+   * ボタンのラベルを組み立てる。
+   *
+   * **文言はページ種別によらず「Gemini Notebook」で統一する**。ページ内の既存ボタン列
+   * （チャンネル登録・すべて再生・高評価/共有）に混ざる位置に置くため、説明的な長い文言だと
+   * 行が押し広げられて周囲のレイアウトを崩す（実機で確認 / 2026-07-29）。何が送られるかは
+   * 押した先のパネルで分かるので、ボタン側は宛先名 + 件数だけに絞る。
+   */
   function buildButtonLabel(kind, count) {
-    if (kind === "watch") return i18n("nlmSendWatch", "この動画を NotebookLM へ");
-    const template = {
-      results: i18n("nlmSendResults", "検索結果を NotebookLM へ ({0})"),
-      playlist: i18n("nlmSendPlaylist", "プレイリストを NotebookLM へ ({0})"),
-      channel: i18n("nlmSendChannel", "チャンネルの動画を NotebookLM へ ({0})"),
-    }[kind];
-    return template.replace("{0}", String(count));
+    const label = i18n("nlmSendLabel", "Gemini Notebook");
+    // 一括系は「描画済みカードのうち何件が対象か」を示す（0 件でもボタン自体は出す設計）
+    return kind === "watch" ? label : `${label} (${count})`;
   }
 
   // ---------- UI ----------
