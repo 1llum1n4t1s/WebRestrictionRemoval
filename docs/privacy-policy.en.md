@@ -24,6 +24,8 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`instagramCleanerFeatures`** (object): on/off state of each of the 11 Instagram cleaner sub-features (Remove Reels / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion / Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Image download button).
 - **`tiktokCleanerEnabled`** (boolean): whether the TikTok cleaner is enabled.
 - **`tiktokCleanerFeatures`** (object): on/off state of each of the 3 TikTok cleaner sub-features (Hide comments / Hide suggested accounts / Image download button).
+- **`xCleanerEnabled`** (boolean): whether the X (formerly Twitter) cleaner is enabled. Default OFF.
+- **`xCleanerFeatures`** (object): on/off state of each of the 9 X cleaner sub-features (Hide right pane / Hide trends / Hide who to follow / Hide messages dock / Hide promoted posts / Hide Premium upsells / Hide Grok / Hide engagement counts / Open Home on "Following"). All of them are local CSS visibility rules plus one tab selection; nothing is transmitted.
 - **`volumeBoosterEnabled`** (boolean): Volume Booster master toggle. Default OFF.
 - **`volumeBoosterLastGain`** (number, 0–600): Volume Booster slider position (%). Default 100.
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` acting as a fast limiter) is enabled. Default OFF.

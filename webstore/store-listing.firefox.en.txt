@@ -2,22 +2,25 @@
 Firefox AMO Listing (English)
 ※ For Chrome Web Store, see webstore/store-listing.en.txt
 ※ For Japanese, see webstore/store-listing.firefox.ja.txt
-※ All 11 categories work on Firefox. The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource), except on DRM-protected video sites.
+※ All 12 categories work on Firefox. The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource), except on DRM-protected video sites.
 ============================================================
 
 ■ Name
 Vuora (Firefox)
 
 ■ Summary (250 chars max)
-Locally tunes the pages you view. 11 categories: YouTube Enhancements, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (except DRM video sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
+Locally tunes the pages you view. 12 categories: YouTube Enhancements, X Cleaner, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (non-DRM sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 11 categories of features into a single popup.
+A productivity helper that bundles 12 categories of features into a single popup.
 
 ■ Features available on Firefox
 
 🔹 YouTube Enhancements (34 sub-features)
 Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, subscription channel expansion (subs feed → grid + lazy thumbnail), live-stream connection monitor, and more granular controls for YouTube's verbose UI.
+
+🔹 X Cleaner (9 sub-features)
+Hide the right pane (widening the timeline into it) / trends / who to follow / messages dock / promoted posts / Premium upsells / Grok / engagement counts, and open Home on the "Following" tab. Selectors are structural data-testid matches only, so they do not depend on the display language.
 
 🔹 Amazon Subscribe & Save totals
 On amazon.co.jp/auto-deliveries, computes per-month delivery totals and inserts them inline.

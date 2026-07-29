@@ -1,0 +1,96 @@
+/*
+ * X（旧 Twitter）クリーナー
+ *
+ * `<html>` に付くクラス（`XCleaner.BODY_CLASS`）が付いているときだけ有効になる。クラスが
+ * 無ければルールは 1 つもマッチせず、X の UI は素のまま。
+ *
+ * **セレクタ方針: `data-testid` + `:has()` の構造マッチのみ。`aria-label` の文言に依存しない。**
+ * X の aria-label は UI 言語でローカライズされる（実機で「トレンド」「プレミアムプラスに
+ * アップグレード」を確認済み）ため、文言マッチは日本語環境でしか動かない。難読化 class
+ * (`css-146c3p1` など) はビルドごとに変わるので当然使わない。
+ *
+ * 実機確認済みの構造（2026-07-28 / ログイン状態の x.com/home、3 ペイン幅 659 + 600 + 350）:
+ *   - 右ペイン全体     … [data-testid="sidebarColumn"]
+ *   - トレンド         … 右ペイン内の section:has([data-testid="trend"])
+ *   - おすすめユーザー … 右ペイン内の aside:has([data-testid="UserCell"])
+ *   - プレミアム勧誘   … 右ペイン内の aside:not(:has([data-testid="UserCell"]))
+ *   - 広告投稿         … [data-testid="cellInnerDiv"]:has([data-testid="placementTracking"])
+ *   - Grok             … [data-testid="GrokDrawer"] / 左ナビ a[href^="/i/grok"]
+ *   - チャットドック   … [data-testid="chat-drawer-root"]（旧 DMDrawer も併記）
+ *
+ * 対象は twitter.com / x.com の top frame のみ。セレクタは完全名前空間化（__cpa-x-）してある。
+ */
+
+/* ---------- 右ペイン（3 ペインのうち一番右）を丸ごと非表示 ---------- */
+html.__cpa-x-right-pane [data-testid="sidebarColumn"] {
+  display: none !important;
+}
+
+/* 空いた右ペインぶんまでタイムラインを広げる（実機で幅の出どころを確認 / 2026-07-28）。
+   X は幅を **2 段階**で止めている: ①primaryColumn 自体の max-width: 600px、
+   ②その内側でタイムライン section を包む div の max-width: 600px（auto マージンで中央寄せ）。
+   ①だけ外すと列は広がるのに投稿セルが 600px のまま中央に残るので、両方を外す必要がある。
+   内側の div は位置ではなく「section を直接子に持つ」構造で特定する（クラス名は難読化されるため）。 */
+html.__cpa-x-right-pane [data-testid="primaryColumn"] {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+html.__cpa-x-right-pane [data-testid="primaryColumn"] div:has(> section) {
+  max-width: none !important;
+}
+
+/* ---------- トレンドだけ非表示（右ペインは残す） ----------
+   「トレンド」ブロックに加えて「本日のニュース」(news_sidebar) も同じ扱いにする。
+   どちらも“いま話題”の枠で、片方だけ残ると隠した意味が薄いため（実機で確認）。
+   検索ボックスは別要素なので残る。 */
+html.__cpa-x-trends [data-testid="sidebarColumn"] section:has([data-testid="trend"]),
+html.__cpa-x-trends [data-testid="sidebarColumn"] [data-testid="news_sidebar"] {
+  display: none !important;
+}
+
+/* ---------- 「おすすめユーザー / フォローする候補」だけ非表示 ---------- */
+html.__cpa-x-who-to-follow [data-testid="sidebarColumn"] aside:has([data-testid="UserCell"]) {
+  display: none !important;
+}
+
+/* ---------- プレミアム（サブスク）の勧誘 ----------
+   右ペインの aside のうち UserCell を含まない方が勧誘カード。左ナビの Premium 項目も併せて隠す。 */
+html.__cpa-x-premium [data-testid="sidebarColumn"] aside:not(:has([data-testid="UserCell"])),
+html.__cpa-x-premium header[role="banner"] a[href^="/i/premium"],
+html.__cpa-x-premium [data-testid="premium-hub-tab"],
+html.__cpa-x-premium [data-testid="super-upsell-UpsellCardRenderer"] {
+  display: none !important;
+}
+
+/* ---------- Grok（左ナビ項目 / 右下ドロワー / 投稿内の Grok ボタン） ---------- */
+html.__cpa-x-grok [data-testid="GrokDrawer"],
+html.__cpa-x-grok header[role="banner"] a[href^="/i/grok"],
+html.__cpa-x-grok [data-testid="grokImgGen"],
+html.__cpa-x-grok article [aria-label="Grok actions"] {
+  display: none !important;
+}
+
+/* ---------- プロモーション（広告）投稿 ----------
+   広告ツイートは placementTracking を内包する。セル単位で消さないと余白が残る。 */
+html.__cpa-x-promoted [data-testid="cellInnerDiv"]:has([data-testid="placementTracking"]) {
+  display: none !important;
+}
+
+/* ---------- 返信 / リポスト / いいね / 表示回数の数値 ----------
+   ボタン自体は残し、カウンタ（app-text-transition-container）だけ消す。
+   数字が見えないと「伸びているか」が気にならなくなる、いわゆる vanity metrics 隠し。 */
+html.__cpa-x-counts [data-testid="reply"] [data-testid="app-text-transition-container"],
+html.__cpa-x-counts [data-testid="retweet"] [data-testid="app-text-transition-container"],
+html.__cpa-x-counts [data-testid="unretweet"] [data-testid="app-text-transition-container"],
+html.__cpa-x-counts [data-testid="like"] [data-testid="app-text-transition-container"],
+html.__cpa-x-counts [data-testid="unlike"] [data-testid="app-text-transition-container"],
+html.__cpa-x-counts a[href$="/analytics"] [data-testid="app-text-transition-container"] {
+  display: none !important;
+}
+
+/* ---------- 右下のメッセージ / チャットドック ---------- */
+html.__cpa-x-dock [data-testid="chat-drawer-root"],
+html.__cpa-x-dock [data-testid="DMDrawer"] {
+  display: none !important;
+}

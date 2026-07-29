@@ -225,6 +225,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $tiktokCleanerToggle = document.getElementById("tiktokCleanerToggle");
   const $ttFeatureCategories = document.getElementById("ttFeatureCategories");
   const $tiktokCleanerPill = document.getElementById("tiktokCleanerPill");
+  const $xCleanerToggle = document.getElementById("xCleanerToggle");
+  const $xFeatureCategories = document.getElementById("xFeatureCategories");
+  const $xCleanerPill = document.getElementById("xCleanerPill");
   const $status = document.getElementById("statusMsg");
 
   // ----- ローカル状態 -----
@@ -236,6 +239,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const igFeatureInputs = new Map();
   /** @type {Map<string, HTMLInputElement>} TikTok クリーナーの個別機能入力 */
   const ttFeatureInputs = new Map();
+  /** @type {Map<string, HTMLInputElement>} X クリーナーの個別機能入力 */
+  const xFeatureInputs = new Map();
   /** 動画黒帯除去の表示モード（"zoom" | "stretch"）。モードセグメントのクリックで更新。 */
   let videoFillMode = VideoFill.DEFAULT_MODE;
   /** @type {Array<{key: string, name: string}>} 検索結果チャンネルブロックリスト（channelBlocklist 管理 UI 用）。
@@ -251,6 +256,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   buildVideoFillTargetSelect();
   buildInstagramFeatureCategories();
   buildTikTokFeatureCategories();
+  buildXFeatureCategories();
 
   // ----- 現在状態を復元 -----
   // 3-C4 最適化: アシスト系 + カラーピッカー系の storage key を 1 回の get で並列取得し、
@@ -268,6 +274,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
     StorageKeys.TIKTOK_CLEANER_FEATURES,
+    StorageKeys.X_CLEANER_ENABLED,
+    StorageKeys.X_CLEANER_FEATURES,
     StorageKeys.VOLUME_BOOSTER_ENABLED,
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
@@ -313,6 +321,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $amazonMerchantInfoToggle.checked = stored[StorageKeys.AMAZON_MERCHANT_INFO_ENABLED] === true;
   $instagramCleanerToggle.checked = stored[StorageKeys.INSTAGRAM_CLEANER_ENABLED] === true;
   $tiktokCleanerToggle.checked = stored[StorageKeys.TIKTOK_CLEANER_ENABLED] === true;
+  $xCleanerToggle.checked = stored[StorageKeys.X_CLEANER_ENABLED] === true;
   $volumeBoosterToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true;
   $volumeAntiClipToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
   $volumeNightModeToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
@@ -424,12 +433,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     input.checked = storedTtFeatures[key] === true;
   }
 
+  const storedXFeatures = XCleaner.mergeFeatures(stored[StorageKeys.X_CLEANER_FEATURES]);
+  for (const [key, input] of xFeatureInputs) {
+    input.checked = storedXFeatures[key] === true;
+  }
+
   updateCleanerCountBadge();
   updateCleanerDimState();
   updateIgCleanerCountBadge();
   updateIgCleanerDimState();
   updateTtCleanerCountBadge();
   updateTtCleanerDimState();
+  updateXCleanerCountBadge();
+  updateXCleanerDimState();
 
   // 調整タブを 4 セクション（オーディオ / 映像 / Amazon / セッション）のサブタブに分割する。
   // 各セクションのマスタートグルは復元済みなので、ここで初期 badge 件数も確定する。
@@ -440,23 +456,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ============================================================
 
   // ---------- DOM 参照 ----------
-  // 5 タブ構成: 調整 (tune) / YouTube / Instagram / TikTok / カラーピッカー (picker)。
+  // 6 タブ構成: 調整 (tune) / YouTube / X / Instagram / TikTok / カラーピッカー (picker)。
   // tab/panel ペアを Map で保持し、setActiveTab / 矢印キー操作を統一的に扱う。
   const $tabTune = document.getElementById("tabTune");
   const $tabYoutube = document.getElementById("tabYoutube");
   const $tabInstagram = document.getElementById("tabInstagram");
   const $tabTikTok = document.getElementById("tabTikTok");
+  const $tabX = document.getElementById("tabX");
   const $tabPicker = document.getElementById("tabPicker");
   const $panelTune = document.getElementById("panelTune");
   const $panelYoutube = document.getElementById("panelYoutube");
   const $panelInstagram = document.getElementById("panelInstagram");
   const $panelTikTok = document.getElementById("panelTikTok");
+  const $panelX = document.getElementById("panelX");
   const $panelPicker = document.getElementById("panelPicker");
 
   /** タブ id → { tab, panel } の対応表。順序は UI と一致させる（矢印キー巡回用）。 */
   const TAB_REGISTRY = [
     { id: PopupTabs.TUNE, tab: $tabTune, panel: $panelTune },
     { id: PopupTabs.YOUTUBE, tab: $tabYoutube, panel: $panelYoutube },
+    { id: PopupTabs.X, tab: $tabX, panel: $panelX },
     { id: PopupTabs.INSTAGRAM, tab: $tabInstagram, panel: $panelInstagram },
     { id: PopupTabs.TIKTOK, tab: $tabTikTok, panel: $panelTikTok },
     { id: PopupTabs.PICKER, tab: $tabPicker, panel: $panelPicker },
@@ -647,6 +666,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $tiktokCleanerToggle.addEventListener("change", () => {
     updateTtCleanerDimState();
+    apply();
+  });
+
+  $xCleanerToggle.addEventListener("change", () => {
+    updateXCleanerDimState();
     apply();
   });
 
@@ -956,6 +980,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const input of ttFeatureInputs.values()) {
     input.addEventListener("change", () => {
       updateTtCleanerCountBadge();
+      apply();
+    });
+  }
+
+  for (const input of xFeatureInputs.values()) {
+    input.addEventListener("change", () => {
+      updateXCleanerCountBadge();
       apply();
     });
   }
@@ -1322,6 +1353,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateTtCleanerCountBadge() { updateCleanerPill($tiktokCleanerPill, ttFeatureInputs); }
   function updateTtCleanerDimState() { updateCleanerDim($ttFeatureCategories, $tiktokCleanerToggle); }
 
+  function buildXFeatureCategories() {
+    _buildAccordionCategories(
+      $xFeatureCategories, XCleaner.CATEGORIES, XCleaner.FEATURES,
+      xFeatureInputs, "x-feature-", "feat_x_"
+    );
+  }
+  function updateXCleanerCountBadge() { updateCleanerPill($xCleanerPill, xFeatureInputs); }
+  function updateXCleanerDimState() { updateCleanerDim($xFeatureCategories, $xCleanerToggle); }
+
   /**
    * 調整タブ（#panelTune）の 4 セクションをサブタブで切り替えられるようにする。
    *
@@ -1409,6 +1449,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const amazonMerchantInfoEnabled = $amazonMerchantInfoToggle.checked;
     const instagramCleanerEnabled = $instagramCleanerToggle.checked;
     const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
+    const xCleanerEnabled = $xCleanerToggle.checked;
     const videoGammaEnabled = $videoGammaToggle.checked;
     const videoGammaValue = currentVideoGammaValue();
     const videoFillEnabled = $videoFillToggle.checked;
@@ -1418,6 +1459,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchFixerGridItems = SearchFixer.clampGridItems($gridItemsSelect.value);
     const instagramCleanerFeatures = collectIgFeatureValues();
     const tiktokCleanerFeatures = collectTtFeatureValues();
+    const xCleanerFeatures = collectXFeatureValues();
 
     const seq = ++applySeq;
     try {
@@ -1434,6 +1476,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           instagramCleanerFeatures,
           tiktokCleanerEnabled,
           tiktokCleanerFeatures,
+          xCleanerEnabled,
+          xCleanerFeatures,
           videoGammaEnabled,
           videoGammaValue,
           videoFillEnabled,
@@ -1452,6 +1496,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             amazonMerchantInfoEnabled,
             instagramCleanerEnabled,
             tiktokCleanerEnabled,
+            xCleanerEnabled,
             videoGammaEnabled,
             videoFillEnabled,
             loupeEnabled
@@ -1476,6 +1521,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function collectFeatureValues() { return collectInputValues(featureInputs); }
   function collectIgFeatureValues() { return collectInputValues(igFeatureInputs); }
   function collectTtFeatureValues() { return collectInputValues(ttFeatureInputs); }
+  function collectXFeatureValues() { return collectInputValues(xFeatureInputs); }
 
   function buildOkMessage(
     searchFixerEnabled,
@@ -1484,6 +1530,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     amazonMerchantInfoEnabled,
     instagramCleanerEnabled,
     tiktokCleanerEnabled,
+    xCleanerEnabled,
     videoGammaEnabled,
     videoFillEnabled,
     loupeEnabled
@@ -1495,6 +1542,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (amazonMerchantInfoEnabled) parts.push(i18n("applyOkAmazonMerchantInfo"));
     if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
     if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
+    if (xCleanerEnabled) parts.push(i18n("applyOkX"));
     if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
     if (videoFillEnabled) parts.push(i18n("applyOkVideoFill"));
     if (loupeEnabled) parts.push(i18n("applyOkLoupe"));

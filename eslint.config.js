@@ -38,6 +38,7 @@ const ACTIONS_GLOBALS = {
   ConnectionMonitor: "readonly",
   BroadcastClock: "readonly",
   NotebookLm: "readonly",
+  XCleaner: "readonly",
   ColorPicker: "readonly",
   PopupTabs: "readonly",
   // /rere B1-007/B2-I002/D-002 + B1-004/B2-I001/D-001 で追加した共通モジュール

@@ -26,6 +26,8 @@
 - **`instagramCleanerFeatures`**（オブジェクト）: Instagram クリーナーの 11 個のサブ機能（Reels 削除 / Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示 / いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`tiktokCleanerEnabled`**（真偽値）: TikTok クリーナー機能の有効/無効。
 - **`tiktokCleanerFeatures`**（オブジェクト）: TikTok クリーナーの 3 個のサブ機能（コメント欄非表示 / おすすめのアカウント非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
+- **`xCleanerEnabled`**（真偽値）: X（旧 Twitter）クリーナー機能の有効/無効。デフォルト OFF。
+- **`xCleanerFeatures`**（オブジェクト）: X クリーナーの 9 個のサブ機能（右ペイン非表示 / トレンド非表示 / おすすめユーザー非表示 / メッセージドック非表示 / プロモーション投稿非表示 / プレミアム勧誘非表示 / Grok 非表示 / 反応数非表示 / ホームを「フォロー中」で開く）の個別 ON/OFF 状態。すべて端末内の CSS 表示制御とタブ選択のみで、外部送信は行いません。
 - **`volumeBoosterEnabled`**（真偽値）: 音量ブースターのマスタートグル。デフォルト OFF。
 - **`volumeBoosterLastGain`**（数値・0〜600）: 音量ブースターのスライダー位置（%）。デフォルト 100。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（高速リミッタとして動作する `DynamicsCompressor`）の有効/無効。デフォルト OFF。

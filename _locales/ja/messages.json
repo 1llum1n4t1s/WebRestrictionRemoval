@@ -26,6 +26,7 @@
   "tabYoutube": { "message": "YouTube" },
   "tabInstagram": { "message": "Instagram" },
   "tabTiktok": { "message": "TikTok" },
+  "tabX": { "message": "X" },
   "tabPicker": { "message": "カラーピッカー" },
 
   "groupAudio": { "message": "オーディオ" },
@@ -145,6 +146,9 @@
 
   "tiktokCleanerMaster": { "message": "TikTok クリーナー" },
   "tiktokCleanerMasterDesc": { "message": "コメント欄 / おすすめのアカウントなどの冗長 UI を一括非表示" },
+
+  "xCleanerMaster": { "message": "X クリーナー" },
+  "xCleanerMasterDesc": { "message": "右ペイン / 広告 / 勧誘などの気が散る UI を一括非表示" },
 
   "cleanerHint": { "message": "マスタートグル（クリーナー）が ON のときだけ動作します。個別に ON / OFF を選んでカスタマイズしてください。" },
 
@@ -267,6 +271,9 @@
   "categoryIgMain": { "message": "主要機能" },
   "categoryIgExtra": { "message": "追加機能" },
   "categoryTtMain": { "message": "主要機能" },
+  "categoryXLayout": { "message": "レイアウト" },
+  "categoryXNoise": { "message": "ノイズ除去" },
+  "categoryXTimeline": { "message": "タイムライン" },
 
   "applyOkSearchFixer": { "message": "YT 機能拡張" },
   "applyOkAmazon": { "message": "Amazon" },
@@ -274,6 +281,7 @@
   "applyOkAmazonMerchantInfo": { "message": "販売元バッジ" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
+  "applyOkX": { "message": "X" },
   "applyOkVideoGamma": { "message": "映像補正" },
   "applyOkVideoFill": { "message": "黒帯除去" },
   "applyOkLoupe": { "message": "ルーペ" },
@@ -402,5 +410,24 @@
   "feat_tt_hideSuggested_label": { "message": "おすすめのアカウント非表示" },
   "feat_tt_hideSuggested_desc": { "message": "For You / フォロー中フィード / プロフィールに挿入される「おすすめのアカウント」セクションを CSS で非表示化" },
   "feat_tt_imageDownload_label": { "message": "画像にダウンロードボタンを表示" },
-  "feat_tt_imageDownload_desc": { "message": "フォト投稿 / 動画サムネにマウスを乗せたとき、右上にダウンロードボタンを overlay 表示" }
+  "feat_tt_imageDownload_desc": { "message": "フォト投稿 / 動画サムネにマウスを乗せたとき、右上にダウンロードボタンを overlay 表示" },
+
+  "feat_x_hideRightPane_label": { "message": "右ペインを非表示" },
+  "feat_x_hideRightPane_desc": { "message": "3 ペインのうち一番右の列（検索 / トレンド / おすすめユーザー / 勧誘）を丸ごと非表示にし、空いたぶんタイムラインを右端まで広げる" },
+  "feat_x_hideTrends_label": { "message": "トレンドを非表示" },
+  "feat_x_hideTrends_desc": { "message": "右ペインは残したまま「いまどうしてる？ / トレンド」ブロックだけを非表示にする" },
+  "feat_x_hideWhoToFollow_label": { "message": "おすすめユーザーを非表示" },
+  "feat_x_hideWhoToFollow_desc": { "message": "右ペインの「おすすめユーザー / フォローする候補」ブロックを非表示にする" },
+  "feat_x_hideMessagesDock_label": { "message": "右下のメッセージドックを非表示" },
+  "feat_x_hideMessagesDock_desc": { "message": "画面右下に常駐するメッセージ / チャットのドックを非表示にする（メッセージ画面からは通常どおり利用可）" },
+  "feat_x_hidePromoted_label": { "message": "プロモーション投稿を非表示" },
+  "feat_x_hidePromoted_desc": { "message": "タイムラインに差し込まれる広告（プロモーション）投稿を、余白を残さずセルごと非表示にする" },
+  "feat_x_hidePremiumUpsell_label": { "message": "プレミアムの勧誘を非表示" },
+  "feat_x_hidePremiumUpsell_desc": { "message": "右ペインのサブスク勧誘カードと、左メニューの「プレミアム」項目を非表示にする" },
+  "feat_x_hideGrok_label": { "message": "Grok を非表示" },
+  "feat_x_hideGrok_desc": { "message": "左メニューの Grok 項目・画面右下の Grok ドロワー・投稿内の Grok ボタンを非表示にする" },
+  "feat_x_hideEngagementCounts_label": { "message": "反応数（いいね等）を非表示" },
+  "feat_x_hideEngagementCounts_desc": { "message": "返信 / リポスト / いいね / 表示回数の数字だけを隠す（ボタンは残るので操作は今までどおり）" },
+  "feat_x_followingTabDefault_label": { "message": "ホームを「フォロー中」で開く" },
+  "feat_x_followingTabDefault_desc": { "message": "ホームで「おすすめ」が選ばれていたら「フォロー中」タブへ切り替える（1 ページにつき 1 回だけ。自分で「おすすめ」に戻したあとは介入しない）" }
 }

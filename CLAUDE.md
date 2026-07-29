@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working in this repository.
 
 ## Project Overview
 
-Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 11 機能を提供する。
+Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適にする 12 機能を提供する。
 
 ### 機能カウント早見表（単一情報源）
 
@@ -12,15 +12,16 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
 
 | カウント名 | 値 | 単一情報源（drift 検知元） |
 |---|---|---|
-| 機能カテゴリ | 11 | `SettingsSchema` + `test/actions.test.js` |
-| マスタートグル | 10 | popup.html の独立 toggle-row 数（`class="toggle-row"` 13 − `toggle-row--sub` 3 = 10）。カラーピッカー除く 10 機能すべてが独立マスタートグル（独自 storage key + 独立 checkbox + SettingsSchema 独立エントリを持つ）。Shorts のみ YouTube 機能拡張配下サブ機能で独立トグルを持たない |
+| 機能カテゴリ | 12 | `SettingsSchema` + `test/actions.test.js` |
+| マスタートグル | 11 | popup.html の独立 toggle-row 数（`class="toggle-row"` の総数 − `toggle-row--sub` の数。内訳の実数は `rg -c` で数え直す）。カラーピッカー除く 11 機能すべてが独立マスタートグル（独自 storage key + 独立 checkbox + SettingsSchema 独立エントリを持つ）。Shorts のみ YouTube 機能拡張配下サブ機能で独立トグルを持たない |
 | YouTube 機能拡張 サブ機能 | 34 | `SearchFixer.FEATURES`（内訳: 検索ノイズ除去 + Shorts 5 + 動画ページ整形 + 登録チャンネル拡張 3 + 接続モニター 1 + 配信時刻オーバーレイ 1 + 海外チャンネル除外 1 等） |
 | Instagram クリーナー サブ機能 | 11 | `InstagramCleaner.FEATURES` |
 | TikTok クリーナー サブ機能 | 3 | `TikTokCleaner.FEATURES` |
-| Firefox 提供機能 | 11 | 全 11 機能（音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js`。EME_HOSTS の DRM サイトでは無効） |
-| `globalThis` 公開定数 | 23 | `actions.js` + ScanRunner + AudioPipeline + CleanerCore |
+| X クリーナー サブ機能 | 9 | `XCleaner.FEATURES`（レイアウト 4 + ノイズ除去 4 + タイムライン 1） |
+| Firefox 提供機能 | 12 | 全 12 機能（音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js`。EME_HOSTS の DRM サイトでは無効） |
+| `globalThis` 公開定数 | 27 | `actions.js` の 24 名前空間（`test/actions.test.js` の `required` 配列が単一情報源）+ ScanRunner + AudioPipeline + CleanerCore。※ `rg "globalThis\.\w+ = "` は二重ロード防止フラグ（`__cpaActionsLoaded` / `__cpaAudioPipelineLoaded`）も拾うので、素の grep 件数は名前空間数と一致しない |
 | カラーピッカー履歴上限 | 20 件 | `ColorPicker.HISTORY_LIMIT` |
-| popup タブ数 | 5 | `PopupTabs.ALL`（調整 / YouTube / Instagram / TikTok / カラーピッカー） |
+| popup タブ数 | 6 | `PopupTabs.ALL`（調整 / YouTube / X / Instagram / TikTok / カラーピッカー） |
 | YouTube 機能拡張 カテゴリ数 | 5 | `SearchFixer.CATEGORIES`（menu_ui / video_filter / watch_page / search_only / integration） |
 
 ### 機能一覧
@@ -31,26 +32,30 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
 4. **Amazon 販売元・出荷元バッジ** — 緑（Amazon 直販）/ オレンジ（マーケット出品）の視覚区別、判定は `isInternal` JSON フラグ最優先
 5. **Instagram クリーナー** — 11 サブ機能
 6. **TikTok クリーナー** — 3 サブ機能（コメント欄非表示 / おすすめアカウント非表示 / 画像ダウンロード）
-7. **音量ブースター** — 自動歪み防止 / ナイトモード / 壁ドン対策モード（低音カット） / ミュートトグル + **10 バンドグラフィックイコライザ (プリアンプ + プリセット)**、設定グローバル永続化、タブ切替で自動適用。Chrome = tabCapture 経路 / Firefox = 専用 MES 経路（DRM サイト除く）の per-browser 2 実装
-8. **動画ガンマ補正** — SVG `<feComponentTransfer type="gamma">` 独自実装、全タブ共通スライダー
-9. **動画の黒帯除去** — ウルトラワイド画面で動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出
-10. **ルーペ** — `chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / サイズ可変
-11. **カラーピッカー** — EyeDropper API ベース、popup 内完結
+7. **X クリーナー** — 9 サブ機能（右ペイン / トレンド / おすすめユーザー / メッセージドック / 広告投稿 / プレミアム勧誘 / Grok / 反応数を非表示 + ホームを「フォロー中」で開く）
+8. **音量ブースター** — 自動歪み防止 / ナイトモード / 壁ドン対策モード（低音カット） / ミュートトグル + **10 バンドグラフィックイコライザ (プリアンプ + プリセット)**、設定グローバル永続化、タブ切替で自動適用。Chrome = tabCapture 経路 / Firefox = 専用 MES 経路（DRM サイト除く）の per-browser 2 実装
+9. **動画ガンマ補正** — SVG `<feComponentTransfer type="gamma">` 独自実装、全タブ共通スライダー
+10. **動画の黒帯除去** — ウルトラワイド画面で動画の上下/左右の黒帯をズーム/引き伸ばしで除去、動画縦横比は自動検出
+11. **ルーペ** — `chrome.tabs.captureVisibleTab` で取得した JPEG 静止画を `background-position` で追従表示、倍率 3 段階 / サイズ可変
+12. **カラーピッカー** — EyeDropper API ベース、popup 内完結
 
 ### 設計方針
 
-- **デフォルト OFF オプトイン**: 11 機能のうち 10 機能がマスタートグル付き、**全てデフォルト OFF**（カラーピッカーは popup タブとして常時利用可）。サイト挙動を勝手に書き換えない方針。
+- **デフォルト OFF オプトイン**: 12 機能のうち 11 機能がマスタートグル付き、**全てデフォルト OFF**（カラーピッカーは popup タブとして常時利用可）。サイト挙動を勝手に書き換えない方針。
 - **独立機能ではないサブ統合**:
   - 接続モニター = YouTube 機能拡張のサブ機能 `connectionMonitor`（master `searchFixerEnabled` AND で制御）
   - 画像ダウンロード = Instagram / TikTok 各クリーナーのサブ機能として共通実装（YouTube では未提供）
-- **外部送信ゼロ + 2 例外**: すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で外部送信ゼロ。**例外 1**: 接続モニター ON 中の YouTube ライブ視聴時のみ 5 秒周期で `https://www.gstatic.com/generate_204` と `https://speed.cloudflare.com/__down?bytes=10` への RTT 計測 fetch（`mode: "no-cors"` + `credentials: "omit"` + `referrerPolicy: "no-referrer"`、レスポンス本文は破棄、識別子・cookie・ユーザーデータは送信せず）。**例外 2**: Gemini Notebook 送信 ON 中の `https://notebooklm.google.com`（ユーザー自身の Google アカウント宛）との通信。**動画 URL とノートブック名を送るのはユーザーがボタンを押した瞬間のみ**で、対象ページで送信ボタンを出したときに行う**アカウント一覧 / ノートブック一覧の先読みは読み取りのみ**（視聴内容・動画 URL・識別子は送らない）。視聴履歴収集・バックグラウンド送信なし。詳細は §Gemini Notebook 送信。なお画像ダウンロード（Instagram / TikTok）の CDN 取得は「取得のみで送信ゼロ」だが privacy-policy では例外 1 として明記している（本表と番号が異なる点に注意）。
+- **外部通信ゼロ + 3 例外（番号は `docs/privacy-policy.{md,en.md}` の見出しと一致させる。独自番号を作らない）**: すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、既定では外部通信ゼロ。
+  - **例外 1: 画像ダウンロード**（Instagram / TikTok クリーナーのサブ機能）— CDN からの**取得のみ**でユーザーデータの送信はゼロ。fetch 4 原則は §外部 fetch allowlist 設計。
+  - **例外 2: 接続モニター** — ON 中の YouTube ライブ視聴時のみ 5 秒周期で `https://www.gstatic.com/generate_204` と `https://speed.cloudflare.com/__down?bytes=10` への RTT 計測 fetch（`mode: "no-cors"` + `credentials: "omit"` + `referrerPolicy: "no-referrer"`、レスポンス本文は破棄、識別子・cookie・ユーザーデータは送信せず）。
+  - **例外 3: Gemini Notebook 送信** — ON 中の `https://notebooklm.google.com`（ユーザー自身の Google アカウント宛）との通信。**動画 URL とノートブック名を送るのはユーザーがボタンを押した瞬間のみ**で、対象ページで送信ボタンを出したときに行う**アカウント一覧 / ノートブック一覧の先読みは読み取りのみ**（視聴内容・動画 URL・識別子は送らない）。視聴履歴収集・バックグラウンド送信なし。詳細は §Gemini Notebook 送信。
 - **バージョン管理**: バージョン番号は `/vava` スキル経由でのみ更新する（コード変更コミットで `manifest.json` / `package.json` / `pnpm-lock.yaml` の version フィールドには触らない）。
 - **旧呼称 drift check**: Vuora 改名前の「WEB閲覧アシスト」「Web Viewing Assist」「Web Restriction Removal Helper」が、`docs/privacy-policy.en.md` の `formerly` 表記・`docs/privacy-policy.md` の「旧称:」表記（いずれも意図的な改名履歴の明記）以外で意図せず残ってないか定期確認:
   ```bash
   rtk grep -i "WEB閲覧アシスト\|Web Viewing Assist\|Web Restriction Removal Helper" --exclude-dir=node_modules --exclude=*.lock
   ```
 
-popup は **5 タブ構成** (`調整 / YouTube / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
+popup は **6 タブ構成** (`調整 / YouTube / X / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
 
 設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（ブラウザ UI 言語が `ja` → 日本語 / それ以外 → 英語にフォールバック）。`manifest.json` の `default_locale: "en"` + `_locales/{en,ja}/messages.json` を単一情報源とし、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。バージョン番号は `/vava` スキル経由でのみ更新する。
 
@@ -62,11 +67,29 @@ pnpm run ci:install           # CI 用 (pnpm install --frozen-lockfile。lockfil
 pnpm run build                # アイコン + スクリーンショット一括生成
 pnpm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 pnpm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-pnpm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + 26 globalThis 定数列挙 (actions.js 23 + ScanRunner + AudioPipeline + CleanerCore、/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-pnpm test                     # Node.js 標準 test runner（syntax-check.test.js が src/**/*.js 全 26 ファイル構文 check + actions.test.js が FEATURES 件数アサート + ALLOWED_HOSTS scontent- prefix + 音量ブースター 5 キー + EQ 定数・clamp・プリセット (eargasm/eargasmKai/perfect/perfectKai 値固定 drift 検知含む) + cdninstagram scontent- prefix + Loupe pure function 群 + extractHandleFromHref の Unicode 境界値 + SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知 + AmazonMerchantInfo.parseIsInternal/isAmazonOwnedName 境界値 + BroadcastClock 純粋関数境界値 + VolumeBooster.isEmeHost/classifyMesSource 境界値 (Firefox MES 経路) + 撤去済み機能 drift 検知（自動音量正規化を含む）+ manifest-drift.test.js が manifest.json/firefox 間の content_scripts 一致検証を含む、合計 139 ケース前後（正確な件数は `pnpm test` の出力サマリ `# tests N` で確認）
+pnpm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
+pnpm test                     # Node.js 標準 test runner（4 ファイル構成。件数は出力サマリ `# tests N` を正とする）
 node --test test/actions.test.js                  # 単一テストファイルのみ実行 (さらに --test-name-pattern="FEATURES" で個別ケース絞り込み)
 pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
+
+テスト 4 ファイルの担当範囲:
+
+| ファイル | 担当 |
+|---|---|
+| `test/actions.test.js` | 純粋関数の境界値 + FEATURES 件数 + `globalThis` 公開名の drift 検知（詳細は Key Files 表） |
+| `test/syntax-check.test.js` | `src/**/*.js` を動的列挙して `vm.compileFunction` で構文 check（content_scripts の追加・削除で手動更新が要らない） |
+| `test/manifest-drift.test.js` | `manifest.json` と `manifest.firefox.json` の content_scripts 一致検証 |
+| `test/audio-pipeline.test.js` | `src/lib/audio-pipeline.js` の DSP ヘルパー |
+| `test/_load-actions.js` | 上記から共有する actions.js ロード用ヘルパー（`_` 始まりなので `node --test` の対象外） |
+
+### 依存パッケージの運用
+
+- **`pnpm-workspace.yaml` が overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` ではない）。transitive 脆弱性は「脆弱範囲だけに効く versioned selector」で固定し、blast radius を最小化する。
+- **`pnpm audit` が high 1 件を報告するのは既知の正常状態**: `brace-expansion@1.1.16`（GHSA-mh99-v99m-4gvg）が `web-ext > addons-linter > eslint > minimatch@3` 経由で残る。1.x 系に修正版が存在せず、パッチ版 5.0.8 は ESM 専用で CJS の minimatch@3 に当てると `require` が壊れるため、**addons-linter の更新待ちとして意図的に保留**している（5.x 系は override 済み）。この 1 件を消そうとして 1.x へ override を当てない。
+- **`minimumReleaseAgeExclude` は pnpm v11 が自動追記する**（公開直後の版を一定期間使わない供給網ガードの例外記録）。手編集しない。
+- **GitHub Actions は SHA ピン + タグコメント運用**。Dependabot は SHA だけ更新して**コメントの version 表記は直さない**ので、bump PR を取り込んだら `gh api repos/<owner>/<repo>/git/matching-refs/tags` で SHA → タグを引き直してコメントを合わせる（実例: v6.0.0 表記のまま v7.0.1 へ上がっていた）。
+- 依存更新の正規ルートは `/deps` スキル。バージョン番号（`manifest.json` / `package.json`）には触れない。
 
 ## Development Workflow
 
@@ -83,9 +106,9 @@ pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zi
 pnpm test
 ```
 
-内訳:
-- `test/syntax-check.test.js` が `src/**/*.js` 全 26 ファイルを `vm.compileFunction` で動的列挙 + 構文 check（content_scripts 追加・削除の手動 drift 防御）
-- `test/actions.test.js` が `globalThis` 23 個公開 / FEATURES 件数 / Loupe 純粋関数 / extractHandleFromHref Unicode 境界値 / BroadcastClock 純粋関数（videoId 抽出 / liveBroadcastDetails パース / 配信時刻算出 / yyyy/MM/dd　hh:mm:ss 整形）境界値 / SettingsSchema 整合 / **撤去済み機能 drift 検知（自動音量正規化を含む）** / **EQ 定数・clamp 関数・プリセット境界値・コミュニティ 4 プリセット (eargasm/eargasmKai/perfect/perfectKai) 値固定** 等 100+ ケースをアサート
+内訳（担当範囲の一覧は §Build Commands のテスト表を参照）:
+- `test/syntax-check.test.js` が `src/**/*.js` を**動的列挙**して構文 check する（ファイル数はハードコードしないので、content_scripts を増減しても更新不要）
+- `test/actions.test.js` が `globalThis` 公開名 / FEATURES 件数 / Loupe 純粋関数 / extractHandleFromHref Unicode 境界値 / BroadcastClock 純粋関数（videoId 抽出 / liveBroadcastDetails パース / 配信時刻算出 / yyyy/MM/dd　hh:mm:ss 整形）境界値 / SettingsSchema 整合 / **撤去済み機能 drift 検知（自動音量正規化を含む）** / **EQ 定数・clamp 関数・プリセット境界値・コミュニティ 4 プリセット (eargasm/eargasmKai/perfect/perfectKai) 値固定** をアサート
 
 Lint は ESLint v10 flat config:
 
@@ -142,7 +165,7 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。**10 マスタートグル**（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ トグル + プリセット dropdown + プリアンプ縦スライダー + 10 バンド縦スライダー）** + 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube 機能拡張 34 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示・接続モニター・配信時刻オーバーレイは YouTube 機能拡張のサブ機能（`removeShortsShelf` 等 / `hideComments` / `connectionMonitor` / `broadcastClock`）として統合され、専用パネルのアコーディオン（接続モニター・配信時刻オーバーレイは `watch_page` カテゴリ）に FEATURES 駆動で自動描画される。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+6 タブ構成（調整 / YouTube / X / Instagram / TikTok / カラーピッカー）。**10 マスタートグル**（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ トグル + プリセット dropdown + プリアンプ縦スライダー + 10 バンド縦スライダー）** + 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube 機能拡張 34 機能 / Instagram クリーナー 11 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示・接続モニター・配信時刻オーバーレイは YouTube 機能拡張のサブ機能（`removeShortsShelf` 等 / `hideComments` / `connectionMonitor` / `broadcastClock`）として統合され、専用パネルのアコーディオン（接続モニター・配信時刻オーバーレイは `watch_page` カテゴリ）に FEATURES 駆動で自動描画される。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
 
 **クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
@@ -339,6 +362,31 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 - 単純 `[data-e2e="recommend-list-item-container"]` 一律非表示 → 通常動画も巻き込んで全消し
 - modal viewer で `DivCommentContainer` 全体非表示 → プロフィール + キャプション巻き込み
 
+### X クリーナー (`src/content/x-cleaner.{js,css}` + `src/content/x-early.js`)
+`*://x.com/*` / `*://*.x.com/*` / `*://twitter.com/*` / `*://*.twitter.com/*` の top frame 限定。TikTok クリーナーと同じ master + FEATURES の 2 段構造（`xCleanerEnabled` / `xCleanerFeatures`）+ CleanerCore 購読 + `<html>` クラス駆動 CSS で、**9 サブ機能**（レイアウト 4 / ノイズ除去 4 / タイムライン 1）を提供する。`window.__cpaXCleanerRunning` で二重実行防止。旧ドメイン `twitter.com` は x.com へ転送されるだけで残っているため、manifest matches と background の `isXUrl` の両方で併記する。
+
+**セレクタ戦略（最重要）: `data-testid` + `:has()` の構造マッチのみ。`aria-label` の文言に依存しない。**
+X の aria-label は UI 言語でローカライズされる（実機で「トレンド」「プレミアムプラスにアップグレード」を確認）ため、文言マッチだと日本語環境でしか動かない。難読化 class（`css-146c3p1` 等）はビルドごとに変わるので当然使わない。`:has()` は minimum_chrome_version 140 / Firefox 142 のどちらでも使える。
+
+実機確認済みの構造（2026-07-28 / ログイン状態の `x.com/home`、3 ペイン幅は左ナビ 659 + タイムライン 600 + 右ペイン 350）:
+
+| 対象 | セレクタ |
+|---|---|
+| 右ペイン全体 | `[data-testid="sidebarColumn"]`。**同時にタイムラインを右端まで広げる**（下記） |
+| トレンド | 右ペイン内の `section:has([data-testid="trend"])` **＋「本日のニュース」の `[data-testid="news_sidebar"]`**（片方だけ残すと隠した意味が薄いので同じ機能で消す。検索ボックスは別要素なので残る） |
+| おすすめユーザー | 右ペイン内の `aside:has([data-testid="UserCell"])` |
+| プレミアム勧誘 | 右ペイン内の `aside:not(:has([data-testid="UserCell"]))` + 左ナビ `a[href^="/i/premium"]` + `[data-testid="premium-hub-tab"]` |
+| Grok | `[data-testid="GrokDrawer"]` + 左ナビ `a[href^="/i/grok"]` |
+| 広告投稿 | `[data-testid="cellInnerDiv"]:has([data-testid="placementTracking"])`（セル単位で消さないと余白が残る） |
+| 反応数 | `[data-testid="{reply,retweet,like,…}"] [data-testid="app-text-transition-container"]`（ボタンは残しカウンタだけ消す） |
+| メッセージドック | `[data-testid="chat-drawer-root"]`（旧 `DMDrawer` も併記） |
+
+**`hideRightPane` は幅の制約を 2 段階で外す**（実機で確認 / 2026-07-28）。X はタイムライン幅を ①`[data-testid="primaryColumn"]` の `max-width: 600px` と ②その内側で timeline `section` を包む div の `max-width: 600px`（auto マージンで中央寄せ）の**2 か所**で止めている。①だけ外すと列は 1050px に広がるのに**投稿セルが 600px のまま中央に取り残される**ので、②も外す。②はクラス名が難読化されるため位置ではなく `div:has(> section)` の構造で特定する。ホーム / プロフィール / 投稿詳細で横スクロールが出ないことを実機確認済み。
+
+**`followingTabDefault` だけ JS 実装**（唯一 CSS で書けない機能）。ホームのタブは `[role="tablist"] [role="tab"]` の **index 0 = おすすめ / 1 = フォロー中**で、ピン留めリストは 3 番目以降に並ぶため先頭 2 つの順序は不変（＝位置で特定すればロケール非依存）。ユーザー操作と競合させないため、**ホームで、かつ「おすすめ」が選択中のときだけ、1 ページ表示につき 1 回だけ**クリックする（自分で「おすすめ」に戻したあとは介入しない）。走査は MutationObserver + rAF coalesce、SPA 遷移は `popstate` でも拾う。機能 OFF / orphan / `pagehide(persisted=false)` で observer を切る（bfcache 凍結は温存）。
+
+**early script は「レイアウトが動く 3 つ」だけ焼き込む**（`x-early.js`）: 右ペイン / トレンド / おすすめユーザー。広告・カウンタ・Grok はレイアウトを押し広げないので manifest css の到達で間に合い、早期 paint を無駄に遅らせない。
+
 ### 音量ブースター (tabCapture 経路一本、`src/background/background.js` + `src/offscreen/offscreen.js`)
 `chrome.tabCapture.getMediaStreamId` + offscreen の `getUserMedia` + AudioContext 方式。**全サイト一律・URL 分岐なし**（Netflix / Prime Video / Amazon 等 EME 動画も含む）。`chrome.tabCapture` は OS / ブラウザレベルで復号された後のタブ音声出力を捕獲するため、EME 動画でもブースト可能。
 
@@ -413,7 +461,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 
 **外部送信の 3 例外目**: 本機能は接続モニターの RTT 計測・画像ダウンロードの CDN 取得と並ぶ、外部通信を行う例外。**送信されるのはユーザーがボタンを押した瞬間の YouTube 動画 URL と（新規作成時の）ノートブック名だけ**で、視聴履歴収集やバックグラウンド送信は行わない。docs/privacy-policy.{md,en.md} の「例外 3」に明記済み。
 
-**通信方式（Gemini Notebook には公開 API が無い）**: Web アプリ自身が使う `batchexecute` RPC を叩く。純粋ロジックは `actions.js` の `Gemini Notebook` namespace、cross-origin 通信は background（content script からは cross-origin になるため。`host_permissions: ["<all_urls>"]` は v1.0.34 のルーペ対応で既にあるので**権限追加は不要**）。
+**通信方式（Gemini Notebook には公開 API が無い）**: Web アプリ自身が使う `batchexecute` RPC を叩く。純粋ロジックは `actions.js` の `NotebookLm` namespace（**コード上の識別子は `NotebookLm`。「Gemini Notebook」は表示名なので grep では引けない**）、cross-origin 通信は background（content script からは cross-origin になるため。`host_permissions: ["<all_urls>"]` は v1.0.34 のルーペ対応で既にあるので**権限追加は不要**）。
 - **オリジンは `https://notebooklm.google.com`（復活禁止: `notebook.google.com`）**: 旧オリジンは別ホストへ 302 するだけで、全 fetch 共通要件の `redirect:"manual"` では opaqueredirect（`res.ok === false`）になり、**ログイン済みでも必ず `not-authorized`**（「ログインしてください」）に落ちる。「急に全部ログイン要求になった」ときは真っ先にここを疑う
 - トークン: `https://notebooklm.google.com/` の HTML から `cfb2h`（build label → `bl`）と `SNlM0e`（XSRF → `at`）を `NotebookLm.extractToken` で抽出
 - RPC ID（`test/actions.test.js` で値固定アサート）: `CCqFvf` = ノートブック作成（payload `[title, null, null, options]`、応答から UUID）/ `izAoDd` = ソース追加（payload `[sources, notebookId, options]`）/ `wXbhsf` = 一覧（payload `[null,1,null,[2]]`）/ `ozz5Z` = ソース上限（プラン判定）
@@ -477,7 +525,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 設定; permissions: `activeTab`, `storage`, `offscreen`, `tabCapture` + host_permissions: `<all_urls>` (ルーペ `captureVisibleTab` を popup close 後 / SPA navigation 後でも確実に動作させるため、v1.0.34 で追加。content_scripts で既に全 http(s) に注入済みなので実質アクセス範囲は同じ) |
-| `src/lib/actions.js` | `Object.freeze` された 23 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / VideoFill / Loupe / ConnectionMonitor / BroadcastClock / Gemini Notebook / ColorPicker / PopupTabs |
+| `src/lib/actions.js` | `Object.freeze` された 23 個の定数を IIFE wrap + globalThis 公開: SettingsSchema / Actions / ExtensionPaths / SenderCheck / Offscreen / StorageKeys / YouTubeShorts / SearchFixer / AmazonDeliveryTotal / AmazonRankingJump / AmazonMerchantInfo / InstagramCleaner / TikTokCleaner / ImageDownloader / VolumeBooster / VideoGamma / VideoFill / Loupe / ConnectionMonitor / BroadcastClock / NotebookLm（Gemini Notebook 送信）/ ColorPicker / PopupTabs。件数と名前の単一情報源は `test/actions.test.js` の `required` 配列 |
 | `src/lib/scan-runner.js` | content script 共通実行ランタイム (`/rere` B1-007/B2-I002/D-002 で抽出)。rAF coalesce + MutationObserver `disconnect → render → takeRecords → observe` ガード + Extension context invalidation guard を `ScanRunner.create({ render, cleanup })` に集約し `globalThis.ScanRunner` 公開。Amazon 3-cs (delivery-total / ranking-jump / merchant-info) が利用 (image-downloader / youtube-shorts は別バッチで移行予定)。cleanup は idempotent 必須。context invalidation 後でも throw しない i18n 取得 `ScanRunner.safeMsg(key, fallback)` も公開し Amazon 3-cs の重複ヘルパー (ranking-jump / merchant-info の同型コピー + delivery-total のインライン) を統合 (/opop) |
 | `src/lib/audio-pipeline.js` | 音量ブースター DSP コア共有モジュール (`/rere` B1-004/B2-I001/D-001 で抽出)。`dbToGain` / `applyCompressorPreset` / `applyFilterPreset` / `createBassCutChain` / `applyEqualizer` / `createEqChain` / `connectAudioGraph` の 7 関数を `globalThis.AudioPipeline` 公開。`createBassCutChain(ctx)` は highpass BiquadFilterNode × 2 を直列接続した `{bassCutNodes, head, tail}`、`createEqChain(ctx)` は preampNode + 10 バンド peaking BiquadFilterNode を直列接続した `{head, tail, preampNode, eqFilters}` を返す。`connectAudioGraph` は Chrome / Firefox 共通の最上位 DSP 接続順を固定する。`applyEqualizer` は preampNode の dB→gain 倍率変換と eqFilters[10] の peaking gain を ramp 更新し、`applyFilterPreset` は壁ドン対策 highpass 2 段の frequency/Q を一括設定する。caller は offscreen.js (Chrome tabCapture 経路) + volume-booster-mes.js (Firefox 専用 MES 経路、2026-07-02 復活) の 2 つ。値定数は actions.js の VolumeBooster 経由 |
 | `src/lib/cleaner-core.js` | body-class クリーナーの設定購読共通ランタイム (/opop で抽出)。master + features 2 キーの購読 3 経路 (初期 storage.get / runtime.onMessage gate / storage.onChanged 部分更新) を `CleanerCore.subscribe({ masterKey, featuresKey, applyAction, mergeFeatures, onUpdate })` に集約し `globalThis.CleanerCore` 公開。Instagram / TikTok クリーナーが利用。active/features 保持と applyBodyClasses/固有ロジック (Instagram の DOM スイープ・URL guard 等) は各 cs に残す最小責務分離 (early-framework.js / scan-runner.js と同じ思想で config 肥大化を回避)。onUpdate(patch) は変わったキーだけ通知し各 cs が部分適用 (片方キーのみ変化時の undefined 上書き罠を回避) |
@@ -491,6 +539,8 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/content/instagram-cleaner.{js,css}` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ + 意味論的セレクタのみ（aria-label / href / role / data-pagelet / SVG path data） |
 | `src/content/tiktok-early.js` | TikTok 用 `document_start` 注入の最小スクリプト。`tiktokCleanerEnabled` + `tiktokCleanerFeatures` を読んで `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` 同期付与 + inline `<style>` で主要セレクタ焼き込み（FOUC 防止、actions.js 非依存） |
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
+| `src/content/x-early.js` | X 用 `document_start` 注入の最小スクリプト。`xCleanerEnabled` + `xCleanerFeatures` を読んで `<html>` に `__cpa-x-right-pane` / `__cpa-x-trends` / `__cpa-x-who-to-follow` を同期付与 + inline `<style>` で焼き込み（**レイアウトが動く 3 機能のみ**。FOUC 防止、actions.js 非依存） |
+| `src/content/x-cleaner.{js,css}` | X（旧 Twitter）クリーナー: master + features で `<html>` クラス駆動、9 サブ機能（レイアウト 4 / ノイズ除去 4 / タイムライン 1）。**セレクタは `data-testid` + `:has()` の構造マッチのみで `aria-label` の文言に依存しない**（X の aria-label はロケールで変わる）。`followingTabDefault` だけ JS 実装で、ホームのタブを**位置**（index 0 = おすすめ / 1 = フォロー中）で特定し 1 ページ表示につき 1 回だけクリックする |
 | `src/content/amazon-ranking-jump.{js,css}` | Amazon ランキングへ移動ボタン: `*://www.amazon.co.jp/*` の top frame に注入、商品詳細欄の売れ筋ランキングリンクから「一番細かいサブカテゴリ」を選んで商品情報最上部に集約ボタン (`<a href>`) を挿入、同じタブで移動。商品ページで自己ゲート、rAF coalesce + observer guard、外部送信ゼロ |
 | `src/content/amazon-merchant-info.{js,css}` | Amazon 販売元・出荷元バッジ: `*://www.amazon.co.jp/*` の top frame に注入、隠し div (`#merchantInfoFeature_feature_div` / `#fulfillerInfoFeature_feature_div`) から販売元・出荷元を抽出し、「📦 販売: XXX / 出荷: YYY」を商品情報最上部 (ランキングボタンの隣) に **クリック不可の情報バッジ** (`<span>` ベース) で表示。**Amazon 直販 = 緑 / マーケット出品 = オレンジ警告** で視覚区別 (`data-variant` 属性で CSS 切替)。直販判定は `AmazonMerchantInfo.parseIsInternal` で script 埋め込み JSON の `isInternal` フラグを最優先、欠落時は `isAmazonOwnedName` の販売元名フォールバック (両純粋関数とも境界値テスト可能化)。商品ページで自己ゲート、rAF coalesce + observer guard + context invalidation guard、外部送信ゼロ |
 | `src/content/video-gamma.js` | 動画ガンマ補正: 全 http(s) + iframe に注入、SVG `<feComponentTransfer type="gamma">` を `<body>` に inject。**v1.0.41 で video-fill と同型 lifecycle に統一**: 旧 CSS rule 一斉注入 → **per-video inline `style.setProperty("filter", "url(#...)", "important")` + `loadedmetadata` 待ち + WeakMap original + AbortController + MutationObserver で detach 即 revert**。動機: 旧設計が video element の readyState 関係なく filter 当てるため DRM player の session 取得中に attestation 干渉する理論的リスクを構造的に排除 |
@@ -500,7 +550,7 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `src/content/youtube-notebooklm.{js,css}` | Gemini Notebook 送信（**YouTube 機能拡張のサブ機能** `searchFixerFeatures.notebookLmSend`、`integration` カテゴリ。master `searchFixerEnabled` AND で制御・`APPLY_SEARCH_FIXER_CS` を購読・**接続モニター / 配信時刻オーバーレイと同じ content_scripts エントリに相乗り**）: `*://*.youtube.com/*` の top frame に注入。**YouTube のページ内**（`/watch` は高評価・共有の行、`/results` は検索フィルタの隣、`/playlist` とチャンネルはタイトル見出しの行 — 参考拡張と同じ配置）にボタンを挿し込み、body 直下 fixed のノートブック選択ポップオーバーで、視聴中の動画 (`/watch`) / 検索結果 (`/results`) / プレイリスト (`/playlist`) / チャンネル (`/videos` `/streams`) の動画を Gemini Notebook にソース追加する。cross-origin RPC は background が担当（`NOTEBOOK_LM_LIST` / `NOTEBOOK_LM_SEND`、`host_permissions: <all_urls>` は既存のため権限追加なし）。プロトコル純粋関数は actions.js の `NotebookLm`（`extractToken` / `parseBatchPayload` / `parseNotebookList` / `extractNotebookId` / `buildSourcePayload` / `isYouTubeUrl` / `normalizeWatchUrl`、RPC ID 値固定を含め `test/actions.test.js` でアサート）。**外部送信の例外機能**（ユーザーのボタン操作時のみ、動画 URL とノートブック名を送信） |
 | `src/content/youtube-broadcast-clock.{js,css}` | 配信時刻オーバーレイ（**YouTube 機能拡張のサブ機能** `searchFixerFeatures.broadcastClock`、master `searchFixerEnabled` AND で制御。独立 storage key なし・`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と共に購読・`computeActive()` 判定。**接続モニターと同じ content_scripts エントリに相乗り**）: `*://*.youtube.com/*` の top frame に注入。ライブ配信アーカイブ（`liveBroadcastDetails` を持ち `isLiveNow !== true`）の再生中に、その瞬間の実配信時刻を `yyyy/MM/dd　hh:mm:ss`（全桁ゼロ埋め・全角スペース・24 時間制・ローカル）で HUD 表示する（body 直下 `position:fixed`、初期位置はプレーヤー左上付近、ドラッグで動画の外側を含む任意位置へ移動可）。配信開始時刻は `/watch?v=<id>` の **same-origin fetch**（`credentials:"same-origin"` + `redirect:"manual"`、search-fixer.js と同型・**外部送信ゼロ維持**）で HTML から `BroadcastClock.parseLiveBroadcastDetails` 抽出 → videoId 単位 sessionStorage cache。`配信時刻 = startTimestamp + currentTime` を `BroadcastClock.computeBroadcastEpochMs` / `formatTimestamp` で算出・整形（純粋関数、`test/actions.test.js` で境界値テスト）。`timeupdate`/`seeked` 駆動 + 250ms throttle、ドラッグ移動可（viewport 座標を localStorage 永続化 + resize/フルスクリーンで clamp）、フルスクリーンは `fullscreenchange` で `document.fullscreenElement` へ reparent 追従、context invalidation guard |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得 / URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
-| `src/popup/popup.{html,js,css}` | ポップアップ UI: 5 タブ構成（調整 / YouTube / Instagram / TikTok / カラーピッカー）。調整タブは **10 マスタートグル** + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ + プリセット + プリアンプ + 10 バンド縦スライダー、EQ_BANDS 駆動で動的生成）** + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、YouTube タブは 34 機能リスト（接続モニター・配信時刻オーバーレイは `watch_page` カテゴリのサブ機能として FEATURES 駆動で自動描画）、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット (Regular 400 / SemiBold 600 / Bold 700) 同梱 + popup.html で 3 weight すべて preload |
+| `src/popup/popup.{html,js,css}` | ポップアップ UI: 6 タブ構成（調整 / YouTube / X / Instagram / TikTok / カラーピッカー）。調整タブは **10 マスタートグル** + 音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ + プリセット + プリアンプ + 10 バンド縦スライダー、EQ_BANDS 駆動で動的生成）** + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、YouTube タブは 34 機能リスト（接続モニター・配信時刻オーバーレイは `watch_page` カテゴリのサブ機能として FEATURES 駆動で自動描画）、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは EyeDropper 採取 + HEX/RGB/HSL 表示 + format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット (Regular 400 / SemiBold 600 / Bold 700) 同梱 + popup.html で 3 weight すべて preload |
 | `src/content/volume-booster-mes.js` | 音量ブースター Firefox 専用 MES 経路 (**manifest.firefox.json のみから注入、Chrome には一切ロードされない**): 全 http(s) の全フレームに `document_idle` 注入、`<video>`/`<audio>` 1 要素 = 1 AudioContext で MediaElementSource + 18 処理ノードを attach。`source → dryGain → destination` と、offscreen.js と同じ 16 ノード DSP の末尾に `wetGain` を置く wet 経路へ分岐する。popup → storage 直書きを `storage.onChanged` で購読する storage 駆動・メッセージレス (user gesture 不要、全タブ自動適用、タブ共有バナーなし)。**Firefox では ctx.close しても音声が直接出力に復帰しない前提**で、誤 attach の予防 (EME_HOSTS 起動 skip / mediaKeys / encrypted 事前検出 / readyState gate / `classifyMesSource` 4 値分類 + same-origin 1 バイト Range GET redirect probe) と bypass 維持 (OFF / UNITY / orphan は dry/wet crossfade、close は DOM 除去 30 秒猶予後 + pagehide のみ) に全振り。拡張リロードで旧 sandbox が消えても、5 秒 heartbeat で更新する 20 秒 lease の AudioParam automation が旧 graph を dry bypass へ戻す。設定適用は ATTACHED レジストリ (WeakRef Set) 反復で shadow DOM / detached 要素にも届く。冒頭 `chrome.runtime.getURL("")` の `moz-extension://` スキーム検査で Chrome 誤ロード時も即 return。DSP コアは audio-pipeline.js 共有 |
 | `src/popup/fonts/IBMPlexSansJP-{Regular,SemiBold,Bold}.woff2` | popup タイポグラフィ用 woff2 サブセット。Regular / SemiBold は IBM 純正の subset 済み版 (約 77 / 81 KB)、Bold は `scripts/fetch-bold-woff2.mjs` で IBM/plex full CJK Bold (npm `@ibm/plex-sans-jp@3.0.0`) を Regular と同じ cmap (652 unicode) で subset 化した版 (約 200 KB、subset-font の woff2 encoder が IBM 純正より圧縮率低めのため大きい)。preload で並列 fetch するので popup 起動コストへの影響は小 |
 | `scripts/fetch-bold-woff2.mjs` | Bold woff2 再生成スクリプト。`pnpm add fontkit subset-font @ibm/plex-sans-jp@3.0.0` 後に `node scripts/fetch-bold-woff2.mjs` を実行すると、既存 Regular の cmap を読んで同じ unicode 集合の Bold woff2 を `src/popup/fonts/IBMPlexSansJP-Bold.woff2` に書き出す。完了後は `pnpm install --frozen-lockfile` で node_modules を pnpm-lock.yaml 通りに復元し、`package.json` / lockfile に紛れ込んだ 3 パッケージを取り除くこと (75 MB の @ibm/plex-sans-jp パッケージは devDependencies には含めない方針) |
@@ -510,8 +560,11 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 | `manifest.firefox.json` | Firefox AMO 申請用 manifest (Chrome 用 `manifest.json` から `offscreen` / `tabCapture` permission 除外 + `browser_specific_settings.gecko` + `background.scripts` 併記 + **Firefox 専用 MES 経路の content_scripts エントリ `volume-booster-mes.js` を追加**。Chrome 用 manifest.json はこのエントリを持たない)。zip スクリプトが Firefox xpi 生成時にこれを `manifest.json` として同梱する |
 | `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
+| `pnpm-workspace.yaml` | **overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` は使わない）。transitive 脆弱性は脆弱範囲だけに効く versioned selector で固定し、`minimumReleaseAgeExclude` は pnpm v11 が自動追記する（手編集しない）。詳細と保留中の既知脆弱性は §依存パッケージの運用 |
+| `.github/dependabot.yml` | github-actions（SHA ピン維持）と npm の weekly 更新 PR 設定。取り込みの正規ルートは `/deps` スキル |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト: globalThis 23 個公開 (SettingsSchema 含む) / **FEATURES 件数アサート (SearchFixer 34 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
+| `test/actions.test.js` | 純粋関数テスト: globalThis 公開名 23 件の列挙 (SettingsSchema 含む。**この `required` 配列が公開定数の単一情報源**) / **FEATURES 件数アサート (SearchFixer 34 / IG 11 / TT 3)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
+| `test/syntax-check.test.js` / `test/manifest-drift.test.js` / `test/audio-pipeline.test.js` | 順に「`src/**/*.js` の動的列挙 + 構文 check」「`manifest.json` と `manifest.firefox.json` の content_scripts 一致検証」「audio-pipeline.js の DSP ヘルパー」。共有ローダーは `test/_load-actions.js`（`_` 始まりなので `node --test` の対象外） |
 | `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.claude/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
 | `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要。`/vava` Step 8.7-B (CWS drift check) からも自動参照される |
 | `vava.config.json` | `/vava` スキル (`~/.claude/skills/vava/scripts/{check-store-listing,update-amo-listing}.mjs`) に渡すプロジェクト固有設定。AMO slug / homepage / supportUrl / 表示名 / listing ファイルパス / privacy ファイルパス / categories / CWS extension ID ファイル / drift 判定キーワードを集約。**スクリプト本体はスキル側に汎用化集約**しており、プロジェクトには本ファイルだけ置けば動く設計 (他 Chrome 拡張機能プロジェクトでも同じスキルを再利用できる) |

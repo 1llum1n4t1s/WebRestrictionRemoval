@@ -39,21 +39,27 @@
         <span class="tabbar-label" data-i18n="tabYoutube">YouTube</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
+      <button type="button" id="tabX" class="tabbar-btn"
+              role="tab" aria-selected="false" aria-controls="panelX" tabindex="-1">
+        <span class="tabbar-no" aria-hidden="true">03</span>
+        <span class="tabbar-label" data-i18n="tabX">X</span>
+        <span class="tabbar-rule" aria-hidden="true"></span>
+      </button>
       <button type="button" id="tabInstagram" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelInstagram" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">03</span>
+        <span class="tabbar-no" aria-hidden="true">04</span>
         <span class="tabbar-label" data-i18n="tabInstagram">Instagram</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabTikTok" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelTikTok" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">04</span>
+        <span class="tabbar-no" aria-hidden="true">05</span>
         <span class="tabbar-label" data-i18n="tabTiktok">TikTok</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
       <button type="button" id="tabPicker" class="tabbar-btn"
               role="tab" aria-selected="false" aria-controls="panelPicker" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">05</span>
+        <span class="tabbar-no" aria-hidden="true">06</span>
         <span class="tabbar-label" data-i18n="tabPicker">カラーピッカー</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
@@ -370,6 +376,41 @@
       </section>
 
     </div><!-- /panel.youtube -->
+
+    <!-- ===== Panel: X (クリーナー 9 機能) ===== -->
+    <div class="panel panel--x" id="panelX"
+         role="tabpanel" aria-labelledby="tabX" hidden>
+
+      <section class="grp" data-i18n-attr="aria-label:tabX" aria-label="X">
+        <h2 class="grp-title">
+          <span class="grp-title-text" data-i18n="tabX">X</span>
+          <span class="grp-pill" id="xCleanerPill"></span>
+        </h2>
+
+        <label class="toggle-row" id="xCleanerToggleRow">
+          <span class="tr-icon" aria-hidden="true">🐦</span>
+          <span class="tr-text">
+            <span class="tr-name" data-i18n="xCleanerMaster">X クリーナー</span>
+            <span class="tr-desc" data-i18n="xCleanerMasterDesc">右ペイン / 広告 / 勧誘などの気が散る UI を一括非表示</span>
+          </span>
+          <span class="switch">
+            <input type="checkbox" id="xCleanerToggle" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <div class="cleaner-detail">
+          <p class="cleaner-hint" data-i18n="cleanerHint">
+            マスタートグル（クリーナー）が ON のときだけ動作します。
+            個別に ON / OFF を選んでカスタマイズしてください。
+          </p>
+
+          <!-- カテゴリブロックは popup.js が XCleaner.FEATURES から生成する -->
+          <div id="xFeatureCategories"></div>
+        </div>
+      </section>
+
+    </div><!-- /panel.x -->
 
     <!-- ===== Panel: Instagram (クリーナー 11 機能) ===== -->
     <div class="panel panel--instagram" id="panelInstagram"

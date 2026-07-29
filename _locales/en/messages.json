@@ -26,6 +26,7 @@
   "tabYoutube": { "message": "YouTube" },
   "tabInstagram": { "message": "Instagram" },
   "tabTiktok": { "message": "TikTok" },
+  "tabX": { "message": "X" },
   "tabPicker": { "message": "Color Picker" },
 
   "groupAudio": { "message": "Audio" },
@@ -146,6 +147,9 @@
 
   "tiktokCleanerMaster": { "message": "TikTok cleaner" },
   "tiktokCleanerMasterDesc": { "message": "Hide redundant UI such as the comment panel and suggested-account section in one toggle." },
+
+  "xCleanerMaster": { "message": "X Cleaner" },
+  "xCleanerMasterDesc": { "message": "Hide distracting UI such as the right pane, ads, and upsells in one toggle." },
 
   "cleanerHint": { "message": "Active only while the master toggle (cleaner) is on. Pick the individual sub-features you want." },
 
@@ -268,6 +272,9 @@
   "categoryIgMain": { "message": "Main" },
   "categoryIgExtra": { "message": "Extras" },
   "categoryTtMain": { "message": "Main" },
+  "categoryXLayout": { "message": "Layout" },
+  "categoryXNoise": { "message": "Noise" },
+  "categoryXTimeline": { "message": "Timeline" },
 
   "applyOkSearchFixer": { "message": "YT enhancements" },
   "applyOkAmazon": { "message": "Amazon" },
@@ -275,6 +282,7 @@
   "applyOkAmazonMerchantInfo": { "message": "Seller badge" },
   "applyOkInstagram": { "message": "Instagram" },
   "applyOkTiktok": { "message": "TikTok" },
+  "applyOkX": { "message": "X" },
   "applyOkVideoGamma": { "message": "Video gamma" },
   "applyOkVideoFill": { "message": "Black bar removal" },
   "applyOkLoupe": { "message": "Loupe" },
@@ -403,5 +411,24 @@
   "feat_tt_hideSuggested_label": { "message": "Hide suggested accounts" },
   "feat_tt_hideSuggested_desc": { "message": "Hide the \"Suggested accounts\" section injected into For You / Following feeds and profiles via CSS." },
   "feat_tt_imageDownload_label": { "message": "Show download button on images" },
-  "feat_tt_imageDownload_desc": { "message": "Overlay a download button on the top-left of photo posts and video thumbnails on hover." }
+  "feat_tt_imageDownload_desc": { "message": "Overlay a download button on the top-left of photo posts and video thumbnails on hover." },
+
+  "feat_x_hideRightPane_label": { "message": "Hide the right pane" },
+  "feat_x_hideRightPane_desc": { "message": "Hide the entire right column of the three-pane layout (search, trends, who to follow, upsells) and widen the timeline into the freed space." },
+  "feat_x_hideTrends_label": { "message": "Hide trends" },
+  "feat_x_hideTrends_desc": { "message": "Keep the right pane but hide only the trends block." },
+  "feat_x_hideWhoToFollow_label": { "message": "Hide who to follow" },
+  "feat_x_hideWhoToFollow_desc": { "message": "Hide the \"Who to follow\" suggestion block in the right pane." },
+  "feat_x_hideMessagesDock_label": { "message": "Hide the messages dock" },
+  "feat_x_hideMessagesDock_desc": { "message": "Hide the docked messages / chat panel pinned to the bottom-right corner (the Messages page still works as usual)." },
+  "feat_x_hidePromoted_label": { "message": "Hide promoted posts" },
+  "feat_x_hidePromoted_desc": { "message": "Hide ad (promoted) posts injected into the timeline, removing the whole cell so no gap is left behind." },
+  "feat_x_hidePremiumUpsell_label": { "message": "Hide Premium upsells" },
+  "feat_x_hidePremiumUpsell_desc": { "message": "Hide the subscription upsell card in the right pane and the Premium entry in the left menu." },
+  "feat_x_hideGrok_label": { "message": "Hide Grok" },
+  "feat_x_hideGrok_desc": { "message": "Hide the Grok entry in the left menu, the Grok drawer in the bottom-right corner, and Grok buttons inside posts." },
+  "feat_x_hideEngagementCounts_label": { "message": "Hide engagement counts" },
+  "feat_x_hideEngagementCounts_desc": { "message": "Hide reply / repost / like / view counts only. The buttons stay, so interactions work as before." },
+  "feat_x_followingTabDefault_label": { "message": "Open Home on \"Following\"" },
+  "feat_x_followingTabDefault_desc": { "message": "Switch Home from \"For you\" to \"Following\" (once per page view; if you switch back to \"For you\" yourself, it stops interfering)." }
 }

@@ -30,6 +30,8 @@ const Actions = Object.freeze({
   APPLY_INSTAGRAM_CLEANER_CS: "applyInstagramCleanerCS",
   /** background → TikTok content script: TikTok クリーナー設定を反映 */
   APPLY_TIKTOK_CLEANER_CS: "applyTiktokCleanerCS",
+  /** background → X content script: X クリーナー設定を反映 */
+  APPLY_X_CLEANER_CS: "applyXCleanerCS",
   /** background → video-gamma content script: <video> ガンマ補正設定を反映（全タブ共通設定） */
   APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
   /** background → video-fill content script: <video> 黒帯除去（ズーム/引き伸ばし）設定を反映（全タブ共通設定） */
@@ -142,6 +144,10 @@ const StorageKeys = Object.freeze({
   TIKTOK_CLEANER_ENABLED: "tiktokCleanerEnabled",
   /** TikTok クリーナーの個別機能オン/オフ（オブジェクト） */
   TIKTOK_CLEANER_FEATURES: "tiktokCleanerFeatures",
+  /** X クリーナーマスタートグル */
+  X_CLEANER_ENABLED: "xCleanerEnabled",
+  /** X クリーナーの個別機能オン/オフ（オブジェクト） */
+  X_CLEANER_FEATURES: "xCleanerFeatures",
   /** 音量ブースター: マスタートグル（OFF 時は全タブの AudioContext を解放しパイプラインをカット。設定値は残す） */
   VOLUME_BOOSTER_ENABLED: "volumeBoosterEnabled",
   /** 音量ブースター: 保存されたスライダー位置 (0–300%)。マスター ON 時にタブ切替で自動適用される */
@@ -974,6 +980,98 @@ const TikTokCleaner = Object.freeze({
     const out = { ...TikTokCleaner.DEFAULT_FEATURES };
     if (stored && typeof stored === "object") {
       for (const key of Object.keys(TikTokCleaner.DEFAULT_FEATURES)) {
+        if (stored[key] === true) out[key] = true;
+        else if (stored[key] === false) out[key] = false;
+      }
+    }
+    return out;
+  },
+});
+
+/**
+ * @readonly X（旧 Twitter）クリーナーの機能定義と定数（独自実装）。
+ *
+ * X の 3 ペインレイアウト（左ナビ / タイムライン / 右ペイン）のうち、閲覧の邪魔になる
+ * 右ペインや広告・勧誘 UI を隠す。設定は `chrome.storage.local` の `xCleanerEnabled` (master)
+ * + `xCleanerFeatures` (object) で保持し、TikTok / Instagram と同じ body クラス駆動 CSS で当てる。
+ *
+ * **セレクタは `data-testid` と `:has()` だけで構成し、`aria-label` の文言に依存しない**。
+ * X の `aria-label` は UI 言語でローカライズされる（実機で「トレンド」「プレミアムプラスに
+ * アップグレード」を確認済み）ため、文言マッチは日本語環境でしか動かない。代わりに
+ * 「トレンド項目を含む section」「UserCell を含む aside」のような**構造**で特定する
+ * （`:has()` は minimum_chrome_version 140 / Firefox 142 のいずれでも利用可）。
+ *
+ * 実機確認済みの構造（2026-07-28、ログイン状態の x.com/home）:
+ *   - 右ペイン全体   … `[data-testid="sidebarColumn"]`
+ *   - トレンド       … 右ペイン内の `section:has([data-testid="trend"])`
+ *   - おすすめユーザー … 右ペイン内の `aside:has([data-testid="UserCell"])`
+ *   - プレミアム勧誘  … 右ペイン内の `aside:not(:has([data-testid="UserCell"]))`
+ *   - 広告投稿       … `[data-testid="cellInnerDiv"]:has([data-testid="placementTracking"])`
+ *   - ホームのタブ    … `[role="tablist"] [role="tab"]` の index 0 = おすすめ / 1 = フォロー中
+ */
+const XCleanerFeatures = Object.freeze([
+  // ラベル / 説明文は _locales/{en,ja}/messages.json の `feat_x_<key>_{label,desc}` を参照。
+  Object.freeze({ key: "hideRightPane", category: "x_layout" }),
+  Object.freeze({ key: "hideTrends", category: "x_layout" }),
+  Object.freeze({ key: "hideWhoToFollow", category: "x_layout" }),
+  Object.freeze({ key: "hideMessagesDock", category: "x_layout" }),
+  Object.freeze({ key: "hidePromoted", category: "x_noise" }),
+  Object.freeze({ key: "hidePremiumUpsell", category: "x_noise" }),
+  Object.freeze({ key: "hideGrok", category: "x_noise" }),
+  Object.freeze({ key: "hideEngagementCounts", category: "x_noise" }),
+  Object.freeze({ key: "followingTabDefault", category: "x_timeline" }),
+]);
+
+const XCleanerDefaultFeatures = Object.freeze(
+  Object.fromEntries(XCleanerFeatures.map((feature) => [feature.key, false]))
+);
+
+const XCleaner = Object.freeze({
+  FEATURES: XCleanerFeatures,
+
+  // category.label は _locales/.../messages.json の `categoryX*`。
+  CATEGORIES: Object.freeze([
+    Object.freeze({ id: "x_layout", icon: "🪟" }),
+    Object.freeze({ id: "x_noise", icon: "🚫" }),
+    Object.freeze({ id: "x_timeline", icon: "🧭" }),
+  ]),
+
+  DEFAULT_FEATURES: XCleanerDefaultFeatures,
+
+  /** `<html>` に付与する CSS クラス名（feature key → クラス名）。CSS 側の prefix と対で使う。 */
+  BODY_CLASS: Object.freeze({
+    hideRightPane: "__cpa-x-right-pane",
+    hideTrends: "__cpa-x-trends",
+    hideWhoToFollow: "__cpa-x-who-to-follow",
+    hideMessagesDock: "__cpa-x-dock",
+    hidePromoted: "__cpa-x-promoted",
+    hidePremiumUpsell: "__cpa-x-premium",
+    hideGrok: "__cpa-x-grok",
+    hideEngagementCounts: "__cpa-x-counts",
+    // followingTabDefault は CSS ではなく JS（タブ選択）なので BODY_CLASS を持たない。
+  }),
+
+  /**
+   * ホームタイムラインのタブ位置（`[role="tablist"] [role="tab"]` の index）。
+   * **文言ではなく位置で特定する**（「おすすめ」「For you」はロケールで変わるが、
+   * ピン留めリストは 2 番目より後ろに並ぶため先頭 2 つの順序は不変）。
+   */
+  TAB_INDEX: Object.freeze({ FOR_YOU: 0, FOLLOWING: 1 }),
+
+  /** followingTabDefault が動作するパス（ホームのみ。個別ポストやプロフィールでは何もしない） */
+  HOME_PATHS: Object.freeze(["/home"]),
+
+  /** `followingTabDefault` の対象ページか判定する（純粋関数）。 */
+  isHomePath(pathname) {
+    if (typeof pathname !== "string") return false;
+    const path = pathname.replace(/\/+$/, "") || "/";
+    return XCleaner.HOME_PATHS.includes(path);
+  },
+
+  mergeFeatures(stored) {
+    const out = { ...XCleaner.DEFAULT_FEATURES };
+    if (stored && typeof stored === "object") {
+      for (const key of Object.keys(XCleaner.DEFAULT_FEATURES)) {
         if (stored[key] === true) out[key] = true;
         else if (stored[key] === false) out[key] = false;
       }
@@ -2512,10 +2610,12 @@ const PopupTabs = Object.freeze({
   YOUTUBE: "youtube",
   INSTAGRAM: "instagram",
   TIKTOK: "tiktok",
+  X: "x",
   PICKER: "picker",
-  ALL: Object.freeze(["tune", "youtube", "instagram", "tiktok", "picker"]),
+  /** UI の並び順と一致させる（矢印キー巡回の順序に使われる）。X は YouTube の次に置く。 */
+  ALL: Object.freeze(["tune", "youtube", "x", "instagram", "tiktok", "picker"]),
 
-  /** 5 つのタブ識別子のいずれかなら true */
+  /** タブ識別子のいずれかなら true */
   isValid(value) {
     return PopupTabs.ALL.includes(value);
   },
@@ -2563,6 +2663,8 @@ const PopupTabs = Object.freeze({
     Object.freeze({ field: "instagramCleanerFeatures", storageKey: StorageKeys.INSTAGRAM_CLEANER_FEATURES, applyAction: Actions.APPLY_INSTAGRAM_CLEANER_CS }),
     Object.freeze({ field: "tiktokCleanerEnabled", storageKey: StorageKeys.TIKTOK_CLEANER_ENABLED, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
     Object.freeze({ field: "tiktokCleanerFeatures", storageKey: StorageKeys.TIKTOK_CLEANER_FEATURES, applyAction: Actions.APPLY_TIKTOK_CLEANER_CS }),
+    Object.freeze({ field: "xCleanerEnabled", storageKey: StorageKeys.X_CLEANER_ENABLED, applyAction: Actions.APPLY_X_CLEANER_CS }),
+    Object.freeze({ field: "xCleanerFeatures", storageKey: StorageKeys.X_CLEANER_FEATURES, applyAction: Actions.APPLY_X_CLEANER_CS }),
     Object.freeze({ field: "videoGammaEnabled", storageKey: StorageKeys.VIDEO_GAMMA_ENABLED, applyAction: Actions.APPLY_VIDEO_GAMMA_CS }),
     Object.freeze({ field: "videoGammaValue", storageKey: StorageKeys.VIDEO_GAMMA_VALUE, applyAction: Actions.APPLY_VIDEO_GAMMA_CS }),
     Object.freeze({ field: "videoFillEnabled", storageKey: StorageKeys.VIDEO_FILL_ENABLED, applyAction: Actions.APPLY_VIDEO_FILL_CS }),
@@ -2588,6 +2690,7 @@ const PopupTabs = Object.freeze({
   globalThis.AmazonMerchantInfo = AmazonMerchantInfo;
   globalThis.InstagramCleaner = InstagramCleaner;
   globalThis.TikTokCleaner = TikTokCleaner;
+  globalThis.XCleaner = XCleaner;
   globalThis.ImageDownloader = ImageDownloader;
   globalThis.VolumeBooster = VolumeBooster;
   globalThis.VideoGamma = VideoGamma;

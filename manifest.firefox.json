@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.0.53",
+  "version": "1.0.54",
   "browser_specific_settings": {
     "gecko": {
       "id": "{8b2f6c4e-9a1d-4e8f-b3a7-1c5d9e7f2a4b}",
@@ -91,6 +91,19 @@
       "matches": ["*://*.tiktok.com/*"],
       "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/tiktok-cleaner.js", "src/content/image-downloader.js"],
       "css": ["src/content/tiktok-cleaner.css", "src/content/image-downloader.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://x.com/*", "*://*.x.com/*", "*://twitter.com/*", "*://*.twitter.com/*"],
+      "js": ["src/content/early-framework.js", "src/content/x-early.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://x.com/*", "*://*.x.com/*", "*://twitter.com/*", "*://*.twitter.com/*"],
+      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/x-cleaner.js"],
+      "css": ["src/content/x-cleaner.css"],
       "run_at": "document_idle",
       "all_frames": false
     },

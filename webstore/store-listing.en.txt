@@ -12,13 +12,21 @@ Vuora
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 11 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
+An extension that consolidates 12 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
 
 ■ Main features
 
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
   In addition, the YouTube Enhancements offers 31 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, live-stream connection monitor).
+
+· 🐦 X cleaner (opt-in, default OFF)
+  Nine sub-features that hide distracting UI on X (formerly Twitter).
+  Layout: hide the right pane (widening the timeline into it) / trends / who to follow / messages dock
+  Noise: hide promoted posts / Premium upsells / Grok / engagement counts (reply, repost, like, views)
+  Timeline: open Home on the "Following" tab
+  * Selectors are structural data-testid matches only, so they do not depend on the display language.
+  * Client-side DOM/CSS only; nothing is ever transmitted.
 
 · 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
   Shows a per-month total on https://www.amazon.co.jp/auto-deliveries.

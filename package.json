@@ -1,6 +1,6 @@
 {
   "name": "web-viewing-assist",
-  "version": "1.0.53",
+  "version": "1.0.54",
   "type": "commonjs",
   "description": "Browser extension that bundles the YouTube enhancements, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {

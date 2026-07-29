@@ -2,7 +2,7 @@
 
 > [日本語版](README.md) もあります。
 
-A Chrome / Firefox extension that consolidates **11 features for comfortable browsing** into a single popup.
+A Chrome / Firefox extension that consolidates **12 features for comfortable browsing** into a single popup.
 All features start OFF — opt in only to what you need. Zero external transmission, zero personal data collection.
 
 ---
@@ -12,6 +12,7 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 | Feature | Description |
 |---------|-------------|
 | 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / send to Gemini Notebook and more — **34 sub-features** |
+| 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" (**9 sub-features**) |
 | 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
@@ -37,7 +38,7 @@ Search for **"Vuora"** on the [Chrome Web Store](https://chrome.google.com/webst
 
 Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
-> **All 11 features work on Firefox.** The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. The only limitation: it has no effect on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally.
+> **All 12 features work on Firefox.** The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. The only limitation: it has no effect on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally.
 
 ---
 
@@ -49,8 +50,9 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 4. Settings are persisted across sessions.
 
 ### Popup tabs
-- **Tune**: 10 master toggles + Volume slider + Gamma / Loupe
+- **Tune**: 11 master toggles + Volume slider + Gamma / Loupe
 - **YouTube**: 34 YouTube Enhancements sub-features
+- **X**: 9 X cleaner sub-features
 - **Instagram**: 11 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
 - **Color Picker**: EyeDropper + history

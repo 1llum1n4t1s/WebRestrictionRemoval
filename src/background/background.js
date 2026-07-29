@@ -147,6 +147,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
     StorageKeys.TIKTOK_CLEANER_FEATURES,
+    StorageKeys.X_CLEANER_ENABLED,
+    StorageKeys.X_CLEANER_FEATURES,
     StorageKeys.VOLUME_BOOSTER_ENABLED,
     StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
     StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
@@ -207,6 +209,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.TIKTOK_CLEANER_FEATURES in stored)) {
     defaults[StorageKeys.TIKTOK_CLEANER_FEATURES] = TikTokCleaner.mergeFeatures({});
+  }
+  if (!(StorageKeys.X_CLEANER_ENABLED in stored)) {
+    defaults[StorageKeys.X_CLEANER_ENABLED] = false;
+  }
+  if (!(StorageKeys.X_CLEANER_FEATURES in stored)) {
+    defaults[StorageKeys.X_CLEANER_FEATURES] = XCleaner.mergeFeatures({});
   }
   if (!(StorageKeys.VOLUME_BOOSTER_ENABLED in stored)) {
     defaults[StorageKeys.VOLUME_BOOSTER_ENABLED] = false;
@@ -1047,6 +1055,8 @@ function normalizeSettings(settings) {
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
     tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
     tiktokCleanerFeatures: TikTokCleaner.mergeFeatures(settings?.tiktokCleanerFeatures),
+    xCleanerEnabled: settings?.xCleanerEnabled === true,
+    xCleanerFeatures: XCleaner.mergeFeatures(settings?.xCleanerFeatures),
     videoGammaEnabled: settings?.videoGammaEnabled === true,
     videoGammaValue: VideoGamma.clampValue(settings?.videoGammaValue),
     videoFillEnabled: settings?.videoFillEnabled === true,
@@ -1145,6 +1155,12 @@ async function notifyContentScripts(s) {
       features: s.tiktokCleanerFeatures,
     } }, TOP_FRAME]);
   }
+  if (isXUrl(url)) {
+    messages.push([{ action: Actions.APPLY_X_CLEANER_CS, data: {
+      enabled: s.xCleanerEnabled,
+      features: s.xCleanerFeatures,
+    } }, TOP_FRAME]);
+  }
   await Promise.all(messages.map(([msg, opts]) => safeSendMessage(tab.id, msg, opts)));
 }
 
@@ -1209,6 +1225,18 @@ function isTikTokUrl(url) {
     if (u.protocol !== "http:" && u.protocol !== "https:") return false;
     const h = u.hostname.toLowerCase();
     return h === "tiktok.com" || h.endsWith(".tiktok.com");
+  } catch {
+    return false;
+  }
+}
+
+/** X（旧 Twitter）。改名後も twitter.com は x.com へ転送されるだけで残っているため両方見る。 */
+function isXUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const h = u.hostname.toLowerCase();
+    return h === "x.com" || h.endsWith(".x.com") || h === "twitter.com" || h.endsWith(".twitter.com");
   } catch {
     return false;
   }

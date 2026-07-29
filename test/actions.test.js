@@ -38,6 +38,7 @@ test("_locales: 全 FEATURES に label / desc が ja / en 両方そろってい�
     { prefix: "feat_sf_", features: G.SearchFixer.FEATURES },
     { prefix: "feat_ig_", features: G.InstagramCleaner.FEATURES },
     { prefix: "feat_tt_", features: G.TikTokCleaner.FEATURES },
+    { prefix: "feat_x_", features: G.XCleaner.FEATURES },
   ];
   const missing = [];
   for (const { prefix, features } of groups) {
@@ -58,7 +59,15 @@ test("_locales: 全 CATEGORIES にカテゴリ名が ja / en 両方そろって�
   const ja = read("ja");
   const en = read("en");
   const missing = [];
-  for (const cat of G.SearchFixer.CATEGORIES) {
+  // 4 クリーナーすべてのカテゴリを見る（旧実装は SearchFixer だけで、他 3 つの
+  // カテゴリ名欠落を検知できなかった）。
+  const categories = [
+    ...G.SearchFixer.CATEGORIES,
+    ...G.InstagramCleaner.CATEGORIES,
+    ...G.TikTokCleaner.CATEGORIES,
+    ...G.XCleaner.CATEGORIES,
+  ];
+  for (const cat of categories) {
     // popup は category id (snake_case) を camelCase 化して `category<CamelId>` を引く。
     const camel = cat.id.split("_").map((s) => s[0].toUpperCase() + s.slice(1)).join("");
     const key = `category${camel}`;
@@ -907,7 +916,8 @@ test("ColorPicker.isValidFormat / normalizeFormat", () => {
 
 // ---------- PopupTabs ----------
 
-test("PopupTabs.isValid / normalize: 5 タブ識別子のみ受理、不正値は TUNE", () => {
+test("PopupTabs.isValid / normalize: タブ識別子のみ受理、不正値は TUNE", () => {
+  assert.equal(G.PopupTabs.ALL.length, 6, "popup タブ数（ドキュメント整合性の単一情報源）");
   for (const id of G.PopupTabs.ALL) {
     assert.equal(G.PopupTabs.isValid(id), true, `${id} should be valid`);
   }
@@ -944,7 +954,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 23 個の定数を公開する", () => {
+test("actions.js は globalThis に 24 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -959,6 +969,7 @@ test("actions.js は globalThis に 23 個の定数を公開する", () => {
     "AmazonMerchantInfo",
     "InstagramCleaner",
     "TikTokCleaner",
+    "XCleaner",
     "ImageDownloader",
     "VolumeBooster",
     "VideoGamma",
@@ -973,7 +984,7 @@ test("actions.js は globalThis に 23 個の定数を公開する", () => {
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);
   }
-  assert.equal(required.length, 23, "公開定数の件数（ドキュメント整合性の単一情報源）");
+  assert.equal(required.length, 24, "公開定数の件数（ドキュメント整合性の単一情報源）");
 });
 
 test("TikTokCleaner.mergeFeatures: undefined / null / 不正型は default", () => {
@@ -1464,6 +1475,31 @@ test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema
   assert.ok(
     /SettingsSchema/.test(toStorageMatch[1]),
     "toStorageRecord は SettingsSchema 駆動 (例: SettingsSchema.map(({field, storageKey}) => ...)) で実装されている必要がある (手書き列挙は drift 温床)"
+  );
+});
+
+// クリーナーのサブ機能トグルは popup.js が `for (const input of <xx>FeatureInputs.values())` で
+// change リスナーを張ることで初めて保存される。X クリーナー追加時にこのループを書き忘れ、
+// 「トグルを ON にしても閉じると OFF に戻る」実害が出た（2026-07-28、実機で発覚）。
+// map を定義しただけでリスナー登録を忘れる drift を機械的に検知する。
+test("popup.js: すべての <xx>FeatureInputs に change リスナー登録ループがある（保存されないトグルの再発防止）", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const popupSrc = fs.readFileSync(path.resolve(__dirname, "..", "src", "popup", "popup.js"), "utf8");
+
+  // `const <name>FeatureInputs = new Map();` で定義されている map をすべて拾う
+  // YouTube だけ prefix なしの `featureInputs` なので [Ff] を許容する
+  const defined = [...popupSrc.matchAll(/const\s+(\w*[Ff]eatureInputs)\s*=\s*new Map\(\)/g)].map((m) => m[1]);
+  assert.ok(defined.length >= 4, `FeatureInputs map が想定より少ない: ${defined.join(",")}`);
+
+  const missing = defined.filter((name) => {
+    const loop = new RegExp(`for\\s*\\(\\s*const\\s+input\\s+of\\s+${name}\\.values\\(\\)\\s*\\)`);
+    return !loop.test(popupSrc);
+  });
+  assert.deepEqual(
+    missing,
+    [],
+    `change リスナー登録ループが無い FeatureInputs（トグルを操作しても apply() が呼ばれず保存されない）: ${missing.join(", ")}`
   );
 });
 
