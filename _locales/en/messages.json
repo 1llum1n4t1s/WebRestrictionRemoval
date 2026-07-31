@@ -160,23 +160,56 @@
   "pickerActivateJp": { "message": "Pick a color from the screen" },
   "pickerActivateEn": { "message": "activate eyedropper" },
   "pickerNoteIdle": { "message": "Press the button to pick any color on screen (Esc cancels)." },
-  "specimenAriaLabel": { "message": "Picked color" },
-  "specimenTitle": { "message": "Specimen" },
-  "specimenPillEmpty": { "message": "Empty" },
-  "specimenNoEmpty": { "message": "No. — —" },
-  "specimenTimeEmpty": { "message": "Empty" },
+  "specimenTitle": { "message": "Current color" },
+  "specimenPillEmpty": { "message": "None" },
+  "specimenNoEmpty": { "message": "Not saved" },
+  "specimenNoSaved": {
+    "message": "History $NO$",
+    "placeholders": {
+      "no": { "content": "$1", "example": "01" }
+    }
+  },
+  "specimenTimeEmpty": { "message": "—" },
+  "specimenTimeSaved": {
+    "message": "Saved $TIME$",
+    "placeholders": {
+      "time": { "content": "$1", "example": "12:34" }
+    }
+  },
+  "copyBtnLabel": { "message": "Copy" },
+  "copyBtnDone": { "message": "Copied" },
   "copyHexAria": { "message": "Copy HEX" },
   "copyRgbAria": { "message": "Copy RGB" },
   "copyHslAria": { "message": "Copy HSL" },
-  "formatTitle": { "message": "Default copy format" },
-  "formatGroupAriaLabel": { "message": "Default copy format" },
-  "formatLegend": { "message": "Default copy format" },
-  "formatRowAria": { "message": "Default copy format" },
+  "editHexAria": { "message": "HEX value (editable)" },
+  "editRgbAria": { "message": "RGB value (editable)" },
+  "editHslAria": { "message": "HSL value (editable)" },
+  "valueEditHint": { "message": "All three fields are editable. Paste a color code to see it right away, or press Enter to save it to your history." },
+  "paletteTitle": { "message": "Adjust color" },
+  "paletteAreaAria": { "message": "Adjust vividness and brightness (arrow keys to nudge, Shift for larger steps)" },
+  "paletteAxisHint": { "message": "Drag to adjust — horizontal = vividness / vertical = brightness" },
+  "paletteHueLabel": { "message": "Hue" },
+  "paletteHueAria": { "message": "Hue" },
+  "palettePillValue": {
+    "message": "Hue $H$° / Vividness $S$% / Brightness $V$%",
+    "placeholders": {
+      "h": { "content": "$1", "example": "213" },
+      "s": { "content": "$2", "example": "45" },
+      "v": { "content": "$3", "example": "55" }
+    }
+  },
+  "paletteAddBtn": { "message": "Save this color to history" },
+  "paletteResetBtn": { "message": "Undo adjustments" },
+  "formatTitle": { "message": "Copy settings" },
+  "formatGroupAriaLabel": { "message": "Format used for auto-copy" },
+  "formatLegend": { "message": "Format used for auto-copy" },
+  "formatRowAria": { "message": "Format used for auto-copy" },
   "formatHashLabel": { "message": "Include # in HEX" },
-  "formatNote": { "message": "Auto-copied in this format when you pick or click a history entry." },
-  "historyTitle": { "message": "Specimen Box" },
-  "historyEmpty": { "message": "No specimens yet. Use the eyedropper to pick one." },
-  "historyClearBtn": { "message": "Clear specimen box" },
+  "formatNote": { "message": "Colors are auto-copied in the selected format when you pick with the eyedropper or click a history entry." },
+  "historyTitle": { "message": "History" },
+  "historyHint": { "message": "Click a color to make it the current color and copy it in the format set below." },
+  "historyEmpty": { "message": "No colors yet. Pick one with the eyedropper, or paste a color code and press Enter." },
+  "historyClearBtn": { "message": "Delete all history" },
   "extVersionAriaLabel": { "message": "Extension version" },
 
   "eyedropperUnsupported": { "message": "EyeDropper API is not supported. Please use Chrome 95 or later." },
@@ -198,7 +231,14 @@
       "text": { "content": "$2", "example": "#C0605A" }
     }
   },
-  "historyClearedToast": { "message": "Specimen box cleared." },
+  "pickerInputInvalid": { "message": "Could not read that as a color (e.g. #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%))." },
+  "pickerInputAdded": {
+    "message": "Saved $HEX$ to your history",
+    "placeholders": {
+      "hex": { "content": "$1", "example": "#C0605A" }
+    }
+  },
+  "historyClearedToast": { "message": "History deleted." },
   "copyOkToast": {
     "message": "Copied $FORMAT$: $TEXT$",
     "placeholders": {
@@ -222,7 +262,7 @@
     }
   },
   "historyChipAria": {
-    "message": "Recall $HEX$ and copy in the default format",
+    "message": "Make $HEX$ the current color and copy it",
     "placeholders": {
       "hex": { "content": "$1" }
     }

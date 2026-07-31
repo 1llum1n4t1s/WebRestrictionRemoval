@@ -10,9 +10,10 @@ const OUTPUT_DIR = path.join(__dirname, 'images');
 const POPUP_HTML_SRC = path.join(__dirname, '..', 'src', 'popup', 'popup.html');
 const POPUP_RENDER_DST = path.join(__dirname, 'popup-render.html');
 const POPUP_SHIM_DST = path.join(__dirname, 'popup-shim.js');
+const MESSAGES_SRC = path.join(__dirname, '..', '_locales', 'ja', 'messages.json');
 
 /**
- * ストア素材レンダリング用の chrome.* API shim 内容。
+ * ストア素材レンダリング用の chrome.* API shim 内容を生成する。
  *
  * popup.html の CSP `script-src 'self'` 配下で実行できるよう、インライン script ではなく
  * 同階層の `popup-shim.js` として外部ファイル化する。actions.js / popup.js より先に
@@ -23,9 +24,36 @@ const POPUP_SHIM_DST = path.join(__dirname, 'popup-shim.js');
  *   - tabs.query はダミー http タブを返す → 「このページでは使えません」エラーを抑制
  *   - runtime.sendMessage は常に `{ ok: true }` を返す
  *     → 音量スライダーは storage 空 → DEFAULT (100%) のまま
+ *   - **i18n は `_locales/ja/messages.json` を焼き込んで実際に解決する**
+ *     popup.html の静的テキストは日本語 fallback を持つので i18n 無しでも写るが、
+ *     popup.js が `createElement` で組む文字列（調整タブのサブタブ名など）は
+ *     fallback を持たない。i18n を欠くとそこが空欄のままストア素材に写り込むため、
+ *     実メッセージを解決する（過去に調整タブのサブタブが空欄で撮れていた）。
  */
-const POPUP_SHIM_CONTENT = `// ストア素材レンダリング用 chrome.* API shim（generate-screenshots.js が生成、
-// 実拡張機能では Chrome がネイティブに提供）。
+function buildPopupShimContent() {
+  const messages = JSON.parse(fs.readFileSync(MESSAGES_SRC, 'utf-8'));
+  return `// ストア素材レンダリング用 chrome.* API shim（generate-screenshots.js が生成、
+// 実拡張機能では Chrome がネイティブに提供）。編集は generate-screenshots.js 側で行う。
+const MESSAGES = ${JSON.stringify(messages)};
+
+// chrome.i18n.getMessage 互換。$NAME$ プレースホルダを placeholders 定義の $1 / $2 …
+// で substitutions に対応付けて置換する（Chrome の実装と同じ解決順）。
+function getMessage(key, substitutions) {
+  const entry = MESSAGES[key];
+  if (!entry || typeof entry.message !== "string") return "";
+  const subs = substitutions == null
+    ? []
+    : (Array.isArray(substitutions) ? substitutions : [substitutions]);
+  let out = entry.message;
+  const placeholders = entry.placeholders || {};
+  for (const [name, def] of Object.entries(placeholders)) {
+    const m = /^\\$(\\d+)$/.exec(String(def && def.content));
+    const value = m ? (subs[Number(m[1]) - 1] ?? "") : String((def && def.content) ?? "");
+    out = out.replace(new RegExp("\\\\$" + name + "\\\\$", "gi"), value);
+  }
+  return out.replace(/\\$(\\d+)/g, (_, i) => subs[Number(i) - 1] ?? "");
+}
+
 window.chrome = {
   storage: {
     local: {
@@ -46,8 +74,13 @@ window.chrome = {
   tabs: {
     query: () => Promise.resolve([{ id: 1, url: "https://example.com/", active: true, windowId: 1 }]),
   },
+  i18n: {
+    getMessage,
+    getUILanguage: () => "ja",
+  },
 };
 `;
+}
 
 /**
  * `src/popup/popup.html` を読んで chrome.* API shim と相対パス調整を施した
@@ -61,7 +94,7 @@ window.chrome = {
  */
 function generatePopupRenderHtml() {
   // shim を外部ファイルとして書き出し（CSP `script-src 'self'` を満たすため）。
-  fs.writeFileSync(POPUP_SHIM_DST, POPUP_SHIM_CONTENT);
+  fs.writeFileSync(POPUP_SHIM_DST, buildPopupShimContent());
 
   let html = fs.readFileSync(POPUP_HTML_SRC, 'utf-8');
 

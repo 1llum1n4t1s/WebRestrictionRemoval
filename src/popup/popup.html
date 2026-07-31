@@ -11,10 +11,146 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <!-- ===== Icon sprite =====
+       絵文字は OS ごとに絵柄・彩度・太さが変わり、金と葡萄酒の配色に対して質感が揃わないため
+       使わない。すべて 24x24 グリッドの単色線画に統一し、色は currentColor で文字色に追従させる。
+       参照側は <svg class="ic"><use href="#ic-*"></use></svg>。JS 生成側は popup.js の
+       createIcon() が同じ形を組む（単一情報源はこのスプライト）。 -->
+  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0">
+    <symbol id="ic-volume" viewBox="0 0 24 24">
+      <path d="M4 9h3.5L13 4.5v15L7.5 15H4z" />
+      <path d="M16.5 9.5a4 4 0 0 1 0 5" />
+      <path d="M19 7a7.5 7.5 0 0 1 0 10" />
+    </symbol>
+    <symbol id="ic-mute" viewBox="0 0 24 24">
+      <path d="M4 9h3.5L13 4.5v15L7.5 15H4z" />
+      <path d="M16.5 9.5l5 5" />
+      <path d="M21.5 9.5l-5 5" />
+    </symbol>
+    <symbol id="ic-shield" viewBox="0 0 24 24">
+      <path d="M12 3.5l7 2.8v4.9c0 4.5-2.9 7.6-7 9.3-4.1-1.7-7-4.8-7-9.3V6.3z" />
+      <path d="M9.2 12.2l2 2 3.6-3.9" />
+    </symbol>
+    <symbol id="ic-moon" viewBox="0 0 24 24">
+      <path d="M20 14.6A8.2 8.2 0 1 1 10.4 4a6.6 6.6 0 0 0 9.6 10.6z" />
+    </symbol>
+    <symbol id="ic-wall" viewBox="0 0 24 24">
+      <rect x="3.5" y="6" width="17" height="12" rx="1" />
+      <path d="M3.5 12h17" />
+      <path d="M9 6v6" />
+      <path d="M15 6v6" />
+      <path d="M6 12v6" />
+      <path d="M12 12v6" />
+      <path d="M18 12v6" />
+    </symbol>
+    <symbol id="ic-sliders" viewBox="0 0 24 24">
+      <path d="M6 4v6" />
+      <path d="M6 14v6" />
+      <path d="M12 4v3" />
+      <path d="M12 11v9" />
+      <path d="M18 4v9" />
+      <path d="M18 17v3" />
+      <circle cx="6" cy="12" r="2" />
+      <circle cx="12" cy="9" r="2" />
+      <circle cx="18" cy="15" r="2" />
+    </symbol>
+    <symbol id="ic-film" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M7.5 5v14" />
+      <path d="M16.5 5v14" />
+      <path d="M3 9.5h4.5" />
+      <path d="M3 14.5h4.5" />
+      <path d="M16.5 9.5H21" />
+      <path d="M16.5 14.5H21" />
+    </symbol>
+    <symbol id="ic-monitor" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="11" rx="2" />
+      <path d="M12 16v4" />
+      <path d="M8.5 20h7" />
+    </symbol>
+    <symbol id="ic-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="6" />
+      <path d="M15.4 15.4L20 20" />
+    </symbol>
+    <symbol id="ic-frame" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M8.5 8.5h7v7h-7z" />
+    </symbol>
+    <symbol id="ic-box" viewBox="0 0 24 24">
+      <path d="M12 3.5l8.5 4v9l-8.5 4-8.5-4v-9z" />
+      <path d="M3.5 7.5L12 11.5l8.5-4" />
+      <path d="M12 11.5v9" />
+    </symbol>
+    <symbol id="ic-trophy" viewBox="0 0 24 24">
+      <path d="M8 4h8v5.5a4 4 0 0 1-8 0z" />
+      <path d="M8 5.5H5V7a3 3 0 0 0 3 3" />
+      <path d="M16 5.5h3V7a3 3 0 0 1-3 3" />
+      <path d="M12 13.5V17" />
+      <path d="M9 20h6" />
+      <path d="M10 17h4v3h-4z" />
+    </symbol>
+    <symbol id="ic-broom" viewBox="0 0 24 24">
+      <path d="M17.5 4L11 11.5" />
+      <path d="M6 20l3.5-8.5 7 3L14 20z" />
+      <path d="M9.5 15l-1.2 3.4" />
+      <path d="M12.5 16.2l-1 3" />
+    </symbol>
+    <symbol id="ic-x-mark" viewBox="0 0 24 24">
+      <path d="M5.5 5.5l13 13" />
+      <path d="M18.5 5.5l-13 13" />
+    </symbol>
+    <symbol id="ic-camera" viewBox="0 0 24 24">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="4" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17" cy="8" r="0.9" />
+    </symbol>
+    <symbol id="ic-music" viewBox="0 0 24 24">
+      <path d="M9 17.5V5.5l10-2v12" />
+      <circle cx="6.5" cy="17.5" r="2.5" />
+      <circle cx="16.5" cy="15.5" r="2.5" />
+    </symbol>
+    <symbol id="ic-compass" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M15.5 8.5l-2 5-5 2 2-5z" />
+    </symbol>
+    <symbol id="ic-trash" viewBox="0 0 24 24">
+      <path d="M4.5 7h15" />
+      <path d="M9.5 7V4.5h5V7" />
+      <path d="M6.5 7l1 12.5h9L17.5 7" />
+      <path d="M10.5 10.5v6" />
+      <path d="M13.5 10.5v6" />
+    </symbol>
+    <symbol id="ic-clapper" viewBox="0 0 24 24">
+      <path d="M4 9.5h16V19H4z" />
+      <path d="M4 9.5L5.8 5h3.4L7.4 9.5" />
+      <path d="M11.4 9.5L13.2 5h3.4l-1.8 4.5" />
+      <path d="M18.6 5H20v4.5" />
+    </symbol>
+    <symbol id="ic-link" viewBox="0 0 24 24">
+      <path d="M10.5 13.5a3.8 3.8 0 0 0 5.4 0l2.4-2.4a3.8 3.8 0 0 0-5.4-5.4l-1.2 1.2" />
+      <path d="M13.5 10.5a3.8 3.8 0 0 0-5.4 0l-2.4 2.4a3.8 3.8 0 0 0 5.4 5.4l1.2-1.2" />
+    </symbol>
+    <symbol id="ic-ban" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M6.4 17.6l11.2-11.2" />
+    </symbol>
+    <symbol id="ic-scissors" viewBox="0 0 24 24">
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="6.5" cy="6" r="2.5" />
+      <path d="M8.6 16.6L19 5" />
+      <path d="M8.6 7.4L19 19" />
+    </symbol>
+    <symbol id="ic-window" viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M15 5v14" />
+    </symbol>
+  </svg>
+
   <div class="popup-shell">
     <!-- ===== Header ===== -->
     <header class="hdr">
-      <div class="hdr-mark" aria-hidden="true">📖</div>
+      <!-- 頭文字のモノグラム。絵文字は OS ごとに絵柄が変わり質感も揃わないため使わない。 -->
+      <div class="hdr-mark" aria-hidden="true">V</div>
       <div class="hdr-text">
         <h1 class="hdr-title" data-i18n="headerTitle">Vuora</h1>
         <p class="hdr-tag" data-i18n="headerTagline">増幅 / 整理 / 維持 を 1 つのパネルから</p>
@@ -78,7 +214,7 @@
       </h2>
 
       <label class="toggle-row" id="volumeBoosterToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔊</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-volume"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="volumeBoosterMaster">音量ブースター</span>
           <span class="tr-desc" data-i18n="volumeBoosterMasterDesc">タブの音声を増幅・補正します。設定はタブ切替で自動適用されます</span>
@@ -92,7 +228,7 @@
       <div class="sub-block slider-center-mark" id="volumeRow">
         <div class="sub-head">
           <span class="sub-label">
-            <span aria-hidden="true">🔊</span>&nbsp;<span data-i18n="volumeSubLabel">音量ブースター</span>
+            <svg class="ic ic--inline" aria-hidden="true" focusable="false"><use href="#ic-volume"></use></svg>&nbsp;<span data-i18n="volumeSubLabel">音量ブースター</span>
           </span>
           <span class="sub-value" id="volumeValue">100%</span>
         </div>
@@ -105,7 +241,7 @@
                   data-i18n-attr="aria-label:volumeMuteAriaOff;title:volumeMuteTitleOff"
                   aria-label="ミュート"
                   title="ミュート（音量は保持）">
-            <span class="volume-mute-icon" aria-hidden="true">🔊</span>
+            <svg class="volume-mute-icon ic" aria-hidden="true" focusable="false"><use href="#ic-volume"></use></svg>
           </button>
           <!-- ± ボタンはスライダーの左右に置く（行を増やさず、つまみ操作の延長で押せる位置）。
                増減幅は VolumeBooster.NUDGE_STEP（10%）。 -->
@@ -133,7 +269,7 @@
 
         <!-- 自動歪み防止 / ナイトモード / 壁ドン対策モード（オプトイン・デフォルト OFF） -->
         <label class="toggle-row toggle-row--sub" id="volumeAntiClipToggleRow">
-          <span class="tr-icon" aria-hidden="true">🛡️</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-shield"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="volumeAntiClipLabel">自動歪み防止</span>
             <span class="tr-desc" data-i18n="volumeAntiClipDesc">突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます</span>
@@ -145,7 +281,7 @@
         </label>
 
         <label class="toggle-row toggle-row--sub" id="volumeNightModeToggleRow">
-          <span class="tr-icon" aria-hidden="true">🌙</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-moon"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="volumeNightModeLabel">ナイトモード</span>
             <span class="tr-desc" data-i18n="volumeNightModeDesc">大きな声や爆発音をなだらかに抑え、小さいゲーム音との音量差を縮めます</span>
@@ -157,7 +293,7 @@
         </label>
 
         <label class="toggle-row toggle-row--sub" id="volumeBassCutToggleRow">
-          <span class="tr-icon" aria-hidden="true">🧱</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-wall"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="volumeBassCutLabel">壁ドン対策モード</span>
             <span class="tr-desc" data-i18n="volumeBassCutDesc">低音をカットし、壁や床を伝って隣室に響く振動音を抑えます</span>
@@ -171,7 +307,7 @@
         <!-- イコライザ（10 バンドグラフィック EQ・オプトイン・デフォルト OFF） -->
         <div class="eq-block" id="volumeEqBlock">
           <label class="toggle-row toggle-row--sub" id="volumeEqToggleRow">
-            <span class="tr-icon" aria-hidden="true">🎚️</span>
+            <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-sliders"></use></svg>
             <span class="tr-text">
               <span class="tr-name" data-i18n="volumeEqLabel">イコライザ</span>
               <span class="tr-desc" data-i18n="volumeEqDesc">10 バンドで周波数ごとに音量を調整。低音・高音の強調やプリセット選択ができます</span>
@@ -201,7 +337,7 @@
       </h2>
 
       <label class="toggle-row" id="videoGammaToggleRow">
-        <span class="tr-icon" aria-hidden="true">🎞️</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-film"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="videoGammaMaster">動画ガンマ補正</span>
           <span class="tr-desc"><span data-i18n="videoGammaMasterDescPre">ページ上の </span><code class="tr-code">&lt;video&gt;</code><span data-i18n="videoGammaMasterDescPost"> 要素にガンマ補正を適用。暗い動画を明るくしたり、明るすぎる動画のコントラストを抑えるのに便利</span></span>
@@ -232,7 +368,7 @@
 
       <!-- 動画黒帯除去（ワイド表示）マスタートグル -->
       <label class="toggle-row" id="videoFillToggleRow">
-        <span class="tr-icon" aria-hidden="true">🖥️</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-monitor"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="videoFillMaster">動画の黒帯除去</span>
           <span class="tr-desc" data-i18n="videoFillMasterDesc">ウルトラワイド画面などで動画の上下/左右の黒帯を、ズームまたは引き伸ばしで除去して画面いっぱいに表示します</span>
@@ -247,7 +383,7 @@
       <div class="sub-block hidden" id="videoFillRow">
         <div class="sub-head">
           <span class="sub-label">
-            <span aria-hidden="true">🖥️</span>&nbsp;<span data-i18n="videoFillModeLabel">表示モード</span>
+            <svg class="ic ic--inline" aria-hidden="true" focusable="false"><use href="#ic-monitor"></use></svg>&nbsp;<span data-i18n="videoFillModeLabel">表示モード</span>
           </span>
         </div>
         <div class="fill-mode-segment" id="videoFillModeSegment" role="group"
@@ -259,7 +395,7 @@
 
         <div class="sub-head sub-head--gap">
           <span class="sub-label">
-            <span aria-hidden="true">🖥️</span>&nbsp;<span data-i18n="videoFillTargetLabel">お使いのモニター</span>
+            <svg class="ic ic--inline" aria-hidden="true" focusable="false"><use href="#ic-monitor"></use></svg>&nbsp;<span data-i18n="videoFillTargetLabel">お使いのモニター</span>
           </span>
         </div>
         <div class="tr-desc" data-i18n="videoFillTargetDesc">画面の縦横比または解像度を選ぶと、動画ごとの形を自動判別して黒帯を除去します</div>
@@ -270,7 +406,7 @@
 
       <!-- ルーペ機能マスタートグル -->
       <label class="toggle-row" id="loupeToggleRow">
-        <span class="tr-icon" aria-hidden="true">🔍</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-search"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="loupeMaster">ルーペ</span>
           <span class="tr-desc" data-i18n="loupeMasterDesc">現在の画面を円形レンズで拡大。動画は一時停止してから使うのがおすすめ。左クリックで OFF</span>
@@ -285,7 +421,7 @@
       <div class="sub-block hidden" id="loupeRow">
         <div class="sub-head">
           <span class="sub-label">
-            <span aria-hidden="true">🔎</span>&nbsp;<span data-i18n="loupeZoomLabel">倍率</span>
+            <svg class="ic ic--inline" aria-hidden="true" focusable="false"><use href="#ic-search"></use></svg>&nbsp;<span data-i18n="loupeZoomLabel">倍率</span>
           </span>
           <span class="sub-value" id="loupeZoomValue">2.5×</span>
         </div>
@@ -299,7 +435,7 @@
 
         <div class="sub-head sub-head--gap">
           <span class="sub-label">
-            <span aria-hidden="true">🔲</span>&nbsp;<span data-i18n="loupeSizeLabel">レンズサイズ</span>
+            <svg class="ic ic--inline" aria-hidden="true" focusable="false"><use href="#ic-frame"></use></svg>&nbsp;<span data-i18n="loupeSizeLabel">レンズサイズ</span>
           </span>
           <span class="sub-value" id="loupeSizeValue">220px</span>
         </div>
@@ -316,7 +452,7 @@
       </h2>
 
       <label class="toggle-row" id="amazonDeliveryToggleRow">
-        <span class="tr-icon" aria-hidden="true">📦</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-box"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="amazonDeliveryMaster">定期おトク便 月別合計</span>
           <span class="tr-desc"><span data-i18n="amazonDeliveryMasterDescPre">配送月ごとの合計金額を </span><code class="tr-code">/auto-deliveries</code><span data-i18n="amazonDeliveryMasterDescPost"> ページに表示</span></span>
@@ -328,7 +464,7 @@
       </label>
 
       <label class="toggle-row" id="amazonRankingJumpToggleRow">
-        <span class="tr-icon" aria-hidden="true">🏆</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-trophy"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="amazonRankingJumpMaster">ランキングへ移動ボタン</span>
           <span class="tr-desc" data-i18n="amazonRankingJumpMasterDesc">商品ページ上部に「この商品が所属するランキングへ移動」ボタンを表示</span>
@@ -340,7 +476,7 @@
       </label>
 
       <label class="toggle-row" id="amazonMerchantInfoToggleRow">
-        <span class="tr-icon" aria-hidden="true">📦</span>
+        <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-box"></use></svg>
         <span class="tr-text">
           <span class="tr-name" data-i18n="amazonMerchantInfoMaster">販売元・出荷元バッジ</span>
           <span class="tr-desc" data-i18n="amazonMerchantInfoMasterDesc">商品ページ上部に販売元・出荷元バッジを表示 (Amazon 直販=緑 / マーケット=オレンジ警告)</span>
@@ -366,7 +502,7 @@
         </h2>
 
         <label class="toggle-row" id="searchFixerToggleRow">
-          <span class="tr-icon" aria-hidden="true">🧹</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-broom"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="searchFixerMaster">YouTube 機能拡張</span>
             <span class="tr-desc" data-i18n="searchFixerMasterDesc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張など 34 サブ機能を一括管理</span>
@@ -402,7 +538,7 @@
         </h2>
 
         <label class="toggle-row" id="xCleanerToggleRow">
-          <span class="tr-icon" aria-hidden="true">🐦</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-x-mark"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="xCleanerMaster">X クリーナー</span>
             <span class="tr-desc" data-i18n="xCleanerMasterDesc">右ペイン / 広告 / 勧誘などの気が散る UI を一括非表示</span>
@@ -437,7 +573,7 @@
         </h2>
 
         <label class="toggle-row" id="instagramCleanerToggleRow">
-          <span class="tr-icon" aria-hidden="true">📷</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-camera"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="instagramCleanerMaster">Instagram クリーナー</span>
             <span class="tr-desc" data-i18n="instagramCleanerMasterDesc">Reels / Explore / Stories などの冗長 UI を一括非表示</span>
@@ -472,7 +608,7 @@
         </h2>
 
         <label class="toggle-row" id="tiktokCleanerToggleRow">
-          <span class="tr-icon" aria-hidden="true">🎵</span>
+          <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-music"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="tiktokCleanerMaster">TikTok クリーナー</span>
             <span class="tr-desc" data-i18n="tiktokCleanerMasterDesc">コメント欄 / おすすめのアカウントなどの冗長 UI を一括非表示</span>
@@ -496,7 +632,9 @@
 
     </div><!-- /panel.tiktok -->
 
-    <!-- ===== Panel: Picker (顔料アトリエ) ===== -->
+    <!-- ===== Panel: Picker (色を採る → 調整する → 保存する の 3 段構成) =====
+         UI 文言は比喩（標本 / 標本箱 / 調色台）をやめ、何をする場所かをそのまま書く。
+         アイコンだけのボタンも置かない（「写」1 文字がコピーだと伝わらなかった反省）。 -->
     <div class="panel panel--picker" id="panelPicker"
          role="tabpanel" aria-labelledby="tabPicker" hidden>
 
@@ -516,19 +654,19 @@
         </p>
       </div>
 
-      <!-- ===== Specimen 標本カード ===== -->
-      <section class="grp grp--specimen" data-i18n-attr="aria-label:specimenAriaLabel" aria-label="採取した色">
+      <!-- ===== 現在の色 ===== -->
+      <section class="grp grp--specimen" data-i18n-attr="aria-label:specimenTitle" aria-label="現在の色">
         <h2 class="grp-title">
-          <span class="grp-title-text" data-i18n="specimenTitle">標本</span>
-          <span class="grp-pill" id="specimenPill" data-i18n="specimenPillEmpty">未採取</span>
+          <span class="grp-title-text" data-i18n="specimenTitle">現在の色</span>
+          <span class="grp-pill" id="specimenPill" data-i18n="specimenPillEmpty">未選択</span>
         </h2>
 
         <article class="specimen-card is-empty" id="specimenCard">
           <div class="specimen-swatch" id="specimenSwatch" aria-hidden="true"></div>
           <div class="specimen-meta">
             <div class="specimen-meta-row">
-              <span class="specimen-no" id="specimenNo">No. — —</span>
-              <span class="specimen-time" id="specimenTime" data-i18n="specimenTimeEmpty">未採取</span>
+              <span class="specimen-no" id="specimenNo" data-i18n="specimenNoEmpty">未保存</span>
+              <span class="specimen-time" id="specimenTime" data-i18n="specimenTimeEmpty">—</span>
             </div>
 
             <dl class="value-list" id="valueList">
@@ -537,11 +675,14 @@
                   <span class="value-label-en">HEX</span>
                 </dt>
                 <dd class="value-output">
-                  <code class="value-text" id="hexValue" data-empty="true">—</code>
+                  <input type="text" class="value-text" id="hexValue" data-fmt-input="hex"
+                         placeholder="#RRGGBB" spellcheck="false" autocomplete="off"
+                         autocapitalize="off" data-i18n-attr="aria-label:editHexAria"
+                         aria-label="HEX 値（編集可能）" />
                   <button type="button" class="copy-btn" data-copy="hex"
                           data-i18n-attr="aria-label:copyHexAria"
                           aria-label="HEX をコピー" disabled>
-                    <span class="copy-btn-glyph" aria-hidden="true">写</span>
+                    <span class="copy-btn-glyph" data-i18n="copyBtnLabel">コピー</span>
                   </button>
                 </dd>
               </div>
@@ -550,11 +691,14 @@
                   <span class="value-label-en">RGB</span>
                 </dt>
                 <dd class="value-output">
-                  <code class="value-text" id="rgbValue" data-empty="true">—</code>
+                  <input type="text" class="value-text" id="rgbValue" data-fmt-input="rgb"
+                         placeholder="R, G, B" spellcheck="false" autocomplete="off"
+                         autocapitalize="off" data-i18n-attr="aria-label:editRgbAria"
+                         aria-label="RGB 値（編集可能）" />
                   <button type="button" class="copy-btn" data-copy="rgb"
                           data-i18n-attr="aria-label:copyRgbAria"
                           aria-label="RGB をコピー" disabled>
-                    <span class="copy-btn-glyph" aria-hidden="true">写</span>
+                    <span class="copy-btn-glyph" data-i18n="copyBtnLabel">コピー</span>
                   </button>
                 </dd>
               </div>
@@ -563,28 +707,94 @@
                   <span class="value-label-en">HSL</span>
                 </dt>
                 <dd class="value-output">
-                  <code class="value-text" id="hslValue" data-empty="true">—</code>
+                  <input type="text" class="value-text" id="hslValue" data-fmt-input="hsl"
+                         placeholder="H°, S%, L%" spellcheck="false" autocomplete="off"
+                         autocapitalize="off" data-i18n-attr="aria-label:editHslAria"
+                         aria-label="HSL 値（編集可能）" />
                   <button type="button" class="copy-btn" data-copy="hsl"
                           data-i18n-attr="aria-label:copyHslAria"
                           aria-label="HSL をコピー" disabled>
-                    <span class="copy-btn-glyph" aria-hidden="true">写</span>
+                    <span class="copy-btn-glyph" data-i18n="copyBtnLabel">コピー</span>
                   </button>
                 </dd>
               </div>
             </dl>
+            <p class="value-hint" data-i18n="valueEditHint">
+              3 つの欄はどれも書き換えできます。拾ってきた色コードを貼り付けるとその場で色を確認でき、Enter で履歴に保存します。
+            </p>
           </div>
         </article>
       </section>
 
-      <!-- ===== Format Selector ===== -->
-      <section class="grp grp--format" data-i18n-attr="aria-label:formatTitle" aria-label="既定の保存形式">
+      <!-- ===== 色を調整 =====
+           現在の色を起点に、彩度×明度の 2D エリアと色相スライダーで微調整する。
+           ドラッグ中は storage に書かず、履歴への保存は明示ボタンで行う。 -->
+      <section class="grp grp--palette" data-i18n-attr="aria-label:paletteTitle" aria-label="色を調整">
         <h2 class="grp-title">
-          <span class="grp-title-text" data-i18n="formatTitle">既定の保存形式</span>
+          <span class="grp-title-text" data-i18n="paletteTitle">色を調整</span>
+          <span class="grp-pill" id="palettePill">— — —</span>
+        </h2>
+
+        <div class="palette">
+          <div class="palette-area" id="paletteArea" tabindex="0"
+               data-i18n-attr="aria-label:paletteAreaAria"
+               aria-label="鮮やかさと明るさを調整（矢印キーで微調整、Shift で大きく動かす）">
+            <span class="palette-thumb" id="paletteThumb" aria-hidden="true"></span>
+          </div>
+          <p class="palette-axis" data-i18n="paletteAxisHint">
+            ドラッグで調整 — 横 = 鮮やかさ / 縦 = 明るさ
+          </p>
+          <div class="palette-hue-row">
+            <span class="palette-hue-label" data-i18n="paletteHueLabel">色あい</span>
+            <input type="range" class="range palette-hue" id="paletteHue"
+                   min="0" max="360" step="1" value="0"
+                   data-i18n-attr="aria-label:paletteHueAria" aria-label="色あい" />
+          </div>
+          <div class="palette-actions">
+            <button type="button" id="paletteAddBtn" class="ghost-btn" data-i18n="paletteAddBtn">
+              この色を履歴に保存
+            </button>
+            <button type="button" id="paletteResetBtn" class="ghost-btn" data-i18n="paletteResetBtn">
+              調整前に戻す
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 履歴 ===== -->
+      <section class="grp grp--history" data-i18n-attr="aria-label:historyTitle" aria-label="履歴">
+        <h2 class="grp-title">
+          <span class="grp-title-text" data-i18n="historyTitle">履歴</span>
+          <span class="grp-pill" id="historyCount">0 / 20</span>
+        </h2>
+
+        <p class="section-hint" data-i18n="historyHint">
+          色をクリックすると「現在の色」に戻して、下の設定の形式で自動コピーします。
+        </p>
+        <ol class="history-grid" id="historyGrid"></ol>
+        <p class="history-empty" id="historyEmpty" data-i18n="historyEmpty">
+          まだ履歴がありません。スポイトで採取するか、色コードを貼り付けて Enter を押してください。
+        </p>
+
+        <div class="history-actions">
+          <button type="button" id="clearHistoryBtn" class="ghost-btn" data-i18n="historyClearBtn" disabled>
+            履歴をすべて削除
+          </button>
+        </div>
+      </section>
+
+      <!-- ===== コピーの設定（操作ではなく設定なので最下段） ===== -->
+      <section class="grp grp--format" data-i18n-attr="aria-label:formatTitle" aria-label="コピーの設定">
+        <h2 class="grp-title">
+          <span class="grp-title-text" data-i18n="formatTitle">コピーの設定</span>
         </h2>
 
         <fieldset class="fmt-fieldset">
-          <legend class="visually-hidden" data-i18n="formatLegend">既定の保存形式</legend>
-          <div class="fmt-row" role="radiogroup" data-i18n-attr="aria-label:formatRowAria" aria-label="既定の保存形式">
+          <legend class="visually-hidden" data-i18n="formatLegend">自動コピーする形式</legend>
+          <p class="section-hint" data-i18n="formatNote">
+            スポイトで採取したときと履歴をクリックしたときに、選んだ形式で自動コピーします。
+          </p>
+          <div class="fmt-row" role="radiogroup" data-i18n-attr="aria-label:formatRowAria" aria-label="自動コピーする形式">
             <label class="fmt-chip">
               <input type="radio" name="defaultFormat" value="hex" />
               <span class="fmt-chip-text">
@@ -611,29 +821,7 @@
             <input type="checkbox" id="hexHashCheck" checked />
             <span class="fmt-hash-label" data-i18n="formatHashLabel">HEX に # を含める</span>
           </label>
-          <p class="fmt-note" data-i18n="formatNote">
-            採取・履歴クリック時にこの形式で自動コピーされます。
-          </p>
         </fieldset>
-      </section>
-
-      <!-- ===== History 標本箱 ===== -->
-      <section class="grp grp--history" data-i18n-attr="aria-label:historyTitle" aria-label="標本箱">
-        <h2 class="grp-title">
-          <span class="grp-title-text" data-i18n="historyTitle">標本箱</span>
-          <span class="grp-pill" id="historyCount">0 / 20</span>
-        </h2>
-
-        <ol class="history-grid" id="historyGrid"></ol>
-        <p class="history-empty" id="historyEmpty" data-i18n="historyEmpty">
-          まだ標本がありません。スポイトで採取してください。
-        </p>
-
-        <div class="history-actions">
-          <button type="button" id="clearHistoryBtn" class="ghost-btn" data-i18n="historyClearBtn" disabled>
-            標本箱を空にする
-          </button>
-        </div>
       </section>
 
     </div><!-- /panel.picker -->

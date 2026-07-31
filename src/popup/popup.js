@@ -11,7 +11,11 @@
  *   - 音量ブースターはマスタートグル付き。マスター OFF / マスター ON かつスライダー 100% かつ
  *     全サブトグル OFF かつミュート OFF のとき AudioContext を解放、
  *     それ以外の状態で増幅処理を起動する
- *   - カラーピッカータブは EyeDropper API で画面色を採取し、履歴 / format chips / コピー先制御を提供
+ *   - カラーピッカータブは EyeDropper API で画面色を採取し、履歴 / format chips / コピー先制御を提供。
+ *     HEX / RGB / HSL の 3 欄は編集可能で、外から拾ってきたカラーコードを貼り付けると
+ *     即プレビュー（storage には書かない）、Enter で履歴へ保存する。
+ *     「色を調整」（鮮やかさ×明るさの 2D エリア + 色あいスライダー）で貼り付けた色を
+ *     そのまま微調整でき、こちらも保存は明示ボタン（この色を履歴に保存）でのみ行う
  *
  * ローカライズ:
  *   - 全 UI 文字列は `_locales/{en,ja}/messages.json` から `chrome.i18n.getMessage` 経由で取得する
@@ -59,6 +63,29 @@ function i18n(key, ...substitutions) {
   if (typeof chrome === "undefined" || !chrome.i18n || !chrome.i18n.getMessage) return "";
   if (substitutions.length === 0) return chrome.i18n.getMessage(key) || "";
   return chrome.i18n.getMessage(key, substitutions) || "";
+}
+
+/**
+ * popup.html のアイコンスプライト（`<symbol id="ic-*">`）を参照する `<svg>` を組み立てる。
+ *
+ * 絵文字を使わないのは、OS ごとに絵柄・彩度・線の太さが変わり、金と葡萄酒の配色に対して
+ * 質感が揃わないため。線画は currentColor を継ぐので、テーマ切替にもそのまま追従する。
+ * SVG 要素は namespace 付きで作る必要があるため createElementNS を使う（createElement だと
+ * HTML 要素として作られて描画されない）。
+ *
+ * @param {string} iconId スプライトの symbol id から `ic-` を除いた部分（例 "compass"）
+ * @param {string} className 付与するクラス（"ic" は呼び出し側で含めること）
+ */
+function createIcon(iconId, className) {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", className);
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const use = document.createElementNS(NS, "use");
+  use.setAttribute("href", `#ic-${iconId}`);
+  svg.appendChild(use);
+  return svg;
 }
 
 /**
@@ -455,7 +482,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   buildTuneSubTabs();
 
   // ============================================================
-  // ===== タブナビ + 顔料アトリエ（カラーピッカー） =====
+  // ===== タブナビ + カラーピッカー =====
   // ============================================================
 
   // ---------- DOM 参照 ----------
@@ -487,10 +514,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $specimenNo = document.getElementById("specimenNo");
   const $specimenTime = document.getElementById("specimenTime");
   const $specimenPill = document.getElementById("specimenPill");
-  const $hexValue = document.getElementById("hexValue");
-  const $rgbValue = document.getElementById("rgbValue");
-  const $hslValue = document.getElementById("hslValue");
   const $valueList = document.getElementById("valueList");
+  /** HEX / RGB / HSL の値欄（<input>）。貼り付け・手入力で色を差し替えられる。 */
+  const $valueInputs = Array.from(document.querySelectorAll("[data-fmt-input]"));
+  const $paletteArea = document.getElementById("paletteArea");
+  const $paletteThumb = document.getElementById("paletteThumb");
+  const $paletteHue = document.getElementById("paletteHue");
+  const $palettePill = document.getElementById("palettePill");
+  const $paletteAddBtn = document.getElementById("paletteAddBtn");
+  const $paletteResetBtn = document.getElementById("paletteResetBtn");
   const $pickBtn = document.getElementById("pickBtn");
   const $pickerNote = document.getElementById("pickerNote");
   const $historyGrid = document.getElementById("historyGrid");
@@ -506,6 +538,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentHex = null;
   /** @type {Array<{hex:string, ts:number}>} 採取履歴（新しい順） */
   let history = [];
+  /**
+   * @type {{h:number,s:number,v:number}} 調色パレットの現在位置（色相 0..360 / 彩度・明度 0..100）。
+   * currentHex から毎回逆算すると無彩色や黒で色相・彩度が失われるので、パレット側に状態を持つ。
+   */
+  let paletteHsv = { h: 0, s: 0, v: 0 };
+  /** @type {string|null} 調色を始める前の色（「調整前に戻す」の戻り先） */
+  let paletteBaseHex = null;
+  /** @type {number|null} パレットをドラッグ中のポインタ ID（null なら非ドラッグ） */
+  let palettePointerId = null;
   /** 既定の保存形式 */
   let defaultFormat = ColorPicker.DEFAULT_FORMAT;
   /** HEX コピー時に # を含めるか */
@@ -576,12 +617,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ---------- ピッカ��イベント ----------
+  // ---------- ピッカーイベント ----------
   $pickBtn.addEventListener("click", onPick);
   $clearHistoryBtn.addEventListener("click", onClearHistory);
   for (const radio of $fmtRadios) radio.addEventListener("change", onFormatChange);
   $hexHashCheck.addEventListener("change", onHexHashChange);
   for (const btn of $copyBtns) btn.addEventListener("click", onCopyClick);
+  for (const input of $valueInputs) {
+    input.addEventListener("input", onValueInput);
+    input.addEventListener("paste", onValuePaste);
+    input.addEventListener("keydown", onValueKeydown);
+    input.addEventListener("blur", onValueBlur);
+  }
+  $paletteArea.addEventListener("pointerdown", onPalettePointerDown);
+  $paletteArea.addEventListener("pointermove", onPalettePointerMove);
+  $paletteArea.addEventListener("pointerup", onPalettePointerUp);
+  $paletteArea.addEventListener("pointercancel", onPalettePointerUp);
+  $paletteArea.addEventListener("keydown", onPaletteKeydown);
+  $paletteHue.addEventListener("input", onPaletteHueInput);
+  $paletteAddBtn.addEventListener("click", onPaletteAdd);
+  $paletteResetBtn.addEventListener("click", onPaletteReset);
   $historyGrid.addEventListener("click", onHistoryClick);
 
   // 別ウィンドウで履歴が変わったら反映（複数 popup 同時起動の保険）
@@ -1203,10 +1258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const head = document.createElement("div");
       head.className = "cat-head";
-      const headIcon = document.createElement("span");
-      headIcon.className = "cat-head-icon";
-      headIcon.textContent = cat.icon;
-      headIcon.setAttribute("aria-hidden", "true");
+      const headIcon = createIcon(cat.icon, "cat-head-icon ic");
       const headLabel = document.createElement("span");
       headLabel.textContent = i18n(categoryMessageKey(cat.id));
       head.append(headIcon, headLabel);
@@ -1263,10 +1315,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       tab.className = "cat-subtab";
       tab.setAttribute("role", "tab");
 
-      const icon = document.createElement("span");
-      icon.className = "cat-subtab-icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = cat.icon;
+      const icon = createIcon(cat.icon, "cat-subtab-icon ic");
 
       const label = document.createElement("span");
       label.className = "cat-subtab-label";
@@ -1386,10 +1435,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const panel = document.getElementById("panelTune");
     if (!panel) return;
 
+    // icon は popup.html のアイコンスプライトの symbol id（`ic-<icon>`）。
     const defs = [
-      { icon: "🔊", labelKey: "groupAudio",   sectionId: "audioGroupSection" },
-      { icon: "🎞️", labelKey: "groupVideo",   sectionId: "videoGroupSection" },
-      { icon: "📦", labelKey: "groupAmazon",  sectionId: "amazonGroupSection" },
+      { icon: "volume", labelKey: "groupAudio",  sectionId: "audioGroupSection" },
+      { icon: "film",   labelKey: "groupVideo",  sectionId: "videoGroupSection" },
+      { icon: "box",    labelKey: "groupAmazon", sectionId: "amazonGroupSection" },
     ];
 
     const entries = defs
@@ -1420,10 +1470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       tab.className = "cat-subtab";
       tab.setAttribute("role", "tab");
 
-      const icon = document.createElement("span");
-      icon.className = "cat-subtab-icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = e.icon;
+      const icon = createIcon(e.icon, "cat-subtab-icon ic");
 
       const label = document.createElement("span");
       label.className = "cat-subtab-label";
@@ -1815,7 +1862,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * ミュートボタンの視覚状態を volumeMuted に同期する。
    * - aria-pressed: スクリーンリーダ向けトグル状態（クリック挙動と一致させる）
    * - aria-label / title: ON/OFF で意味を切替（i18n キーは ja/en で両方提供）
-   * - icon: 🔊 ⇄ 🔇 で見た目を反転
+   * - icon: スプライトの ic-volume ⇄ ic-mute を <use href> の差し替えで反転
    * - クラス: CSS の [aria-pressed="true"] セレクタで warn 色に切替
    */
   function updateMuteBtnVisual() {
@@ -1827,7 +1874,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const title = i18n(titleKey);
     if (ariaLabel) $volumeMuteBtn.setAttribute("aria-label", ariaLabel);
     if (title) $volumeMuteBtn.setAttribute("title", title);
-    if ($volumeMuteIcon) $volumeMuteIcon.textContent = volumeMuted ? "🔇" : "🔊";
+    const muteUse = $volumeMuteIcon && $volumeMuteIcon.querySelector("use");
+    if (muteUse) muteUse.setAttribute("href", volumeMuted ? "#ic-mute" : "#ic-volume");
   }
 
   /**
@@ -1858,7 +1906,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ============================================================
-  // ===== 顔料アトリエ（カラーピッカー）の関数群 =====
+  // ===== カラーピッカーの関数群 =====
   // ============================================================
 
   /**
@@ -1952,18 +2000,192 @@ document.addEventListener("DOMContentLoaded", async () => {
       await navigator.clipboard.writeText(text);
       const glyph = btn.querySelector(".copy-btn-glyph");
       if (glyph) {
-        const original = glyph.textContent;
+        // 押した結果を記号ではなく文字で返す（"✓" だけだと成功したのか分からない）
         btn.classList.add("is-copied");
-        glyph.textContent = "✓";
+        glyph.textContent = i18n("copyBtnDone") || glyph.textContent;
         setTimeout(() => {
           btn.classList.remove("is-copied");
-          glyph.textContent = original;
+          glyph.textContent = i18n("copyBtnLabel") || glyph.textContent;
         }, 1100);
       }
       showStatus(i18n("copyOkToast", label, text), "ok");
     } catch {
       showStatus(i18n("copyFailToast"), "warn");
     }
+  }
+
+  /**
+   * 値欄への手入力。読めた時点で即プレビュー（swatch / 他 2 欄 / pill を更新）し、
+   * storage には書かない。読めない途中入力は枠だけ警告表示にして値は消さない。
+   */
+  function onValueInput(ev) {
+    const input = ev.currentTarget;
+    const raw = input.value.trim();
+    if (raw === "") {
+      input.classList.remove("is-invalid");
+      return;
+    }
+    const hex = ColorPicker.parseColorInput(raw);
+    if (!hex) {
+      input.classList.add("is-invalid");
+      return;
+    }
+    input.classList.remove("is-invalid");
+    // 未確定のプレビューなので採取時刻は持たせない（No. / 時刻は "—" になる）
+    setCurrentColor(hex, { time: null, source: input });
+  }
+
+  /**
+   * 貼り付けは欄まるごと差し替える。キャレット位置への部分挿入を許すと
+   * "#c0605a#c0605a" のような読めない値になり、咄嗟に確認したいという用途を壊すため。
+   * 読めない文字列はブラウザ既定の貼り付けに任せ、input ハンドラで警告表示に倒す。
+   */
+  function onValuePaste(ev) {
+    const text = ev.clipboardData?.getData("text");
+    if (!text) return;
+    const hex = ColorPicker.parseColorInput(text);
+    if (!hex) return;
+    ev.preventDefault();
+    setCurrentColor(hex, { time: null });
+  }
+
+  /** Enter で「履歴に保存」まで確定する（見るだけなら押さなくてよい）。 */
+  function onValueKeydown(ev) {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    const input = ev.currentTarget;
+    const hex = ColorPicker.parseColorInput(input.value);
+    if (!hex) {
+      input.classList.add("is-invalid");
+      showStatus(i18n("pickerInputInvalid"), "warn");
+      return;
+    }
+    commitInputColor(hex);
+  }
+
+  /** 欄を離れたら現在色の正規表記へ戻す（読めない値が残り続けないように）。 */
+  function onValueBlur() {
+    syncValueInputs(currentHex);
+  }
+
+  // ---------- 調色パレット ----------
+
+  /**
+   * パレットの HSV を確定して現在色に反映する。ドラッグ中に何度も呼ばれるので
+   * storage には書かない（保存は「この色を履歴に保存」ボタン / 値欄の Enter）。
+   */
+  function applyPaletteHsv({ h, s, v }) {
+    const clamp = (n, max) => Math.min(max, Math.max(0, Math.round(Number(n) || 0)));
+    paletteHsv = { h: clamp(h, 360) % 360, s: clamp(s, 100), v: clamp(v, 100) };
+    const hex = ColorPicker.rgbToHex(
+      ColorPicker.hsvToRgb(paletteHsv.h, paletteHsv.s, paletteHsv.v)
+    );
+    // 調色の途中経過なので採取時刻は持たせない（No. / 時刻は "—" のまま）
+    setCurrentColor(hex, { time: null, fromPalette: true });
+  }
+
+  /** パレットの見た目（純色グラデ / つまみ位置 / 色相スライダー / pill / ボタン活性）を現在値に合わせる。 */
+  function renderPalette() {
+    const pure = ColorPicker.rgbToHex(ColorPicker.hsvToRgb(paletteHsv.h, 100, 100));
+    $paletteArea.style.setProperty("--palette-hue", pure);
+    $paletteThumb.style.left = `${paletteHsv.s}%`;
+    $paletteThumb.style.top = `${100 - paletteHsv.v}%`;
+    if ($paletteHue.value !== String(paletteHsv.h)) $paletteHue.value = String(paletteHsv.h);
+    $palettePill.textContent = currentHex
+      ? i18n("palettePillValue", String(paletteHsv.h), String(paletteHsv.s), String(paletteHsv.v)) ||
+        `${paletteHsv.h}° / ${paletteHsv.s}% / ${paletteHsv.v}%`
+      : "— — —";
+    $paletteAddBtn.disabled = !currentHex;
+    $paletteResetBtn.disabled = !paletteBaseHex || paletteBaseHex === currentHex;
+  }
+
+  /** ポインタ座標 → 彩度（横）・明度（縦）。色相はスライダー側が持つので変えない。 */
+  function paletteFromPointer(ev) {
+    const rect = $paletteArea.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const s = ((ev.clientX - rect.left) / rect.width) * 100;
+    const v = 100 - ((ev.clientY - rect.top) / rect.height) * 100;
+    applyPaletteHsv({ h: paletteHsv.h, s, v });
+  }
+
+  function onPalettePointerDown(ev) {
+    ev.preventDefault();
+    palettePointerId = ev.pointerId;
+    // エリア外へドラッグしても追従させるため pointer capture を取る。
+    // 取得可否はドラッグ継続の条件にしない（capture が張れない環境でも
+    // エリア内のドラッグは palettePointerId だけで成立させる）。
+    try {
+      $paletteArea.setPointerCapture(ev.pointerId);
+    } catch {
+      /* capture 不可でも続行 */
+    }
+    $paletteArea.focus();
+    paletteFromPointer(ev);
+  }
+
+  function onPalettePointerMove(ev) {
+    if (palettePointerId !== ev.pointerId) return;
+    // capture が張れない環境でエリア外に pointerup が落ちた場合の取りこぼし対策。
+    // ボタンが離れていたらドラッグ終了とみなす（押していないのに追従するのを防ぐ）。
+    if (ev.buttons === 0) {
+      palettePointerId = null;
+      return;
+    }
+    paletteFromPointer(ev);
+  }
+
+  function onPalettePointerUp(ev) {
+    if (palettePointerId !== ev.pointerId) return;
+    palettePointerId = null;
+    try {
+      if ($paletteArea.hasPointerCapture(ev.pointerId)) {
+        $paletteArea.releasePointerCapture(ev.pointerId);
+      }
+    } catch {
+      /* 解放済み / capture 未取得なら何もしない */
+    }
+  }
+
+  /** 矢印キーで彩度・明度を微調整（Shift で 10 刻み）。 */
+  function onPaletteKeydown(ev) {
+    const step = ev.shiftKey ? 10 : 1;
+    let { s, v } = paletteHsv;
+    if (ev.key === "ArrowLeft") s -= step;
+    else if (ev.key === "ArrowRight") s += step;
+    else if (ev.key === "ArrowUp") v += step;
+    else if (ev.key === "ArrowDown") v -= step;
+    else return;
+    ev.preventDefault();
+    applyPaletteHsv({ h: paletteHsv.h, s, v });
+  }
+
+  function onPaletteHueInput(ev) {
+    applyPaletteHsv({ h: Number(ev.target.value), s: paletteHsv.s, v: paletteHsv.v });
+  }
+
+  function onPaletteAdd() {
+    if (!currentHex) return;
+    commitInputColor(currentHex);
+  }
+
+  function onPaletteReset() {
+    if (!paletteBaseHex) return;
+    // fromPalette を渡さないので paletteHsv / paletteBaseHex も基準色へ再同期される
+    setCurrentColor(paletteBaseHex, { time: null });
+  }
+
+  /** 入力された色を履歴へ追加して永続化する。 */
+  async function commitInputColor(hex) {
+    const norm = normalizeHex(hex);
+    if (!norm) return;
+    const entry = { hex: norm, ts: Date.now() };
+    history = addHistory(history, entry);
+    await chrome.storage.local
+      .set({ [StorageKeys.COLOR_PICKER_HISTORY]: history })
+      .catch(() => {});
+    setCurrentColor(norm, { time: entry.ts });
+    renderHistory();
+    showStatus(i18n("pickerInputAdded", norm.toUpperCase()), "ok");
   }
 
   async function onHistoryClick(ev) {
@@ -1997,26 +2219,61 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.documentElement.style.removeProperty("--pigment");
     document.documentElement.style.removeProperty("--pigment-contrast");
     document.documentElement.style.removeProperty("--pigment-tint");
-    $hexValue.textContent = "—";
-    $rgbValue.textContent = "—";
-    $hslValue.textContent = "—";
-    $hexValue.dataset.empty = "true";
-    $rgbValue.dataset.empty = "true";
-    $hslValue.dataset.empty = "true";
-    $specimenNo.textContent = "No. — —";
-    $specimenTime.textContent = i18n("specimenTimeEmpty");
-    $specimenPill.textContent = i18n("specimenPillEmpty");
+    syncValueInputs(null);
+    paletteHsv = { h: 0, s: 0, v: 0 };
+    paletteBaseHex = null;
+    renderPalette();
+    // i18n が引けない異常時でも欄が空白にならないよう "—" に倒す
+    $specimenNo.textContent = i18n("specimenNoEmpty") || "—";
+    $specimenTime.textContent = i18n("specimenTimeEmpty") || "—";
+    $specimenPill.textContent = i18n("specimenPillEmpty") || "—";
     for (const btn of $copyBtns) btn.disabled = true;
   }
 
-  function setCurrentColor(hex, { time = Date.now() } = {}) {
+  /**
+   * 3 つの値欄を指定色の表記で埋め直す。`source` に渡した入力欄だけは書き換えない
+   * （入力中の欄を上書きするとキャレット位置が飛んで打ち込めなくなるため）。
+   * hex が null なら全欄を空にして placeholder を見せる。
+   */
+  function syncValueInputs(hex, { source = null } = {}) {
+    const norm = hex ? normalizeHex(hex) : null;
+    if (!norm) {
+      for (const input of $valueInputs) {
+        input.value = "";
+        input.classList.remove("is-invalid");
+      }
+      return;
+    }
+    const rgb = hexToRgb(norm);
+    const hsl = rgbToHsl(rgb);
+    const texts = {
+      hex: norm.toUpperCase(),
+      rgb: `${rgb.r}, ${rgb.g}, ${rgb.b}`,
+      hsl: `${hsl.h}°, ${hsl.s}%, ${hsl.l}%`,
+    };
+    for (const input of $valueInputs) {
+      input.classList.remove("is-invalid");
+      if (input === source) continue;
+      input.value = texts[input.dataset.fmtInput] ?? "";
+    }
+  }
+
+  /**
+   * 現在色を差し替えて「現在の色」カード全体（swatch / 値欄 / パレット / pill）を更新する。
+   *
+   * @param {string} hex "#rrggbb"
+   * @param {object} [opts]
+   * @param {number|null} [opts.time] 採取時刻。null なら未確定プレビュー扱いで "—" 表示
+   * @param {HTMLElement|null} [opts.source] 入力中の値欄（その欄だけ書き換えない）
+   * @param {boolean} [opts.fromPalette] パレット操作由来なら true（パレット位置を再計算しない）
+   */
+  function setCurrentColor(hex, { time = Date.now(), source = null, fromPalette = false } = {}) {
     const norm = normalizeHex(hex);
     if (!norm) return;
     currentHex = norm;
     $specimenCard.classList.remove("is-empty");
 
     const rgb = hexToRgb(norm);
-    const hsl = rgbToHsl(rgb);
     const tint = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10)`;
     const contrast = pickContrast(rgb);
 
@@ -2024,17 +2281,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.documentElement.style.setProperty("--pigment-contrast", contrast);
     document.documentElement.style.setProperty("--pigment-tint", tint);
 
-    $hexValue.textContent = norm.toUpperCase();
-    $rgbValue.textContent = `${rgb.r}, ${rgb.g}, ${rgb.b}`;
-    $hslValue.textContent = `${hsl.h}°, ${hsl.s}%, ${hsl.l}%`;
-    delete $hexValue.dataset.empty;
-    delete $rgbValue.dataset.empty;
-    delete $hslValue.dataset.empty;
+    syncValueInputs(norm, { source });
+    if (!fromPalette) {
+      // 外から入ってきた色（採取 / 貼り付け / 履歴 / リセット）はパレットの基準点になる
+      paletteHsv = ColorPicker.hexToPaletteHsv(norm, paletteHsv);
+      paletteBaseHex = norm;
+    }
+    renderPalette();
 
+    // 履歴に入っている色は「履歴 01」、未保存のプレビューは「未保存」と言い切る
+    // （旧 "No. — —" は履歴番号なのか何なのか伝わらなかった）
     const idx = findHistoryIndex(history, norm);
-    const no = idx >= 0 ? String(idx + 1).padStart(2, "0") : "—";
-    $specimenNo.textContent = `No. ${no}`;
-    $specimenTime.textContent = formatTime(time);
+    const no = String(idx + 1).padStart(2, "0");
+    $specimenNo.textContent =
+      idx >= 0
+        ? i18n("specimenNoSaved", no) || `No. ${no}`
+        : i18n("specimenNoEmpty") || "—";
+    $specimenTime.textContent = Number.isFinite(time)
+      ? i18n("specimenTimeSaved", formatTime(time)) || formatTime(time)
+      : i18n("specimenTimeEmpty") || "—";
     $specimenPill.textContent = norm.toUpperCase();
     for (const btn of $copyBtns) btn.disabled = false;
   }
@@ -2079,26 +2344,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 // ============================================================================
-// 顔料アトリエ: 純関数ヘルパー（DOM/storage に依存しないので IIFE 外に切り出し）
+// カラーピッカー: 純関数ヘルパー（DOM/storage に依存しないので IIFE 外に切り出し）
 // ============================================================================
 
 /**
- * 受け取った任意の値を `#rrggbb` 6 桁小文字形式に正規化する。
- * 不正な入力は null を返す。
- *   - 先頭 # の有無は問わない
- *   - 短縮 3 桁形式 (#abc) は #aabbcc に展開
- *   - 余白は trim
+ * 受け取った任意の値を `#rrggbb` 6 桁小文字形式に正規化する。不正な入力は null。
+ * 実体は actions.js の `ColorPicker.normalizeHex`（値欄の貼り付け解釈 `parseColorInput` と
+ * 同じ判定を使うため単一情報源に寄せている）。popup 内の呼び出し名だけ従来どおり残す。
  */
 function normalizeHex(value) {
-  if (typeof value !== "string") return null;
-  let s = value.trim().toLowerCase();
-  if (!s.startsWith("#")) s = "#" + s;
-  if (!ColorPicker.HEX_RE.test(s)) return null;
-  if (s.length === 4) {
-    const r = s[1], g = s[2], b = s[3];
-    s = `#${r}${r}${g}${g}${b}${b}`;
-  }
-  return s;
+  return ColorPicker.normalizeHex(value);
 }
 
 /** "#rrggbb" → {r,g,b} (各 0..255 整数)。不正値は黒を返す。 */

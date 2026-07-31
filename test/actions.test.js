@@ -933,6 +933,114 @@ test("ColorPicker.isValidFormat / normalizeFormat", () => {
   assert.equal(G.ColorPicker.normalizeFormat("invalid"), G.ColorPicker.DEFAULT_FORMAT);
 });
 
+test("ColorPicker.normalizeHex: # 有無 / 3 桁短縮 / 不正値", () => {
+  assert.equal(G.ColorPicker.normalizeHex("#C0605A"), "#c0605a");
+  assert.equal(G.ColorPicker.normalizeHex("c0605a"), "#c0605a");
+  assert.equal(G.ColorPicker.normalizeHex("  #abc  "), "#aabbcc");
+  assert.equal(G.ColorPicker.normalizeHex("abc"), "#aabbcc");
+  assert.equal(G.ColorPicker.normalizeHex("#12345"), null, "5 桁は不正");
+  assert.equal(G.ColorPicker.normalizeHex("#gggggg"), null, "16 進以外は不正");
+  assert.equal(G.ColorPicker.normalizeHex(""), null);
+  assert.equal(G.ColorPicker.normalizeHex(null), null);
+});
+
+test("ColorPicker.hslToRgb / rgbToHex: 境界値と巻き戻し・クランプ", () => {
+  assert.deepEqual(G.ColorPicker.hslToRgb(0, 0, 0), { r: 0, g: 0, b: 0 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(0, 0, 100), { r: 255, g: 255, b: 255 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(0, 100, 50), { r: 255, g: 0, b: 0 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(120, 100, 50), { r: 0, g: 255, b: 0 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(240, 100, 50), { r: 0, g: 0, b: 255 });
+  // 色相は 360 を法に巻き戻し、s / l は 0..100 にクランプ
+  assert.deepEqual(G.ColorPicker.hslToRgb(360, 100, 50), { r: 255, g: 0, b: 0 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(-120, 100, 50), { r: 0, g: 0, b: 255 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(0, 999, 999), { r: 255, g: 255, b: 255 });
+  assert.deepEqual(G.ColorPicker.hslToRgb(NaN, 50, 50), { r: 0, g: 0, b: 0 });
+
+  assert.equal(G.ColorPicker.rgbToHex({ r: 192, g: 96, b: 90 }), "#c0605a");
+  assert.equal(G.ColorPicker.rgbToHex({ r: 0, g: 0, b: 0 }), "#000000");
+  assert.equal(G.ColorPicker.rgbToHex({ r: 300, g: -20, b: 255 }), "#ff00ff", "範囲外はクランプ");
+});
+
+test("ColorPicker.rgbToHsv / hsvToRgb: 調色パレットの往復と境界値", () => {
+  assert.deepEqual(G.ColorPicker.rgbToHsv({ r: 255, g: 0, b: 0 }), { h: 0, s: 100, v: 100 });
+  assert.deepEqual(G.ColorPicker.rgbToHsv({ r: 0, g: 255, b: 0 }), { h: 120, s: 100, v: 100 });
+  assert.deepEqual(G.ColorPicker.rgbToHsv({ r: 0, g: 0, b: 255 }), { h: 240, s: 100, v: 100 });
+  assert.deepEqual(G.ColorPicker.rgbToHsv({ r: 0, g: 0, b: 0 }), { h: 0, s: 0, v: 0 });
+  assert.deepEqual(G.ColorPicker.rgbToHsv({ r: 255, g: 255, b: 255 }), { h: 0, s: 0, v: 100 });
+
+  assert.deepEqual(G.ColorPicker.hsvToRgb(0, 100, 100), { r: 255, g: 0, b: 0 });
+  assert.deepEqual(G.ColorPicker.hsvToRgb(120, 100, 100), { r: 0, g: 255, b: 0 });
+  assert.deepEqual(G.ColorPicker.hsvToRgb(0, 0, 100), { r: 255, g: 255, b: 255 });
+  assert.deepEqual(G.ColorPicker.hsvToRgb(0, 100, 0), { r: 0, g: 0, b: 0 }, "明度 0 は色相によらず黒");
+  assert.deepEqual(G.ColorPicker.hsvToRgb(360, 100, 100), { r: 255, g: 0, b: 0 }, "色相は 360 を法に巻き戻す");
+  assert.deepEqual(G.ColorPicker.hsvToRgb(-120, 100, 100), { r: 0, g: 0, b: 255 });
+  assert.deepEqual(G.ColorPicker.hsvToRgb(0, 999, 999), { r: 255, g: 0, b: 0 }, "s / v は 0..100 にクランプ");
+  assert.deepEqual(G.ColorPicker.hsvToRgb(NaN, 50, 50), { r: 0, g: 0, b: 0 });
+
+  // 代表色は HEX → HSV → HEX で往復する（丸め誤差で色が変わらないこと）
+  for (const hex of ["#c0605a", "#2f6f4f", "#123456", "#ffffff", "#000000"]) {
+    const hsv = G.ColorPicker.rgbToHsv({
+      r: parseInt(hex.slice(1, 3), 16),
+      g: parseInt(hex.slice(3, 5), 16),
+      b: parseInt(hex.slice(5, 7), 16),
+    });
+    const back = G.ColorPicker.rgbToHex(G.ColorPicker.hsvToRgb(hsv.h, hsv.s, hsv.v));
+    const diff = [1, 3, 5].map((i) =>
+      Math.abs(parseInt(hex.slice(i, i + 2), 16) - parseInt(back.slice(i, i + 2), 16))
+    );
+    assert.ok(Math.max(...diff) <= 2, `${hex} → HSV → ${back} の往復誤差が大きい`);
+  }
+});
+
+test("ColorPicker.hexToPaletteHsv: 無彩色 / 黒では直前の色相・彩度を引き継ぐ", () => {
+  const prev = { h: 213, s: 45, v: 55 };
+  // 黒は色相・彩度が定まらないので両方引き継ぐ（黒→色相スライダー操作で元の色味に戻れる）
+  assert.deepEqual(G.ColorPicker.hexToPaletteHsv("#000000", prev), { h: 213, s: 45, v: 0 });
+  // 白・グレーは色相のみ引き継ぎ、明度は実測値を使う
+  assert.deepEqual(G.ColorPicker.hexToPaletteHsv("#ffffff", prev), { h: 213, s: 0, v: 100 });
+  assert.deepEqual(G.ColorPicker.hexToPaletteHsv("#808080", prev), { h: 213, s: 0, v: 50 });
+  // 有彩色は実測値をそのまま採用
+  assert.deepEqual(G.ColorPicker.hexToPaletteHsv("#ff0000", prev), { h: 0, s: 100, v: 100 });
+  // prev なし / 不正 hex
+  assert.deepEqual(G.ColorPicker.hexToPaletteHsv("#000000", null), { h: 0, s: 0, v: 0 });
+  assert.deepEqual(G.ColorPicker.hexToPaletteHsv("zzz", prev), { h: 0, s: 0, v: 0 });
+});
+
+test("ColorPicker.parseColorInput: HEX / RGB / HSL の貼り付け解釈", () => {
+  const parse = G.ColorPicker.parseColorInput;
+
+  // HEX（# 有無・3 桁短縮・大文字・前後余白）
+  assert.equal(parse("#C0605A"), "#c0605a");
+  assert.equal(parse("c0605a"), "#c0605a");
+  assert.equal(parse(" #abc "), "#aabbcc");
+
+  // RGB（関数表記 / 素の 3 数値 / スペース区切り / alpha 無視 / % 指定）
+  assert.equal(parse("rgb(192, 96, 90)"), "#c0605a");
+  assert.equal(parse("RGB(192,96,90)"), "#c0605a");
+  assert.equal(parse("192, 96, 90"), "#c0605a", "UI の RGB 欄の表記がそのまま往復する");
+  assert.equal(parse("rgba(192 96 90 / 0.5)"), "#c0605a", "alpha は無視する");
+  assert.equal(parse("rgb(100%, 0%, 0%)"), "#ff0000");
+  assert.equal(parse("rgb(300, -20, 255)"), "#ff00ff", "範囲外はクランプ");
+
+  // HSL（関数表記 / deg / 素の 3 数値は ° か % で判別）
+  assert.equal(parse("hsl(0, 100%, 50%)"), "#ff0000");
+  assert.equal(parse("hsl(120deg 100% 50%)"), "#00ff00");
+  assert.equal(parse("hsla(240, 100%, 50%, 0.3)"), "#0000ff");
+  assert.equal(parse("240°, 100%, 50%"), "#0000ff", "UI の HSL 欄の表記がそのまま往復する");
+  assert.equal(parse("0, 100%, 50%"), "#ff0000", "% があれば HSL 扱い");
+
+  // 不正値
+  assert.equal(parse(""), null);
+  assert.equal(parse("   "), null);
+  assert.equal(parse("#12345"), null, "# 始まりで HEX として読めない値は数値列に倒さない");
+  assert.equal(parse("192, 96"), null, "成分不足");
+  assert.equal(parse("rgb(a, b, c)"), null);
+  assert.equal(parse("hoge(1, 2, 3)"), null, "未対応の関数表記");
+  assert.equal(parse("tomato"), null, "CSS 名前付き色は非対応");
+  assert.equal(parse(null), null);
+  assert.equal(parse(123456), null, "文字列以外は受け付けない");
+});
+
 // ---------- PopupTabs ----------
 
 test("PopupTabs.isValid / normalize: タブ識別子のみ受理、不正値は TUNE", () => {

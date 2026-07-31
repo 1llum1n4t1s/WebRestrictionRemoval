@@ -417,12 +417,14 @@ const SearchFixer = Object.freeze({
   FEATURES: SearchFixerFeatures,
 
   // category.label は _locales/.../messages.json の `category<CamelId>` (例: categoryMenuUi)。
+  // category.icon は popup.html のアイコンスプライトの symbol id (`ic-<icon>`)。
+  // 絵文字は OS ごとに絵柄が変わり配色の質感が揃わないため、単色線画に統一している。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "menu_ui",      icon: "🧭" }),
-    Object.freeze({ id: "video_filter", icon: "🗑️" }),
-    Object.freeze({ id: "watch_page",   icon: "🎬" }),
-    Object.freeze({ id: "search_only",  icon: "🔍" }),
-    Object.freeze({ id: "integration",  icon: "🔗" }),
+    Object.freeze({ id: "menu_ui",      icon: "compass" }),
+    Object.freeze({ id: "video_filter", icon: "trash" }),
+    Object.freeze({ id: "watch_page",   icon: "clapper" }),
+    Object.freeze({ id: "search_only",  icon: "search" }),
+    Object.freeze({ id: "integration",  icon: "link" }),
   ]),
 
   DEFAULT_FEATURES: SearchFixerDefaultFeatures,
@@ -892,8 +894,8 @@ const InstagramCleaner = Object.freeze({
 
   // category.label は _locales/.../messages.json の `categoryIgMain` / `categoryIgExtra`。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "ig_main",  icon: "🚫" }),
-    Object.freeze({ id: "ig_extra", icon: "✂️" }),
+    Object.freeze({ id: "ig_main",  icon: "ban" }),
+    Object.freeze({ id: "ig_extra", icon: "scissors" }),
   ]),
 
   DEFAULT_FEATURES: InstagramCleanerDefaultFeatures,
@@ -965,7 +967,7 @@ const TikTokCleaner = Object.freeze({
 
   // category.label は _locales/.../messages.json の `categoryTtMain`。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "tt_main", icon: "🚫" }),
+    Object.freeze({ id: "tt_main", icon: "ban" }),
   ]),
 
   DEFAULT_FEATURES: TikTokCleanerDefaultFeatures,
@@ -1031,9 +1033,9 @@ const XCleaner = Object.freeze({
 
   // category.label は _locales/.../messages.json の `categoryX*`。
   CATEGORIES: Object.freeze([
-    Object.freeze({ id: "x_layout", icon: "🪟" }),
-    Object.freeze({ id: "x_noise", icon: "🚫" }),
-    Object.freeze({ id: "x_timeline", icon: "🧭" }),
+    Object.freeze({ id: "x_layout", icon: "window" }),
+    Object.freeze({ id: "x_noise", icon: "ban" }),
+    Object.freeze({ id: "x_timeline", icon: "compass" }),
   ]),
 
   DEFAULT_FEATURES: XCleanerDefaultFeatures,
@@ -2589,7 +2591,9 @@ const NotebookLm = Object.freeze({
  *
  * Web 標準の EyeDropper API（Chrome 95+。本拡張機能の minimum_chrome_version は 140）で
  * 画面上のピクセル色を採取し、HEX / RGB / HSL の 3 形式で表示・コピーする小さな採色机。
- * 履歴は `chrome.storage.local` に最大 20 件まで保持し、popup を閉じても永続化される。
+ * 3 形式の値欄は編集可能で、外から拾ってきたカラーコードを貼り付けるとその場でプレビューできる
+ * （解釈は `parseColorInput`）。履歴は `chrome.storage.local` に最大 20 件まで保持し、popup を
+ * 閉じても永続化される。
  *
  * 動作対象: 拡張機能ポップアップ (src/popup/popup.html) のタブ内のみ。Web ページに対する
  * DOM/CSS 操作・content script 注入は一切なく、外部送信ゼロ。色形式変換はすべて独自の
@@ -2613,6 +2617,197 @@ const ColorPicker = Object.freeze({
   /** 不正値はデフォルト形式 "hex" にフォールバック */
   normalizeFormat(value) {
     return ColorPicker.isValidFormat(value) ? value : ColorPicker.DEFAULT_FORMAT;
+  },
+
+  /**
+   * 受け取った任意の値を `#rrggbb` 6 桁小文字形式に正規化する。不正な入力は null。
+   *   - 先頭 # の有無は問わない（"c0605a" も可）
+   *   - 短縮 3 桁形式 (#abc) は #aabbcc に展開
+   *   - 前後の余白は trim
+   */
+  normalizeHex(value) {
+    if (typeof value !== "string") return null;
+    let s = value.trim().toLowerCase();
+    if (!s.startsWith("#")) s = "#" + s;
+    if (!ColorPicker.HEX_RE.test(s)) return null;
+    if (s.length === 4) {
+      const r = s[1], g = s[2], b = s[3];
+      s = `#${r}${r}${g}${g}${b}${b}`;
+    }
+    return s;
+  },
+
+  /** 数値を 0..255 の整数へ丸める（範囲外は CSS と同じくクランプ、非数は 0） */
+  clampChannel(value) {
+    const n = Math.round(Number(value));
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(255, Math.max(0, n));
+  },
+
+  /** {r,g,b}（0..255）→ "#rrggbb"。範囲外はクランプする。 */
+  rgbToHex(rgb) {
+    const to2 = (v) => ColorPicker.clampChannel(v).toString(16).padStart(2, "0");
+    return `#${to2(rgb?.r)}${to2(rgb?.g)}${to2(rgb?.b)}`;
+  },
+
+  /**
+   * HSL（h: 度・任意実数で 360 を法に巻き戻す / s,l: 0..100 でクランプ）→ {r,g,b}（0..255 整数）。
+   * CSS Color Module Level 4 の標準式をそのまま実装した数学変換。
+   */
+  hslToRgb(h, s, l) {
+    const hh = ((Number(h) % 360) + 360) % 360;
+    const ss = Math.min(100, Math.max(0, Number(s))) / 100;
+    const ll = Math.min(100, Math.max(0, Number(l))) / 100;
+    if (!Number.isFinite(hh) || !Number.isFinite(ss) || !Number.isFinite(ll)) {
+      return { r: 0, g: 0, b: 0 };
+    }
+    const c = (1 - Math.abs(2 * ll - 1)) * ss;
+    const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+    const m = ll - c / 2;
+    let rp = 0, gp = 0, bp = 0;
+    if (hh < 60) { rp = c; gp = x; bp = 0; }
+    else if (hh < 120) { rp = x; gp = c; bp = 0; }
+    else if (hh < 180) { rp = 0; gp = c; bp = x; }
+    else if (hh < 240) { rp = 0; gp = x; bp = c; }
+    else if (hh < 300) { rp = x; gp = 0; bp = c; }
+    else { rp = c; gp = 0; bp = x; }
+    return {
+      r: Math.round((rp + m) * 255),
+      g: Math.round((gp + m) * 255),
+      b: Math.round((bp + m) * 255),
+    };
+  },
+
+  /**
+   * {r,g,b}（0..255）→ {h: 0..360, s: 0..100, v: 0..100}（いずれも整数に丸め）。
+   * 調色パレット（彩度×明度の 2D エリア + 色相スライダー）の座標計算に使う。
+   * HSL ではなく HSV を使うのは、パレットの縦横が「白 → 純色」「純色 → 黒」に
+   * 素直に対応して掴みやすいため（一般的なカラーピッカーの操作感に合わせる）。
+   */
+  rgbToHsv(rgb) {
+    const r = ColorPicker.clampChannel(rgb?.r) / 255;
+    const g = ColorPicker.clampChannel(rgb?.g) / 255;
+    const b = ColorPicker.clampChannel(rgb?.b) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+      else if (max === g) h = ((b - r) / d + 2) * 60;
+      else h = ((r - g) / d + 4) * 60;
+    }
+    return {
+      h: Math.round(h) % 360,
+      s: Math.round((max === 0 ? 0 : d / max) * 100),
+      v: Math.round(max * 100),
+    };
+  },
+
+  /** {h: 度・360 を法に巻き戻し / s,v: 0..100 でクランプ} → {r,g,b}（0..255 整数）。 */
+  hsvToRgb(h, s, v) {
+    const hh = ((Number(h) % 360) + 360) % 360;
+    const ss = Math.min(100, Math.max(0, Number(s))) / 100;
+    const vv = Math.min(100, Math.max(0, Number(v))) / 100;
+    if (!Number.isFinite(hh) || !Number.isFinite(ss) || !Number.isFinite(vv)) {
+      return { r: 0, g: 0, b: 0 };
+    }
+    const c = vv * ss;
+    const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+    const m = vv - c;
+    let rp = 0, gp = 0, bp = 0;
+    if (hh < 60) { rp = c; gp = x; bp = 0; }
+    else if (hh < 120) { rp = x; gp = c; bp = 0; }
+    else if (hh < 180) { rp = 0; gp = c; bp = x; }
+    else if (hh < 240) { rp = 0; gp = x; bp = c; }
+    else if (hh < 300) { rp = x; gp = 0; bp = c; }
+    else { rp = c; gp = 0; bp = x; }
+    return {
+      r: Math.round((rp + m) * 255),
+      g: Math.round((gp + m) * 255),
+      b: Math.round((bp + m) * 255),
+    };
+  },
+
+  /**
+   * 調色パレットの状態（HSV）を現在色に追従させる。s=0（無彩色）や v=0（黒）では
+   * 色相・彩度が数学的に定まらないので、直前の値を引き継いで「グレーに落としてから
+   * 色相スライダーを動かしたら元の彩度で戻る」操作を成立させる。
+   *
+   * @param {string} hex "#rrggbb"
+   * @param {{h:number,s:number,v:number}|null} prev 直前のパレット状態
+   */
+  hexToPaletteHsv(hex, prev) {
+    const norm = ColorPicker.normalizeHex(hex);
+    if (!norm) return { h: 0, s: 0, v: 0 };
+    const next = ColorPicker.rgbToHsv({
+      r: parseInt(norm.slice(1, 3), 16),
+      g: parseInt(norm.slice(3, 5), 16),
+      b: parseInt(norm.slice(5, 7), 16),
+    });
+    if (!prev) return next;
+    if (next.v === 0) return { h: prev.h, s: prev.s, v: 0 };
+    if (next.s === 0) return { h: prev.h, s: 0, v: next.v };
+    return next;
+  },
+
+  /**
+   * ユーザーが「現在の色」カードの値欄へ貼り付け / 入力した文字列を "#rrggbb" に解釈する。
+   * 読み取れなければ null（呼び出し側は入力欄を「不正」表示にして値は消さない）。
+   *
+   * 受理する書式:
+   *   - HEX: "#c0605a" / "c0605a" / "#abc" / "abc"
+   *   - RGB: "rgb(192, 96, 90)" / "rgba(192 96 90 / 0.5)" / "192, 96, 90" / "rgb(50%, 50%, 50%)"
+   *   - HSL: "hsl(213, 40%, 30%)" / "hsl(213deg 40% 30%)" / "213°, 40%, 30%"
+   *   ※ alpha は 4 つ目の値として無視する（本機能は不透明色のみ扱う）
+   *
+   * 関数表記のない素の 3 数値は、1 番目に "°"/"deg" が付くか 2〜3 番目に "%" が付けば HSL、
+   * それ以外は RGB と解釈する（UI の RGB 欄 "192, 96, 90" / HSL 欄 "213°, 40%, 30%" が
+   * そのまま往復できる形に合わせた判定）。
+   */
+  parseColorInput(value) {
+    if (typeof value !== "string") return null;
+    const raw = value.trim();
+    if (!raw) return null;
+
+    const fn = /^([a-z]+)\s*\(([^()]*)\)$/i.exec(raw);
+    const kind = fn ? fn[1].toLowerCase() : "";
+    if (fn && !["rgb", "rgba", "hsl", "hsla"].includes(kind)) return null;
+
+    if (!fn) {
+      const hex = ColorPicker.normalizeHex(raw);
+      if (hex) return hex;
+      // "#" 始まりなのに HEX として読めない値は、数値列として解釈し直さない
+      if (raw.startsWith("#")) return null;
+    }
+
+    const parts = (fn ? fn[2] : raw)
+      .split(/[,/]|\s+/)
+      .map((p) => p.trim())
+      .filter((p) => p !== "");
+    if (parts.length < 3) return null;
+
+    const numOf = (token) => {
+      const m = /^([+-]?(?:\d+\.?\d*|\.\d+))\s*(%|°|deg)?$/i.exec(token);
+      if (!m) return null;
+      const n = Number(m[1]);
+      if (!Number.isFinite(n)) return null;
+      return { n, unit: (m[2] || "").toLowerCase() };
+    };
+    const a = numOf(parts[0]);
+    const b = numOf(parts[1]);
+    const c = numOf(parts[2]);
+    if (!a || !b || !c) return null;
+
+    const isHsl =
+      kind === "hsl" ||
+      kind === "hsla" ||
+      (kind === "" && (a.unit === "°" || a.unit === "deg" || b.unit === "%" || c.unit === "%"));
+    if (isHsl) return ColorPicker.rgbToHex(ColorPicker.hslToRgb(a.n, b.n, c.n));
+
+    // rgb(50%, 50%, 50%) 形式のパーセント指定に対応
+    const ch = (t) => (t.unit === "%" ? (t.n * 255) / 100 : t.n);
+    return ColorPicker.rgbToHex({ r: ch(a), g: ch(b), b: ch(c) });
   },
 });
 

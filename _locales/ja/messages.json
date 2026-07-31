@@ -159,23 +159,56 @@
   "pickerActivateJp": { "message": "スポイトで色を採取する" },
   "pickerActivateEn": { "message": "activate eyedropper" },
   "pickerNoteIdle": { "message": "ボタンを押すと画面上のどこでも色を採取できます（Esc でキャンセル）。" },
-  "specimenAriaLabel": { "message": "採取した色" },
-  "specimenTitle": { "message": "標本" },
-  "specimenPillEmpty": { "message": "未採取" },
-  "specimenNoEmpty": { "message": "No. — —" },
-  "specimenTimeEmpty": { "message": "未採取" },
+  "specimenTitle": { "message": "現在の色" },
+  "specimenPillEmpty": { "message": "未選択" },
+  "specimenNoEmpty": { "message": "未保存" },
+  "specimenNoSaved": {
+    "message": "履歴 $NO$",
+    "placeholders": {
+      "no": { "content": "$1", "example": "01" }
+    }
+  },
+  "specimenTimeEmpty": { "message": "—" },
+  "specimenTimeSaved": {
+    "message": "保存 $TIME$",
+    "placeholders": {
+      "time": { "content": "$1", "example": "12:34" }
+    }
+  },
+  "copyBtnLabel": { "message": "コピー" },
+  "copyBtnDone": { "message": "コピー済" },
   "copyHexAria": { "message": "HEX をコピー" },
   "copyRgbAria": { "message": "RGB をコピー" },
   "copyHslAria": { "message": "HSL をコピー" },
-  "formatTitle": { "message": "既定の保存形式" },
-  "formatGroupAriaLabel": { "message": "既定の保存形式" },
-  "formatLegend": { "message": "既定の保存形式" },
-  "formatRowAria": { "message": "既定の保存形式" },
+  "editHexAria": { "message": "HEX 値（書き換え可能）" },
+  "editRgbAria": { "message": "RGB 値（書き換え可能）" },
+  "editHslAria": { "message": "HSL 値（書き換え可能）" },
+  "valueEditHint": { "message": "3 つの欄はどれも書き換えできます。拾ってきた色コードを貼り付けるとその場で色を確認でき、Enter で履歴に保存します。" },
+  "paletteTitle": { "message": "色を調整" },
+  "paletteAreaAria": { "message": "鮮やかさと明るさを調整（矢印キーで微調整、Shift で大きく動かす）" },
+  "paletteAxisHint": { "message": "ドラッグで調整 — 横 = 鮮やかさ / 縦 = 明るさ" },
+  "paletteHueLabel": { "message": "色あい" },
+  "paletteHueAria": { "message": "色あい" },
+  "palettePillValue": {
+    "message": "色あい $H$° / 鮮やかさ $S$% / 明るさ $V$%",
+    "placeholders": {
+      "h": { "content": "$1", "example": "213" },
+      "s": { "content": "$2", "example": "45" },
+      "v": { "content": "$3", "example": "55" }
+    }
+  },
+  "paletteAddBtn": { "message": "この色を履歴に保存" },
+  "paletteResetBtn": { "message": "調整前に戻す" },
+  "formatTitle": { "message": "コピーの設定" },
+  "formatGroupAriaLabel": { "message": "自動コピーする形式" },
+  "formatLegend": { "message": "自動コピーする形式" },
+  "formatRowAria": { "message": "自動コピーする形式" },
   "formatHashLabel": { "message": "HEX に # を含める" },
-  "formatNote": { "message": "採取・履歴クリック時にこの形式で自動コピーされます。" },
-  "historyTitle": { "message": "標本箱" },
-  "historyEmpty": { "message": "まだ標本がありません。スポイトで採取してください。" },
-  "historyClearBtn": { "message": "標本箱を空にする" },
+  "formatNote": { "message": "スポイトで採取したときと履歴をクリックしたときに、選んだ形式で自動コピーします。" },
+  "historyTitle": { "message": "履歴" },
+  "historyHint": { "message": "色をクリックすると「現在の色」に戻して、下の設定の形式で自動コピーします。" },
+  "historyEmpty": { "message": "まだ履歴がありません。スポイトで採取するか、色コードを貼り付けて Enter を押してください。" },
+  "historyClearBtn": { "message": "履歴をすべて削除" },
   "extVersionAriaLabel": { "message": "拡張機能のバージョン" },
 
   "eyedropperUnsupported": { "message": "EyeDropper API に対応していません。Chrome 95+ をお使いください。" },
@@ -197,7 +230,14 @@
       "text": { "content": "$2", "example": "#C0605A" }
     }
   },
-  "historyClearedToast": { "message": "標本箱を空にしました。" },
+  "pickerInputInvalid": { "message": "色として読み取れませんでした（例: #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%)）。" },
+  "pickerInputAdded": {
+    "message": "$HEX$ を履歴に保存しました",
+    "placeholders": {
+      "hex": { "content": "$1", "example": "#C0605A" }
+    }
+  },
+  "historyClearedToast": { "message": "履歴を削除しました。" },
   "copyOkToast": {
     "message": "$FORMAT$: $TEXT$ をコピー",
     "placeholders": {
@@ -221,7 +261,7 @@
     }
   },
   "historyChipAria": {
-    "message": "$HEX$ を呼び出して既定形式でコピー",
+    "message": "$HEX$ を現在の色にしてコピー",
     "placeholders": {
       "hex": { "content": "$1" }
     }
