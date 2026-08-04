@@ -131,9 +131,13 @@ test("VolumeBooster.isUnityRelease: 100%+全OFF のみ true、いずれか ON �
 test("VolumeBooster.BASS_CUT_PRESET / BASS_CUT_BYPASS: 壁ドン対策モードの highpass フィルタ値固定 (drift 検知)", () => {
   assert.equal(G.VolumeBooster.BASS_CUT_STAGES, 2);
   assert.equal(G.VolumeBooster.BASS_CUT_PRESET.frequency, 150);
-  assert.equal(G.VolumeBooster.BASS_CUT_PRESET.Q, 0.7071);
+  // Web Audio の highpass の Q は「共振量を dB 指定」する例外仕様。Butterworth（無共振）は
+  // 線形 Q 0.7071 ではなく 20*log10(0.7071) = -3.0103 dB。線形値を入れると 150〜250Hz を
+  // +1.4〜+3.5dB ブーストして壁ドン対策が逆効果になるため、dB 表記であることを固定する。
+  assert.equal(G.VolumeBooster.BASS_CUT_PRESET.Q, -3.0103);
   // BYPASS は frequency:0 で highpass を実質無効化（ノード抜き差しなしのバイパス方式）。
   assert.equal(G.VolumeBooster.BASS_CUT_BYPASS.frequency, 0);
+  assert.equal(G.VolumeBooster.BASS_CUT_BYPASS.Q, -3.0103);
 });
 
 test("VolumeBooster.percentToGain: 0/100/MAX のアンカー値が正しい", () => {

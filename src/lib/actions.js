@@ -1452,21 +1452,30 @@ const VolumeBooster = Object.freeze({
   /**
    * 壁ドン対策モード用 highpass フィルタプリセット（各 BiquadFilterNode type:"highpass"）。
    * カットオフ 150Hz は、壁・床を伝って隣室に響きやすいサブベース〜低音域（ドスドス感の主因）を
-   * 除去しつつ、ボーカルや楽器の芯（中音域）は残す落としどころ。各段の Q は 0.7071
-   * （Butterworth）で固定し、同一段の直列化で共振ピークを作らず減衰だけを急峻にする。
+   * 除去しつつ、ボーカルや楽器の芯（中音域）は残す落としどころ。各段は共振ピークを作らない
+   * Butterworth 特性で固定し、同一段の直列化で減衰だけを急峻にする。
+   *
+   * **Q の単位に注意（復活禁止: `Q: 0.7071`）**: Web Audio API の `lowpass` / `highpass` の Q は
+   * `peaking` などと違い「カットオフでの共振量を **デシベル** で指定」する例外仕様。線形 Q の
+   * Butterworth 値 0.7071 をそのまま入れると「+0.71dB の共振」の意味になり、実測（2 段合成）で
+   * 150Hz +1.4dB / 200Hz +3.5dB / 250Hz +2.9dB と、**壁を伝うドスドス感の主帯域を逆にブースト**
+   * してしまう（「壁ドン対策が効かない」の実原因。2026-08-04 修正）。Butterworth 相当の指定値は
+   * `20*log10(0.7071) = -3.0103` dB で、修正後は 150Hz -6.0dB / 200Hz -2.4dB と素直な減衰になる。
    */
   BASS_CUT_PRESET: Object.freeze({
     frequency: 150,
-    Q: 0.7071,
+    Q: -3.0103,
   }),
   /**
    * 壁ドン対策モード OFF 時のバイパス設定。highpass のカットオフを 0Hz にすると
    * 可聴域全体を素通しできる（disconnect/reconnect による音切れを避けるため、
    * COMPRESSOR_BYPASS と同じ「ノードは繋いだままパラメータで無効化」方式）。
+   * frequency:0 では Q は特性に影響しない（実測で全帯域 0dB）が、PRESET と単位を
+   * 揃えておくため同じ dB 表記の Butterworth 値を入れる。
    */
   BASS_CUT_BYPASS: Object.freeze({
     frequency: 0,
-    Q: 0.7071,
+    Q: -3.0103,
   }),
 
   // ===== Firefox 専用 MES (MediaElementSource) 経路 =====

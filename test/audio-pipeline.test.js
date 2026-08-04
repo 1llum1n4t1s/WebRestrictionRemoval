@@ -60,7 +60,8 @@ test("applyFilterPreset: bass cut の全段へ同じ preset を適用", () => {
 
   for (const node of nodes) {
     assert.equal(node.frequency.value, 150);
-    assert.equal(node.Q.value, 0.7071);
+    // highpass の Q は dB 指定（Butterworth = -3.0103dB）。値の正は actions.js の BASS_CUT_PRESET。
+    assert.equal(node.Q.value, -3.0103);
   }
 });
 
