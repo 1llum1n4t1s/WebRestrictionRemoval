@@ -10,17 +10,20 @@ minimumReleaseAgeExclude:
   - puppeteer-core@25.4.0
   - puppeteer@25.4.0
 
-# overrides: web-ext 配下の transitive 脆弱性 3 件をパッチ版へ固定する
+# overrides: web-ext 配下の transitive 脆弱性をパッチ版へ固定する
 # (脆弱範囲にだけ効く versioned selector で blast radius を最小化)
 #   - adm-zip     GHSA-xcpc-8h2w-3j85 (web-ext>firefox-profile 経由)
 #   - shell-quote GHSA-395f-4hp3-45gv (web-ext>fx-runner 経由)
-#   - fast-uri    GHSA-v2hh-gcrm-f6hx (web-ext>addons-linter>ajv 経由、ajv 互換のため v3 系維持)
-#   - brace-expansion GHSA-mh99-v99m-4gvg (eslint>minimatch@10 経由)
-#     ※ minimatch@3 が引く 1.1.16 も同 advisory の対象だが、1.x 系に修正版が存在せず
-#       (1.1.16 が最新)、5.0.8 は type:"module" の ESM 専用なので CJS の minimatch@3 に
-#       当てると require で壊れる。よって 5.x 系だけを patch 版へ固定する。
+#   - fast-uri    GHSA-v2hh-gcrm-f6hx / GHSA-7p8r-x3mc-p8w7 (web-ext>addons-linter>ajv 経由、ajv 互換のため v3 系維持)
+#   - undici      GHSA-4cwx-7wf7-3272 等 (web-ext>addons-linter>cheerio 経由)
+#   - brace-expansion GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (eslint>minimatch@3,10 経由)
+#     ※ 2026-08-06 更新: 旧コメントで「1.x 系に修正版が存在せず保留」としていた 1.1.16 (minimatch@3 経由)
+#       は 1.1.18 (CJS のまま、ESM 化なし) が公開されたため override 対象に追加した。
+#       5.x 系 (minimatch@10 経由) も新 advisory で >=5.0.9 が要求されるため範囲を広げた。
 overrides:
   "adm-zip@<0.6.0": "0.6.0"
   "shell-quote@<1.8.5": "^1.8.5"
-  "fast-uri@>=3.0.0 <3.1.4": "^3.1.4"
-  "brace-expansion@>=5.0.0 <5.0.8": "^5.0.8"
+  "fast-uri@>=3.0.0 <3.1.5": "^3.1.5"
+  "undici@>=7.0.0 <7.29.0": "^7.29.0"
+  "brace-expansion@>=1.0.0 <1.1.18": "^1.1.18"
+  "brace-expansion@>=5.0.0 <5.0.9": "^5.0.9"

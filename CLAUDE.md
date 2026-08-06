@@ -86,7 +86,7 @@ pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zi
 ### 依存パッケージの運用
 
 - **`pnpm-workspace.yaml` が overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` ではない）。transitive 脆弱性は「脆弱範囲だけに効く versioned selector」で固定し、blast radius を最小化する。
-- **`pnpm audit` が high 1 件を報告するのは既知の正常状態**: `brace-expansion@1.1.16`（GHSA-mh99-v99m-4gvg）が `web-ext > addons-linter > eslint > minimatch@3` 経由で残る。1.x 系に修正版が存在せず、パッチ版 5.0.8 は ESM 専用で CJS の minimatch@3 に当てると `require` が壊れるため、**addons-linter の更新待ちとして意図的に保留**している（5.x 系は override 済み）。この 1 件を消そうとして 1.x へ override を当てない。
+- **`pnpm audit` は 0 件が正常状態**（2026-08-06 `/deps` で解消）。`web-ext > addons-linter` 系の transitive 脆弱性（fast-uri / undici / brace-expansion の 1.x・5.x 両系統）はすべて `pnpm-workspace.yaml` の `overrides` で固定済み。旧コメントで「1.x 系 (`brace-expansion@1.1.16`) に修正版が存在せず保留」としていたが、`1.1.18`（CJS のまま）が公開されたため override 対象に追加できた。新規に transitive 脆弱性が出た場合は `pnpm why <package>` で経路を確認し、パッチ版が ESM 化されて CJS 経路 (`minimatch@3` 等) を壊す場合にのみ保留判断を検討する。
 - **`minimumReleaseAgeExclude` は pnpm v11 が自動追記する**（公開直後の版を一定期間使わない供給網ガードの例外記録）。手編集しない。
 - **GitHub Actions は SHA ピン + タグコメント運用**。Dependabot は SHA だけ更新して**コメントの version 表記は直さない**ので、bump PR を取り込んだら `gh api repos/<owner>/<repo>/git/matching-refs/tags` で SHA → タグを引き直してコメントを合わせる（実例: v6.0.0 表記のまま v7.0.1 へ上がっていた）。
 - 依存更新の正規ルートは `/deps` スキル。バージョン番号（`manifest.json` / `package.json`）には触れない。
