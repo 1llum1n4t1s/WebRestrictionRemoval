@@ -140,6 +140,10 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
+    // NOTEBOOK_LM_ACCOUNT_INDEX を get リストから漏らすと、storage.get は要求キーしか返さないため
+    // `!(key in stored)` が毎回 true になり、install / update のたびに 0 で上書きされる
+    // （マルチアカウント利用者の選んだ authuser が更新後に既定アカウントへ戻る）。
+    StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
     StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
     StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,

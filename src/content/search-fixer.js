@@ -1191,6 +1191,12 @@
    * master OFF / サブ機能 OFF / ページ離脱 / orphan 化のすべてから呼ぶ。
    */
   function abortForeignCountryFetch() {
+    // 未発射のキュー分は予算を消費していないので返却する。減算しないと master OFF や
+    // フィード外への SPA 遷移で abort するたびに予約分がセッション上限を食い潰し、
+    // 機能を再開しても about 取得が早期に打ち切られて判定が実質止まる
+    // （fail-open なので誤除去にはならないが、機能が効かなくなる）。
+    // in-flight 分は fetchChannelOrigin の finally が未確定として減算するので触らない。
+    foreignFetchBudgetUsed = Math.max(0, foreignFetchBudgetUsed - foreignFetchQueue.size);
     foreignFetchQueue.clear();
     try { foreignFetchAbort?.abort(); } catch {}
     foreignFetchAbort = null;

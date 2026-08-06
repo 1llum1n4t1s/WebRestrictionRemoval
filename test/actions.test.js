@@ -1701,6 +1701,42 @@ test("popup.js の chrome.storage.local.get リストに SettingsSchema の全 s
   );
 });
 
+// Grok 監査 [high] 修正: background.js の onInstalled が `!(StorageKeys.X in stored)` で
+// 未設定判定するキーは、直前の `chrome.storage.local.get([...])` で必ず要求されている必要がある。
+// storage.get は要求キーのうち実在するものだけ返すため、get リストから漏れたキーは
+// `in stored` が毎回 false になり、install / update のたびに defaults 値で上書きされる
+// (実例: NOTEBOOK_LM_ACCOUNT_INDEX が漏れており、拡張更新のたびに選択アカウントが 0 へ戻っていた)。
+test("background.js の onInstalled: `in stored` 判定キーはすべて get リストに含まれる (Grok 監査 high)", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const bgPath = path.resolve(__dirname, "..", "src", "background", "background.js");
+  const bgSrc = fs.readFileSync(bgPath, "utf8");
+
+  // onInstalled 内の defaults 初期化を担う最大の get 呼び出し (キー数 > 10) を対象にする。
+  const getCalls = [...bgSrc.matchAll(/chrome\.storage\.local\.get\(\s*\[([\s\S]*?)\]/g)];
+  assert.ok(getCalls.length > 0, "background.js に chrome.storage.local.get([...]) 呼び出しが見つからない");
+  const mainGetCall = getCalls
+    .map((m) => m[1])
+    .filter((body) => (body.match(/StorageKeys\./g) || []).length >= 10)
+    .sort((a, b) => (b.match(/StorageKeys\./g) || []).length - (a.match(/StorageKeys\./g) || []).length)[0];
+  assert.ok(mainGetCall, "background.js のメイン storage.local.get (10+ キー) が見つからない");
+
+  const requested = new Set();
+  for (const m of mainGetCall.matchAll(/StorageKeys\.([A-Z_][A-Z0-9_]*)/g)) requested.add(m[1]);
+
+  // `!(StorageKeys.X in stored)` で未設定判定しているキーを抽出して照合する。
+  const checked = [...bgSrc.matchAll(/StorageKeys\.([A-Z_][A-Z0-9_]*)\s+in\s+stored/g)].map((m) => m[1]);
+  assert.ok(checked.length > 0, "`StorageKeys.X in stored` パターンが見つからない");
+
+  const missing = [...new Set(checked)].filter((name) => !requested.has(name));
+  assert.equal(
+    missing.length,
+    0,
+    `onInstalled で \`in stored\` 判定しているのに get リストへ含まれていない StorageKeys ` +
+      `(install/update のたびに既定値で上書きされる):\n  - ${missing.join("\n  - ")}`
+  );
+});
+
 // /rere レビュー A2-002 修正: cdninstagram.com の 1 段サブドメインを `scontent-` prefix 限定に
 // 絞り込んだことを検証する。`tracking.cdninstagram.com` / `auth.cdninstagram.com` 等の
 // 任意サブドメインへの代理 fetch が遮断されることを保証する（fbcdn / tiktok と対称防御）。
