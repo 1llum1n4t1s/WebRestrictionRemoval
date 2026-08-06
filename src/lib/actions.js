@@ -196,6 +196,10 @@ const StorageKeys = Object.freeze({
   COLOR_PICKER_HEX_HASH: "colorPickerHexHash",
   /** ポップアップで最後に開いていたタブ (PopupTabs.ALL のいずれか) */
   POPUP_LAST_TAB: "popupLastTab",
+  /** ポップアップで最後に開いていたサブタブ（親タブ id → サブタブ id のレコード）。
+   *  例 `{ tune: "video", youtube: "watch_page" }`。値の妥当性は各タブの構築時に
+   *  「その id のサブタブが実在するか」で判定するので、ここでは形だけ正規化する。 */
+  POPUP_LAST_SUBTAB: "popupLastSubTab",
   /** インストール / 起動 sentinel。`onInstalled` で必ず 1 を書き込み、popup 起動時に消失していたら
    *  `chrome.storage.local` が破損・リセットされた可能性として開発者コンソールに警告を出す（#3）。
    *  接頭辞 "_" でユーザー向け設定キーと区別する。 */
@@ -2857,6 +2861,26 @@ const PopupTabs = Object.freeze({
   migrate(value) {
     if (value === "assist") return PopupTabs.TUNE;
     return PopupTabs.normalize(value);
+  },
+
+  /**
+   * POPUP_LAST_SUBTAB の生値を「親タブ id → サブタブ id」のプレーンなレコードに正規化する。
+   *
+   * サブタブ id は各タブの CATEGORIES / 調整タブのセクション定義に依存して増減するため、
+   * ここでは id の妥当性まで見ない（popup 側が「その id のサブタブが実在するか」で判定し、
+   * 見つからなければ先頭にフォールバックする）。壊れた値・配列・非文字列は捨てる。
+   *
+   * @param {unknown} value chrome.storage.local の生値
+   * @returns {Record<string, string>} 正規化済みレコード（不正値は空オブジェクト）
+   */
+  normalizeSubTabs(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    const out = {};
+    for (const tabId of PopupTabs.ALL) {
+      const subId = value[tabId];
+      if (typeof subId === "string" && subId.length > 0) out[tabId] = subId;
+    }
+    return out;
   },
 });
 

@@ -55,7 +55,7 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
   rtk grep -i "WEB閲覧アシスト\|Web Viewing Assist\|Web Restriction Removal Helper" --exclude-dir=node_modules --exclude=*.lock
   ```
 
-popup は **6 タブ構成** (`調整 / YouTube / X / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。
+popup は **6 タブ構成** (`調整 / YouTube / X / Instagram / TikTok / カラーピッカー`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。**サブタブ（調整タブの オーディオ / 映像 / Amazon、YouTube / Instagram のカテゴリ）も `POPUP_LAST_SUBTAB`（親タブ id → サブタブ id のレコード）に永続化**する（`PopupTabs.normalizeSubTabs` で形だけ正規化し、保存済み id が現存しないときは先頭サブタブにフォールバック。1 キーに複数タブ分が相乗りするので書き戻し前に storage 現在値を再取得してマージする）。
 
 設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（ブラウザ UI 言語が `ja` → 日本語 / それ以外 → 英語にフォールバック）。`manifest.json` の `default_locale: "en"` + `_locales/{en,ja}/messages.json` を単一情報源とし、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。バージョン番号は `/vava` スキル経由でのみ更新する。
 

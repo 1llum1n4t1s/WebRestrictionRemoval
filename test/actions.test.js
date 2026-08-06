@@ -1067,6 +1067,22 @@ test("PopupTabs.migrate: 旧 \"assist\" は \"tune\" に変換、それ以外は
   assert.equal(G.PopupTabs.migrate(undefined), G.PopupTabs.TUNE);
 });
 
+test("PopupTabs.normalizeSubTabs: 親タブ id をキーにした文字列だけ残す（最後に開いたサブタブの記憶）", () => {
+  assert.equal(G.StorageKeys.POPUP_LAST_SUBTAB, "popupLastSubTab");
+  // 正常系: 既知の親タブ id + 文字列値はそのまま通る（サブタブ id 自体の妥当性は popup 側が判定）
+  assert.deepEqual(
+    G.PopupTabs.normalizeSubTabs({ tune: "video", youtube: "watch_page" }),
+    { tune: "video", youtube: "watch_page" }
+  );
+  // 未知キー / 非文字列 / 空文字は捨てる
+  assert.deepEqual(G.PopupTabs.normalizeSubTabs({ nope: "x", tune: 1, youtube: "" }), {});
+  // 壊れた値は空オブジェクト（storage 破損・型違いで popup が落ちないこと）
+  assert.deepEqual(G.PopupTabs.normalizeSubTabs(undefined), {});
+  assert.deepEqual(G.PopupTabs.normalizeSubTabs(null), {});
+  assert.deepEqual(G.PopupTabs.normalizeSubTabs("tune"), {});
+  assert.deepEqual(G.PopupTabs.normalizeSubTabs(["tune"]), {});
+});
+
 // ---------- 再評価ガードのテスト ----------
 
 test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", () => {

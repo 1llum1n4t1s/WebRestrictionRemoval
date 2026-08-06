@@ -276,6 +276,13 @@ document.addEventListener("DOMContentLoaded", async () => {
    *  popup → storage 直書きパターン（APPLY_SETTINGS 非経由）。登録は検索結果ページの 🚫 ボタン、
    *  popup では一覧表示 + 個別解除のみ提供する。 */
   let blockedChannels = [];
+  /** @type {Map<string, (subId: string) => void>} 親タブ id → 保存済みサブタブ id を選び直す関数。
+   *  サブタブ DOM の構築は storage 取得より先に走るため、復元は storage 読み込み後に
+   *  このレジストリ経由で行う（見つからない id は無視して先頭のままにする）。 */
+  const subTabSelectors = new Map();
+  /** @type {Record<string, string>} 最後に開いていたサブタブ（親タブ id → サブタブ id）。
+   *  POPUP_LAST_TAB と同じ popup → storage 直書きパターン（APPLY_SETTINGS 非経由）。 */
+  let lastSubTabs = {};
 
   buildFeatureCategories();
   // menu_ui カテゴリ先頭に挿入された gridItemsSelect を以降の処理で参照する。
@@ -327,6 +334,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
+    StorageKeys.POPUP_LAST_SUBTAB,
     StorageKeys.INSTALL_SENTINEL,
   ]);
 
@@ -583,6 +591,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const lastTab = PopupTabs.migrate(pickerStored[StorageKeys.POPUP_LAST_TAB]);
   setActiveTab(lastTab, { persist: false, focus: false });
 
+  // サブタブの復元。DOM 構築（build 系）は storage 取得より先に走るので、ここで選び直す。
+  // 保存済み id が現存しないカテゴリ（機能の増減・撤去）なら selector が無視して先頭のまま。
+  lastSubTabs = PopupTabs.normalizeSubTabs(pickerStored[StorageKeys.POPUP_LAST_SUBTAB]);
+  for (const [groupKey, select] of subTabSelectors) {
+    const subId = lastSubTabs[groupKey];
+    if (subId) select(subId);
+  }
+
   for (const entry of TAB_REGISTRY) {
     entry.tab.addEventListener("click", () => setActiveTab(entry.id));
     // ←/→ 矢印キーで前後に巡回（WAI-ARIA Authoring Practices 準拠）。最後で → なら最初に折返し。
@@ -615,6 +631,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         .set({ [StorageKeys.POPUP_LAST_TAB]: target })
         .catch(logStorageError("popup-last-tab"));
     }
+  }
+
+  /**
+   * 親タブ内で最後に開いたサブタブを記憶する（親タブ id → サブタブ id）。
+   *
+   * 書き戻す前に storage 現在値を再取得してマージする（POPUP_LAST_TAB と違い 1 キーに
+   * 複数タブ分を相乗りさせるレコードなので、別 popup が書いた他タブ分を wipe しないため。
+   * CLAUDE.md「経路 B: popup 内変数の stale 化 race」の対策と同型）。
+   */
+  function persistSubTab(groupKey, subId) {
+    lastSubTabs = { ...lastSubTabs, [groupKey]: subId };
+    chrome.storage.local
+      .get(StorageKeys.POPUP_LAST_SUBTAB)
+      .then((rec) => {
+        const merged = {
+          ...PopupTabs.normalizeSubTabs(rec[StorageKeys.POPUP_LAST_SUBTAB]),
+          [groupKey]: subId,
+        };
+        return chrome.storage.local.set({ [StorageKeys.POPUP_LAST_SUBTAB]: merged });
+      })
+      .catch(logStorageError("popup-last-subtab"));
   }
 
   // ---------- ピッカーイベント ----------
@@ -1278,8 +1315,9 @@ document.addEventListener("DOMContentLoaded", async () => {
    * checked 状態は保持され、ON 数カウントや apply() の収集に影響しない）。
    *
    * @param {string} ariaLabelKey tablist の aria-label に使う messages.json キー。
+   * @param {string} groupKey 最後に開いたサブタブを記憶する単位（親タブ id）。
    */
-  function _buildSubTabbedCategories(rootEl, categories, features, inputMap, idPrefix, messageKeyPrefix, ariaLabelKey) {
+  function _buildSubTabbedCategories(rootEl, categories, features, inputMap, idPrefix, messageKeyPrefix, ariaLabelKey, groupKey) {
     const cats = categories.filter((cat) => {
       const items = features.filter((f) => f.category === cat.id);
       return items.length > 0 || cat.id === "menu_ui";
@@ -1297,7 +1335,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const panels = [];
 
     // idx 番目のサブタブをアクティブにし、他を非アクティブ化する（roving tabindex）。
-    const activate = (idx) => {
+    // persist: false は storage からの復元時（自分が書いた値を書き戻さない）。
+    const activate = (idx, { persist = true } = {}) => {
       tabs.forEach((tab, i) => {
         const on = i === idx;
         tab.classList.toggle("is-active", on);
@@ -1305,6 +1344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         tab.tabIndex = on ? 0 : -1;
         panels[i].hidden = !on;
       });
+      if (persist && cats[idx]) persistSubTab(groupKey, cats[idx].id);
     };
 
     cats.forEach((cat, idx) => {
@@ -1349,7 +1389,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
     });
 
-    activate(0);
+    activate(0, { persist: false });
+    // 保存済みサブタブの復元は storage 取得後（restoreSubTabs）にレジストリ経由で行う。
+    subTabSelectors.set(groupKey, (subId) => {
+      const idx = cats.findIndex((cat) => cat.id === subId);
+      if (idx >= 0) activate(idx, { persist: false });
+    });
     rootEl.append(tablist, panelsWrap);
   }
 
@@ -1361,7 +1406,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       featureInputs,
       "feature-",
       "feat_sf_",
-      "ytCleanerSubtabsAria"
+      "ytCleanerSubtabsAria",
+      PopupTabs.YOUTUBE
     );
   }
 
@@ -1396,7 +1442,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function buildInstagramFeatureCategories() {
     _buildSubTabbedCategories(
       $igFeatureCategories, InstagramCleaner.CATEGORIES, InstagramCleaner.FEATURES,
-      igFeatureInputs, "ig-feature-", "feat_ig_", "igCleanerSubtabsAria"
+      igFeatureInputs, "ig-feature-", "feat_ig_", "igCleanerSubtabsAria",
+      PopupTabs.INSTAGRAM
     );
   }
   function updateIgCleanerCountBadge() {
@@ -1436,10 +1483,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!panel) return;
 
     // icon は popup.html のアイコンスプライトの symbol id（`ic-<icon>`）。
+    // id は POPUP_LAST_SUBTAB に保存される識別子なので、並び替えても変えない。
     const defs = [
-      { icon: "volume", labelKey: "groupAudio",  sectionId: "audioGroupSection" },
-      { icon: "film",   labelKey: "groupVideo",  sectionId: "videoGroupSection" },
-      { icon: "box",    labelKey: "groupAmazon", sectionId: "amazonGroupSection" },
+      { id: "audio",  icon: "volume", labelKey: "groupAudio",  sectionId: "audioGroupSection" },
+      { id: "video",  icon: "film",   labelKey: "groupVideo",  sectionId: "videoGroupSection" },
+      { id: "amazon", icon: "box",    labelKey: "groupAmazon", sectionId: "amazonGroupSection" },
     ];
 
     const entries = defs
@@ -1454,7 +1502,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const tabs = [];
 
-    const activate = (idx) => {
+    const activate = (idx, { persist = true } = {}) => {
       entries.forEach((e, i) => {
         const on = i === idx;
         tabs[i].classList.toggle("is-active", on);
@@ -1462,6 +1510,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         tabs[i].tabIndex = on ? 0 : -1;
         e.section.classList.toggle("tune-section-hidden", !on);
       });
+      if (persist && entries[idx]) persistSubTab(PopupTabs.TUNE, entries[idx].id);
     };
 
     entries.forEach((e, idx) => {
@@ -1496,7 +1545,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     panel.insertBefore(tablist, panel.firstChild);
-    activate(0);
+    activate(0, { persist: false });
+    subTabSelectors.set(PopupTabs.TUNE, (subId) => {
+      const idx = entries.findIndex((e) => e.id === subId);
+      if (idx >= 0) activate(idx, { persist: false });
+    });
   }
 
   // ----- 適用 -----

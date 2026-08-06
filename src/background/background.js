@@ -171,6 +171,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
     StorageKeys.COLOR_PICKER_HEX_HASH,
     StorageKeys.POPUP_LAST_TAB,
+    StorageKeys.POPUP_LAST_SUBTAB,
   ]);
   const defaults = {};
   if (!(StorageKeys.SEARCH_FIXER_ENABLED in stored)) {
@@ -291,6 +292,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
   if (!(StorageKeys.POPUP_LAST_TAB in stored)) {
     defaults[StorageKeys.POPUP_LAST_TAB] = PopupTabs.TUNE;
+  }
+  if (!(StorageKeys.POPUP_LAST_SUBTAB in stored)) {
+    // 空レコード = 各タブとも先頭サブタブから開始（popup 側が実在判定でフォールバックする）
+    defaults[StorageKeys.POPUP_LAST_SUBTAB] = {};
   }
   if (Object.keys(defaults).length > 0) {
     // defaults 書き込みが reject しても直後の INSTALL_SENTINEL 書き込み（破損検知の要）に
