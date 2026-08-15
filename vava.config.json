@@ -25,8 +25,8 @@
     "_comment": "check-store-listing.mjs の drift 判定キーワード。listing が「主要新キーワードを含む」か確認する。未設定 (null) なら drift チェックを skip。summary (短い概要) と description (長い説明) で実在するキーワードが違うため、それぞれ別セットで判定する (summary に MediaElementSource / Firefox 142 は載らない)。",
     "cws": {
       "_comment": "CWS は meta description しか取得できない (Full Description は SPA で <meta> 非抽出) ため、meta に確実に載る名前ベースの語のみで判定する。",
-      "ja": ["Vuora"],
-      "en": ["Vuora"]
+      "ja": ["閲覧中ページ"],
+      "en": ["Browser extension"]
     },
     "amo": {
       "_comment": "Firefox AMO listing は全 12 機能カテゴリ (音量ブースターは Firefox 専用 MES 経路、DRM サイト除く) で構成される (2026-07-02 から)。AMO の drift check では Firefox 用 listing の文言と一致させる。summary は 250 字上限のため Amazon 3 機能を圧縮表記しており、description (機能一覧セクション込み) とはキーワードが異なる。ranking 単独を明示 (CodeRabbit 指摘: カテゴリ数だけだと個別機能の脱落を検出できない)。",
