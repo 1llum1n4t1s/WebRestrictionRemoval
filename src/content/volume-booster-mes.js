@@ -281,6 +281,7 @@
   async function probeAndAttach(media) {
     const src = media.currentSrc;
     let ok = PROBE_CACHE.get(src);
+    let cacheable = ok !== undefined;
     if (ok === undefined) {
       ATTACHING.add(media);
       try {
@@ -294,17 +295,20 @@
         });
         // redirect さえしていなければ status は問わない (206/200/416 等は taint 判定に無関係)
         ok = res.type !== "opaqueredirect";
+        cacheable = true;
         // Range を無視して本文全体 (200 + フルボディ) を返すサーバーだと、ヘッダ確認後に
         // 本文を読み捨てないと実際のメディア GET と並行してバックグラウンド転送が続いてしまう。
         // ヘッダ判定だけで用は済んでいるため、ここで確実に打ち切る。
         res.body?.cancel().catch(() => {});
       } catch {
-        ok = false; // 判定不能は attach しない側に倒す
+        ok = false; // 判定不能は今回 attach しないが、次の media event では再試行する
       } finally {
         ATTACHING.delete(media);
       }
-      if (PROBE_CACHE.size >= PROBE_CACHE_MAX) PROBE_CACHE.clear();
-      PROBE_CACHE.set(src, ok);
+      if (cacheable) {
+        if (PROBE_CACHE.size >= PROBE_CACHE_MAX) PROBE_CACHE.clear();
+        PROBE_CACHE.set(src, ok);
+      }
     }
     if (!ok) return;
     // post-await guard: probe 中に状況が変わっていたら attach しない / 再評価に回す
@@ -748,6 +752,7 @@
     StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
   ];
   const WATCHED_KEY_SET = new Set(WATCHED_KEYS);
+  let settingsLoadGeneration = 0;
 
   function loadAndApply() {
     if (orphaned) return;
@@ -755,6 +760,7 @@
       teardownOrphan();
       return;
     }
+    const generation = ++settingsLoadGeneration;
     try {
       chrome.storage.local.get(WATCHED_KEYS, (s) => {
         let runtimeError = null;
@@ -769,6 +775,7 @@
           return;
         }
         if (orphaned) return;
+        if (generation !== settingsLoadGeneration) return;
         currentSettings = {
           enabled: s[StorageKeys.VOLUME_BOOSTER_ENABLED] === true,
           gain: VolumeBooster.clampValue(s[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT),

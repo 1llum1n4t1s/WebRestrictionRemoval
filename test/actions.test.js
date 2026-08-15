@@ -1134,6 +1134,33 @@ test("actions.js は globalThis に 24 個の定数を公開する", () => {
   assert.equal(required.length, 24, "公開定数の件数（ドキュメント整合性の単一情報源）");
 });
 
+test("SenderCheck.isFromOffscreen: extension id・tab不在・URL完全一致で検証", () => {
+  assert.equal(G.ExtensionPaths.OFFSCREEN, "src/offscreen/offscreen.html");
+  assert.equal(G.Offscreen.ACTION_VOLUME_STREAM_ENDED, "volumeStreamEnded");
+  const previousChrome = globalThis.chrome;
+  globalThis.chrome = {
+    runtime: {
+      id: "extension-id",
+      getURL: (path) => `chrome-extension://extension-id/${path}`,
+    },
+  };
+  try {
+    const sender = {
+      id: "extension-id",
+      url: "chrome-extension://extension-id/src/offscreen/offscreen.html",
+    };
+    assert.equal(G.SenderCheck.isFromOffscreen(sender), true);
+    assert.equal(G.SenderCheck.isFromOffscreen({ ...sender, id: "other" }), false);
+    assert.equal(G.SenderCheck.isFromOffscreen({ ...sender, tab: { id: 1 } }), false);
+    assert.equal(
+      G.SenderCheck.isFromOffscreen({ ...sender, url: "chrome-extension://extension-id/src/popup/popup.html" }),
+      false
+    );
+  } finally {
+    globalThis.chrome = previousChrome;
+  }
+});
+
 test("TikTokCleaner.mergeFeatures: undefined / null / 不正型は default", () => {
   for (const value of [undefined, null, 0, "x", []]) {
     const merged = G.TikTokCleaner.mergeFeatures(value);
@@ -1447,6 +1474,7 @@ test("NotebookLm.buildRpcRequest / buildHomeUrl / buildNotebookUrl: authuser の
   assert.equal(G.NotebookLm.buildHomeUrl(0), "https://notebooklm.google.com/");
   assert.equal(G.NotebookLm.buildHomeUrl(3), "https://notebooklm.google.com/?authuser=3");
   assert.equal(G.NotebookLm.buildNotebookUrl("nb-1", 0), "https://notebooklm.google.com/notebook/nb-1");
+  assert.equal(G.NotebookLm.buildNotebookUrl("../x", 0), "https://notebooklm.google.com/notebook/..%2Fx");
   assert.equal(
     G.NotebookLm.buildNotebookUrl("nb-1", 1),
     "https://notebooklm.google.com/notebook/nb-1?authuser=1",
@@ -1477,6 +1505,8 @@ test("NotebookLm.normalizeWatchUrl: videoId を正規化 watch URL に揃える"
     "list / index を落として同じ動画が重複ソース化しないようにする"
   );
   assert.equal(n("https://youtu.be/dQw4w9WgXcQ?t=42"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(n("https://evil.test/?v=dQw4w9WgXcQ"), null, "任意ホストの videoId を受理しない");
+  assert.equal(n("https://www.youtube.com/results?v=dQw4w9WgXcQ"), null, "watch 以外の query を受理しない");
   assert.equal(n("/shorts/dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   assert.equal(n("/live/dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   assert.equal(n("/playlist?list=PLabc"), null, "動画 ID を含まない URL は null");
@@ -1536,6 +1566,22 @@ test("NotebookLm.extractToken / extractNotebookId: HTML と応答からの抽出
   );
   assert.equal(id("no uuid here"), null);
   assert.equal(id(null), null);
+
+  const normalizeId = G.NotebookLm.normalizeNotebookId;
+  assert.equal(normalizeId("3f2504e0-4f89-11d3-9a0c-0305e82c3301"), "3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+  assert.equal(normalizeId("prefix-3f2504e0-4f89-11d3-9a0c-0305e82c3301"), null);
+  assert.equal(normalizeId("../notebook"), null);
+});
+
+test("SearchFixer.normalizeChannelHref: YouTube チャンネルパスだけを許可", () => {
+  const n = G.SearchFixer.normalizeChannelHref;
+  assert.equal(n("/@example"), "/@example");
+  assert.equal(n("https://www.youtube.com/@example/videos?view=0"), "/@example/videos?view=0");
+  assert.equal(n("/channel/UCabcdefghijk"), "/channel/UCabcdefghijk");
+  assert.equal(n("//evil.example/@example"), "/");
+  assert.equal(n("https://evil.example/@example"), "/");
+  assert.equal(n("javascript:alert(1)"), "/");
+  assert.equal(n("/watch?v=dQw4w9WgXcQ"), "/");
 });
 
 test("NotebookLm.parseNotebookList: batchexecute 応答の正規化と共有ノートブック除外", () => {

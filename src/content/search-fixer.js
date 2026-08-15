@@ -1892,10 +1892,14 @@
 
   /** @type {Promise<Array<{handle:string,name:string,href:string,avatarUrl:string}>>|null} */
   let subsListFetchInFlight = null;
+  let subsListFetchAbort = null;
   /** sort-wipe 経路でカードの SUBS_CARD_MARKER_ATTR を一括 clear して再 observe するときに、
    * 直前の fetch がまだ in-flight なハンドルが再 trigger されて重複 fetch + 重複 cache write
    * を起こすバグを防ぐ。fetch 開始時に add、finally で delete。*/
   const subsThumbFetchingHandles = new Set();
+  const subsThumbFetchQueue = [];
+  let subsThumbFetchActive = 0;
+  let subsThumbFetchAbort = null;
   /** @type {{toolbar:HTMLElement,search:HTMLInputElement,observer:IntersectionObserver|null}|null} */
   let subsGridState = null;
   /** @type {MutationObserver|null} ネイティブ sort dropdown 操作後の card 再 hydrate を検出する observer */
@@ -2128,6 +2132,7 @@
 
   async function applySubsLeftnavInjection() {
     if (!f("subsLeftnavInjectAll")) {
+      abortSubsListFetch();
       document.querySelectorAll(`.${SUBS_INJECT_MARKER}`).forEach((el) => el.remove());
       return;
     }
@@ -2214,8 +2219,7 @@
     // 来るパス相対 (`/@handle`) のはず。`javascript:` / `data:` 等が紛れ込んだ場合に <a> クリックで
     // page world でスクリプト実行される経路を遮断する (/rere レビュー A2-I-2)。
     // 通常の YouTube ハンドル URL は `/` または `https://` 始まりなのでこの 2 形式のみ allowlist。
-    link.href =
-      ch.href.startsWith("/") || ch.href.startsWith("https://") ? ch.href : "/";
+    link.href = SearchFixer.normalizeChannelHref(ch.href);
     link.title = ch.name;
     link.setAttribute("data-handle", ch.handle);
     const avatarUrl = normalizeAvatarUrl(ch.avatarUrl);
@@ -2287,8 +2291,16 @@
         // "same-origin" 固定 (omit にすると未ログイン扱いで取得不能)。referrerPolicy / ALLOWED_HOSTS は
         // same-origin では無意味なので付けない。redirect:"manual" でプロキシ環境の cross-origin 302 を
         // opaqueredirect (res.ok===false) 扱いにし YouTube Cookie 漏洩を塞ぐ (keepalive.js と同型、
-        // external CDN 向けの fetch 4 原則とは別パターン — CLAUDE.md「外部 fetch allowlist 設計」参照)。
-        const res = await fetch("/feed/channels", { credentials: "same-origin", redirect: "manual" });
+        // external CDN 向けの fetch 4 原則とは別パターン — references/patterns.md「外部 fetch allowlist 設計」参照)。
+        subsListFetchAbort ??= new AbortController();
+        const res = await fetch("/feed/channels", {
+          credentials: "same-origin",
+          redirect: "manual",
+          signal: AbortSignal.any([
+            subsListFetchAbort.signal,
+            AbortSignal.timeout(SearchFixer.SUBS_FETCH_TIMEOUT_MS),
+          ]),
+        });
         if (!res.ok) {
           subsListFetchLastFailedAt = Date.now();
           subsListFetchBackoffMs = Math.min(60000, Math.max(2000, subsListFetchBackoffMs * 2));
@@ -2308,6 +2320,7 @@
         return null;
       } finally {
         subsListFetchInFlight = null;
+        subsListFetchAbort = null;
       }
     })();
     return subsListFetchInFlight;
@@ -2731,6 +2744,7 @@
     if (tb) tb.remove();
     stopSubsGridCardsObserver();
     stopSubsGridResizeListener();
+    abortSubsThumbnailFetches();
     if (subsGridState?.observer) {
       try {
         subsGridState.observer.disconnect();
@@ -2950,7 +2964,7 @@
           for (const entry of entries) {
             if (entry.isIntersecting) {
               observer.unobserve(entry.target); // closure capture 経由で stale な subsGridState 不要
-              fetchAndInjectThumbnail(entry.target);
+              queueSubsThumbnailFetch(entry.target);
             }
           }
         },
@@ -3217,9 +3231,11 @@
       // 同じ handle に対する重複 fetch を抑止（sort-wipe 経路で marker 一括 clear → 再 observe
       // で同じカードが in-flight 中に再 trigger されると、`readSubsThumbCache` は cache miss
       // を返すため fetch が複数走ってしまう）。
-      if (subsThumbFetchingHandles.has(handle)) return;
-      subsThumbFetchingHandles.add(handle);
       try {
+        const signal = AbortSignal.any([
+          subsThumbFetchAbort.signal,
+          AbortSignal.timeout(SearchFixer.SUBS_FETCH_TIMEOUT_MS),
+        ]);
         // v7 (2026-05-28): `/${handle}` (チャンネルトップ) 1 fetch → `/${handle}/videos` +
         // `/${handle}/streams` 2 fetch 並列に切替。ライブ配信中の動画 (LIVE) を最優先 + 配信
         // 予定 (UPCOMING、雑談チャット用が混じることが多い) を除外できるようになった。
@@ -3253,8 +3269,8 @@
         // /streams にしか出ない archived stream のみのチャンネル (LIVE 終了後アーカイブ) には
         // /videos の通常動画候補が代わりに表示される (UX 影響ほぼなし)。
         // same-origin 認証 fetch (credentials:"same-origin" 固定、omit 不可)。/feed/channels と同型で、
-        // external CDN 向け fetch 4 原則とは別パターン (CLAUDE.md「外部 fetch allowlist 設計」参照)。
-        const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin", redirect: "manual" })
+        // external CDN 向け fetch 4 原則とは別パターン (references/patterns.md「外部 fetch allowlist 設計」参照)。
+        const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin", redirect: "manual", signal })
           .then((r) => (r.ok ? r.text() : null))
           .catch(() => null);
         // 軽量 LIVE 検出: 1 マッチで早期判定 (matchAll の前段、lastIndex 進行を避けるため new RegExp)
@@ -3263,7 +3279,7 @@
           new RegExp('"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"').test(videosHtml);
         let streamsHtml = null;
         if (!liveDetectedInVideos) {
-          streamsHtml = await fetch(`/${handle}/streams`, { credentials: "same-origin", redirect: "manual" })
+          streamsHtml = await fetch(`/${handle}/streams`, { credentials: "same-origin", redirect: "manual", signal })
             .then((r) => (r.ok ? r.text() : null))
             .catch(() => null);
         }
@@ -3313,6 +3329,7 @@
               method: "HEAD",
               credentials: "omit",
               redirect: "manual",
+              signal,
             }).then((r) => ({ vid, ok: r.ok }))
           )
         );
@@ -3334,6 +3351,7 @@
                 method: "HEAD",
                 credentials: "omit",
                 redirect: "manual",
+                signal,
               }).then((r) => ({
                 vid,
                 len: parseInt(r.headers.get("content-length") || "0", 10),
@@ -3355,8 +3373,6 @@
         writeSubsThumbCache(handle, { thumbUrl, channelId, ts: Date.now() });
       } catch {
         return;
-      } finally {
-        subsThumbFetchingHandles.delete(handle);
       }
     }
     if (!thumbUrl) return;
@@ -3389,6 +3405,42 @@
     // #avatar-section 直下に置く。`#avatar` 内に置くとアバター 36px 円の上に乗ってしまう。
     const slot = card.querySelector("#avatar-section") || card;
     slot.appendChild(img);
+  }
+
+  function queueSubsThumbnailFetch(card) {
+    const handle = extractHandleFromHref(card.querySelector("#main-link")?.getAttribute("href") || "");
+    if (!handle || subsThumbFetchingHandles.has(handle)) return;
+    subsThumbFetchingHandles.add(handle);
+    subsThumbFetchQueue.push({ card, handle });
+    drainSubsThumbnailFetchQueue();
+  }
+
+  function drainSubsThumbnailFetchQueue() {
+    if (!subsThumbFetchAbort) subsThumbFetchAbort = new AbortController();
+    while (
+      subsGridState &&
+      subsThumbFetchActive < SearchFixer.SUBS_THUMB_FETCH_CONCURRENCY &&
+      subsThumbFetchQueue.length > 0
+    ) {
+      const task = subsThumbFetchQueue.shift();
+      subsThumbFetchActive++;
+      fetchAndInjectThumbnail(task.card).finally(() => {
+        subsThumbFetchingHandles.delete(task.handle);
+        subsThumbFetchActive--;
+        drainSubsThumbnailFetchQueue();
+      });
+    }
+  }
+
+  function abortSubsThumbnailFetches() {
+    for (const task of subsThumbFetchQueue.splice(0)) subsThumbFetchingHandles.delete(task.handle);
+    try { subsThumbFetchAbort?.abort(); } catch {}
+    subsThumbFetchAbort = null;
+  }
+
+  function abortSubsListFetch() {
+    try { subsListFetchAbort?.abort(); } catch {}
+    subsListFetchAbort = null;
   }
 
   function readSubsThumbCache(handle) {
@@ -3481,6 +3533,8 @@
     try { stopSubsGridResizeListener(); } catch {}
     try { removeAllBlockButtons(); } catch {} // chrome API 非依存、orphan 後も安全
     try { abortForeignCountryFetch(); } catch {} // 同上（待ち行列破棄 + in-flight 中断）
+    try { abortSubsListFetch(); } catch {}
+    try { abortSubsThumbnailFetches(); } catch {}
   }
 
   window.addEventListener(

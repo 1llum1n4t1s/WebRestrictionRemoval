@@ -61,6 +61,7 @@ const Actions = Object.freeze({
 const ExtensionPaths = Object.freeze({
   BACKGROUND: "src/background/background.js",
   POPUP: "src/popup/popup.html",
+  OFFSCREEN: "src/offscreen/offscreen.html",
 });
 
 /**
@@ -81,6 +82,12 @@ const SenderCheck = Object.freeze({
     if (!sender || sender.id !== chrome.runtime.id) return false;
     if (sender.tab) return false;
     return sender.url === chrome.runtime.getURL(ExtensionPaths.POPUP);
+  },
+  /** sender が offscreen document 由来か（background から呼ぶ）。 */
+  isFromOffscreen(sender) {
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    if (sender.tab) return false;
+    return sender.url === chrome.runtime.getURL(ExtensionPaths.OFFSCREEN);
   },
   /** sender が content script 由来か（background から呼ぶ）。 */
   isFromContentScript(sender) {
@@ -103,6 +110,8 @@ const Offscreen = Object.freeze({
   ACTION_VOLUME_RELEASE_ALL: "volumeReleaseAll",
   /** 音量ブースト: 現在 boost 中のタブ数を返す（アイドル close 判定に使用） */
   ACTION_VOLUME_QUERY_ACTIVE: "volumeQueryActive",
+  /** offscreen → background: tabCapture stream の自然終了を通知 */
+  ACTION_VOLUME_STREAM_ENDED: "volumeStreamEnded",
   /** 使用後のアイドル close 待機時間（ms）。tabCapture 系の連続操作を吸収できる長さ */
   IDLE_MS: 30_000,
   /**
@@ -506,6 +515,19 @@ const SearchFixer = Object.freeze({
     return m ? m[1] : null;
   },
 
+  /** leftnav 注入に使える YouTube チャンネル URLだけを返す。 */
+  normalizeChannelHref(href) {
+    if (typeof href !== "string" || href === "") return "/";
+    try {
+      const url = new URL(href, "https://www.youtube.com");
+      if (url.origin !== "https://www.youtube.com") return "/";
+      if (!/^\/(?:@[^/]+|channel\/UC[\w-]{10,64})(?:\/|$)/u.test(url.pathname)) return "/";
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return "/";
+    }
+  },
+
   /** チャンネルブロックリストの登録上限。storage 肥大と検索ページの照合コストの上限を兼ねる。 */
   BLOCKED_CHANNELS_MAX: 500,
 
@@ -579,6 +601,10 @@ const SearchFixer = Object.freeze({
   FOREIGN_FETCH_SESSION_MAX: 60,
   /** about 取得のタイムアウト。無いとスロットを永久占有して待ち行列が止まる（/rere RC-C）。 */
   FOREIGN_FETCH_TIMEOUT_MS: 15000,
+  /** 登録チャンネルの HTML / サムネ候補取得を止めるまでの上限。 */
+  SUBS_FETCH_TIMEOUT_MS: 15000,
+  /** 登録チャンネルカードのサムネ取得同時実行数。 */
+  SUBS_THUMB_FETCH_CONCURRENCY: 2,
 
   /**
    * タイトル / チャンネル名の文字種から、そのカードが自国コンテンツか判定する（純粋関数）。
@@ -2447,7 +2473,7 @@ const NotebookLm = Object.freeze({
    */
   buildNotebookUrl(notebookId, accountIndex) {
     const n = NotebookLm.normalizeAccountIndex(accountIndex);
-    const base = `${NotebookLm.ORIGIN}/notebook/${notebookId}`;
+    const base = `${NotebookLm.ORIGIN}/notebook/${encodeURIComponent(String(notebookId ?? ""))}`;
     return n > 0 ? `${base}?authuser=${n}` : base;
   },
 
@@ -2528,6 +2554,14 @@ const NotebookLm = Object.freeze({
     return m ? m[0] : null;
   },
 
+  /** 外部入力が UUID そのものの場合だけ notebook ID として受理する。 */
+  normalizeNotebookId(value) {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    const id = NotebookLm.extractNotebookId(trimmed);
+    return id && id.length === trimmed.length ? id : null;
+  },
+
   /**
    * URL 配列を RPC_ADD_SOURCES のソース配列に変換する（純粋関数）。
    * YouTube URL は「YouTube ソース」用の 8 番目のスロット、それ以外は「Web サイト」用の
@@ -2588,12 +2622,26 @@ const NotebookLm = Object.freeze({
    */
   normalizeWatchUrl(href) {
     if (typeof href !== "string" || href === "") return null;
+    let url;
+    try {
+      url = new URL(href, "https://www.youtube.com");
+    } catch {
+      return null;
+    }
+    const host = url.hostname.toLowerCase();
+    const isYoutube = host === "youtube.com" || host.endsWith(".youtube.com");
+    const isShort = host === "youtu.be";
+    if (!isYoutube && !isShort) return null;
     let id = null;
-    const m = href.match(/[?&]v=([\w-]{11})(?:[&#]|$)/);
-    if (m) id = m[1];
-    else {
-      const short = href.match(/(?:youtu\.be\/|\/shorts\/|\/live\/|\/embed\/)([\w-]{11})(?:[/?#]|$)/);
-      if (short) id = short[1];
+    if (isShort) {
+      const m = url.pathname.match(/^\/([\w-]{11})(?:\/|$)/);
+      if (m) id = m[1];
+    } else if (url.pathname === "/watch") {
+      const value = url.searchParams.get("v");
+      if (/^[\w-]{11}$/.test(value ?? "")) id = value;
+    } else {
+      const m = url.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]{11})(?:\/|$)/);
+      if (m) id = m[1];
     }
     return id ? `https://www.youtube.com/watch?v=${id}` : null;
   },

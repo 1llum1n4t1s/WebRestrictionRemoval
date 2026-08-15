@@ -328,7 +328,16 @@ chrome.runtime.onInstalled.addListener(async () => {
 // 未知 action 経路も最末尾で `return false;` を明示し、将来の handler 追加で `return true` 漏れの
 // 罠を物理的に避ける (現状の implicit `undefined` 返しでは同じ silent failure リスクが残る)。
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === Actions.APPLY_SETTINGS) {
+  if (request.action === Offscreen.ACTION_VOLUME_STREAM_ENDED) {
+    if (!SenderCheck.isFromOffscreen(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
+    handleVolumeStreamEnded(request.tabId)
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  } else if (request.action === Actions.APPLY_SETTINGS) {
     if (!SenderCheck.isFromPopup(sender)) {
       sendResponse({ ok: false, error: "sender-rejected" });
       return false;
@@ -756,15 +765,23 @@ async function fetchNotebookLmSourceLimit(tokens) {
  * @returns {Promise<{ok: boolean, url?: string, added?: number, skipped?: number, error?: string}>}
  */
 async function sendToNotebookLm(data) {
-  const urls = Array.isArray(data?.urls) ? data.urls.filter((u) => typeof u === "string" && u !== "") : [];
+  const urls = Array.isArray(data?.urls)
+    ? [...new Set(data.urls.map((u) => NotebookLm.normalizeWatchUrl(u)).filter(Boolean))]
+    : [];
   if (urls.length === 0) return { ok: false, error: "no-urls" };
+
+  const hasRequestedNotebook = typeof data?.notebookId === "string" && data.notebookId.trim() !== "";
+  const requestedNotebookId = NotebookLm.normalizeNotebookId(data?.notebookId);
+  if (hasRequestedNotebook && requestedNotebookId === null) {
+    return { ok: false, error: "invalid-notebook-id" };
+  }
 
   const accountIndex = NotebookLm.normalizeAccountIndex(data?.accountIndex);
   const tokens = await fetchNotebookLmTokens(accountIndex);
   if (!tokens.ok) return { ok: false, error: tokens.error };
 
-  const createdHere = !(typeof data?.notebookId === "string" && data.notebookId !== "");
-  let notebookId = createdHere ? null : data.notebookId;
+  const createdHere = requestedNotebookId === null;
+  let notebookId = requestedNotebookId;
   if (!notebookId) {
     const title = typeof data?.title === "string" && data.title.trim() !== ""
       ? data.title.trim().slice(0, 120)
@@ -1299,6 +1316,22 @@ function enqueueVolumeTabOperation(tabId, operation) {
   current.then(cleanup, cleanup);
   return current;
 }
+
+const handleVolumeStreamEnded = async (tabId) => {
+  if (!Number.isInteger(tabId) || tabId <= 0) {
+    return { ok: false, error: "invalid-tab-id" };
+  }
+  return await enqueueVolumeTabOperation(tabId, async () => {
+    // ended 通知と新規 SET が交差しても、タブキュー内で現在の offscreen state を再確認する。
+    // 新しい capture が既に成立していれば boosted 状態を消さない。
+    const current = await getVolumeBoosterGainDirect(tabId);
+    if (!Number.isFinite(current?.gain)) {
+      boostedTabIds.delete(tabId);
+      scheduleOffscreenClose();
+    }
+    return { ok: true };
+  });
+};
 
 function rememberRemovedVolumeBoosterTab(tabId) {
   if (!Number.isInteger(tabId) || tabId <= 0) return;

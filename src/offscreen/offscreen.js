@@ -88,6 +88,13 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       }
     }
 
+    // 共有停止ボタンや内部要因で track が終了した state は既存経路として扱わない。
+    // ended/inactive event 配送前でも stream/track 状態から検出し、fresh streamId を要求させる。
+    if (state && !isAudioStateLive(state)) {
+      await disposeAudioState(tabId, state, true);
+      state = null;
+    }
+
     if (!state) {
       if (activeReleaseAllCount > 0) {
         return { ok: false, error: "release-all-in-progress" };
@@ -237,6 +244,11 @@ async function createAudioState(tabId, streamId, initGeneration) {
       throw new Error(cleanedUp ? "cleanup-during-init" : "release-all-during-init");
     }
     audioStates.set(tabId, state);
+    bindAudioStateEndHandlers(tabId, state);
+    if (!isAudioStateLive(state)) {
+      await disposeAudioState(tabId, state, true);
+      throw new Error("capture-stream-ended-during-init");
+    }
     return state;
   } catch (err) {
     // /rere F-001: DSP ノードチェーン構築失敗の可視化（getUserMedia / AudioContext / connect 失敗）
@@ -246,9 +258,46 @@ async function createAudioState(tabId, streamId, initGeneration) {
   }
 }
 
+const isAudioStateLive = (state) => {
+  if (!state?.stream || state.stream.active === false) return false;
+  const tracks = state.stream.getAudioTracks?.() ?? state.stream.getTracks?.() ?? [];
+  return tracks.some((track) => track.readyState !== "ended");
+};
+
+const bindAudioStateEndHandlers = (tabId, state) => {
+  const onEnded = () => {
+    disposeAudioState(tabId, state, true).catch(() => {});
+  };
+  try { state.stream.addEventListener?.("inactive", onEnded, { once: true }); } catch {}
+  try {
+    state.stream.getAudioTracks().forEach((track) => {
+      track.addEventListener?.("ended", onEnded, { once: true });
+    });
+  } catch {}
+};
+
+const disposeAudioState = async (tabId, state, notifyBackground) => {
+  // 古い state の ended が、新しく作り直した同一 tabId の state を消さないよう identity で fence。
+  if (audioStates.get(tabId) !== state) return false;
+  audioStates.delete(tabId);
+  if (notifyBackground) {
+    chrome.runtime.sendMessage({
+      action: Offscreen.ACTION_VOLUME_STREAM_ENDED,
+      tabId,
+    }).catch(() => {});
+  }
+  try { state.stream?.getTracks().forEach((track) => track.stop()); } catch {}
+  try { await state.ctx?.close(); } catch {}
+  return true;
+};
+
 function volumeGetGain(tabId) {
   const state = audioStates.get(tabId);
   if (!state) return { gain: null };
+  if (!isAudioStateLive(state)) {
+    disposeAudioState(tabId, state, true).catch(() => {});
+    return { gain: null };
+  }
   // gain.value はランプ中の中間値になり得るため、ユーザーが最後に指定した
   // スライダー percent を返す。round-trip 誤差ゼロでスライダー位置を再現できる。
   return { gain: state.lastSetPercent };
@@ -267,10 +316,8 @@ async function volumeReleaseTab(tabId) {
   }
   const state = audioStates.get(tabId);
   if (!state) return { ok: true };
-  audioStates.delete(tabId);
   try {
-    state.stream?.getTracks().forEach((t) => t.stop());
-    await state.ctx.close();
+    await disposeAudioState(tabId, state, false);
   } catch (err) {
     // /rere F-001: close 失敗は致命的ではない（既に閉じている可能性）が、
     // 観測性のため debug ログを残す（warn は info より少し下げて debug 相当）

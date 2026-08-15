@@ -59,6 +59,7 @@
   let broadcastInfo = null;
   /** @type {string | null} fetch 進行中の videoId（重複 fetch 防止） */
   let fetchInFlightVideoId = null;
+  let fetchAbort = null;
   /** same-origin fetch 失敗時の exponential backoff（search-fixer.js の確立パターンと同型:
    *  2s スタート → 倍々 → 60s 上限、成功で 0 リセット）。失敗は cache しない設計のため、
    *  高頻度 MutationObserver 経由の rescan が失敗 fetch を無制限に連打するのを構造的に防ぐ。
@@ -173,7 +174,7 @@
    *   - 通常動画（配信由来でない）: { none:true }（負例 cache）
    *   - 配信中ライブ / 一時失敗: null（cache せず、次回再試行）
    */
-  async function resolveBroadcastInfo(videoId) {
+  async function resolveBroadcastInfo(videoId, signal) {
     const cacheKey = BroadcastClock.CACHE_PREFIX + videoId;
     const cached = readSession(cacheKey);
     if (cached) return cached;
@@ -187,6 +188,7 @@
       const res = await fetch(`/watch?v=${encodeURIComponent(videoId)}`, {
         credentials: "same-origin",
         redirect: "manual",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(BroadcastClock.FETCH_TIMEOUT_MS)]),
       });
       if (!res.ok) return null; // 一時失敗は cache しない
       html = await res.text();
@@ -454,6 +456,8 @@
 
     // 動画が変わったら配信情報をリセット（backoff も新規動画には持ち越さず即試行させる）
     if (videoId !== currentVideoId) {
+      try { fetchAbort?.abort(); } catch {}
+      fetchAbort = null;
       currentVideoId = videoId;
       broadcastInfo = null;
       fetchBackoffMs = 0;
@@ -478,12 +482,17 @@
     if (fetchInFlightVideoId === videoId) return;
     if (fetchBackoffMs > 0 && Date.now() - fetchLastFailedAt < fetchBackoffMs) return;
     fetchInFlightVideoId = videoId;
+    const controller = new AbortController();
+    fetchAbort = controller;
     let info = null;
     try {
-      info = await resolveBroadcastInfo(videoId);
+      info = await resolveBroadcastInfo(videoId, controller.signal);
     } finally {
       if (fetchInFlightVideoId === videoId) fetchInFlightVideoId = null;
+      if (fetchAbort === controller) fetchAbort = null;
     }
+    // SPA 遷移で旧動画の fetch が abort 完了した場合、新動画の backoff 状態を汚さない。
+    if (currentVideoId !== videoId) return;
     if (info) {
       fetchBackoffMs = 0;
     } else {
@@ -561,6 +570,8 @@
       return;
     }
     active = false;
+    try { fetchAbort?.abort(); } catch {}
+    fetchAbort = null;
     resetVideoTracking();
     fetchInFlightVideoId = null;
     if (mutationObserver) {
