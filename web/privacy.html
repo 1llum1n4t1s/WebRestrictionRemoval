@@ -25,7 +25,7 @@
 
   <main id="main" class="legal section-shell">
     <h1>プライバシー<br>ポリシー</h1>
-    <p class="legal-lead">最終更新日: 2026年6月6日</p>
+    <p class="legal-lead">最終更新日: 2026年8月27日</p>
         <p class="legal-quote"><a href="https://github.com/1llum1n4t1s/WebRestrictionRemoval/blob/main/docs/privacy-policy.en.md">English version</a> is also available.</p>
       <section>
         <h2>はじめに</h2>
@@ -33,7 +33,7 @@
       </section>
       <section>
         <h2>収集するデータ</h2>
-        <p>本拡張機能は、個人情報を一切収集しません。</p>
+        <p>本拡張機能は、利用者が自分でお問い合わせフォームを送信したときを除き、個人情報を一切収集しません。フォームを送信したときだけ、入力されたメールアドレスと問い合わせ内容が開発者（Kagayoi）のサポート窓口へ送信されます（下記「例外 4: お問い合わせフォーム」を参照）。</p>
       </section>
       <section>
         <h2>ローカルに保存するデータ</h2>
@@ -88,11 +88,11 @@
       </section>
       <section>
         <h2>データの共有</h2>
-        <p>本拡張機能は、いかなるデータも第三者と共有しません。</p>
+        <p>本拡張機能は、いかなるデータも第三者と共有しません。お問い合わせフォームから送信された内容は、返信のために開発者（Kagayoi）のサポート窓口でのみ取り扱います。</p>
       </section>
       <section>
         <h2>ネットワーク通信</h2>
-        <p>本拡張機能は、以下に明示する 3 つの例外を除き、第三者の外部サーバーへの通信を一切行いません。</p>
+        <p>本拡張機能は、以下に明示する 4 つの例外を除き、外部サーバーへの通信を一切行いません。</p>
         <h3>例外 1: 画像ダウンロード（Instagram / TikTok クリーナーのサブ機能）</h3>
         <p>Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（Instagram: <code>scontent-*.cdninstagram.com</code> / <code>scontent-*.fna.fbcdn.net</code>、TikTok: <code>p&lt;数字&gt;.tiktokcdn.com</code> / <code>p&lt;数字&gt;.tiktokcdn-us.com</code>）に対して画像 GET を発行します。これは現にブラウザが <code>&lt;img&gt;</code> タグでロードしているドメインと同一であり、<code>credentials: &quot;omit&quot;</code> でクッキーは送信せず、<code>redirect: &quot;manual&quot;</code> で 302 経由の第三者ドメイン送信を遮断し、<code>referrerPolicy: &quot;no-referrer&quot;</code> でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します（YouTube では本機能は提供されません）。ダウンロードした画像は Blob URL + <code>&lt;a download&gt;</code> 経由でローカルに保存されるのみで、外部送信は一切行いません。</p>
         <h3>例外 2: 接続モニター（YouTube 機能拡張のサブ機能）</h3>
@@ -127,6 +127,13 @@
         <p>認証にはブラウザに既に保存されている Google のログインセッション（クッキー）を利用します。本拡張機能は Google の認証情報を読み取らず、保存もせず、他のいかなる宛先にも送信しません。Gemini Notebook にログインしていない場合、送信は失敗し、ログインを促す表示のみを行います。</p>
         <p>Gemini Notebook には公開 API が存在しないため、通信には Gemini Notebook の Web アプリ自身が使用する内部エンドポイントを利用します。この仕様は Google 側の都合で予告なく変更される場合があり、その際は本機能が一時的に動作しなくなることがあります。</p>
         <p>本サブ機能 OFF 時 / YouTube 機能拡張のマスタートグル OFF 時には、送信ボタン自体が表示されず、これらの通信は <strong>一切発行されません</strong>。</p>
+        <h3>例外 4: お問い合わせフォーム</h3>
+        <p>設定ポップアップ下部の「お問い合わせ」ボタンからフォームを送信したときだけ、次の情報を Kagayoi Support（<code>https://support.kagayoi.com</code>）へ送信します。ボタンを押さない限り、この通信は発生しません。</p>
+        <ul>
+          <li>入力されたメールアドレス、お名前（任意）、問い合わせ種別、件名、本文</li>
+          <li>製品ID、拡張機能のバージョン、ロケール</li>
+        </ul>
+        <p>初回はメールで届く6桁の確認コードを Kagayoi Support へ送信して本人確認します。認証後の問い合わせと返信は、利用者本人とサポート担当者が確認できるよう Kagayoi Support に保存します。お問い合わせの認証セッション（アクセストークン、メールアドレス、有効期限）は拡張機能の <code>localStorage</code> に保存し、確認コードは保存しません。閲覧中のページの URL、ページの内容、キャプチャした画像、拡張機能の設定は送信しません。</p>
       </section>
       <section>
         <h2>権限の使用目的</h2>
@@ -135,7 +142,7 @@
           <li><strong>storage</strong>: 上記「ローカルに保存するデータ」の各キーを端末内に保存・復元するために使用します。</li>
           <li><strong>offscreen</strong>（Chrome 版のみ。Firefox 版の manifest には含まれません）: 音量ブースターの <code>AudioContext</code> を Service Worker のライフサイクル外で維持するために、オフスクリーン ドキュメント（extension コンテキスト）を利用します。</li>
           <li><strong>tabCapture</strong>（Chrome 版のみ。Firefox 版の manifest には含まれません）: 音量ブースターのスライダーが 100% 以外の値に設定されている場合、または 100% のままでも自動歪み防止 / ナイトモード / ミュート / イコライザのいずれかが有効な場合に、アクティブタブの音声ストリームを取得して <code>AudioContext</code> で増幅・圧縮・周波数調整・消音を行うために使用します。録音・保存・外部送信は一切行いません。</li>
-          <li><strong><code>&lt;all_urls&gt;</code> ホスト権限</strong>: ルーペ機能で <code>chrome.tabs.captureVisibleTab</code> によりアクティブタブの可視領域を JPEG 静止画として取得し、円形レンズに拡大表示するために使用します。<code>activeTab</code> 権限のみでは、ポップアップを閉じた後 / SPA ページで内部 navigation が発生した後に grant が早期失効してキャプチャがブロックされる事例があるため、ルーペ機能を確実に動作させる目的で追加しています。取得した静止画は端末内の Blob URL として保持され、レンズ DOM 撤去と同時に <code>URL.revokeObjectURL</code> で解放されます。外部送信・保存は一切行いません。なお本拡張機能は既に content_scripts として全 http(s) サイトに DOM/CSS 操作のスクリプトを注入しており、<code>&lt;all_urls&gt;</code> ホスト権限の追加でアクセス可能になる範囲は実質変わりません。</li>
+          <li><strong><code>&lt;all_urls&gt;</code> ホスト権限</strong>: ルーペ機能で <code>chrome.tabs.captureVisibleTab</code> によりアクティブタブの可視領域を JPEG 静止画として取得し、円形レンズに拡大表示するために使用します。<code>activeTab</code> 権限のみでは、ポップアップを閉じた後 / SPA ページで内部 navigation が発生した後に grant が早期失効してキャプチャがブロックされる事例があるため、ルーペ機能を確実に動作させる目的で追加しています。取得した静止画は端末内の Blob URL として保持され、レンズ DOM 撤去と同時に <code>URL.revokeObjectURL</code> で解放されます。外部送信・保存は一切行いません。なお本拡張機能は既に content_scripts として全 http(s) サイトに DOM/CSS 操作のスクリプトを注入しており、<code>&lt;all_urls&gt;</code> ホスト権限の追加でアクセス可能になる範囲は実質変わりません。お問い合わせフォームの送信先 <code>https://support.kagayoi.com</code> への通信もこの権限に含まれます。</li>
         </ul>
       </section>
       <section>

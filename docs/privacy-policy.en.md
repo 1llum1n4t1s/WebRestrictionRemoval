@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: June 6, 2026
+Last updated: August 27, 2026
 
 ## Introduction
 
@@ -8,7 +8,7 @@ Last updated: June 6, 2026
 
 ## Data we collect
 
-The Extension does not collect any personal information.
+Except for a contact form you submit yourself, the Extension does not collect any personal information. Only when you submit the form are the email address and message you typed sent to the developer's (Kagayoi) support desk (see "Exception 4: Contact form" below).
 
 ## Data stored locally
 
@@ -65,11 +65,11 @@ While the Loupe master toggle is ON, the Extension uses the `chrome.tabs.capture
 
 ## Data sharing
 
-The Extension does not share any data with third parties.
+The Extension does not share any data with third parties. What you submit through the contact form is handled solely by the developer's (Kagayoi) support desk in order to reply to you.
 
 ## Network communication
 
-The Extension does not communicate with any third-party external servers, with the three explicit exceptions listed below.
+The Extension does not communicate with any external servers, with the four explicit exceptions listed below.
 
 ### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
@@ -117,13 +117,22 @@ Because Gemini Notebook has no public API, the Extension uses the internal endpo
 
 When the sub-feature is OFF or the YouTube Enhancements master toggle is OFF, the send button is not rendered and **none of these requests are issued**.
 
+### Exception 4: Contact form
+
+Only when you press "Contact support" at the bottom of the settings popup and submit the form does the Extension send the following to Kagayoi Support (`https://support.kagayoi.com`). No such request happens unless you press the button.
+
+- The email address, optional name, inquiry category, subject, and message you entered
+- Product ID, extension version, and locale
+
+On first use, the six-digit code delivered by email is sent to Kagayoi Support to verify you. After verification, Kagayoi Support stores the inquiry and replies so that you and support staff can access them. The contact authentication session (access token, email address, expiry) is kept in the extension's `localStorage`; the verification code itself is never stored. The URL or content of pages you browse, captured images, and your extension settings are never sent.
+
 ## Permission usage
 
 - **activeTab**: used to access information about the current tab (e.g. determining the target tab for the Volume Booster) when the user changes settings via the popup.
 - **storage**: used to save and restore the keys listed in "Data stored locally" on the device.
 - **offscreen** (Chrome edition only; not present in the Firefox manifest): used to host an offscreen document (extension context) so the Volume Booster's `AudioContext` can be maintained outside the Service Worker lifecycle.
 - **tabCapture** (Chrome edition only; not present in the Firefox manifest): used to capture the active tab's audio stream for amplification, compression, frequency-band adjustment, or muting in the `AudioContext` when the Volume Booster slider is not at 100%, or when any sub-toggle / mute / equalizer is enabled at 100%. No recording, storage, or external transmission is performed.
-- **`<all_urls>` host permission**: used by the Loupe feature to call `chrome.tabs.captureVisibleTab` against the active tab and display the visible region as a magnified JPEG image in a circular lens. The `activeTab` permission alone is sometimes revoked early after the popup closes or when SPA pages trigger internal navigations, which blocks the capture. The `<all_urls>` host permission ensures the Loupe runs reliably. Captured images are held as Blob URLs locally and released with `URL.revokeObjectURL` as soon as the lens DOM is removed. No external transmission or storage is performed. Note: this extension already injects content scripts on all http(s) sites for DOM/CSS-only operations, so adding the `<all_urls>` host permission does not change the effective access scope.
+- **`<all_urls>` host permission**: used by the Loupe feature to call `chrome.tabs.captureVisibleTab` against the active tab and display the visible region as a magnified JPEG image in a circular lens. The `activeTab` permission alone is sometimes revoked early after the popup closes or when SPA pages trigger internal navigations, which blocks the capture. The `<all_urls>` host permission ensures the Loupe runs reliably. Captured images are held as Blob URLs locally and released with `URL.revokeObjectURL` as soon as the lens DOM is removed. No external transmission or storage is performed. Note: this extension already injects content scripts on all http(s) sites for DOM/CSS-only operations, so adding the `<all_urls>` host permission does not change the effective access scope. Requests to the contact form's destination `https://support.kagayoi.com` are also covered by this permission.
 
 ## Notable changes through v1.0.18 (already applied)
 
