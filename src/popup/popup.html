@@ -832,6 +832,10 @@
     <!-- ===== Version footer ===== -->
     <!-- popup.js が DOMContentLoaded で chrome.runtime.getManifest().version を流し込む。
          サポート対応時に「拡張のバージョンを教えて」確認コストを削るための観測性改善 (I-7)。 -->
+    <div class="support-footer">
+      <kagayoi-support-footer product-id="web-restriction-removal"></kagayoi-support-footer>
+    </div>
+
     <p class="footer-version" id="extVersion"
        data-i18n-attr="aria-label:extVersionAriaLabel"
        aria-label="拡張機能のバージョン"></p>
@@ -839,5 +843,7 @@
 
   <script src="../lib/actions.js"></script>
   <script src="popup.js"></script>
+  <script type="module" src="../shared/kagayoi-support-popup.js"></script>
+  <script type="module" src="../shared/kagayoi-support-footer.js"></script>
 </body>
 </html>
