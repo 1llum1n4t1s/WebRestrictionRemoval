@@ -25,6 +25,7 @@ test("設定画面へ共通のサポートフッターを組み込んでいる",
   const html = read(SETTINGS_HTML);
 
   assert.match(html, new RegExp(`<kagayoi-support-footer[^>]+product-id="${PRODUCT_ID}"`));
+  assert.match(html, /<kagayoi-support-footer\b[^>]*\bfirefox-data-consent\b[^>]*>/);
   assert.match(html, /<script type="module" src="[^"]*shared\/kagayoi-support-popup\.js"><\/script>/);
   assert.match(html, /<script type="module" src="[^"]*shared\/kagayoi-support-footer\.js"><\/script>/);
   assert.ok(
@@ -38,6 +39,12 @@ test("同梱した共通部品が正本の契約を満たす", () => {
   const footerJs = read("src/shared/kagayoi-support-footer.js");
 
   assert.match(popupJs, /const DEFAULT_API_BASE = "https:\/\/support\.kagayoi\.com"/);
+  assert.match(popupJs, /const API_TIMEOUT_MS = 15_000/);
+  assert.match(popupJs, /signal: AbortSignal\.timeout\(API_TIMEOUT_MS\)/);
+  assert.match(
+    popupJs,
+    /const FIREFOX_OPTIONAL_CONTACT_DATA_PERMISSIONS = \["personalCommunications"\]/,
+  );
   assert.match(popupJs, /this\.form\.setAttribute\("channel", "extension"\)/);
   assert.match(popupJs, /this\.form\.setAttribute\("storage", "local"\)/);
   assert.match(popupJs, /customElements\.define\("kagayoi-contact-popup", KagayoiContactPopup\)/);
@@ -77,9 +84,11 @@ test("Firefox 版が問い合わせで送るデータを AMO へ申告してい�
     const gecko = manifestAt(manifestPath)?.browser_specific_settings?.gecko;
     if (!gecko) continue;
     const declared = gecko.data_collection_permissions?.required ?? [];
+    const optional = gecko.data_collection_permissions?.optional ?? [];
     for (const category of ["personallyIdentifyingInfo", "authenticationInfo"]) {
       assert.ok(declared.includes(category), `${manifestPath} の申告に ${category} が要る`);
     }
+    assert.ok(optional.includes("personalCommunications"), `${manifestPath} の optional 申告に personalCommunications が要る`);
     assert.equal(declared.includes("none"), false, `${manifestPath}: "none" は併記できない`);
   }
 });

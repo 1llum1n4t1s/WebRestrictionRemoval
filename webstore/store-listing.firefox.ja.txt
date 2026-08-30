@@ -53,7 +53,7 @@ EyeDropper API ベース。HEX / RGB / HSL 形式で履歴を最大 20 件、`br
 0〜300% の音量補正・自動歪み防止・ナイトモード・壁ドン対策モード（低音カット）・ミュート・10 バンドグラフィックイコライザ (プリセット同梱)。Firefox 版は専用のページ内音声処理 (MediaElementSource) で動作し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。制約: DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）では仕様上利用できません（動画は普通に再生されます）。音声はページ内で処理され、録音・保存・外部送信は一切行いません。
 
 ■ プライバシー
-すべてローカル実行・外部送信ゼロ。`browser.storage.local` のみ使用 (sync なし、クラウド同期なし)。プライバシーポリシーは docs/privacy-policy.md を参照。
+設定は `browser.storage.local` のみに保存します。閲覧支援データは広告・解析・テレメトリ目的で送信しません。利用者がお問い合わせフォームを送信したときだけ入力内容を Kagayoi Support へ送り、画像取得・接続モニター・Gemini Notebook 送信では利用者が操作または有効化した機能に必要な通信だけを行います。詳しくは docs/privacy-policy.md を参照してください。
 
 ■ 動作要件
 Firefox 142 以降。

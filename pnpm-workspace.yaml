@@ -9,6 +9,8 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - puppeteer-core@25.4.0
   - puppeteer@25.4.0
+  - kagayoi-support-extension@1.0.2
+  - kagayoi-support-extension@1.0.4
 
 # overrides: web-ext 配下の transitive 脆弱性をパッチ版へ固定する
 # (脆弱範囲にだけ効く versioned selector で blast radius を最小化)

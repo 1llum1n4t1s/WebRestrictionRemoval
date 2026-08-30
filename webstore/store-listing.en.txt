@@ -85,9 +85,10 @@ Settings are auto-saved and restored on next launch.
 
 ■ Privacy
 
-· No personal information or user data is collected.
 · Settings are stored only on your device (chrome.storage.local).
-· No communication with any third-party external servers.
+· Page content and tab audio are not collected or transmitted for advertising, analytics, or telemetry.
+· Only when you submit the optional contact form are your email address, optional name, inquiry content, verification code, and related support details sent to Kagayoi Support.
+· Other external communication is limited to user-initiated or opt-in Instagram / TikTok image retrieval, the YouTube live connection monitor, and sending video URLs to Gemini Notebook.
   (When the Instagram / TikTok image download button is ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
 · While Volume Booster is in use, tab audio data is only amplified and re-output through an AudioContext; no recording, storage, or external transmission is performed.
 

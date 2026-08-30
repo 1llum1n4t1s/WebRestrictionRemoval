@@ -4,6 +4,8 @@
   "type": "commonjs",
   "description": "Browser extension that bundles the YouTube enhancements, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {
+    "sync:support": "node --preserve-symlinks-main ./node_modules/kagayoi-support-extension/bin/kagayoi-support-sync.mjs",
+    "prebuild": "pnpm sync:support",
     "ci:install": "pnpm install --frozen-lockfile",
     "generate-icons": "node scripts/generate-icons.js",
     "generate-screenshots": "node webstore/generate-screenshots.js",
@@ -13,10 +15,11 @@
   },
   "devDependencies": {
     "chrome-webstore-upload-cli": "^4.0.1",
-    "eslint": "^10.9.0",
+    "eslint": "^10.9.1",
     "globals": "^17.11.0",
-    "puppeteer": "^25.8.0",
-    "sharp": "0.35.3",
+    "kagayoi-support-extension": "1.0.4",
+    "puppeteer": "^25.9.0",
+    "sharp": "0.35.4",
     "web-ext": "^10.6.0"
   },
   "keywords": [
