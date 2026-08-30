@@ -1337,6 +1337,20 @@ test("FEATURES 件数の固定アサート（ドキュメント整合性の再�
 
 // ---------- 海外チャンネル除外 (hideForeignChannels) の純粋関数 ----------
 
+test("search-fixer: about 取得失敗はセッション予算を消費し、明示中断だけ返却", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "src/content/search-fixer.js"), "utf8");
+  const start = source.indexOf("async function fetchChannelOrigin");
+  const end = source.indexOf("\n  function applyForeignChannelFilter", start);
+  assert.notEqual(start, -1, "fetchChannelOrigin が存在する");
+  assert.notEqual(end, -1, "fetchChannelOrigin の終端を特定できる");
+  const fetchChannelOrigin = source.slice(start, end);
+
+  assert.match(fetchChannelOrigin, /requestAbort = foreignFetchAbort \|\| new AbortController\(\)/);
+  assert.match(fetchChannelOrigin, /foreignFetchAbort = requestAbort/);
+  assert.match(fetchChannelOrigin, /else if \(requestAbort\.signal\.aborted\) foreignFetchBudgetUsed--/);
+  assert.doesNotMatch(fetchChannelOrigin, /else foreignFetchBudgetUsed--/);
+});
+
 test("SearchFixer.detectTextOrigin: 自国固有スクリプトで home、別スクリプトで foreign", () => {
   const d = G.SearchFixer.detectTextOrigin;
   // 仮名を含めば日本語話者にとって home（漢字が混ざっていても同じ）

@@ -1195,7 +1195,8 @@
     // フィード外への SPA 遷移で abort するたびに予約分がセッション上限を食い潰し、
     // 機能を再開しても about 取得が早期に打ち切られて判定が実質止まる
     // （fail-open なので誤除去にはならないが、機能が効かなくなる）。
-    // in-flight 分は fetchChannelOrigin の finally が未確定として減算するので触らない。
+    // in-flight 分は各リクエストが捕捉した共有 controller の abort を確認し、
+    // fetchChannelOrigin の finally で減算するので触らない。
     foreignFetchBudgetUsed = Math.max(0, foreignFetchBudgetUsed - foreignFetchQueue.size);
     foreignFetchQueue.clear();
     try { foreignFetchAbort?.abort(); } catch {}
@@ -1212,17 +1213,18 @@
    * 恒久的に潰していた。
    */
   async function fetchChannelOrigin(key, path) {
+    const requestAbort = foreignFetchAbort || new AbortController();
+    foreignFetchAbort = requestAbort;
     let origin = null;      // null = 未確定（キャッシュしない）
     try {
       if (!chrome.runtime?.id) return; // orphan 化後は静かに諦める
       // タイムアウト必須（/rere RC-C）: signal が無いと応答が返らない fetch が
       // FOREIGN_FETCH_CONCURRENCY のスロットを永久占有し、待ち行列全体が停止する。
-      if (!foreignFetchAbort) foreignFetchAbort = new AbortController();
       const res = await fetch(`${path}/about`, {
         credentials: "same-origin",
         redirect: "manual",
         signal: AbortSignal.any([
-          foreignFetchAbort.signal,
+          requestAbort.signal,
           AbortSignal.timeout(SearchFixer.FOREIGN_FETCH_TIMEOUT_MS),
         ]),
       });
@@ -1239,7 +1241,9 @@
     } finally {
       foreignFetchInFlight.delete(key);
       if (origin) writeForeignCache(key, origin);
-      else foreignFetchBudgetUsed--; // 未確定は予算を消費しなかった扱いにして再挑戦を許す
+      // master OFF / 対象外ページへの遷移など、共有 controller による明示中断だけ返却する。
+      // timeout / 非 OK / 通信失敗まで返すと同じ key が再投入され続け、セッション上限を迂回する。
+      else if (requestAbort.signal.aborted) foreignFetchBudgetUsed--;
       pumpForeignCountryFetch();
       // 判定が確定したカードを取り除くため、次フレームでまとめて再スキャンする
       if (origin === "foreign") scheduleForeignRescan();
