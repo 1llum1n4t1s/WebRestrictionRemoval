@@ -5,7 +5,6 @@ webstore/popup-shim.js
 icons/icon-*.png
 temp-build/
 *.zip
-.serena/
 .claude/
 temp/
 cxcx-out/
