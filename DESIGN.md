@@ -31,12 +31,13 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 ```text
 利用者
   → Popup
+  → Background の APPLY_SETTINGS（同期世代の検証・部分更新）
   → chrome.storage.local
-  → Background の APPLY_SETTINGS / storage.onChanged
-  → APPLY_*_CS
-  → 対象 Content Script
+  → APPLY_*_CS 通知 / Content Script の storage.onChanged
   → DOM / CSS / video 要素へ適用
 ```
+
+音量の詳細設定やルーペの倍率・サイズなどは popup から `storage.local` へ直接保存し、各設定の購読先へ反映します。
 
 設定名・既定値・storage 変換は `SettingsSchema`、メッセージ名は `Actions`、機能一覧は各 `FEATURES` 配列を正本にします。background は既存 storage と partial payload をマージして正規化し、content script は初期取得・メッセージ・`storage.onChanged` のいずれから更新されても同じ状態へ収束します。
 
@@ -51,7 +52,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 - 未リリースの旧試作 v1 は初参加時だけ読み替え、v2 保存成功後に既知の旧同期キーを撤去します。旧 baseline は初期化時に除去します。バージョン不明のデータは読み込みません。
 - 初参加時の既存値は編集時刻不明として時刻0を使います。設定保存から変更通知の永続化までの間にプロセスが終了した場合は、再起動時の差分検出時刻で回復します。時計がずれた未通信の端末同士で実際の操作順を完全には判定できませんが、受信済みのレコードは同じ順序で比較します。
 
-popup は操作した項目（サブ機能は1項目）と読込時の同期世代だけを送信します。background は同期反映と同じ書込キュー内で世代を照合し、古い画面からの遅延要求を破棄します。保存も変更キーだけに限定します。受信反映時は popup を再読込し、内部状態と表示を一緒に復元します。認証・アカウント情報・採色履歴・表示位置は同期対象外です。ブラウザの同期と容量制限は [Chrome Storage API](https://developer.chrome.com/docs/extensions/reference/api/storage) と [Firefox storage.sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync) を参照してください。
+popup の `APPLY_SETTINGS` 経路は操作した項目（サブ機能は1項目）と読込時の同期世代だけを送信します。background は同期反映と同じ書込キュー内で世代を照合し、古い画面からの遅延要求を破棄します。保存も変更キーだけに限定します。受信反映時は popup を再読込し、内部状態と表示を一緒に復元します。認証・アカウント情報・採色履歴・表示位置は同期対象外です。ブラウザの同期と容量制限は [Chrome Storage API](https://developer.chrome.com/docs/extensions/reference/api/storage) と [Firefox storage.sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync) を参照してください。
 
 ### 音量ブースター
 

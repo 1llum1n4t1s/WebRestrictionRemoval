@@ -84,6 +84,8 @@ pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zi
 | `test/manifest-drift.test.js` | `manifest.json` と `manifest.firefox.json` の content_scripts 一致検証 |
 | `test/audio-pipeline.test.js` | `src/lib/audio-pipeline.js` の DSP ヘルパー |
 | `test/kagayoi-support.test.js` | 同梱した問い合わせ部品と popup / manifest / プライバシーポリシーの契約・正本一致検証 |
+| `test/settings-sync.test.js` | 設定同期のオプトイン・競合解決・削除伝播・再起動回復・容量超過時の保持 |
+| `test/settings-application.test.js` | popup の部分更新・同期世代と保存キュー・Chrome 音量設定の全ブーストタブ反映 |
 | `test/_load-actions.js` | 上記から共有する actions.js ロード用ヘルパー。Node.js の自動探索対象にもなるため、総件数は `pnpm test` の出力を正とする |
 
 ### 依存パッケージの運用
@@ -129,6 +131,8 @@ pnpm lint
 ## Architecture
 
 システム全体の責務・境界・データフロー・不変条件は [DESIGN.md](DESIGN.md) を設計の正本とする。機能別の実装詳細は [references/architecture.md](references/architecture.md) にあるため、**下の機能を触る前に必ず該当節を読む**。
+
+設定キーや保存経路を変更するときは、[DESIGN.md の「任意のPC間同期」](DESIGN.md#任意のpc間同期) を読み、`src/background/settings-sync.js` の同期対象と競合解決単位も確認する。検証は上記2つの設定関連テストを含む `pnpm test` で行う。
 
 | 触る対象 | 読む節 |
 | --- | --- |
