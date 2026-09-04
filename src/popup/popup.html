@@ -826,6 +826,19 @@
 
     </div><!-- /panel.picker -->
 
+    <section class="grp settings-sync" aria-labelledby="settingsSyncTitle">
+      <label class="settings-sync-label" for="settingsSyncToggle">
+        <span id="settingsSyncTitle" data-i18n="settingsSyncTitle">複数PC間で設定を同期</span>
+        <span class="switch">
+          <input type="checkbox" id="settingsSyncToggle" aria-describedby="settingsSyncDescription" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <p id="settingsSyncDescription" class="settings-sync-note" data-i18n="settingsSyncDescription"></p>
+      <p id="settingsSyncStatus" class="settings-sync-note" role="status" aria-live="polite"></p>
+      <button type="button" id="settingsSyncRetry" data-i18n="settingsSyncRetry" hidden>同期を再試行</button>
+    </section>
+
     <!-- ===== Status (live region) ===== -->
     <p class="footer-status" id="statusMsg" role="status" aria-live="polite"></p>
 
@@ -843,6 +856,7 @@
 
   <script src="../lib/actions.js"></script>
   <script src="popup.js"></script>
+  <script src="settings-sync.js"></script>
   <script type="module" src="../shared/kagayoi-support-popup.js"></script>
   <script type="module" src="../shared/kagayoi-support-footer.js"></script>
 </body>

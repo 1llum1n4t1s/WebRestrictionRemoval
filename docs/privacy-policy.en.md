@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: August 27, 2026
+Last updated: September 5, 2026
 
 ## Introduction
 
@@ -12,12 +12,12 @@ Except for a contact form you submit yourself, the Extension does not collect an
 
 ## Data stored locally
 
-The Extension stores the following settings only on the user's device (`chrome.storage.local`):
+The Extension stores the following settings on the user's device (`chrome.storage.local`). See Exception 5 for optional settings sync:
 
 - **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 34 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
 - **`searchFixerFeatures`** (object): on/off state of each of the 34 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
-- **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored only on-device; never transmitted.
+- **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored on-device by default; included in optional settings sync (Exception 5).
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
 - **`amazonRankingJumpEnabled`** (boolean): whether the "Go to this product's ranking" button on Amazon product pages is enabled. Default OFF.
 - **`instagramCleanerEnabled`** (boolean): whether the Instagram cleaner is enabled.
@@ -49,7 +49,7 @@ The Extension stores the following settings only on the user's device (`chrome.s
 - **`colorPickerHexHash`** (boolean, default true): whether to include the leading `#` when copying in HEX format.
 - **`popupLastTab`** (string, one of `"tune"` / `"youtube"` / `"instagram"` / `"tiktok"` / `"picker"`): the last tab the popup had open. Used to restore the popup state on next launch. Legacy value `"assist"` is auto-migrated to `"tune"`.
 
-These values are stored only on the device and are never transmitted to any external server.
+These values are normally stored on the device. When settings sync is enabled, the settings described in Exception 5 are also saved to browser sync storage.
 
 **On Chrome**, the Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled. **On Firefox**, the current gain value is held only in the in-page audio pipeline's memory (see "Tab audio access" below) and is likewise never persisted.
 
@@ -65,11 +65,11 @@ While the Loupe master toggle is ON, the Extension uses the `chrome.tabs.capture
 
 ## Data sharing
 
-The Extension does not share any data with third parties. What you submit through the contact form is handled solely by the developer's (Kagayoi) support desk in order to reply to you.
+When settings sync is enabled, the settings described in Exception 5 are shared with the browser provider’s sync service. Data is not shared for advertising or analytics. What you submit through the contact form is handled solely by the developer's (Kagayoi) support desk in order to reply to you.
 
 ## Network communication
 
-The Extension does not communicate with any external servers, with the four explicit exceptions listed below.
+The Extension does not communicate with any external servers, with the five explicit exceptions listed below.
 
 ### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
@@ -125,6 +125,10 @@ Only when you press "Contact support" at the bottom of the settings popup and su
 - Product ID, extension version, and locale
 
 On first use, the six-digit code delivered by email is sent to Kagayoi Support to verify you. After verification, Kagayoi Support stores the inquiry and replies so that you and support staff can access them. The contact authentication session (access token, email address, expiry) is kept in the extension's `localStorage`; the verification code itself is never stored. The URL or content of pages you browse, captured images, and your extension settings are never sent.
+
+### Exception 5: Settings sync across PCs
+
+“Sync settings across PCs” is OFF by default. When enabled on each PC, feature toggles, sub-features, audio/equalizer, video/loupe settings, blocked channels, and color copy format are stored in the browser’s storage.sync. If browser sync is enabled, the browser provider (Google for Chrome, Mozilla for Firefox) shares them with PCs using the same browser and account. Nothing is sent to the developer’s server. Authentication, destination accounts, account caches, color history, selected popup tabs, HUD positions, browsing URLs, page content, audio, and images are excluded. Update timestamps, logical counters, a randomly generated extension device ID, and deletion records are also synced to resolve conflicts. The ID is not derived from hardware names or account information and is not used for advertising or analytics. The opt-in switch and applied-state bookkeeping remain local. Turning sync off stops this PC from sending or applying settings, but does not delete data already in browser sync storage.
 
 ## Permission usage
 

@@ -45,11 +45,12 @@ Vuora は Chrome 拡張機能 (Manifest V3)。Web ブラウジングを快適に
 - **独立機能ではないサブ統合**:
   - 接続モニター = YouTube 機能拡張のサブ機能 `connectionMonitor`（master `searchFixerEnabled` AND で制御）
   - 画像ダウンロード = Instagram / TikTok 各クリーナーのサブ機能として共通実装（YouTube では未提供）
-- **外部通信ゼロ + 4 例外（番号は `docs/privacy-policy.{md,en.md}` の見出しと一致させる。独自番号を作らない）**: すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、既定では外部通信ゼロ。
+- **外部通信ゼロ + 5 例外（番号は `docs/privacy-policy.{md,en.md}` の見出しと一致させる。独自番号を作らない）**: すべての機能はクライアントサイド DOM/CSS 操作と Chrome 標準 API のみによる独自実装で、既定では外部通信ゼロ。
   - **例外 1: 画像ダウンロード**（Instagram / TikTok クリーナーのサブ機能）— CDN からの**取得のみ**でユーザーデータの送信はゼロ。fetch 4 原則は §外部 fetch allowlist 設計。
   - **例外 2: 接続モニター** — ON 中の YouTube ライブ視聴時のみ 5 秒周期で `https://www.gstatic.com/generate_204` と `https://speed.cloudflare.com/__down?bytes=10` への RTT 計測 fetch（`mode: "no-cors"` + `credentials: "omit"` + `referrerPolicy: "no-referrer"`、レスポンス本文は破棄、識別子・cookie・ユーザーデータは送信せず）。
   - **例外 3: Gemini Notebook 送信** — ON 中の `https://notebooklm.google.com`（ユーザー自身の Google アカウント宛）との通信。**動画 URL とノートブック名を送るのはユーザーがボタンを押した瞬間のみ**で、対象ページで送信ボタンを出したときに行う**アカウント一覧 / ノートブック一覧の先読みは読み取りのみ**（視聴内容・動画 URL・識別子は送らない）。視聴履歴収集・バックグラウンド送信なし。詳細は §Gemini Notebook 送信。
   - **例外 4: お問い合わせフォーム** — popup 下部からユーザーが送信したときだけ `https://support.kagayoi.com` へ入力内容と製品 ID / バージョン / ロケールを送る。閲覧 URL・ページ内容・キャプチャ画像・拡張設定は送らない。初回のメール確認と認証セッションを含む詳細は `docs/privacy-policy.{md,en.md}` を正本とする。
+  - **例外 5: 設定同期** — 各PCで明示的に ON にした場合だけ、機能設定とチャンネル除外リストをブラウザ標準の `storage.sync` へ保存する。認証情報・アカウント選択・キャッシュ・採色履歴・表示位置は端末内に保持する。実装は `src/background/settings-sync.js`、仕様は `DESIGN.md` とプライバシーポリシーを参照。
 - **バージョン管理**: バージョン番号は `/vava` スキル経由でのみ更新する（コード変更コミットで `manifest.json` / `package.json` / `pnpm-lock.yaml` の version フィールドには触らない）。
 - **旧呼称 drift check**: Vuora 改名前の「WEB閲覧アシスト」「Web Viewing Assist」「Web Restriction Removal Helper」が、`docs/privacy-policy.en.md` の `formerly` 表記・`docs/privacy-policy.md` の「旧称:」表記（いずれも意図的な改名履歴の明記）以外で意図せず残ってないか定期確認:
   ```bash

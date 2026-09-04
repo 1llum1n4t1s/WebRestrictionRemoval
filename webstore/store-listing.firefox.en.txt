@@ -53,7 +53,7 @@ EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stor
 0–300% amplification, auto distortion guard, night mode, wall-thump guard (bass cut), mute, and a 10-band graphic equalizer with presets. The Firefox edition runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. Limitation: it cannot work on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally. Audio is processed inside the page; nothing is recorded, stored, or transmitted.
 
 ■ Privacy
-Settings are stored only in `browser.storage.local`. Browsing-assistance data is not sent for advertising, analytics, or telemetry. Contact details are sent to Kagayoi Support only when you submit the optional form; image retrieval, the connection monitor, and Gemini Notebook use only the network requests required by the features you explicitly operate or enable. See docs/privacy-policy.md for details.
+Settings are stored in `browser.storage.local`; optional settings sync shares eligible settings through the browser's sync service. Browsing-assistance data is not sent for advertising, analytics, or telemetry. Contact details are sent to Kagayoi Support only when you submit the optional form; image retrieval, the connection monitor, and Gemini Notebook use only the network requests required by the features you explicitly operate or enable. See docs/privacy-policy.md for details.
 
 ■ Requirements
 Firefox 142 or later.

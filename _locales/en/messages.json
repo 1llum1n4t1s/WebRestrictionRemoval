@@ -1,4 +1,25 @@
 {
+  "settingsSyncTitle": {
+    "message": "Sync settings across PCs"
+  },
+  "settingsSyncDescription": {
+    "message": "On each PC, sign in to the same account in the same browser, enable extension sync in the browser, and turn this option on. Existing synced settings take priority when enabling; subsequent conflicts use the newer update information for each setting. Chrome and Firefox cannot sync with each other. Authentication, destination accounts, color history, and panel positions stay on this PC. Turning this off does not delete cloud data."
+  },
+  "settingsSyncOff": {
+    "message": "Sync is off. Settings are saved on this PC."
+  },
+  "settingsSyncWorking": {
+    "message": "Checking synced settings…"
+  },
+  "settingsSyncReady": {
+    "message": "Saved to browser sync storage. Other PCs may take time to receive changes."
+  },
+  "settingsSyncError": {
+    "message": "Sync failed. Local settings are retained. Check browser sync and storage limits, then retry. Settings and retained deletion records can exceed the sync quota."
+  },
+  "settingsSyncRetry": {
+    "message": "Retry sync"
+  },
   "appName": {
     "message": "Vuora",
     "description": "Extension name shown in chrome://extensions and the Chrome Web Store"

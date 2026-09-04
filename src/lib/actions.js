@@ -122,6 +122,12 @@ const Offscreen = Object.freeze({
 
 /** @readonly ストレージキー */
 const StorageKeys = Object.freeze({
+  /** PC ごとの同期オプトインと、同期処理のローカル管理情報。 */
+  SETTINGS_SYNC_ENABLED: "settingsSyncEnabled",
+  SETTINGS_SYNC_STATE: "_settingsSyncState",
+  SETTINGS_SYNC_STATUS: "_settingsSyncStatus",
+  SETTINGS_SYNC_RETRY: "_settingsSyncRetry",
+  SETTINGS_SYNC_APPLIED: "_settingsSyncApplied",
   /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 34 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube 機能拡張の個別機能オン/オフ（オブジェクト） */

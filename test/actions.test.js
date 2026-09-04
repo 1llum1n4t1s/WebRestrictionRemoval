@@ -1685,7 +1685,7 @@ test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema
   );
 });
 
-// クリーナーのサブ機能トグルは popup.js が `for (const input of <xx>FeatureInputs.values())` で
+// クリーナーのサブ機能トグルは popup.js が `for (const [key, input] of <xx>FeatureInputs)` で
 // change リスナーを張ることで初めて保存される。X クリーナー追加時にこのループを書き忘れ、
 // 「トグルを ON にしても閉じると OFF に戻る」実害が出た（2026-07-28、実機で発覚）。
 // map を定義しただけでリスナー登録を忘れる drift を機械的に検知する。
@@ -1700,7 +1700,7 @@ test("popup.js: すべての <xx>FeatureInputs に change リスナー登録ル�
   assert.ok(defined.length >= 4, `FeatureInputs map が想定より少ない: ${defined.join(",")}`);
 
   const missing = defined.filter((name) => {
-    const loop = new RegExp(`for\\s*\\(\\s*const\\s+input\\s+of\\s+${name}\\.values\\(\\)\\s*\\)`);
+    const loop = new RegExp(`for\\s*\\(\\s*const\\s+\\[key,\\s*input\\]\\s+of\\s+${name}\\s*\\)\\s*\\{\\s*input\\.addEventListener\\("change"`);
     return !loop.test(popupSrc);
   });
   assert.deepEqual(

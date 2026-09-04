@@ -87,10 +87,10 @@ Vuora
 
 ■ プライバシー
 
-・設定はお使いの端末内（chrome.storage.local）にのみ保存されます
+・設定は通常、お使いの端末内（chrome.storage.local）に保存されます。任意のPC間同期をONにすると、対象設定をブラウザの同期サービスで共有します
 ・閲覧ページの内容やタブ音声を、広告・解析・テレメトリ目的で収集または送信しません
 ・利用者が任意のお問い合わせフォームを送信したときだけ、入力したメールアドレス・任意のお名前・問い合わせ内容・確認コード等を Kagayoi Support へ送信します
-・このほかの外部通信は、利用者が操作または有効化した Instagram / TikTok の画像取得、YouTube ライブ接続モニター、Gemini Notebook への動画 URL 送信に限られます
+・このほかの外部通信は、利用者が操作または有効化した Instagram / TikTok の画像取得、YouTube ライブ接続モニター、Gemini Notebook への動画 URL 送信、ブラウザ標準の設定同期に限られます
   （Instagram / TikTok の画像ダウンロードボタン ON 時、ユーザーがボタンをクリックした瞬間のみ各サイトの正規 CDN（*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com）に画像 GET を発行します。credentials:omit + redirect:manual + referrerPolicy:no-referrer でクロスオリジン認証情報送信を遮断し、それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します）
 ・音量ブースター利用時のタブ音声データは AudioContext で増幅・再出力するのみで、録音・保存・外部送信は行いません
 
@@ -146,7 +146,7 @@ Vuora
   ポップアップから現在のタブに設定を反映し、音量ブースター対象タブの判定に使うため。
 
   storage:
-  機能トグル・スライダー設定・カラーピッカー履歴を端末内 (chrome.storage.local) に保存するため。
+  機能トグル・スライダー設定・カラーピッカー履歴を端末内 (chrome.storage.local) に保存し、任意のPC間同期をONにした場合は対象設定を storage.sync へ保存するため。採色履歴と認証情報は同期対象外です。
 
   offscreen:
   音量ブースターの AudioContext / GainNode / BiquadFilterNode / DynamicsCompressor チェーンを Service Worker 外で維持するため。tabCapture で取得したタブ音声をこの offscreen document の AudioContext に流し込み、0〜300% の増幅・10 バンド EQ・圧縮を行います。

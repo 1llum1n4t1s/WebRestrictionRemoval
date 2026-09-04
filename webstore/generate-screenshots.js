@@ -103,7 +103,8 @@ function generatePopupRenderHtml() {
   html = html
     .replace(/href="popup\.css"/g, 'href="../src/popup/popup.css"')
     .replace(/src="\.\.\/lib\/actions\.js"/g, 'src="../src/lib/actions.js"')
-    .replace(/src="popup\.js"/g, 'src="../src/popup/popup.js"');
+    .replace(/src="popup\.js"/g, 'src="../src/popup/popup.js"')
+    .replace(/src="settings-sync\.js"/g, 'src="../src/popup/settings-sync.js"');
 
   // chrome.* API shim を <head> 末尾に注入（外部 JS ファイル参照、CSP 準拠）。
   // actions.js / popup.js より先に <head> 内で読み込まれるため shim が確実に先行する。

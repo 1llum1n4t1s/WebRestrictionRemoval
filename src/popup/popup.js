@@ -299,6 +299,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // popup 起動時の直列 RTT (旧: 2 回 await) を 1 回に削減する。
   // P0-#3: INSTALL_SENTINEL も同じ get に乗せて storage 破損 / リセットを検知する。
   const stored = await chrome.storage.local.get([
+    StorageKeys.SETTINGS_SYNC_APPLIED,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
@@ -748,62 +749,62 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ----- イベントバインド -----
   $searchFixerToggle.addEventListener("change", () => {
     updateCleanerDimState();
-    apply();
+    apply({ searchFixerEnabled: $searchFixerToggle.checked });
   });
-  $amazonDeliveryToggle.addEventListener("change", apply);
-  $amazonRankingJumpToggle.addEventListener("change", apply);
-  $amazonMerchantInfoToggle.addEventListener("change", apply);
+  $amazonDeliveryToggle.addEventListener("change", () => apply({ amazonDeliveryTotalEnabled: $amazonDeliveryToggle.checked }));
+  $amazonRankingJumpToggle.addEventListener("change", () => apply({ amazonRankingJumpEnabled: $amazonRankingJumpToggle.checked }));
+  $amazonMerchantInfoToggle.addEventListener("change", () => apply({ amazonMerchantInfoEnabled: $amazonMerchantInfoToggle.checked }));
 
   $instagramCleanerToggle.addEventListener("change", () => {
     updateIgCleanerDimState();
-    apply();
+    apply({ instagramCleanerEnabled: $instagramCleanerToggle.checked });
   });
 
   $tiktokCleanerToggle.addEventListener("change", () => {
     updateTtCleanerDimState();
-    apply();
+    apply({ tiktokCleanerEnabled: $tiktokCleanerToggle.checked });
   });
 
   $xCleanerToggle.addEventListener("change", () => {
     updateXCleanerDimState();
-    apply();
+    apply({ xCleanerEnabled: $xCleanerToggle.checked });
   });
 
   // 動画ガンマ補正: master toggle / slider / 1.0 戻すボタン
   $videoGammaToggle.addEventListener("change", () => {
     updateVideoGammaRowVisibility();
-    apply();
+    apply({ videoGammaEnabled: $videoGammaToggle.checked });
   });
   $videoGammaSlider.addEventListener("input", () => {
     updateVideoGammaLabel(currentVideoGammaValue());
   });
-  $videoGammaSlider.addEventListener("change", apply);
+  $videoGammaSlider.addEventListener("change", () => apply({ videoGammaValue: currentVideoGammaValue() }));
   $videoGammaResetBtn.addEventListener("click", () => {
     $videoGammaSlider.value = String(VideoGamma.SLIDER_DEFAULT);
     updateVideoGammaLabel(VideoGamma.DEFAULT);
-    apply();
+    apply({ videoGammaValue: currentVideoGammaValue() });
   });
 
   // 動画黒帯除去: master toggle / モードセグメント / 拡大率スライダー
   $videoFillToggle.addEventListener("change", () => {
     updateVideoFillRowVisibility();
-    apply();
+    apply({ videoFillEnabled: $videoFillToggle.checked });
   });
   $videoFillModeSegment.addEventListener("click", (e) => {
     const btn = e.target.closest(".seg-btn");
     if (!btn || !$videoFillModeSegment.contains(btn)) return;
     videoFillMode = VideoFill.normalizeMode(btn.dataset.mode);
     updateVideoFillModeSegment(videoFillMode);
-    apply();
+    apply({ videoFillMode });
   });
-  $videoFillTargetSelect.addEventListener("change", apply);
+  $videoFillTargetSelect.addEventListener("change", () => apply({ videoFillTarget: VideoFill.normalizeTarget($videoFillTargetSelect.value) }));
 
   // ルーペ: マスタートグル
   $loupeToggle.addEventListener("change", () => {
     updateLoupeRowVisibility();
     // loupeEnabled は APPLY_SETTINGS 経路 (background → notifyContentScripts) で伝達。
     // zoom / size は popup の直接 storage.set + content script の storage.onChanged で同期する。
-    apply();
+    apply({ loupeEnabled: $loupeToggle.checked });
     // ルーペ ON 時は popup を自動クローズする (ON 状態だと popup がレンズで拡大したい領域を
     // 隠してしまうため、ゆろさん指摘 2026-05-13)。OFF 時は閉じない (連続で他の操作をする可能性)。
     // `apply()` 内の `sendMessage` は同期で dispatch されるため、close 前に message は送信済み。
@@ -1065,32 +1066,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  for (const input of featureInputs.values()) {
+  for (const [key, input] of featureInputs) {
     input.addEventListener("change", () => {
       updateCleanerCountBadge();
-      apply();
+      apply({ searchFixerFeatures: { [key]: input.checked } });
     });
   }
-  $gridItemsSelect.addEventListener("change", apply);
+  $gridItemsSelect.addEventListener("change", () => apply({ searchFixerGridItems: SearchFixer.clampGridItems($gridItemsSelect.value) }));
 
-  for (const input of igFeatureInputs.values()) {
+  for (const [key, input] of igFeatureInputs) {
     input.addEventListener("change", () => {
       updateIgCleanerCountBadge();
-      apply();
+      apply({ instagramCleanerFeatures: { [key]: input.checked } });
     });
   }
 
-  for (const input of ttFeatureInputs.values()) {
+  for (const [key, input] of ttFeatureInputs) {
     input.addEventListener("change", () => {
       updateTtCleanerCountBadge();
-      apply();
+      apply({ tiktokCleanerFeatures: { [key]: input.checked } });
     });
   }
 
-  for (const input of xFeatureInputs.values()) {
+  for (const [key, input] of xFeatureInputs) {
     input.addEventListener("change", () => {
       updateXCleanerCountBadge();
-      apply();
+      apply({ xCleanerFeatures: { [key]: input.checked } });
     });
   }
 
@@ -1553,64 +1554,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ----- 適用 -----
-  async function apply() {
-    const searchFixerEnabled = $searchFixerToggle.checked;
-    const amazonDeliveryTotalEnabled = $amazonDeliveryToggle.checked;
-    const amazonRankingJumpEnabled = $amazonRankingJumpToggle.checked;
-    const amazonMerchantInfoEnabled = $amazonMerchantInfoToggle.checked;
-    const instagramCleanerEnabled = $instagramCleanerToggle.checked;
-    const tiktokCleanerEnabled = $tiktokCleanerToggle.checked;
-    const xCleanerEnabled = $xCleanerToggle.checked;
-    const videoGammaEnabled = $videoGammaToggle.checked;
-    const videoGammaValue = currentVideoGammaValue();
-    const videoFillEnabled = $videoFillToggle.checked;
-    const videoFillTarget = VideoFill.normalizeTarget($videoFillTargetSelect.value);
-    const loupeEnabled = $loupeToggle.checked;
-    const searchFixerFeatures = collectFeatureValues();
-    const searchFixerGridItems = SearchFixer.clampGridItems($gridItemsSelect.value);
-    const instagramCleanerFeatures = collectIgFeatureValues();
-    const tiktokCleanerFeatures = collectTtFeatureValues();
-    const xCleanerFeatures = collectXFeatureValues();
-
+  async function apply(patch) {
     const seq = ++applySeq;
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.APPLY_SETTINGS,
-        data: {
-          searchFixerEnabled,
-          searchFixerFeatures,
-          searchFixerGridItems,
-          amazonDeliveryTotalEnabled,
-          amazonRankingJumpEnabled,
-          amazonMerchantInfoEnabled,
-          instagramCleanerEnabled,
-          instagramCleanerFeatures,
-          tiktokCleanerEnabled,
-          tiktokCleanerFeatures,
-          xCleanerEnabled,
-          xCleanerFeatures,
-          videoGammaEnabled,
-          videoGammaValue,
-          videoFillEnabled,
-          videoFillMode,
-          videoFillTarget,
-          loupeEnabled,
-        },
+        data: patch,
+        syncGeneration: stored[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null,
       });
       if (seq !== applySeq) return;
       if (res?.ok) {
         showStatus(
           buildOkMessage(
-            searchFixerEnabled,
-            amazonDeliveryTotalEnabled,
-            amazonRankingJumpEnabled,
-            amazonMerchantInfoEnabled,
-            instagramCleanerEnabled,
-            tiktokCleanerEnabled,
-            xCleanerEnabled,
-            videoGammaEnabled,
-            videoFillEnabled,
-            loupeEnabled
+            $searchFixerToggle.checked,
+            $amazonDeliveryToggle.checked,
+            $amazonRankingJumpToggle.checked,
+            $amazonMerchantInfoToggle.checked,
+            $instagramCleanerToggle.checked,
+            $tiktokCleanerToggle.checked,
+            $xCleanerToggle.checked,
+            $videoGammaToggle.checked,
+            $videoFillToggle.checked,
+            $loupeToggle.checked
           ),
           "ok"
         );
@@ -1623,16 +1588,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // /opop CL-4: 3 cleaner で同型の収集ロジックを 1 ヘルパー化。
-  function collectInputValues(inputMap) {
-    const out = {};
-    for (const [key, input] of inputMap) out[key] = input.checked;
-    return out;
-  }
-  function collectFeatureValues() { return collectInputValues(featureInputs); }
-  function collectIgFeatureValues() { return collectInputValues(igFeatureInputs); }
-  function collectTtFeatureValues() { return collectInputValues(ttFeatureInputs); }
-  function collectXFeatureValues() { return collectInputValues(xFeatureInputs); }
 
   function buildOkMessage(
     searchFixerEnabled,
@@ -1823,6 +1778,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] = $volumeEqToggle.checked;
       volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_GAINS] = eqGains.slice();
       volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP] = eqPreamp;
+      volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] = eqPreset;
     }
     chrome.storage.local.set(volumeRecord).catch(logStorageError("volume-pushVolumeNow"));
 

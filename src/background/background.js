@@ -3,7 +3,7 @@
 // manifest.firefox.json の background.scripts に actions.js を併記してあり、
 // background.js 実行時には既に評価済みなのでここでは skip する。
 if (typeof importScripts === "function") {
-  importScripts("/src/lib/actions.js");
+  importScripts("/src/lib/actions.js", "/src/background/settings-sync.js");
 }
 
 // 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する
@@ -342,7 +342,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ ok: false, error: "sender-rejected" });
       return false;
     }
-    handleApplySettings(request.data)
+    handleApplySettings(request.data, request.syncGeneration)
       .then(() => sendResponse({ ok: true }))
       .catch((err) => {
         // storage.set の quota 超過 / notifyContentScripts 失敗等をここで可視化する。
@@ -925,11 +925,12 @@ async function autoApplyVolumeBooster(tabId) {
   // gain と一貫させて offscreen への送信前にクランプ (audio-pipeline で再クランプされる二重防御)。
   const eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
   const eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
-  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp);
+  await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp, true);
 }
 
 // ---------- 音量ブースター: マスター OFF で全タブの AudioContext を解放 + 設定キャッシュ無効化 ----------
-chrome.storage.onChanged.addListener((changes) => {
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効、設定変化も無視
   // 音量関連キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
   // (EQ_PRESET は popup の表示状態のみで boost には EQ_GAINS が効くため監視不要)
@@ -948,6 +949,9 @@ chrome.storage.onChanged.addListener((changes) => {
     // /rere F-003: 進行中の autoApplyVolumeBooster の await が stale な fetch 結果で
     // cache を上書きする race を防ぐため seqId を進める (await 復帰時 seqId 不一致で破棄判定)
     cacheSeqId++;
+    if (changes[StorageKeys.VOLUME_BOOSTER_ENABLED]?.newValue !== false) {
+      for (const tabId of boostedTabIds) autoApplyVolumeBooster(tabId).catch(() => {});
+    }
   }
   if (
     StorageKeys.VOLUME_BOOSTER_ENABLED in changes &&
@@ -1008,7 +1012,7 @@ async function getActiveTab() {
  *
  * 責務:
  *   1. 設定値の正規化（clamp / merge）
- *   2. chrome.storage.local への一括保存
+ *   2. 同期世代の検証と変更キーだけの chrome.storage.local 保存
  *   3. active tab への即時通知（`notifyContentScripts` に委譲）
  *
  * 「制限解除」機能の削除に伴い、対応するハンドラ（contextMenus 再構築 /
@@ -1032,21 +1036,32 @@ const APPLY_SETTINGS_KEYS = Object.freeze(SettingsSchema.map((entry) => entry.st
 // 呼び出しを promise チェーンで直列化し、常に受理順に set → notify を完了させる。
 let applySettingsChain = Promise.resolve();
 
-async function handleApplySettings(settings) {
-  const run = applySettingsChain.then(() => applySettingsInner(settings));
+async function handleApplySettings(settings, syncGeneration) {
+  const run = applySettingsChain.then(() => globalThis.enqueueSettingsWrite(
+    () => applySettingsInner(settings, syncGeneration)));
   // チェーンが reject で途切れないよう失敗は握って次段へ繋ぐ (エラー自体は caller が run で受け取る)。
   applySettingsChain = run.catch(() => {});
   return run;
 }
 
-async function applySettingsInner(settings) {
-  // 既存 storage 値で補完してから normalize: settings に含まれないキーがあっても
-  // 「現状の保存値」が引き継がれる。これで partial payload が紛れ込んでも
-  // 他キーが false で wipe されないことを保証する (落とし穴 C 修正)。
-  const existing = await chrome.storage.local.get(APPLY_SETTINGS_KEYS).catch(() => ({}));
-  const merged = { ...existing, ...(settings ?? {}) };
+async function applySettingsInner(settings, syncGeneration) {
+  const existing = await chrome.storage.local.get([...APPLY_SETTINGS_KEYS, StorageKeys.SETTINGS_SYNC_APPLIED]);
+  // 同期受信と同じキュー内で照合する。古い画面からの遅延要求は保存しない。
+  if ((existing[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null) !== syncGeneration) {
+    throw new Error("stale-settings");
+  }
+  const merged = { ...existing };
+  const featureFields = new Set(["searchFixerFeatures", "instagramCleanerFeatures",
+    "tiktokCleanerFeatures", "xCleanerFeatures"]);
+  const changed = SettingsSchema.filter(({ field }) => Object.hasOwn(settings ?? {}, field));
+  for (const { field, storageKey } of changed) {
+    merged[field] = featureFields.has(field)
+      ? { ...existing[storageKey], ...settings[field] } : settings[field];
+  }
   const normalized = normalizeSettings(merged);
-  await chrome.storage.local.set(toStorageRecord(normalized));
+  const record = toStorageRecord(normalized);
+  // 部分変更と無関係なキーは書き戻さず、別経路の編集を保持する。
+  await chrome.storage.local.set(Object.fromEntries(changed.map(({ storageKey }) => [storageKey, record[storageKey]])));
   await notifyContentScripts(normalized);
 }
 
@@ -1571,7 +1586,7 @@ async function isVolumeBoosterActive() {
  * highpass BiquadFilterNode の機能フラグ。いずれも OFF 時はチェーンに残したままバイパス
  * 設定（compressor は ratio:1、filter は frequency:0）にするため、トグル切替時に音切れは発生しない。
  */
-async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp) {
+async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp, existingOnly = false) {
   activeVolumeSetGainCount += 1;
   invalidateOffscreenCloseCycle();
   const operationGeneration = volumeReleaseGeneration;
@@ -1589,6 +1604,7 @@ async function setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, m
         eqGains,
         eqPreamp,
         operationGeneration,
+        existingOnly,
       ),
     );
   } finally {
@@ -1608,6 +1624,7 @@ async function setVolumeBoosterGainImpl(
   eqGains,
   eqPreamp,
   operationGeneration,
+  existingOnly,
 ) {
   // 呼出時点で公開されている最新global releaseを待つ。待機中にさらにreleaseが始まった場合も、
   // 直後の世代照合でこのoperationを失効させるため、新しいbarrierと並走しない。
@@ -1703,6 +1720,9 @@ async function setVolumeBoosterGainImpl(
     }
     // res が undefined or invalid-stream-id → fresh 取得経路へ
   }
+
+  // 自動反映中に既存 stream が消えても、新規キャプチャへ進まない。
+  if (existingOnly) return { ok: false, error: "volume-stream-ended" };
 
   // 新規接続: tabCapture から streamId を取得。
   // Chrome 119+ の Promise.withResolvers() で callback と Promise の参照位置を物理的に近く保つ

@@ -2429,3 +2429,26 @@ kagayoi-support-footer {
   --kgs-star: var(--gold);
   --kgs-accent: var(--accent);
 }
+/* 同期設定は全タブ共通の末尾に配置する。 */
+.settings-sync-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-sync-note {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.settings-sync input { accent-color: var(--accent); }
+.settings-sync button {
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 4px 8px;
+  cursor: pointer;
+}

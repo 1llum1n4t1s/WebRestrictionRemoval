@@ -40,9 +40,24 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 
 設定名・既定値・storage 変換は `SettingsSchema`、メッセージ名は `Actions`、機能一覧は各 `FEATURES` 配列を正本にします。background は既存 storage と partial payload をマージして正規化し、content script は初期取得・メッセージ・`storage.onChanged` のいずれから更新されても同じ状態へ収束します。
 
+### 任意のPC間同期
+
+`src/background/settings-sync.js` が明示した設定キーだけを `storage.local` と `storage.sync` の間で照合します。同期キーは `vuora.settings.v2.` 接頭辞を持ち、既存のサイト適用リスナーへ直接漏れません。同期スイッチはPC単位で既定 OFF、初参加は同期先優先です。
+
+- 通常設定は項目単位、4クリーナーはサブ機能単位、除外リストはチャンネル単位の LWW register とします。EQ の有効状態・全バンド・プリアンプ・プリセットは1レコードです。
+- 更新情報は `[時刻, 論理カウンター, ランダム端末ID]` の辞書順で比較します。端末の時計が戻った場合はカウンターを進め、受信済みの時刻も引き継ぎます。設定の local 変更通知時に時刻を取得し、5秒の送信待ちより先に更新情報を保存します。受信・再送では刻印し直しません。
+- `_settingsSyncState` に勝者・画面へ適用済みの値・時計を保持し、ネットワーク待ちと独立したキューで編集を記録します。ブラウザ側が古い値へ戻した場合も最大の更新情報を再送します。受信反映の自己通知はマーカーで除外し、設定と適用済み状態を同じ local 書込で更新します。
+- 削除は tombstone を残します。チャンネルの保存先は固定32分割で、sync のキー数を抑えます。長期間オフラインの端末からの復活を防ぐため、削除記録を期限だけで消しません。容量超過時も記録を切り捨てずエラーを表示します。
+- 未リリースの旧試作 v1 は初参加時だけ読み替え、v2 保存成功後に既知の旧同期キーを撤去します。旧 baseline は初期化時に除去します。バージョン不明のデータは読み込みません。
+- 初参加時の既存値は編集時刻不明として時刻0を使います。設定保存から変更通知の永続化までの間にプロセスが終了した場合は、再起動時の差分検出時刻で回復します。時計がずれた未通信の端末同士で実際の操作順を完全には判定できませんが、受信済みのレコードは同じ順序で比較します。
+
+popup は操作した項目（サブ機能は1項目）と読込時の同期世代だけを送信します。background は同期反映と同じ書込キュー内で世代を照合し、古い画面からの遅延要求を破棄します。保存も変更キーだけに限定します。受信反映時は popup を再読込し、内部状態と表示を一緒に復元します。認証・アカウント情報・採色履歴・表示位置は同期対象外です。ブラウザの同期と容量制限は [Chrome Storage API](https://developer.chrome.com/docs/extensions/reference/api/storage) と [Firefox storage.sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync) を参照してください。
+
 ### 音量ブースター
 
 Chrome では popup の user gesture を起点に background が `chrome.tabCapture.getMediaStreamId` を取得し、offscreen document が `AudioContext` と共有 DSP pipeline を維持します。タブを閉じたとき、マスターを OFF にしたとき、または中立設定へ戻したときは stream と graph を解放します。
+
+Chrome の音量設定変更はブースト中の全タブへ即時反映します。自動反映中に stream が終了しても新規キャプチャへ進みません。
 
 Firefox では `manifest.firefox.json` だけが `volume-booster-mes.js` を読み込み、各 `<video>` / `<audio>` を `MediaElementSource` と共有 DSP pipeline へ接続します。Firefox では graph を閉じても直接出力へ戻せないため、OFF 時は dry bypass を維持します。EME / DRM サイトでは attach せず、通常再生を優先します。
 
@@ -60,7 +75,7 @@ Firefox では `manifest.firefox.json` だけが `volume-booster-mes.js` を読�
 4. DOM 監視は rAF coalesce と observer の再入防止を行い、extension context 失効時は observer、timer、listener、注入 DOM、inline style、Blob URL を片付けます。
 5. popup と content script の利用者向け文言は `_locales/{en,ja}/messages.json` と `chrome.i18n` を経由します。
 6. Manifest V3 の CSP に従い、実行 JavaScript はすべて拡張へ同梱します。問い合わせ共通部品もリモート実行せず、npm package から同期したファイルを配布物へ含めます。
-7. 外部通信はプライバシーポリシーの4例外だけです。画像取得、接続モニター、Gemini Notebook、問い合わせで扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。
+7. 外部通信はプライバシーポリシーの5例外だけです。画像取得、接続モニター、Gemini Notebook、問い合わせ、設定同期で扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。
 8. バージョンは Chrome / Firefox manifest、package metadata、lockfile 間で同期し、release ブランチから生成した成果物を同一バージョンとして公開します。
 
 ## 採用済みの設計判断

@@ -1,4 +1,25 @@
 {
+  "settingsSyncTitle": {
+    "message": "複数PC間で設定を同期"
+  },
+  "settingsSyncDescription": {
+    "message": "各PCで同じブラウザの同じアカウントにログインし、ブラウザ側の拡張機能の同期と、この設定をONにしてください。初回は保存済みの同期設定を優先し、その後は項目ごとに更新情報が新しい設定を採用します。ChromeとFirefoxの間では同期できません。認証情報・送信先アカウント・採色履歴・画面位置は同期しません。OFFにしても同期先のデータは残ります。"
+  },
+  "settingsSyncOff": {
+    "message": "同期はOFFです。このPC内に設定を保存します。"
+  },
+  "settingsSyncWorking": {
+    "message": "同期設定を確認しています…"
+  },
+  "settingsSyncReady": {
+    "message": "ブラウザの同期用ストレージに反映済みです。他PCへの反映には時間がかかる場合があります。"
+  },
+  "settingsSyncError": {
+    "message": "同期できませんでした。PC内の設定は保持されています。ブラウザの同期状態や容量制限を確認して再試行してください。設定と削除記録が容量上限に達すると同期できません。"
+  },
+  "settingsSyncRetry": {
+    "message": "同期を再試行"
+  },
   "appName": {
     "message": "Vuora",
     "description": "拡張機能名 (chrome://extensions およびストア表示)"
