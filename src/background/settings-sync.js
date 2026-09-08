@@ -188,9 +188,11 @@
 
   async function applyRecords(epoch) {
     const rev = revision;
-    const latest = await chrome.storage.local.get(keys);
+    const latest = await chrome.storage.local.get([...keys, K.SETTINGS_SYNC_ENABLED]);
     // まだイベントキューにある編集を先に記録する。比較と書込の間に await を挟まない。
-    if (!active || epoch !== generation || rev !== revision || !equal(snapshot(latest), snapshot(state.view))) return;
+    // OFFの保存後、変更通知が届く前でも受信した値で現在の設定を消さない。
+    if (latest[K.SETTINGS_SYNC_ENABLED] !== true || !active || epoch !== generation ||
+        rev !== revision || !equal(snapshot(latest), snapshot(state.view))) return;
     const view = project();
     const updates = {};
     const removals = [];
@@ -207,13 +209,17 @@
       if (removals.length) {
         state.pendingRemovals = removals;
         await save();
-        if (!active || epoch !== generation || rev !== revision) {
+        const current = await chrome.storage.local.get(K.SETTINGS_SYNC_ENABLED);
+        if (current[K.SETTINGS_SYNC_ENABLED] !== true || !active || epoch !== generation || rev !== revision) {
           for (const key of removals) expected.delete(key);
           return;
         }
         await chrome.storage.local.remove(removals);
         // 別項目の編集で後続の set を延期しても、完了した削除の投影値は進める。
         for (const key of removals) delete state.view[key];
+        // remove待機中にOFFへ切り替わった場合も後続の上書きを止める。
+        const afterRemoval = await chrome.storage.local.get(K.SETTINGS_SYNC_ENABLED);
+        if (afterRemoval[K.SETTINGS_SYNC_ENABLED] !== true) return;
       }
       if (!active || epoch !== generation || rev !== revision) return;
       const next = { ...state, view, pendingRemovals: [] };

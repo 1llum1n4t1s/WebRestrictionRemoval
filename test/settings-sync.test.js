@@ -23,6 +23,8 @@ const host = (local = {}, remote = {}, options = {}) => {
   let fail = false;
   let beforeUpload;
   let afterRemove;
+  let beforeRead;
+  let beforeLocalSet;
   const emit = (changes, area) => {
     // Chrome/Firefox とも、set の完了後に onChanged が届くケースを扱う。
     setImmediate(() => listeners.forEach((fn) => fn(copy(changes), area)));
@@ -38,12 +40,14 @@ const host = (local = {}, remote = {}, options = {}) => {
   };
   const area = (name) => ({
     async get(keys) {
+      if (name === "local" && beforeRead) await beforeRead(keys);
       if (name === "sync") reads++;
       return Object.fromEntries((keys == null ? Object.keys(state[name]) : Array.isArray(keys) ? keys : [keys])
         .filter((key) => key in state[name]).map((key) => [key, copy(state[name][key])]));
     },
     async set(values) {
       const data = copy(values);
+      if (name === "local" && beforeLocalSet) await beforeLocalSet(data);
       if (name === "sync") {
         writes++;
         if (beforeUpload) await beforeUpload();
@@ -85,7 +89,9 @@ const host = (local = {}, remote = {}, options = {}) => {
     now: (value) => { now = value; }, receive: async (values) => { set("sync", values); await settle(); },
     edit: async (values) => { await storage.local.set(values); await settle(); },
     fail: (value) => { fail = value; }, beforeUpload: (fn) => { beforeUpload = fn; },
-    afterRemove: (fn) => { afterRemove = fn; } };
+    afterRemove: (fn) => { afterRemove = fn; },
+    beforeRead: (fn) => { beforeRead = fn; },
+    beforeLocalSet: (fn) => { beforeLocalSet = fn; } };
 };
 const records = (h) => h.state.local[K.SETTINGS_SYNC_STATE].records;
 const entry = (id, value, stamp) => ({ [PREFIX + id]: { version: 2, items: { [id]: { value, stamp } } } });
@@ -231,6 +237,43 @@ test("OFF はデータを消さず、OFF中の受信・送信を止め、再ON�
   await h.edit({ settingsSyncEnabled: true }); await h.tick();
   assert.equal(h.state.local.loupeSize, 600);
 });
+
+for (const phase of ["設定読込前", "削除記録の保存中", "削除完了後"]) {
+  test(`同期OFFの通知が遅れても${phase}から設定を削除・上書きしない`, async () => {
+    const h = host({ settingsSyncEnabled: true, loupeSize: 450, searchFixerEnabled: true });
+    await h.tick();
+    await h.receive({
+      [PREFIX + "loupeSize"]: { version: 2, items: { loupeSize: { deleted: true, stamp: [9000, 0, "B"] } } },
+      ...entry("searchFixerEnabled", false, [9000, 0, "B"]),
+    });
+    const disable = async () => {
+      h.beforeRead(undefined);
+      h.beforeLocalSet(undefined);
+      // OFFの保存は完了し、onChangedだけがイベントキューに残っている状態。
+      await h.storage.local.set({ settingsSyncEnabled: false });
+    };
+    if (phase === "設定読込前") {
+      h.beforeRead(async (keys) => { if (keys.includes("loupeSize")) await disable(); });
+    } else if (phase === "削除記録の保存中") {
+      h.beforeLocalSet(async (values) => {
+        if (values[K.SETTINGS_SYNC_STATE]?.pendingRemovals?.length) await disable();
+      });
+    } else {
+      h.afterRemove(async () => { h.afterRemove(undefined); await disable(); });
+    }
+    await h.tick();
+    assert.equal(h.state.local.settingsSyncEnabled, false);
+    // OFFより前に完了した削除は維持し、OFF後の後続設定だけを保護する。
+    const size = phase === "削除完了後" ? undefined : 450;
+    assert.equal(h.state.local.loupeSize, size);
+    assert.equal(h.state.local.searchFixerEnabled, true);
+    const restarted = host(h.state.local, h.state.sync);
+    await restarted.tick();
+    assert.equal(restarted.state.local.loupeSize, size);
+    assert.equal(restarted.state.local.searchFixerEnabled, true);
+    assert.equal(restarted.reads(), 0);
+  });
+}
 
 test("スカラー設定の削除を伝播し、遅れた自己通知で刻印し直さない", async () => {
   const [a, b] = await peers({ loupeSize: 220 });
