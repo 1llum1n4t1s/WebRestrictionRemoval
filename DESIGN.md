@@ -57,7 +57,11 @@ popup の `APPLY_SETTINGS` 経路は操作した項目（サブ機能は1項目�
 
 ### 手動の設定バックアップ
 
-`src/lib/settings-backup.js` の許可リストでJSONを検証し、`IMPORT_SETTINGS` でbackgroundへ送ります。backgroundでも再検証し、同期と共通の書込キューで一括保存します。同期世代の `import:` 接頭辞はローカル編集として扱い、通常の同期受信と区別します。認証・アカウント選択・キャッシュ・同期制御・サイト内HUD位置は対象外です。
+`src/lib/settings-backup.js` が形式と許可リストの正本です。popup は許可された local 設定を既定値込みでJSONへ書き出します。形式は `format: "vuora-settings"`、`version: 1` で、機能設定・EQ・除外チャンネル・採色履歴・表示タブを含みます。認証・アカウント選択・キャッシュ・同期制御・サイト内HUD位置は対象外です。
+
+popup は形式・許可キー・型・値域・5 MiB の上限を検証し、元のJSONを `IMPORT_SETTINGS` で background へ送ります。background は popup 由来の要求だけを受け付け、同じ検証を再実行します。共通検証器は Chrome の `importScripts` と Firefox manifest の `background.scripts` で先に読み込みます。
+
+同期と共通の書込キューで、指定された設定キーと新しい `import:` 世代を一括保存します。欠落した設定キーは保持し、含まれるサブ機能オブジェクトは既定値とマージして置き換えます。世代変更で古い popup の保存要求を失効させ、既存の storage 購読へ反映します。同期側は `import:` をローカル編集として扱うため、同期が ON なら同期対象の設定だけが他PCへ伝わります。成功後に popup を再読み込みします。
 
 ### 音量ブースター
 
