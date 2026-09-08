@@ -85,6 +85,7 @@ pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zi
 | `test/audio-pipeline.test.js` | `src/lib/audio-pipeline.js` の DSP ヘルパー |
 | `test/kagayoi-support.test.js` | 同梱した問い合わせ部品と popup / manifest / プライバシーポリシーの契約・正本一致検証 |
 | `test/settings-sync.test.js` | 設定同期のオプトイン・競合解決・削除伝播・再起動回復・容量超過時の保持 |
+| `test/subscriptions-relevant.test.js` | 登録フィードの「関連が強い」欄だけの非表示と、OFF・SPA 遷移・DOM 再利用時の復元 |
 | `test/settings-application.test.js` | popup の部分更新・同期世代と保存キュー・Chrome 音量設定の全ブーストタブ反映 |
 | `test/_load-actions.js` | 上記から共有する actions.js ロード用ヘルパー。Node.js の自動探索対象にもなるため、総件数は `pnpm test` の出力を正とする |
 
