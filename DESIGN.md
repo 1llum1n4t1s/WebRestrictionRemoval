@@ -6,7 +6,7 @@
 
 Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon、Instagram、TikTok、X と汎用動画ページに対する閲覧支援、音量処理、ルーペ、カラーピッカーを1つのポップアップに統合します。
 
-12機能カテゴリのうちカラーピッカー以外の11機能は独立したマスタートグルを持ち、初期値はすべて OFF です。利用者が選んだ機能だけが対象ページへ作用します。`web/` は製品紹介とプライバシーポリシーを配信する独立した静的ランディングページであり、拡張機能の実行処理や配布は担いません。
+12機能カテゴリのうちカラーピッカー以外の11機能は独立したマスタートグルを持ち、初期値はすべて OFF です。利用者が選んだ機能だけが対象ページへ作用します。`../vps-web/lp/vuora/` は製品紹介とプライバシーポリシーを配信する独立した静的ランディングページであり、拡張機能の実行処理や配布は担いません。
 
 ## 主要コンポーネントと責務
 
@@ -22,7 +22,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 | `src/shared/kagayoi-support-*` | 問い合わせフォームと評価導線 | `kagayoi-support-extension` の exact 固定版から同梱するコピー。製品固有の配置・配色だけを popup 側で与える |
 | `_locales/{en,ja}/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする |
 | `test/` | 純粋関数、公開定数、機能件数、構文、manifest 差分、DSP、問い合わせ契約の drift 検知 | 実サイト DOM の時点依存挙動は手動・実ブラウザ確認で補う |
-| `web/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | Cloudflare Worker は静的素材だけを返し、拡張の API backend にはならない |
+| `../vps-web/lp/vuora/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | Cloudflare Worker は静的素材だけを返し、拡張の API backend にはならない |
 
 ## データフロー
 
@@ -107,3 +107,9 @@ Chrome は `manifest.json`、Firefox は `manifest.firefox.json` を `manifest.j
 - 共通問い合わせ部品の正本一致は `pnpm exec kagayoi-support-sync --check` です。
 - ストア成果物は `pwsh -NoProfile -File zip.ps1` または `./zip.sh` で Chrome / Firefox の両 variant を生成します。
 - version、公開名、機能件数、設定 schema などの可変値は文書へ固定値を増やさず、`AGENTS.md` が示す単一情報源とテスト結果を優先します。
+
+## 製品ページの配信先
+
+製品ページの配信HTMLは `../vps-web/lp/vuora/`（編集元は `../vps-web/tools/lp/templates/`）、公開実体はVPSの `/srv/www/lp/vuora/`。
+直接配信の設定は `../vps-web/deploy/caddy-sites/lp-vuora.caddy` に置く。
+公開URLを維持し、静的ファイルの配信は `vps-web/deploy/deploy-lp.ps1` へ統一する。
