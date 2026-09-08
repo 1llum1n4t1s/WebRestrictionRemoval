@@ -12,7 +12,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 
 | コンポーネント | 責務 | 境界 |
 |---|---|---|
-| `src/popup/` | 6タブの設定 UI、設定の復元・保存、即時適用、カラーピッカー、問い合わせ導線 | サイト DOM は直接操作せず、設定と操作要求を storage または background へ渡す |
+| `src/popup/` | 7タブの設定 UI、設定の復元・保存、即時適用、カラーピッカー、問い合わせ導線 | サイト DOM は直接操作せず、設定と操作要求を storage または background へ渡す |
 | `src/lib/actions.js` | Actions、StorageKeys、SettingsSchema、機能定義、純粋関数の単一情報源 | DOM・ブラウザ固有ライフサイクルを持たない |
 | `src/background/background.js` | popup / content script の sender 検証、設定配布、ルーペ撮影、Chrome 音量処理の調停、Gemini Notebook RPC、設定移行 | UI とサイト DOM を持たず、権限が必要な処理を集約する |
 | `src/content/` | サイト別 DOM / CSS 適用、動画要素処理、HUD、画像ダウンロード | 対象 URL とフレームを manifest で限定し、機能 OFF または context 失効時に状態を戻す |
@@ -54,6 +54,10 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 - 初参加時の既存値は編集時刻不明として時刻0を使います。設定保存から変更通知の永続化までの間にプロセスが終了した場合は、再起動時の差分検出時刻で回復します。時計がずれた未通信の端末同士で実際の操作順を完全には判定できませんが、受信済みのレコードは同じ順序で比較します。
 
 popup の `APPLY_SETTINGS` 経路は操作した項目（サブ機能は1項目）と読込時の同期世代だけを送信します。background は同期反映と同じ書込キュー内で世代を照合し、古い画面からの遅延要求を破棄します。保存も変更キーだけに限定します。受信反映時は popup を再読込し、内部状態と表示を一緒に復元します。認証・アカウント情報・採色履歴・表示位置は同期対象外です。ブラウザの同期と容量制限は [Chrome Storage API](https://developer.chrome.com/docs/extensions/reference/api/storage) と [Firefox storage.sync](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync) を参照してください。
+
+### 手動の設定バックアップ
+
+`src/lib/settings-backup.js` の許可リストでJSONを検証し、`IMPORT_SETTINGS` でbackgroundへ送ります。backgroundでも再検証し、同期と共通の書込キューで一括保存します。同期世代の `import:` 接頭辞はローカル編集として扱い、通常の同期受信と区別します。認証・アカウント選択・キャッシュ・同期制御・サイト内HUD位置は対象外です。
 
 ### 音量ブースター
 

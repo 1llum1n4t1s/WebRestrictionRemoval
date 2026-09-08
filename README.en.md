@@ -103,3 +103,9 @@ LLM-oriented implementation conventions and patterns are in [CLAUDE.md](CLAUDE.m
 ## 📄 License
 
 [MIT License](LICENSE)
+
+## Export and import settings
+
+Open **07 Settings** to enable browser settings sync or export/import a JSON file. The file includes all feature settings, EQ, blocked channels, color history and selected tabs, and can be transferred between Chrome and Firefox. Import overwrites the entries included in the file and preserves missing entries.
+
+Sync on/off, Gemini Notebook destination accounts, authentication, caches and on-site overlay positions remain on each device. Imported feature settings sync to other PCs when sync is on. Invalid files and files larger than 5 MB are rejected.

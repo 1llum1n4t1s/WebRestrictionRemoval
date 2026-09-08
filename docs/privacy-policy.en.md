@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: September 5, 2026
+Last updated: September 9, 2026
 
 ## Introduction
 
@@ -47,11 +47,15 @@ The Extension stores the following settings on the user's device (`chrome.storag
 - **`colorPickerHistory`** (array, up to 20 items): history of colors picked with the color picker. Each entry is `{ hex, ts }` where `hex` is `#RRGGBB` and `ts` is the pick timestamp.
 - **`colorPickerDefaultFormat`** (string, one of `"hex"` / `"rgb"` / `"hsl"`): default clipboard format for picked colors.
 - **`colorPickerHexHash`** (boolean, default true): whether to include the leading `#` when copying in HEX format.
-- **`popupLastTab`** (string, one of `"tune"` / `"youtube"` / `"instagram"` / `"tiktok"` / `"picker"`): the last tab the popup had open. Used to restore the popup state on next launch. Legacy value `"assist"` is auto-migrated to `"tune"`.
+- **`popupLastTab`** (string, one of `"tune"` / `"youtube"` / `"x"` / `"instagram"` / `"tiktok"` / `"picker"` / `"settings"`): the last tab the popup had open. Used to restore the popup state on next launch. Legacy value `"assist"` is auto-migrated to `"tune"`.
 
 These values are normally stored on the device. When settings sync is enabled, the settings described in Exception 5 are also saved to browser sync storage.
 
 **On Chrome**, the Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled. **On Firefox**, the current gain value is held only in the in-page audio pipeline's memory (see "Tab audio access" below) and is likewise never persisted.
+
+## Settings file export and import
+
+Only when you operate the controls in **07 Settings**, the Extension saves feature settings, EQ, blocked channels, color history and selected tabs as a JSON file on your device, or imports a file you choose. Authentication, destination accounts, caches, sync on/off and on-site overlay positions are excluded. The file is not sent to the developer or an external server. When settings sync is on, imported entries covered by Exception 5 are saved to the browser sync service.
 
 ## Tab audio access
 

@@ -18,6 +18,7 @@
 const Actions = Object.freeze({
   /** ポップアップ → background: 設定変更を反映 */
   APPLY_SETTINGS: "applySettings",
+  IMPORT_SETTINGS: "importSettings",
   /** background → YouTube content script: YouTube 機能拡張設定を反映（Shorts 削除も含む） */
   APPLY_SEARCH_FIXER_CS: "applySearchFixerCS",
   /** background → Amazon 定期おトク便 content script: 合計金額表示の有効/無効を反映 */
@@ -2896,8 +2897,9 @@ const PopupTabs = Object.freeze({
   TIKTOK: "tiktok",
   X: "x",
   PICKER: "picker",
+  SETTINGS: "settings",
   /** UI の並び順と一致させる（矢印キー巡回の順序に使われる）。X は YouTube の次に置く。 */
-  ALL: Object.freeze(["tune", "youtube", "x", "instagram", "tiktok", "picker"]),
+  ALL: Object.freeze(["tune", "youtube", "x", "instagram", "tiktok", "picker", "settings"]),
 
   /** タブ識別子のいずれかなら true */
   isValid(value) {

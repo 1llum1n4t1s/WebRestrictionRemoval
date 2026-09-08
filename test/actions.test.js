@@ -1048,7 +1048,7 @@ test("ColorPicker.parseColorInput: HEX / RGB / HSL の貼り付け解釈", () =>
 // ---------- PopupTabs ----------
 
 test("PopupTabs.isValid / normalize: タブ識別子のみ受理、不正値は TUNE", () => {
-  assert.equal(G.PopupTabs.ALL.length, 6, "popup タブ数（ドキュメント整合性の単一情報源）");
+  assert.equal(G.PopupTabs.ALL.length, 7, "popup タブ数（ドキュメント整合性の単一情報源）");
   for (const id of G.PopupTabs.ALL) {
     assert.equal(G.PopupTabs.isValid(id), true, `${id} should be valid`);
   }

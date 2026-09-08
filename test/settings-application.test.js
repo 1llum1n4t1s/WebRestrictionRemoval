@@ -13,6 +13,7 @@ const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(setIm
 const host = async (initial = {}, firefox = false) => {
   const data = copy(initial);
   const listeners = [];
+  let onMessage;
   const writes = [];
   const event = { addListener() {} };
   let beforeRead = async () => {};
@@ -20,10 +21,11 @@ const host = async (initial = {}, firefox = false) => {
     ...Object.fromEntries(["SettingsSchema", "StorageKeys", "Actions", "Offscreen", "SenderCheck",
       "SearchFixer", "InstagramCleaner", "TikTokCleaner", "XCleaner", "VolumeBooster", "VideoGamma",
       "VideoFill", "Loupe", "NotebookLm", "ExtensionPaths"].map((key) => [key, G[key]])),
-    console, URL, setTimeout: () => 1, clearTimeout() {}, crypto: { randomUUID: () => "test-device" },
+    console, URL, TextEncoder, setTimeout: () => 1, clearTimeout() {}, crypto: { randomUUID: () => "test-device" },
     chrome: {
       ...(!firefox ? { offscreen: {}, tabCapture: {} } : {}),
-      runtime: { onInstalled: event, onMessage: event },
+      runtime: { id: "test-extension", getURL: (p) => `chrome-extension://test-extension/${p}`,
+        onInstalled: event, onMessage: { addListener: (fn) => { onMessage = fn; } } },
       tabs: { onRemoved: event, onActivated: event },
       storage: {
         local: {
@@ -39,12 +41,16 @@ const host = async (initial = {}, firefox = false) => {
       },
     },
   });
+  vm.runInContext(read("lib/actions.js"), context);
+  vm.runInContext(read("lib/settings-backup.js"), context);
   vm.runInContext(read("background/settings-sync.js"), context);
   vm.runInContext(read("background/background.js"), context);
   vm.runInContext("notifyContentScripts = async () => {};", context);
   await settle();
   writes.length = 0;
   return { context, data, writes,
+    message: (request, sender = { id: "test-extension", url: "chrome-extension://test-extension/src/popup/popup.html" }) =>
+      new Promise((resolve) => onMessage(request, sender, resolve)),
     run: (code) => vm.runInContext(code, context),
     readHook: (fn) => { beforeRead = fn; },
     emit: (changes, area = "local") => listeners.forEach((fn) => fn(changes, area)),
@@ -173,5 +179,25 @@ test("popup の各操作は該当項目だけを読み込み時の世代とと�
     assert.deepEqual(Object.keys(message.data), [field], name);
     if (field.endsWith("Features")) assert.deepEqual(message.data[field], { one: true });
     assert.equal(message.syncGeneration, "opened-at");
+  }
+});
+
+
+test("インポートはbackgroundで再検証し、一括保存・世代失効・認証情報保持を両ブラウザで行う", async () => {
+  for (const firefox of [false, true]) {
+    const h = await host({ settingsSyncEnabled: true, notebookLmAccountIndex: 2, searchFixerEnabled: false }, firefox);
+    const data = JSON.stringify({ format: "vuora-settings", version: 1,
+      settings: { searchFixerEnabled: true, volumeBoosterLastGain: 150 } });
+    assert.equal((await h.message({ action: G.Actions.IMPORT_SETTINGS, data }, {})).ok, false);
+    assert.equal(h.writes.length, 0);
+    assert.equal((await h.message({ action: G.Actions.IMPORT_SETTINGS, data: data.replace('150', '999') })).ok, false);
+    assert.equal(h.writes.length, 0);
+    assert.equal((await h.message({ action: G.Actions.IMPORT_SETTINGS, data })).ok, true);
+    assert.equal(h.writes.length, 1);
+    assert.equal(h.data.searchFixerEnabled, true);
+    assert.equal(h.data.volumeBoosterLastGain, 150);
+    assert.equal(h.data.settingsSyncEnabled, true);
+    assert.equal(h.data.notebookLmAccountIndex, 2);
+    await assert.rejects(h.run('handleApplySettings({searchFixerEnabled:false}, null)'), /stale-settings/);
   }
 });

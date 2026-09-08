@@ -362,3 +362,18 @@ test("受信した削除の適用中に別項目を編集しても同期が継�
   await b.receive(entry("loupeZoom", 4, [9000, 0, "C"])); await b.tick();
   assert.equal(b.state.local.loupeZoom, 4, "投影値の不一致で後続受信が停止しない");
 });
+
+test("インポート世代付き一括編集は同期先へ伝播し、OFFなら端末内に留まる", async () => {
+  const [a, b] = await peers({ searchFixerEnabled: false });
+  a.now(2000);
+  await a.edit({ searchFixerEnabled: true, [K.SETTINGS_SYNC_APPLIED]: "import:test" });
+  await a.tick();
+  await exchange(a, b);
+  assert.equal(b.state.local.searchFixerEnabled, true);
+  const off = host({ settingsSyncEnabled: false });
+  await off.tick();
+  await off.edit({ searchFixerEnabled: true, [K.SETTINGS_SYNC_APPLIED]: "import:offline" });
+  await off.tick();
+  assert.equal(off.state.local.searchFixerEnabled, true);
+  assert.equal(off.writes(), 0);
+});

@@ -3,7 +3,7 @@
 // manifest.firefox.json の background.scripts に actions.js を併記してあり、
 // background.js 実行時には既に評価済みなのでここでは skip する。
 if (typeof importScripts === "function") {
-  importScripts("/src/lib/actions.js", "/src/background/settings-sync.js");
+  importScripts("/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js");
 }
 
 // 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する
@@ -336,6 +336,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleVolumeStreamEnded(request.tabId)
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  } else if (request.action === Actions.IMPORT_SETTINGS) {
+    if (!SenderCheck.isFromPopup(sender)) {
+      sendResponse({ ok: false, error: "sender-rejected" });
+      return false;
+    }
+    globalThis.enqueueSettingsWrite(async () => {
+      const record = globalThis.SettingsBackup.parse(request.data);
+      // 一括保存で既存の設定購読へ反映し、古い popup の保存要求を失効させる。
+      await chrome.storage.local.set({ ...record, [StorageKeys.SETTINGS_SYNC_APPLIED]: `import:${crypto.randomUUID()}` });
+    }).then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: false, error: "import-failed" }));
     return true;
   } else if (request.action === Actions.APPLY_SETTINGS) {
     if (!SenderCheck.isFromPopup(sender)) {

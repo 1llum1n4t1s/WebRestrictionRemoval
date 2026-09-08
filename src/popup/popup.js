@@ -518,6 +518,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: PopupTabs.INSTAGRAM, tab: $tabInstagram, panel: $panelInstagram },
     { id: PopupTabs.TIKTOK, tab: $tabTikTok, panel: $panelTikTok },
     { id: PopupTabs.PICKER, tab: $tabPicker, panel: $panelPicker },
+    { id: PopupTabs.SETTINGS, tab: document.getElementById("tabSettings"), panel: document.getElementById("panelSettings") },
   ];
   const $specimenCard = document.getElementById("specimenCard");
   const $specimenNo = document.getElementById("specimenNo");
@@ -589,7 +590,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ---------- タブ初期化 ----------
   // 旧 "assist" 値が残っていても PopupTabs.migrate で "tune" に正規化する。
-  const lastTab = PopupTabs.migrate(pickerStored[StorageKeys.POPUP_LAST_TAB]);
+  const lastTab = sessionStorage.getItem("settingsImportSuccess") ? PopupTabs.SETTINGS
+    : PopupTabs.migrate(pickerStored[StorageKeys.POPUP_LAST_TAB]);
+  sessionStorage.removeItem("settingsImportSuccess");
   setActiveTab(lastTab, { persist: false, focus: false });
 
   // サブタブの復元。DOM 構築（build 系）は storage 取得より先に走るので、ここで選び直す。

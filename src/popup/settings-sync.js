@@ -43,7 +43,7 @@
     if (area !== "local") return;
     if (K.SETTINGS_SYNC_APPLIED in changes) {
       // 全機能の UI と内部状態を一緒に復元する。保存要求の失効判定は background が担う。
-      location.reload();
+      if (!globalThis.settingsImportInProgress) location.reload();
       return;
     }
     if (K.SETTINGS_SYNC_ENABLED in changes || K.SETTINGS_SYNC_STATUS in changes) {

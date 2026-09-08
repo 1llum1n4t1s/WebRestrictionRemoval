@@ -76,12 +76,15 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
 ■ How to use
 
 1. Click the toolbar icon to open the popup.
-2. Pick the feature you want via the popup's tab bar (Tune / YouTube / Instagram / TikTok / Color Picker).
+2. Pick the feature you want via the popup's tab bar (Tune / YouTube / X / Instagram / TikTok / Color Picker / Settings).
 3. Toggle on/off and tweak values via toggles and sliders inside each tab (auto-saved).
 4. For Volume Booster and Video Gamma, drag the sliders directly.
 5. On the "Color Picker" tab, trigger EyeDropper to pick a color from the screen.
 
 Settings are auto-saved and restored on next launch.
+
+■ Save and load settings
+The "07 Settings" tab brings together browser settings sync and JSON export/import. Save all feature settings, EQ, blocked channels, color history and selected tabs, and transfer them to another PC or between Chrome and Firefox. Sync on/off, destination accounts, authentication, caches and on-site overlay positions remain device-specific. Imported feature settings also sync when sync is on. The popup has a refreshed, calmer design in Japanese and English, with light and dark themes.
 
 ■ Privacy
 

@@ -493,5 +493,14 @@
   "feat_x_hideEngagementCounts_label": { "message": "反応数（いいね等）を非表示" },
   "feat_x_hideEngagementCounts_desc": { "message": "返信 / リポスト / いいね / 表示回数の数字だけを隠す（ボタンは残るので操作は今までどおり）" },
   "feat_x_followingTabDefault_label": { "message": "ホームを「フォロー中」で開く" },
-  "feat_x_followingTabDefault_desc": { "message": "ホームで「おすすめ」が選ばれていたら「フォロー中」タブへ切り替える（1 ページにつき 1 回だけ。自分で「おすすめ」に戻したあとは介入しない）" }
+  "feat_x_followingTabDefault_desc": { "message": "ホームで「おすすめ」が選ばれていたら「フォロー中」タブへ切り替える（1 ページにつき 1 回だけ。自分で「おすすめ」に戻したあとは介入しない）" },
+  "tabSettings": {"message":"設定"},
+  "settingsBackupTitle": {"message":"設定の保存と読み込み"},
+  "settingsBackupDescription": {"message":"全機能の設定・EQ・除外チャンネル・採色履歴・表示タブをJSONファイルに保存し、別のPCやブラウザへ移せます。インポートするとファイル内の項目を上書きします。同期のON/OFF・送信先アカウント・認証情報・キャッシュ・サイト上の表示位置は含みません。同期がONの場合、読み込んだ機能設定は同期先にも反映されます。"},
+  "settingsExport": {"message":"エクスポート"},
+  "settingsImport": {"message":"インポート"},
+  "settingsExportSuccess": {"message":"設定ファイルのダウンロードを開始しました。"},
+  "settingsExportError": {"message":"エクスポートできませんでした。設定と保存先を確認して再試行してください。"},
+  "settingsImportSuccess": {"message":"設定をインポートしました。"},
+  "settingsImportError": {"message":"インポートできませんでした。Vuoraの設定JSON（5MB以下）か確認してください。"}
 }

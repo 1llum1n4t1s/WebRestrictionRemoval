@@ -1,48 +1,10 @@
 /*
- * Popup スタイル — 「生成り × 葡萄酒」。高級感をテーマにした立体表現版。
- *
- * 設計方針:
- *   - 色数を 4 つに絞る (地 / 文字 / 罫 / 差し色)。第 5 の色を足さない。
- *   - 差し色は状態を示すときだけ出す。常時どこかが光っている状態を作らない。
- *   - 罫線は 1px・低コントラスト。線が主張すると途端に安く見える。
- *   - 余白を大きく取り、見出しは字間 0.22em、ラベルは 0.14em で組む。
- *   - 角丸は 3px まで。大きな丸みは親しみやすさの記号で、高級感とは逆方向。
- *   - 金属は 4 停止のグラデ (濃 → 明 → 中 → 濃) で照りを作る。ベタ塗りの金は安く見える。
- *
- * 立体表現 (フラットではない):
- *   光源を上 1 方向に固定し、以下のトークンだけで凹凸を作る。個別に box-shadow を
- *   書き足さず必ずトークン経由にすること (光源の向きが揃わなくなるため)。
- *     --bevel-top     面の稜線 (上辺 1px の照り返し)
- *     --bevel-bottom  面の落ち際 (下辺 1px の影)
- *     --raise         浮いている面の落ち影 / --raise-strong は popup 外周のみ
- *     --sink          彫り込み (スライダーの溝・沈んだタブ)
- *     --engrave       文字の刻印 (text-shadow)
- *   大きなドロップシャドウは外周 1 か所だけに留める。増やすとスキューモーフィズムに
- *   転んで、高級感ではなく古さになる。
- *
- * ライト / ダークで役割が入れ替わる点 (重要):
- *   ライトは「生成りの地 + 葡萄酒の差し色」、ダークは「葡萄酒の地 + 金の差し色」。
- *   つまり `--accent` はライトで葡萄酒、ダークで金になる。地に色があるダーク側では
- *   拾った色が地に引っ張られて見えるため、カラーピッカーの色見本と履歴チップの下にだけ
- *   `--neutral-plate` の無彩色の台を敷き、色を正しく見せる。
- *
- * カラートークン (light / dark、すべて :root + @media (prefers-color-scheme: dark) で 2 層定義):
- *   --bg-deep / --bg / --bg-card / --bg-elev            画面〜カードの 4 段背景
- *   --rule / --rule-soft / --rule-strong                罫線 3 段
- *   --accent / --accent-strong / --on-accent            差し色・その濃色・差し色上の文字色
- *   --gold / --gold-light / --gold-deep / --gold-line   金 3 段 + 4 停止グラデ
- *   --ink / --ink-soft / --ink-faint                    文字 3 段
- *   --pigment / --pigment-tint / --pigment-contrast     カラーピッカー用 (popup.js が動的書き換え)
- *   --neutral-plate / --neutral-plate-rule              拾った色を歪ませない無彩色の台
- *   --bevel-top / --bevel-bottom / --raise / --sink / --engrave   立体表現
- *   --focus-ring                                        キーボードフォーカス
- *   --switch-off                                        トグル OFF
- *   --sheen 系                                          旧・発光トークン。使わないので transparent 固定
- *   --ok / --warn                                       ステータス
- *
- * フォントは IBM Plex Sans JP 400/600/700 を woff2 で同梱。mono はシステム fallback。
- * `<meta name="color-scheme" content="light dark">` で `:root` ライトトークン +
- * `@media (prefers-color-scheme: dark)` ダーク上書きの 2 層構造。
+ * Popup — 生成り × 葡萄酒。低彩度の面、薄い境界線、揃った角丸で構成する。
+ * ライトは生成りに葡萄酒、ダークは落ち着いた葡萄酒に金を差し色として使う。
+ * 選択状態は淡い面色と境界線で示す。カード8px、入力・ボタン6px、スイッチは丸型。
+ * 動きは操作時の短い色変化とフェードだけ。減らす設定ではすべて停止する。
+ * 採色した色と色相・彩度のグラデーションは実際の値を保持する。
+ * フォントは同梱の IBM Plex Sans JP、数値はシステムの等幅フォントを使う。
  */
 
 @font-face {
@@ -73,183 +35,63 @@
   box-sizing: border-box;
 }
 
-/* ============================================================
- * ライトテーマ — 生成り × 葡萄酒
- * 上質紙に型押ししたような明るい面。差し色は葡萄酒、罫の要所に金。
- * ============================================================ */
+/* テーマの色はここで管理する。文字色は各背景で読みやすい明度差を保つ。 */
 :root {
-  /* 地は一段沈ませ、カードとの明度差で「面が浮いている」ことを分からせる。
-     ここを白に寄せすぎると立体が消えてただの白い画面になる。 */
-  --bg-deep: #e3ddd1;
-  --bg: #eeeade;
-  --bg-card: #fdfcf9;
-  --bg-elev: #f6f3ea;
-
-  --rule: #d8d0c0;
-  --rule-soft: #e6e0d4;
-  --rule-strong: #bcb09b;
-
-  /* 差し色。ライトは葡萄酒、ダークは金（地がワインになるため役割が入れ替わる）。
-     ここを書き換えると下記の派生変数すべてが追従する。 */
-  --accent: #7c2334;
-  --accent-strong: color-mix(in srgb, var(--accent) 72%, #000);
-  /* 差し色の上に載せる文字色。ライトは葡萄酒地に生成り、ダークは金地に焦茶。 */
-  --on-accent: #fdf7f5;
-
-  /* 金。単色ではなく 4 停止のグラデで金属の照りを作る（ベタ塗りの金は安く見える）。 */
-  --gold: #b98a3f;
-  --gold-light: #f0dda6;
-  --gold-deep: #8a6224;
-  --gold-line: linear-gradient(
-    to right,
-    var(--gold-deep),
-    var(--gold-light) 38%,
-    var(--gold) 60%,
-    var(--gold-deep) 85%,
-    transparent
-  );
-
-  /* 発光は使わない（高級感と逆方向）。旧トークンは透明のまま残置。 */
-  --sheen: transparent;
-  --sheen-strong: transparent;
-  --sheen-inset-soft: transparent;
-  --sheen-inset-mid: transparent;
-  --sheen-inset-strong: transparent;
-
-  /* 互換エイリアス (--accent 系の参照を簡易化するため残置) */
+  --bg-deep: #ece7e1;
+  --bg: #f6f3ee;
+  --bg-card: #fffcf8;
+  --bg-elev: #f0ebe5;
+  --rule: #ddd5cf;
+  --rule-soft: #e9e2dc;
+  --rule-strong: #b6a8a1;
+  --accent: #805160;
+  --accent-strong: #693e4c;
   --accent-deep: var(--accent-strong);
-  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
-
-  --ink: #2b2723;
-  --ink-soft: #6b6459;
-  --ink-faint: #8f8779;
-
-  /* カラーピッカー (popup.js が EyeDropper の採取色を setProperty で書き換える) */
-  --pigment: #7c2334;
-  --pigment-tint: rgba(124, 35, 52, 0.10);
-  --pigment-contrast: #fdfcfa;
-  /* 拾った色を正しく見せるための中立の台。地の色に引っ張られないよう無彩色に固定する
-     （ダークの葡萄酒地では特に重要。色見本と履歴チップの下にだけ敷く）。 */
-  --neutral-plate: #efece6;
-  --neutral-plate-rule: #cfc8bc;
-
-  --switch-off: #ddd7cb;
-
-  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 38%, transparent);
-
-  /* 立体表現の 3 点セット。光源は上 1 方向に固定する。
-     bevel-top = 面の稜線 / bevel-bottom = face の落ち際 / raise = 浮き / sink = 彫り込み。 */
-  --bevel-top: inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  --bevel-bottom: inset 0 -1px 0 rgba(120, 100, 70, 0.10);
-  --raise: 0 2px 4px rgba(120, 100, 70, 0.16);
-  --raise-strong: 0 8px 20px rgba(80, 70, 55, 0.20);
-  --sink: inset 0 2px 4px rgba(110, 92, 68, 0.30);
-  /* 選択状態（ラジオ相当）専用の浅い窪み。--sink をそのまま使うと穴のように深く落ちて
-     文字が沈むため、影は浅くし、選択の手掛かりは内側の金の細枠 (--inlay-line) に持たせる。 */
-  --sink-soft: inset 0 1px 2px rgba(110, 92, 68, 0.22);
-  --inlay-line: inset 0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent);
-  --engrave: 0 1px 0 rgba(255, 255, 255, 0.9);
-
-  --carbon: transparent;
-
-  --ok: #3f7a4a;
-  --warn: #a33328;
-
-  --font-sans:
-    "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP",
-    "Segoe UI", system-ui, sans-serif;
-  --font-mono:
-    "SFMono-Regular", "Cascadia Mono", "JetBrains Mono",
-    Consolas, ui-monospace, monospace;
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--bg-card));
+  --on-accent: #fffaf7;
+  --gold: #a58a58;
+  --ink: #302a2c;
+  --ink-soft: #68605e;
+  --ink-faint: #70655f;
+  --pigment: #805160;
+  --pigment-tint: rgba(128, 81, 96, 0.10);
+  --pigment-contrast: #fffaf7;
+  --neutral-plate: #efefef;
+  --neutral-plate-rule: #cccccc;
+  --switch-off: #b6aaa4;
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+  --ok: #386943;
+  --warn: #a13c35;
+  --font-sans: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
 }
-
-/* ============================================================
- * ダークテーマ — 葡萄酒地
- * 地そのものを濃いワインにし、差し色を金へ入れ替える。
- * ============================================================ */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* 地は 4 段のはしご。--bg を基準に、外周は沈め、カードと浮き面は段階的に起こす。
-       間隔（おおよそ R+14 / G+8 / B+9 ずつ）を保つことで、どの段でも稜線と落ち影が
-       同じ強さで効く。1 段だけ動かすと立体の見え方が崩れるので必ずまとめて動かす。 */
-    --bg-deep: #0b0307;
-    --bg: #190b10;
-    --bg-card: #271319;
-    --bg-elev: #351b22;
-
-    /* 罫線は地に対する相対値。地の明るさを変えたら必ず引き直す（固定色のままだと
-       線が沈んで消える）。rule は対カード比 1.4 前後、rule-soft は「あるのが分かる最小」の
-       1.2 台を狙う。1.1 台まで落とすと面の境目が消えて行の区切りが読めなくなる。 */
-    --rule: #4a2733;
-    --rule-soft: #42232d;
-    --rule-strong: #6b3a4c;
-
-    /* 地がワインなので、差し色は金が担う。 */
-    --accent: #c79a4a;
-    --accent-strong: color-mix(in srgb, var(--accent) 78%, #000);
-    --on-accent: #2c1d0e;
-
-    --gold: #c79a4a;
-    --gold-light: #f0dda6;
-    --gold-deep: #8a6224;
-    --gold-line: linear-gradient(
-      to right,
-      var(--gold-deep),
-      var(--gold-light) 38%,
-      var(--gold) 60%,
-      var(--gold-deep) 85%,
-      transparent
-    );
-
-    --sheen: transparent;
-    --sheen-strong: transparent;
-    --sheen-inset-soft: transparent;
-    --sheen-inset-mid: transparent;
-    --sheen-inset-strong: transparent;
-
-    --accent-deep: var(--accent-strong);
-    --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
-
-    --ink: #f6ece2;
-    --ink-soft: #c4a9ae;
-    /* 最も明るい面 (--bg-elev) の上で WCAG AA (4.5:1) を割らない値にする。
-       地を動かすたびに再計算すること。現在 elev 5.06 / card 5.64。 */
-    --ink-faint: #a98a91;
-
-    --pigment: #c79a4a;
-    --pigment-tint: rgba(199, 154, 74, 0.14);
-    --pigment-contrast: #17090d;
-    /* ワイン地の上でも拾った色が歪まないよう、色見本の下だけ無彩色の台を敷く。 */
-    --neutral-plate: #1a1a1c;
-    --neutral-plate-rule: #3a3a3e;
-
-    /* OFF のトグルは彫り込んだ溝。地より沈めることで「まだ入っていない」と読める。
-       ただし黒へ落としすぎると溝ではなく「穴」に見えてスイッチの存在が消えるため、
-       カード面のすぐ下（対カード比 1.06 程度）に留める。溝の輪郭は --rule-strong の
-       ボーダーと --sink の内影が担うので、この色は明るめでも形は失われない。 */
-    --switch-off: #1a1016;
-
-    --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
-
-    --bevel-top: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    --bevel-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.55);
-    --raise: 0 2px 4px rgba(0, 0, 0, 0.55);
-    --raise-strong: 0 10px 26px rgba(0, 0, 0, 0.6);
-    --sink: inset 0 2px 4px rgba(0, 0, 0, 0.9);
-    --sink-soft: inset 0 1px 2px rgba(0, 0, 0, 0.55);
-    --inlay-line: inset 0 0 0 1px color-mix(in srgb, var(--gold) 50%, transparent);
-    --engrave: 0 -1px 0 rgba(0, 0, 0, 0.85);
-
-    --carbon: transparent;
-
-    --ok: #7fbf8a;
-    --warn: #e08a7a;
+    --bg-deep: #1d171c;
+    --bg: #241d22;
+    --bg-card: #2d252b;
+    --bg-elev: #352d33;
+    --rule: #51434b;
+    --rule-soft: #42373e;
+    --rule-strong: #796771;
+    --accent: #c8ae7b;
+    --accent-strong: #d7bf90;
+    --on-accent: #292118;
+    --gold: #c8ae7b;
+    --ink: #f0e9e5;
+    --ink-soft: #c2b5b9;
+    --ink-faint: #b4a5ac;
+    --pigment: #c8ae7b;
+    --pigment-tint: rgba(200, 174, 123, 0.10);
+    --pigment-contrast: #292118;
+    --neutral-plate: #292929;
+    --neutral-plate-rule: #555555;
+    --switch-off: #796771;
+    --ok: #a4c6a5;
+    --warn: #e3a29b;
   }
 }
 
-/* ============================================================
- * Body / Shell — ヘキサゴンメッシュ背景
- * ============================================================ */
 html, body {
   background: var(--bg-deep);
 }
@@ -266,26 +108,10 @@ body {
 /* popup-shell: 地はごく浅い縦グラデ。上が明るく下が沈むことで、面に厚みが出る。 */
 .popup-shell {
   position: relative;
-  padding: 20px 18px 16px;
   background-color: var(--bg);
-  background-image: linear-gradient(
-    color-mix(in srgb, var(--bg) 92%, #fff 8%),
-    var(--bg) 46%,
-    color-mix(in srgb, var(--bg) 94%, #000 6%)
-  );
-}
 
-/* 最上部の金の細線。太いバーではなく 2px の箔で、4 停止グラデの照りだけを見せる。 */
-.popup-shell::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--gold-line);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-  pointer-events: none;
+  padding: 16px 18px 14px;
+  background: var(--bg);
 }
 
 /* ============================================================
@@ -293,53 +119,37 @@ body {
  * ============================================================ */
 .hdr {
   display: flex;
-  align-items: flex-start;
   gap: 12px;
-  padding: 14px 0 12px;
-  margin-bottom: 14px;
   position: relative;
   border-bottom: 1px solid var(--rule);
+
+  padding: 4px 0 16px;
+  margin-bottom: 16px;
+  align-items: center;
 }
 
 /* ヘッダー下の金の細線。罫線の上に重ねて、見出しの区切りを一段格上げする。 */
-.hdr::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -1px;
-  right: 0;
-  height: 2px;
-  background: var(--gold-line);
-  border-radius: 999px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
-  pointer-events: none;
-}
 
-/* 頭文字のモノグラム。金の細枠に収め、地は一段沈めて刻印のように見せる。
-   絵文字を置かないのは、OS ごとに絵柄・彩度・太さが変わって金の細線と釣り合わないため。 */
 .hdr-mark {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
   display: grid;
   place-items: center;
   margin-top: 1px;
   font-family: var(--font-sans);
   font-size: 15px;
-  font-weight: 400;
   line-height: 1;
   /* 中央に見せるため、字間ぶんだけ左に寄る分を右パディングで相殺する */
-  letter-spacing: 0.12em;
+  letter-spacing: 0.03em;
   text-indent: 0.12em;
-  color: var(--gold);
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg) 90%, #000 10%),
-    color-mix(in srgb, var(--bg) 98%, #fff 2%)
-  );
-  border: 1px solid var(--gold-deep);
-  border-radius: 2px;
-  box-shadow: var(--sink), 0 1px 0 rgba(255, 255, 255, 0.12);
-  text-shadow: var(--engrave);
+  box-shadow: none;
+
+  width: 32px;
+  height: 32px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-weight: 600;
 }
 
 .hdr-text {
@@ -349,54 +159,50 @@ body {
 
 .hdr-title {
   font-family: var(--font-sans);
-  font-size: 16.5px;
-  font-weight: 400;
-  /* 高級感は字間で作る。太字で押すのではなく、字を離して静かに見せる。 */
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+
   color: var(--ink);
   line-height: 1.3;
-  text-shadow: var(--engrave);
+
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: none;
 }
 
 .hdr-tag {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
   color: var(--ink-soft);
   margin-top: 5px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 7px;
+
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 /* 旧・LED 風の点滅インジケータ (● PWR_ON) は廃止。点滅は落ち着きを削ぐため置かない。 */
 
-/* ============================================================
- * Tabbar (5 タブ動的拡張) — 装甲スイッチ風
- * ============================================================ */
-/* タブ列は彫り込んだ溝。非選択タブはその底に沈み、選択タブだけが手前に持ち上がる。 */
 .tabbar {
   display: flex;
   align-items: stretch;
-  gap: 0;
   margin: 0 0 14px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 0;
   position: relative;
   overflow: hidden;
-  background: color-mix(in srgb, var(--bg) 88%, #000 12%);
-  box-shadow: var(--sink);
+  box-shadow: none;
+
+  gap: 3px;
+  padding: 3px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  border: 1px solid var(--rule-soft);
 }
 
 .tabbar-btn {
   position: relative;
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 11px 12px 12px;
   background: transparent;
   border: 0;
   color: var(--ink-soft);
@@ -405,14 +211,16 @@ body {
   text-align: left;
   flex: 0 0 auto;
   min-width: 0;
-  transition:
-    flex-grow 280ms cubic-bezier(0.32, 0.72, 0, 1),
-    color 160ms ease,
-    background 160ms ease;
+
+  padding: 9px 9px;
+  gap: 6px;
+  border-radius: 5px;
+  transition: color 140ms ease, background 140ms ease;
 }
 
 .tabbar-btn + .tabbar-btn {
-  border-left: 1px solid var(--rule-soft);
+
+  border-left: 0;
 }
 
 .tabbar-btn:hover {
@@ -429,49 +237,42 @@ body {
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.03em;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
-  transition: color 160ms ease, text-shadow 160ms ease;
+  transition: color 160ms ease;
   flex-shrink: 0;
 }
 
 .tabbar-label {
   font-family: var(--font-sans);
-  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   display: inline-block;
   max-width: 0;
   overflow: hidden;
   white-space: nowrap;
   opacity: 0;
   margin-left: -8px;
-  transition:
-    max-width 280ms cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 220ms ease,
-    margin-left 280ms cubic-bezier(0.32, 0.72, 0, 1);
+
+  font-size: 12px;
+  text-transform: none;
+  transition: opacity 120ms ease;
+  letter-spacing: 0.02em;
 }
 
-/* 旧・アクティブ下罫。選択は面の隆起で示すので、線は出さない。 */
 .tabbar-rule {
   display: none;
 }
 
-/* 選択タブ: 溝から持ち上がった面。上辺の稜線と落ち影で手前に出す。 */
 .tabbar-btn.is-active {
   color: var(--ink);
   flex: 1 1 auto;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
-  box-shadow: var(--bevel-top), var(--raise);
+  box-shadow: none;
+
+  background: var(--bg-card);
 }
 .tabbar-btn.is-active .tabbar-no {
   color: var(--accent);
-  text-shadow: var(--engrave);
 }
 .tabbar-btn.is-active .tabbar-label {
   max-width: 240px;
@@ -496,11 +297,11 @@ body {
 
 @media (prefers-reduced-motion: no-preference) {
   .panel.is-active {
-    animation: panel-rise 340ms cubic-bezier(0.16, 1, 0.3, 1);
+    animation: panel-fade 120ms ease-out;
   }
-  @keyframes panel-rise {
-    0% { opacity: 0; transform: translateY(6px); }
-    100% { opacity: 1; transform: translateY(0); }
+  @keyframes panel-fade {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
   }
 }
 
@@ -516,105 +317,80 @@ body {
   margin-bottom: 6px;
 }
 
-/* グループタイトル: 字間を開けた小さな見出し。差し色は使わず、金の短い箔だけを添える。 */
 .grp-title {
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.24em;
   color: var(--ink-soft);
-  padding: 0 0 8px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--rule);
   position: relative;
-  text-shadow: var(--engrave);
+
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  padding: 0;
+  border-bottom: 0;
+  margin-bottom: 10px;
 }
 
 .grp-title-text {
   position: relative;
-  padding-left: 20px;
-}
 
-/* タイトル左の金の箔 (12px)。装飾はこれ 1 本だけに絞る。 */
-.grp-title-text::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 12px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(to right, var(--gold-deep), var(--gold-light), var(--gold));
+  padding-left: 0;
 }
 
 .grp-pill {
   margin-left: auto;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
-  border: 1px solid var(--rule);
-  border-radius: 2px;
+  border-radius: 6px;
   padding: 2px 9px;
   font-family: var(--font-mono);
-  font-size: 9px;
   font-weight: 400;
-  letter-spacing: 0.14em;
   color: var(--ink-soft);
   text-transform: uppercase;
-  box-shadow: var(--bevel-top), var(--raise);
+  box-shadow: none;
+
+  background: var(--bg-elev);
+  border: 0;
+  font-size: 10px;
+  letter-spacing: 0;
 }
 
-/* ============================================================
- * Toggle Row (主役マスタートグル) — 装甲パネル風
- * ============================================================ */
-/* 行はわずかに隆起した面。上辺の稜線 + 落ち影で持ち上げ、ON のときだけ左に差し色の帯を入れる。 */
 .toggle-row {
   display: grid;
   grid-template-columns: 22px 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px 12px 16px;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
+  background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 3px;
   cursor: pointer;
-  transition:
-    border-color 140ms ease,
-    background 140ms ease,
-    box-shadow 140ms ease,
-    transform 80ms ease;
   margin-bottom: 8px;
   position: relative;
-  box-shadow: var(--bevel-top), var(--raise);
+  box-shadow: none;
+
+  border-radius: 8px;
+  padding: 14px;
+  transition: border-color 140ms ease, background 140ms ease;
 }
 
 .toggle-row:hover {
   border-color: var(--rule-strong);
-  box-shadow: var(--bevel-top), var(--raise), 0 0 0 1px var(--rule-soft);
+  box-shadow: none;
 }
 
-/* 押した瞬間だけ沈ませる (面が押し込まれる手触り) */
 .toggle-row:active {
-  transform: translateY(1px);
-  box-shadow: var(--sink);
+  box-shadow: none;
+
+  transform: none;
+  background: var(--bg-elev);
 }
 
 /* ON: 左に差し色の帯。線ではなく面の縁として入れることで、装飾ではなく状態表示になる。 */
 .toggle-row:has(input:checked) {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
-  box-shadow:
-    inset 3px 0 0 var(--accent),
-    var(--bevel-top),
-    var(--raise);
+  box-shadow: none;
+
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--rule));
 }
 
 /* ============================================================
@@ -676,11 +452,12 @@ body {
 }
 
 .tr-desc {
-  font-size: 10.5px;
   color: var(--ink-soft);
   margin-top: 3px;
-  line-height: 1.5;
   letter-spacing: 0.01em;
+
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .tr-code {
@@ -695,9 +472,6 @@ body {
   white-space: nowrap;
 }
 
-/* ============================================================
- * Switch — 装甲スライドスイッチ
- * ============================================================ */
 .switch {
   position: relative;
   width: 42px;
@@ -715,7 +489,6 @@ body {
   z-index: 2;
 }
 
-/* トラックは彫り込んだ溝、つまみは磨いた金属の玉。溝に球が落ちている形を作る。 */
 .switch-track {
   position: absolute;
   inset: 0;
@@ -723,7 +496,7 @@ body {
   border: 1px solid var(--rule-strong);
   border-radius: 999px;
   transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
-  box-shadow: var(--sink);
+  box-shadow: none;
 }
 
 .switch-track::before {
@@ -733,56 +506,43 @@ body {
   height: 16px;
   top: 2px;
   left: 2px;
-  background: radial-gradient(
-    circle at 34% 26%,
-    color-mix(in srgb, var(--bg-card) 60%, #fff) 0 24%,
-    var(--bg-card) 52%,
-    color-mix(in srgb, var(--bg-card) 70%, #000) 100%
-  );
   border-radius: 50%;
-  transition:
-    transform 200ms cubic-bezier(0.65, 0, 0.35, 1),
-    background 200ms ease,
-    box-shadow 200ms ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
+
+  background: #fffaf7;
+  transition: transform 140ms ease;
 }
 
 .switch input:checked + .switch-track {
-  background: linear-gradient(var(--accent-strong), var(--accent));
+  background: var(--accent);
   border-color: var(--accent-strong);
-  box-shadow: var(--sink);
+  box-shadow: none;
 }
 
 .switch input:checked + .switch-track::before {
   transform: translateX(20px);
-  background: radial-gradient(
-    circle at 34% 26%,
-    #ffffff 0 26%,
-    color-mix(in srgb, var(--on-accent) 20%, #fff) 52%,
-    color-mix(in srgb, var(--on-accent) 45%, #fff) 100%
-  );
+
+  background: #fffaf7;
 }
 
 .switch input:focus-visible + .switch-track {
   outline: none;
-  box-shadow: var(--sink), var(--focus-ring);
+  box-shadow: var(--focus-ring);
 }
 
 /* ============================================================
  * Sub block (slider / segment / sub-toggle コンテナ)
  * ============================================================ */
-/* 親トグルにぶら下がる設定面。親より一段沈めて、従属関係を高さで示す。 */
+/* 親トグルに属する設定は淡い背景の面へまとめる。 */
 .sub-block {
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-elev) 97%, #000 3%),
-    var(--bg-elev)
-  );
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 11px 13px 13px;
-  margin: -2px 0 8px;
   position: relative;
-  box-shadow: var(--sink);
+  box-shadow: none;
+
+  border-radius: 8px;
+  background: var(--bg-elev);
+  padding: 14px;
+  margin: 0 0 10px;
 }
 
 .sub-block.hidden {
@@ -790,9 +550,10 @@ body {
 }
 
 .sub-block.volume-disabled {
-  opacity: 0.4;
   pointer-events: none;
-  filter: grayscale(0.4);
+
+  opacity: 0.55;
+  filter: none;
 }
 
 .sub-block .toggle-row--sub {
@@ -800,7 +561,7 @@ body {
   margin-bottom: 0;
   padding: 8px 0 2px;
   border: 0;
-  border-top: 1px dashed var(--rule);
+  border-top: 1px solid var(--rule);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -818,7 +579,7 @@ body {
   background: transparent;
   box-shadow: none;
   border: 0;
-  border-top: 1px dashed var(--accent);
+  border-top: 1px solid var(--accent);
 }
 .sub-block .toggle-row--sub .tr-icon { font-size: 14px; }
 .sub-block .toggle-row--sub .tr-name { font-size: 12px; }
@@ -839,7 +600,7 @@ body {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--ink-soft);
-  letter-spacing: 0.16em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
@@ -850,7 +611,6 @@ body {
   color: var(--accent);
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 6px var(--sheen);
 }
 
 /* ============================================================
@@ -871,18 +631,15 @@ body {
   font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
   color: var(--ink-soft);
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
+  background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
   text-transform: uppercase;
-  box-shadow: var(--bevel-top), var(--raise);
+  box-shadow: none;
 }
 
 .loupe-zoom-segment .seg-btn:hover,
@@ -891,16 +648,12 @@ body {
   color: var(--ink);
 }
 
-/* セグメント（倍率 / 表示モード）の選択も、サブタブと同じ「浅い窪み + 金の内枠」に揃える。 */
 .loupe-zoom-segment .seg-btn.is-active,
 .fill-mode-segment .seg-btn.is-active {
-  background: linear-gradient(
-    color-mix(in srgb, var(--accent) 22%, var(--bg-elev)),
-    color-mix(in srgb, var(--accent) 13%, var(--bg-elev))
-  );
+  background: var(--accent-soft);
   color: var(--accent);
   border-color: color-mix(in srgb, var(--gold) 55%, var(--rule));
-  box-shadow: var(--sink-soft), var(--inlay-line);
+  box-shadow: none;
   filter: none;
 }
 
@@ -924,8 +677,6 @@ body {
   min-width: 0;
 }
 
-/* ミュートと ± は同じ「スライダー行の小さな装甲ボタン」として共通スタイルを持つ。
-   ± はスライダーの左右に置くので、幅はミュートよりさらに詰めて 26px にする。 */
 .volume-mute-btn,
 .volume-step-btn {
   flex: 0 0 auto;
@@ -941,9 +692,9 @@ body {
   border-radius: 0;
   cursor: pointer;
   color: var(--accent);
-  transition: all 140ms ease;
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
-  border-radius: 3px;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  box-shadow: none;
+  border-radius: 6px;
 }
 
 .volume-mute-btn:hover,
@@ -954,7 +705,7 @@ body {
 
 .volume-mute-btn:active,
 .volume-step-btn:active {
-  transform: translateY(0.5px);
+  transform: none;
 }
 
 /* ± ボタン: 記号を等幅・中央寄せで見せる。押しっぱなしでの連続増減は
@@ -995,39 +746,29 @@ body {
   filter: none;
 }
 
-/* ============================================================
- * Range slider (HUD 装甲スライダー)
- * ============================================================ */
-/* 溝は彫り込み、つまみは球。値の進捗は差し色ではなく金の帯で示す。 */
 .range {
   width: 100%;
   appearance: none;
-  height: 7px;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg) 80%, #000 20%),
-    color-mix(in srgb, var(--bg) 96%, #fff 4%)
-  );
-  border: 1px solid var(--rule-strong);
   border-radius: 999px;
   outline: none;
   cursor: pointer;
-  box-shadow: var(--sink);
+  box-shadow: none;
+
+  height: 5px;
+  background: var(--switch-off);
+  border: 0;
 }
 
 .range::-webkit-slider-thumb {
   appearance: none;
-  width: 15px;
-  height: 15px;
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 34% 26%,
-    var(--gold-light) 0 22%,
-    var(--gold) 48%,
-    var(--gold-deep) 100%
-  );
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
   transition: transform 140ms ease, box-shadow 140ms ease;
+
+  background: var(--accent);
+  width: 14px;
+  height: 14px;
 }
 
 .range::-webkit-slider-thumb:hover {
@@ -1036,22 +777,18 @@ body {
 
 .range::-webkit-slider-thumb:active {
   transform: scale(1.04);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
 }
 
 .range::-moz-range-thumb {
-  width: 15px;
-  height: 15px;
   border: 0;
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 34% 26%,
-    var(--gold-light) 0 22%,
-    var(--gold) 48%,
-    var(--gold-deep) 100%
-  );
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
+
+  background: var(--accent);
+  width: 14px;
+  height: 14px;
 }
 
 /* スライダー中央位置マーカー */
@@ -1066,7 +803,7 @@ body {
   width: 1px;
   height: 11px;
   background: var(--accent);
-  box-shadow: 0 0 4px var(--sheen);
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -1086,37 +823,31 @@ body {
   margin-top: 10px;
 }
 
-/* ボタンは持ち上がった面。押すと沈む。差し色はホバーまで出さない。 */
 .ghost-btn {
   font-family: var(--font-sans);
   font-size: 10.5px;
   font-weight: 400;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
+  background: var(--bg-card);
   color: var(--ink);
   border: 1px solid var(--rule-strong);
   padding: 6px 13px;
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 120ms ease;
-  box-shadow: var(--bevel-top), var(--raise);
-  text-shadow: var(--engrave);
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  box-shadow: none;
 }
 
 .ghost-btn:hover:not(:disabled) {
-  background: linear-gradient(var(--accent), var(--accent-strong));
+  background: var(--accent);
   border-color: var(--accent-strong);
   color: var(--on-accent);
-  text-shadow: none;
 }
 
 .ghost-btn:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: var(--sink);
+  transform: none;
+  box-shadow: none;
 }
 
 .ghost-btn:disabled {
@@ -1127,7 +858,7 @@ body {
 
 .ghost-btn:focus-visible {
   outline: none;
-  box-shadow: var(--bevel-top), var(--raise), var(--focus-ring);
+  box-shadow: var(--focus-ring);
 }
 
 .volume-hint {
@@ -1146,7 +877,6 @@ body {
 
 .volume-hint.error {
   color: var(--warn);
-  text-shadow: 0 0 4px var(--sheen);
 }
 
 /* ============================================================
@@ -1157,14 +887,15 @@ body {
 }
 
 .cleaner-hint {
-  font-size: 11.5px;
-  color: var(--ink);
   line-height: 1.55;
   margin-bottom: 12px;
-  padding: 8px 10px 8px 12px;
-  background: var(--bg-deep);
-  border-left: 2px solid var(--accent);
   border-radius: 0;
+
+  background: transparent;
+  border-left: 0;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--ink-soft);
 }
 
 .cleaner-hint code {
@@ -1188,7 +919,7 @@ body {
 }
 
 .cat-subtabs--tune {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .cat-subtab {
@@ -1198,21 +929,18 @@ body {
   min-width: 0;
   padding: 8px 10px;
   font-family: var(--font-sans);
-  font-size: 10.5px;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--ink-soft);
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
-  box-shadow: var(--bevel-top), var(--raise);
-  text-shadow: var(--engrave);
+  box-shadow: none;
+
+  letter-spacing: 0.01em;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  background: transparent;
 }
 
 .cat-subtabs--tune .cat-subtab {
@@ -1242,17 +970,12 @@ body {
   color: var(--ink);
 }
 
-/* 選択中は「はめ込まれた札」。浅く沈めたうえで内側に金の細枠を回し、
-   面はベタ塗りではなく差し色を薄く敷く（ベタ塗りは文字が沈んで読みにくい）。 */
 .cat-subtab.is-active {
-  background: linear-gradient(
-    color-mix(in srgb, var(--accent) 22%, var(--bg-elev)),
-    color-mix(in srgb, var(--accent) 13%, var(--bg-elev))
-  );
-  border-color: color-mix(in srgb, var(--gold) 55%, var(--rule));
   color: var(--ink);
-  box-shadow: var(--sink-soft), var(--inlay-line);
-  text-shadow: none;
+  box-shadow: none;
+
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+  background: var(--accent-soft);
 }
 
 .cat-subtab.is-active .cat-subtab-icon {
@@ -1261,7 +984,7 @@ body {
 
 .cat-subtab:focus-visible {
   outline: none;
-  box-shadow: var(--bevel-top), var(--raise), var(--focus-ring);
+  box-shadow: var(--focus-ring);
 }
 
 .cat-panel[hidden] {
@@ -1296,10 +1019,9 @@ body {
   font-size: 9.5px;
   font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.03em;
   color: var(--ink-soft);
   padding: 4px 4px 6px;
-  text-shadow: var(--engrave);
 }
 
 .cat-head-icon {
@@ -1308,37 +1030,35 @@ body {
   color: inherit;
 }
 
-/* 機能一覧は隆起した 1 枚の面。件数が多いので行の内側は詰め、面の外周だけで囲う。 */
 .cat-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2px;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
+  background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 8px;
   position: relative;
-  box-shadow: var(--bevel-top), var(--raise);
+  box-shadow: none;
+
+  border-radius: 8px;
+  padding: 4px 12px;
+  gap: 0;
 }
 
 .feature-row {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: start;
-  gap: 8px;
-  padding: 8px 8px;
   border-radius: 0;
   cursor: pointer;
   transition: background 100ms ease;
   color: var(--ink);
   min-width: 0;
+
+  padding: 12px 0;
+  gap: 12px;
 }
 
 .feature-row + .feature-row {
-  border-top: 1px dashed var(--rule-soft);
+  border-top: 1px solid var(--rule-soft);
 }
 
 .feature-row:hover {
@@ -1357,40 +1077,27 @@ body {
   font-weight: 600;
   color: var(--ink);
   letter-spacing: 0.01em;
-  line-height: 1.35;
   position: relative;
-  padding-left: 14px;
+
+  padding-left: 0;
+  line-height: 1.5;
 }
 
-/* 行頭の点。ON のときだけ差し色になる小さな粒で、状態を静かに示す。 */
-.feature-row .fr-name::before {
-  content: "";
-  position: absolute;
-  left: 1px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 5px;
-  height: 5px;
-  background: var(--ink-faint);
-  border-radius: 50%;
-  transition: background 120ms ease, box-shadow 120ms ease;
-}
-
-.feature-row:has(input:checked) .fr-name::before {
-  background: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
-}
 
 .feature-row .fr-desc {
   font-size: 11.5px;
   color: var(--ink-soft);
-  line-height: 1.5;
-  padding-left: 14px;
   letter-spacing: 0.01em;
+
+  padding-left: 0;
+  line-height: 1.6;
 }
 
 .feature-row .switch {
   margin-top: 2px;
+
+  width: 34px;
+  height: 20px;
 }
 
 .cleaner-disabled .cat-list {
@@ -1398,29 +1105,10 @@ body {
   filter: grayscale(0.3);
 }
 
-/* feature 専用コンパクトスイッチ */
-.feature-row .switch {
-  width: 32px;
-  height: 16px;
-}
-
-.feature-row .switch-track {
-  border-radius: 0;
-  border-radius: 3px;
-}
-
-.feature-row .switch-track::before {
-  width: 10px;
-  height: 10px;
-  border-radius: 0;
-  top: 2px;
-  left: 2px;
-  border-radius: 3px;
-}
-
-.feature-row .switch input:checked + .switch-track::before {
-  transform: translateX(16px);
-}
+/* サブ機能も主スイッチと同じ丸型に揃える。 */
+.feature-row .switch-track { border-radius: 999px; }
+.feature-row .switch-track::before { width: 14px; height: 14px; top: 2px; left: 2px; border-radius: 50%; }
+.feature-row .switch input:checked + .switch-track::before { transform: translateX(14px); }
 
 /* switch の代わりに <select> を持つ feature 行（ホーム列数）。
    他のサブ機能行と同じ 1 行レイアウトのまま、右側コントロールだけ差し替える。 */
@@ -1439,11 +1127,12 @@ body {
   background: var(--bg-card);
   color: var(--ink);
   border: 1px solid var(--rule);
-  border-radius: 0;
   cursor: pointer;
   outline: none;
   transition: border-color 120ms ease, box-shadow 120ms ease;
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  box-shadow: none;
+
+  border-radius: 6px;
 }
 
 .select:hover {
@@ -1471,14 +1160,15 @@ body {
   min-height: 26px;
   font-family: var(--font-mono);
   font-size: 10.5px;
-  font-weight: 700;
   text-align: center;
-  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: transparent;
-  border-top: 1px solid var(--rule);
-  transition: color 220ms ease, text-shadow 220ms ease;
+  transition: color 220ms ease;
   position: relative;
+
+  letter-spacing: 0;
+  font-weight: 400;
+  border-top: 0;
 }
 
 .footer-status.ok {
@@ -1489,28 +1179,23 @@ body {
 
 .footer-status.error {
   color: var(--warn);
-  text-shadow: 0 0 6px var(--sheen);
 }
-
 
 .footer-version {
   margin: 4px 0 0;
   padding: 0 8px;
   font-family: var(--font-mono);
   font-size: 9.5px;
-  font-weight: 700;
   text-align: right;
   color: var(--ink-faint);
-  letter-spacing: 0.2em;
   text-transform: uppercase;
   user-select: text;
+
+  font-weight: 400;
+  letter-spacing: 0;
 }
 
 /* 旧・"FW//" プレフィクスは廃止。バージョン番号だけを静かに置く。 */
-
-/* ============================================================
- * Color Picker (ROG ターゲットスキャナ)
- * ============================================================ */
 
 .pick-stage {
   margin: 2px 0 14px;
@@ -1522,26 +1207,24 @@ body {
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
-  background:
-    var(--bg-elev);
   color: var(--ink);
   border: 1px solid var(--accent);
-  border-radius: 0;
   cursor: pointer;
   text-align: left;
   position: relative;
   overflow: hidden;
   font: inherit;
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease;
-  /* outer glow は filter: drop-shadow で表現 (clip-path 後の形状で正しく出る)。
-     inset glow は box-shadow 側に残す (clip-path 内側なので影響なし)。 */
+
   box-shadow: none;
   filter: none;
-  border-radius: 3px;
+
+  background: var(--accent-soft);
+  border-radius: 8px;
 }
 
 .pick-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
+  transform: none;
   box-shadow: none;
   filter: none;
 }
@@ -1552,7 +1235,7 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
   border-color: var(--rule);
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  box-shadow: none;
   filter: none;
 }
 
@@ -1560,19 +1243,6 @@ body {
   outline: 1.5px solid var(--accent);
   outline-offset: 3px;
 }
-
-/* 採取色の照り返し */
-.pick-btn::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--pigment) 0%, transparent 55%);
-  opacity: 0.16;
-  transition: opacity 240ms ease;
-  pointer-events: none;
-}
-
-.pick-btn:hover:not(:disabled)::before { opacity: 0.3; }
 
 /* 旧・斜めスラッシュ装飾は廃止。押す面そのものの陰影だけで見せる。 */
 
@@ -1596,15 +1266,10 @@ body {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: none;
-  /* will-change: transform で composite layer 化を確定 (Agent C2 #13)。
-     transform/opacity only animation なので GPU で完結し main thread をブロックしない。 */
-  will-change: transform;
-  animation: target-pulse 1.6s ease-in-out infinite;
-}
 
-@keyframes target-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.4); opacity: 0.5; }
+
+  animation: none;
+  will-change: auto;
 }
 
 .pick-btn-text {
@@ -1623,18 +1288,17 @@ body {
 }
 
 .pick-btn-en {
-  font-family: var(--font-mono);
   font-style: normal;
   font-size: 9.5px;
   opacity: 0.85;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
   color: var(--accent);
-  text-shadow: 0 0 4px var(--sheen);
+
+  font-family: var(--font-sans);
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .pick-btn-en em { font-style: normal; }
-
 
 .picker-note {
   margin-top: 10px;
@@ -1656,19 +1320,19 @@ body {
 .specimen-card {
   background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 0;
   overflow: hidden;
   margin-bottom: 12px;
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  box-shadow: none;
   transition: border-color 200ms ease, box-shadow 200ms ease;
   position: relative;
-  border-radius: 3px;
+
+  border-radius: 8px;
 }
 
 .specimen-card:not(.is-empty) {
   border-color: var(--accent);
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
-  filter: drop-shadow(0 0 8px var(--sheen));
+  box-shadow: none;
+  filter: none;
 }
 
 .specimen-swatch {
@@ -1679,10 +1343,9 @@ body {
   /* 拾った色は無彩色の台の上に置く。ダークの葡萄酒地では、周囲の赤に順応した目が
      色を実際より緑寄りに見てしまうため、この 6px の縁だけ中立色で挟む。 */
   border: 6px solid var(--neutral-plate);
-  box-shadow: inset 0 0 0 1px var(--neutral-plate-rule), var(--sink);
-  transition:
-    background 320ms cubic-bezier(0.2, 0.6, 0.2, 1),
-    box-shadow 320ms ease;
+  box-shadow: inset 0 0 0 1px var(--neutral-plate-rule);
+
+  transition: none;
 }
 
 .specimen-card.is-empty .specimen-swatch {
@@ -1715,17 +1378,16 @@ body {
   font-size: 13px;
   font-weight: 700;
   color: var(--accent);
-  letter-spacing: 0.16em;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
-  text-shadow: 0 0 6px var(--sheen);
 }
 
 .specimen-time {
   font-family: var(--font-mono);
   font-size: 9.5px;
   color: var(--ink-soft);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.03em;
 }
 
 /* ---------- Value List ---------- */
@@ -1756,7 +1418,7 @@ body {
   bottom: 6px;
   width: 3px;
   background: var(--accent);
-  box-shadow: 0 0 6px var(--sheen);
+  box-shadow: none;
   transition: background 200ms ease;
 }
 
@@ -1768,14 +1430,13 @@ body {
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.2em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   transition: color 200ms ease;
 }
 
 .value-row[data-default="true"] .value-label-en {
   color: var(--accent);
-  text-shadow: 0 0 6px var(--sheen);
 }
 
 .value-output {
@@ -1860,11 +1521,11 @@ body {
   cursor: crosshair;
   touch-action: none;
   outline: none;
-  border-radius: 3px;
+  border-radius: 6px;
 }
 
 .palette-area:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .palette-thumb {
@@ -1934,11 +1595,11 @@ body {
   border-radius: 0;
   color: var(--ink-soft);
   cursor: pointer;
-  transition: all 160ms ease;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
   flex-shrink: 0;
   font: inherit;
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
-  border-radius: 3px;
+  box-shadow: none;
+  border-radius: 6px;
 }
 
 .copy-btn:hover:not(:disabled) {
@@ -1946,8 +1607,8 @@ body {
     var(--accent);
   color: var(--on-accent);
   border-color: var(--accent);
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
-  filter: drop-shadow(0 0 5px var(--sheen));
+  box-shadow: none;
+  filter: none;
 }
 
 .copy-btn:disabled {
@@ -1973,8 +1634,8 @@ body {
     var(--accent);
   color: var(--on-accent);
   border-color: var(--accent);
-  /* outer glow は filter: drop-shadow で表現 (clip-path で box-shadow outer は消える) */
-  filter: drop-shadow(0 0 5px var(--sheen));
+
+  filter: none;
 }
 
 /* ---------- Format Chips ---------- */
@@ -2002,21 +1663,17 @@ body {
   inset: 0;
 }
 
-/* 非選択は持ち上がった面。選択との差を「高さ」で作るため、ここは必ず raise 側に置く。 */
 .fmt-chip-text {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   padding: 14px 8px;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg-card) 96%, #fff 4%),
-    var(--bg-card)
-  );
+  background: var(--bg-card);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  transition: all 160ms ease;
-  box-shadow: var(--bevel-top), var(--raise);
+  border-radius: 6px;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  box-shadow: none;
 }
 
 .fmt-chip-name {
@@ -2025,16 +1682,16 @@ body {
   font-size: 16px;
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.16em;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
-  transition: color 160ms ease, text-shadow 160ms ease;
+  transition: color 160ms ease;
 }
 
 .fmt-chip-sub {
   font-family: var(--font-mono);
   font-size: 8.5px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.03em;
   color: var(--ink-faint);
   text-transform: uppercase;
   font-weight: 600;
@@ -2042,29 +1699,24 @@ body {
 
 .fmt-chip:hover .fmt-chip-text {
   border-color: var(--rule-strong);
-  transform: translateY(-1px);
-  box-shadow: var(--bevel-top), var(--raise);
+  transform: none;
+  box-shadow: none;
 }
 
-/* 選択中のラジオ。持ち上がった非選択の中で、ここだけ浅く沈んで金の内枠が入る。 */
 .fmt-chip input:checked + .fmt-chip-text {
   border-color: color-mix(in srgb, var(--gold) 55%, var(--rule));
-  background: linear-gradient(
-    color-mix(in srgb, var(--accent) 20%, var(--bg-elev)),
-    color-mix(in srgb, var(--accent) 12%, var(--bg-elev))
-  );
+  background: var(--accent-soft);
   transform: none;
-  box-shadow: var(--sink-soft), var(--inlay-line);
+  box-shadow: none;
 }
 
 .fmt-chip input:checked + .fmt-chip-text .fmt-chip-name {
   color: var(--accent);
-  text-shadow: none;
 }
 
 .fmt-chip input:focus-visible + .fmt-chip-text {
   outline: none;
-  box-shadow: var(--sink-soft), var(--inlay-line), var(--focus-ring);
+  box-shadow: var(--focus-ring);
 }
 
 .fmt-hash-toggle {
@@ -2076,7 +1728,7 @@ body {
   cursor: pointer;
   user-select: none;
   font-family: var(--font-mono);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 .fmt-hash-toggle input[type="checkbox"] {
@@ -2088,7 +1740,7 @@ body {
 .fmt-hash-label {
   font-size: 10px;
   color: var(--ink-soft);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
 }
 
 /* セクション見出しの直下に置く「ここで何ができるか」の 1 行説明。
@@ -2113,12 +1765,10 @@ body {
   margin: 0 0 10px;
   background: var(--neutral-plate);
   border: 1px solid var(--neutral-plate-rule);
-  border-radius: 3px;
+  border-radius: 6px;
   position: relative;
-  box-shadow: var(--sink);
+  box-shadow: none;
 }
-
-/* 旧・4 隅の HUD コーナーマークは廃止。台の彫り込みだけで枠を示す。 */
 
 .history-grid.hidden { display: none; }
 
@@ -2145,7 +1795,7 @@ body {
 .history-chip:hover {
   transform: translateY(-2px) scale(1.08);
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: none;
   z-index: 1;
 }
 
@@ -2159,7 +1809,7 @@ body {
   font-size: 8px;
   font-weight: 700;
   color: var(--ink-faint);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
   text-transform: uppercase;
 }
@@ -2173,7 +1823,7 @@ body {
   color: var(--ink-faint);
   font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.03em;
   margin: 0 0 10px;
   text-transform: uppercase;
 }
@@ -2200,27 +1850,6 @@ body {
   border: 0;
 }
 
-/* ============================================================
- * Reduced motion
- *
- * 検証手順 (Agent F #16):
- *   1. Chrome DevTools → Rendering タブ → "Emulate CSS media feature
- *      prefers-reduced-motion" を "reduce" に設定
- *   2. popup を再オープン
- *   3. 以下のアニメーション/トランジションがすべて停止することを目視確認:
- *        - .hdr-tag::before  (led-pulse 3.2s opacity)
- *        - .pick-btn-icon-dot  (target-pulse 1.6s transform/opacity)
- *        - .panel.is-active  (panel-rise 340ms transform/opacity)
- *        - .tabbar-btn  (flex-grow 280ms transition)
- *        - .tabbar-label  (max-width 280ms transition)
- *        - .switch input + .switch-track::before  (transform 200ms)
- *        - .footer-status  (color 220ms transition)
- *        - .toggle-row hover/active  (background/border/box-shadow/transform)
- *        - .pick-btn  (transform/box-shadow/border-color/filter)
- *
- * universal selector (*, *::before, *::after) で全 transition/animation を一括停止する
- * 設計のため、@keyframes を新規追加した場合も自動的に reduce 対応される。
- * ============================================================ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2241,7 +1870,7 @@ body {
   padding: 10px 8px 6px;
   background: var(--bg-elev);
   border-radius: 8px;
-  box-shadow: var(--bevel-top), var(--bevel-bottom);
+  box-shadow: none;
   transition: opacity 0.15s ease;
 }
 .eq-panel.eq-disabled {
@@ -2300,27 +1929,27 @@ body {
   height: 80px;
   appearance: none;
   background: color-mix(in srgb, var(--accent) 28%, transparent);
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
 }
 .eq-slider::-webkit-slider-thumb {
   appearance: none;
   width: 16px;
   height: 9px;
-  border-radius: 3px;
+  border-radius: 6px;
   background: var(--accent);
   box-shadow: none;
   cursor: pointer;
 }
 .eq-slider::-webkit-slider-thumb:hover {
   background: var(--accent-strong);
-  box-shadow: 0 0 7px var(--sheen-strong);
+  box-shadow: none;
 }
 .eq-slider::-moz-range-thumb {
   width: 16px;
   height: 9px;
   border: none;
-  border-radius: 3px;
+  border-radius: 6px;
   background: var(--accent);
 }
 .eq-col-label {
@@ -2429,7 +2058,7 @@ kagayoi-support-footer {
   --kgs-star: var(--gold);
   --kgs-accent: var(--accent);
 }
-/* 同期設定は全タブ共通の末尾に配置する。 */
+/* 同期とファイル操作は設定タブにまとめる。 */
 .settings-sync-label {
   display: flex;
   align-items: center;
@@ -2439,16 +2068,33 @@ kagayoi-support-footer {
   cursor: pointer;
 }
 .settings-sync-note {
-  font-size: 11px;
-  line-height: 1.6;
   margin: 8px 0;
+
+  color: var(--ink-soft);
+  line-height: 1.7;
+  font-size: 11.5px;
 }
 .settings-sync input { accent-color: var(--accent); }
-.settings-sync button {
+.settings-sync button,
+.settings-backup button {
   color: var(--accent);
   background: transparent;
   border: 1px solid currentColor;
-  border-radius: 3px;
+  border-radius: 6px;
   padding: 4px 8px;
   cursor: pointer;
 }
+
+.settings-backup-buttons { display: flex; gap: 8px; }
+.settings-backup button:disabled { opacity: 0.5; cursor: wait; }
+
+.settings-sync,
+.settings-backup { padding: 16px; background: var(--bg-card); border: 1px solid var(--rule); border-radius: 8px; }
+.settings-backup-buttons button { flex: 1; min-height: 36px; font: inherit; }
+.settings-sync button:hover:not(:disabled),
+.settings-backup button:hover:not(:disabled) { background: var(--accent-soft); }
+.settings-sync button:focus-visible,
+.settings-backup button:focus-visible,
+.range:focus-visible,
+.eq-slider:focus-visible,
+.volume-step-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

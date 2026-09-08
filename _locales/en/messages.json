@@ -494,5 +494,14 @@
   "feat_x_hideEngagementCounts_label": { "message": "Hide engagement counts" },
   "feat_x_hideEngagementCounts_desc": { "message": "Hide reply / repost / like / view counts only. The buttons stay, so interactions work as before." },
   "feat_x_followingTabDefault_label": { "message": "Open Home on \"Following\"" },
-  "feat_x_followingTabDefault_desc": { "message": "Switch Home from \"For you\" to \"Following\" (once per page view; if you switch back to \"For you\" yourself, it stops interfering)." }
+  "feat_x_followingTabDefault_desc": { "message": "Switch Home from \"For you\" to \"Following\" (once per page view; if you switch back to \"For you\" yourself, it stops interfering)." },
+  "tabSettings": {"message":"Settings"},
+  "settingsBackupTitle": {"message":"Save and load settings"},
+  "settingsBackupDescription": {"message":"Save all feature settings, EQ, blocked channels, color history and selected tabs to JSON for another PC or browser. Import overwrites the entries included in the file. Sync on/off, destination accounts, authentication, caches and on-site overlay positions are excluded. When sync is on, imported feature settings also sync to your other PCs."},
+  "settingsExport": {"message":"Export"},
+  "settingsImport": {"message":"Import"},
+  "settingsExportSuccess": {"message":"Settings download started."},
+  "settingsExportError": {"message":"Export failed. Check your settings and download destination, then try again."},
+  "settingsImportSuccess": {"message":"Settings imported."},
+  "settingsImportError": {"message":"Import failed. Choose a valid Vuora settings JSON file (up to 5 MB)."}
 }

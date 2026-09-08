@@ -199,6 +199,12 @@
         <span class="tabbar-label" data-i18n="tabPicker">カラーピッカー</span>
         <span class="tabbar-rule" aria-hidden="true"></span>
       </button>
+      <button type="button" id="tabSettings" class="tabbar-btn"
+              role="tab" aria-selected="false" aria-controls="panelSettings" tabindex="-1">
+        <span class="tabbar-no" aria-hidden="true">07</span>
+        <span class="tabbar-label" data-i18n="tabSettings">設定</span>
+        <span class="tabbar-rule" aria-hidden="true"></span>
+      </button>
     </nav>
 
     <!-- ===== Panel: Tune (オーディオ / 映像 / Amazon) ===== -->
@@ -826,6 +832,7 @@
 
     </div><!-- /panel.picker -->
 
+    <div class="panel panel--settings" id="panelSettings" role="tabpanel" aria-labelledby="tabSettings" hidden>
     <section class="grp settings-sync" aria-labelledby="settingsSyncTitle">
       <label class="settings-sync-label" for="settingsSyncToggle">
         <span id="settingsSyncTitle" data-i18n="settingsSyncTitle">複数PC間で設定を同期</span>
@@ -838,6 +845,18 @@
       <p id="settingsSyncStatus" class="settings-sync-note" role="status" aria-live="polite"></p>
       <button type="button" id="settingsSyncRetry" data-i18n="settingsSyncRetry" hidden>同期を再試行</button>
     </section>
+
+    <section class="grp settings-backup" aria-labelledby="settingsBackupTitle">
+      <h2 class="grp-title" id="settingsBackupTitle" data-i18n="settingsBackupTitle">設定の保存と読み込み</h2>
+      <p class="settings-sync-note" data-i18n="settingsBackupDescription"></p>
+      <div class="settings-backup-buttons">
+        <button type="button" id="settingsExport" data-i18n="settingsExport">エクスポート</button>
+        <button type="button" id="settingsImport" data-i18n="settingsImport">インポート</button>
+      </div>
+      <input type="file" id="settingsImportFile" accept=".json,application/json" hidden />
+      <p id="settingsBackupStatus" class="settings-sync-note" role="status" aria-live="polite"></p>
+    </section>
+    </div><!-- /panel.settings -->
 
     <!-- ===== Status (live region) ===== -->
     <p class="footer-status" id="statusMsg" role="status" aria-live="polite"></p>
@@ -855,6 +874,8 @@
   </div>
 
   <script src="../lib/actions.js"></script>
+  <script src="../lib/settings-backup.js"></script>
+  <script src="settings-backup.js"></script>
   <script src="popup.js"></script>
   <script src="settings-sync.js"></script>
   <script type="module" src="../shared/kagayoi-support-popup.js"></script>

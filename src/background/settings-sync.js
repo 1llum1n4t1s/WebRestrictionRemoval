@@ -293,7 +293,8 @@
     }
     if (area !== "local") return;
     // 更新通知が set の完了より遅れても、受信反映を新しい編集として刻印しない。
-    if (K.SETTINGS_SYNC_APPLIED in changes) return;
+    if (K.SETTINGS_SYNC_APPLIED in changes &&
+        !String(changes[K.SETTINGS_SYNC_APPLIED].newValue).startsWith("import:")) return;
     const patch = {};
     for (const key of keys) {
       if (!(key in changes) || equal(changes[key].oldValue, changes[key].newValue)) continue;
