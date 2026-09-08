@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "chrome-webstore-upload-cli": "^4.0.1",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "globals": "^17.12.0",
     "kagayoi-support-extension": "1.0.5",
     "puppeteer": "^25.10.0",
