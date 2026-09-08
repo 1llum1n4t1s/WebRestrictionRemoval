@@ -11,7 +11,7 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 
 | Feature | Description |
 |---------|-------------|
-| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / send to Gemini Notebook and more — **34 sub-features** |
+| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / send to Gemini Notebook and more — **35 sub-features** |
 | 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" (**9 sub-features**) |
 | 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
@@ -46,12 +46,12 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 1. Click the toolbar icon to open the popup.
 2. **Turn ON only the master toggles you need** (everything is OFF by default).
-3. Tune each feature in the popup (the 34 YouTube Enhancements sub-features, Volume Booster slider, etc.).
+3. Tune each feature in the popup (the 35 YouTube Enhancements sub-features, Volume Booster slider, etc.).
 4. Settings are persisted across sessions.
 
 ### Popup tabs
 - **Tune**: 11 master toggles + Volume slider + Gamma / Loupe
-- **YouTube**: 34 YouTube Enhancements sub-features
+- **YouTube**: 35 YouTube Enhancements sub-features
 - **X**: 9 X cleaner sub-features
 - **Instagram**: 11 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features

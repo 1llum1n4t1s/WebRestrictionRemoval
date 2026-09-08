@@ -11,6 +11,11 @@
  *   cpa-sfx-demoted               キーワード非マッチ動画（デモート）— JS 側で動的注入する CSS と二段構え
  */
 
+/* 登録チャンネルの「関連が強い」欄（見出し・動画・もっと見る・区切り線をまとめて隠す）。 */
+ytd-rich-section-renderer.__cpa-sfx-hide-subs-relevant {
+  display: none !important;
+}
+
 /* ---------- サムネ枠装飾（検索結果） ---------- */
 .__cpa-sfx-thumb-dark {
   background: #272727;

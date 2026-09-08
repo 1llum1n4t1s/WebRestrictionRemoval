@@ -14,8 +14,8 @@ Except for a contact form you submit yourself, the Extension does not collect an
 
 The Extension stores the following settings on the user's device (`chrome.storage.local`). See Exception 5 for optional settings sync:
 
-- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 34 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
-- **`searchFixerFeatures`** (object): on/off state of each of the 34 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
+- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 35 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
+- **`searchFixerFeatures`** (object): on/off state of each of the 35 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
 - **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored on-device by default; included in optional settings sync (Exception 5).
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.

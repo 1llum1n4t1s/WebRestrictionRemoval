@@ -128,7 +128,7 @@ const StorageKeys = Object.freeze({
   SETTINGS_SYNC_STATUS: "_settingsSyncStatus",
   SETTINGS_SYNC_RETRY: "_settingsSyncRetry",
   SETTINGS_SYNC_APPLIED: "_settingsSyncApplied",
-  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 34 サブ機能の親） */
+  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 35 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube 機能拡張の個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -310,6 +310,7 @@ const SearchFixerFeatures = Object.freeze([
   // ことを実機確認済み。視聴ページの関連動画欄はプレーンテキストでリンクが無いため対象外）。
   // リストは popup で管理（一覧 + 個別解除）。
   Object.freeze({ key: "channelBlocklist", category: "video_filter" }),
+  Object.freeze({ key: "hideSubscriptionsRelevant", category: "video_filter" }),
   // 海外チャンネル除外: 自分の国以外のチャンネルの動画をフィード / 検索結果から除去する。
   // YouTube 標準の検索フィルタには国の条件が無い（「場所」は動画のジオタグ絞り込みで別物）ため
   // 独自実装。判定は 2 段のハイブリッド:
@@ -2883,7 +2884,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube 機能拡張 (34 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
+ * YouTube 機能拡張 (35 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。

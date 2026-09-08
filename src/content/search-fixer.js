@@ -261,6 +261,7 @@
    * 各機能の必要性に応じて attach / detach / 適用 / 撤去を冪等に行う。
    */
   function onSettingsChanged() {
+    applySubscriptionsRelevant();
     // /shorts/<id> リダイレクトは youtube-shorts.js が担当するためここでは扱わない（責務分離）
 
     // master OFF 時は注入 CSS / observer / 装飾クラスをすべて停止して早期 return (#13)。
@@ -1368,7 +1369,19 @@
     return SearchFixer.extractChannelKeyFromHref(link?.getAttribute("href"));
   }
 
+  // 登録フィードの専用見出しだけを見る。動画タイトルに同じ語があっても巻き込まない。
+  // クラスで隠すことで、OFF・SPA遷移・DOM再利用時に元の欄を復元できる。
+  function applySubscriptionsRelevant(enabled = active && features.hideSubscriptionsRelevant === true) {
+    const hide = enabled && location.pathname === "/feed/subscriptions";
+    for (const section of document.querySelectorAll("ytd-rich-section-renderer")) {
+      const title = section.querySelector("ytd-rich-shelf-renderer #rich-shelf-header h2")?.textContent?.trim();
+      section.classList.toggle("__cpa-sfx-hide-subs-relevant",
+        hide && /^(関連が強い|Most relevant)$/i.test(title ?? ""));
+    }
+  }
+
   function purgeFeedDistractions() {
+    applySubscriptionsRelevant();
     if (!isFeedPage()) return;
 
     // ホームのおすすめセクション群（「その他のトピック」「ニュース速報」「ゲームルーム」）は
@@ -3530,6 +3543,7 @@
   function cleanupAllSearchFixerStateForOrphan() {
     if (orphanCleanupRan) return;
     orphanCleanupRan = true;
+    try { applySubscriptionsRelevant(false); } catch {}
     try { detachResultsObserver(); } catch {}
     try { detachLiveChatObserver(); } catch {}
     try { detachLeftnavObservers(); } catch {}

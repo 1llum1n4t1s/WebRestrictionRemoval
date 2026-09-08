@@ -164,7 +164,7 @@
   "amazonMerchantInfoAriaUnknown": { "message": "販売元未確定" },
 
   "searchFixerMaster": { "message": "YouTube 機能拡張" },
-  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・Gemini Notebook 送信など 34 サブ機能を一括管理" },
+  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・Gemini Notebook 送信など 35 サブ機能を一括管理" },
 
   "instagramCleanerMaster": { "message": "Instagram クリーナー" },
   "instagramCleanerMasterDesc": { "message": "Reels / Explore / Stories などの冗長 UI を一括非表示" },
@@ -383,6 +383,8 @@
   "feat_sf_membersOnly_desc": { "message": "チャンネルメンバーシップ加入者のみ視聴可能な「メンバー限定」/「Members only」サムネバッジ付き動画を除去" },
   "feat_sf_watched_label": { "message": "視聴済み動画" },
   "feat_sf_watched_desc": { "message": "再生位置バー（resume-playback overlay）が表示されている既視聴動画を除去" },
+  "feat_sf_hideSubscriptionsRelevant_label": { "message": "登録チャンネルの「関連が強い」を非表示" },
+  "feat_sf_hideSubscriptionsRelevant_desc": { "message": "登録チャンネルページの「関連が強い」欄を、見出し・動画・「もっと見る」ごと非表示にします。通常の新着動画は残ります。" },
   "feat_sf_removeFeedSections_label": { "message": "セクション" },
   "feat_sf_removeFeedSections_desc": { "message": "ホームに表示される「その他のトピック」「ニュース速報」「ゲームルーム」のおすすめセクション (ytd-rich-section-renderer) を除去（フィードページのみ）" },
   "feat_sf_shelf_label": { "message": "動画棚" },

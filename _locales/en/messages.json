@@ -165,7 +165,7 @@
   "amazonMerchantInfoAriaUnknown": { "message": "Seller unverified" },
 
   "searchFixerMaster": { "message": "YouTube Enhancements" },
-  "searchFixerMasterDesc": { "message": "Manage 34 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, sending videos to Gemini Notebook, and more." },
+  "searchFixerMasterDesc": { "message": "Manage 35 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, sending videos to Gemini Notebook, and more." },
 
   "instagramCleanerMaster": { "message": "Instagram cleaner" },
   "instagramCleanerMasterDesc": { "message": "Hide redundant UI such as Reels, Explore, and Stories in one toggle." },
@@ -384,6 +384,8 @@
   "feat_sf_membersOnly_desc": { "message": "Remove videos with the \"Members only\" thumbnail badge that require channel membership to watch." },
   "feat_sf_watched_label": { "message": "Already watched" },
   "feat_sf_watched_desc": { "message": "Remove videos that show a resume-playback overlay (already watched)." },
+  "feat_sf_hideSubscriptionsRelevant_label": { "message": "Hide Most relevant in Subscriptions" },
+  "feat_sf_hideSubscriptionsRelevant_desc": { "message": "Hide the Most relevant section in Subscriptions, including its heading, videos and Show more button. Keep the regular latest videos." },
   "feat_sf_removeFeedSections_label": { "message": "Sections" },
   "feat_sf_removeFeedSections_desc": { "message": "Remove the \"Topics for you\", \"Breaking news\" and \"Game Room\" recommendation sections (ytd-rich-section-renderer) on Home (feed pages only)." },
   "feat_sf_shelf_label": { "message": "Video shelf" },
