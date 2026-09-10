@@ -19,7 +19,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 | `src/offscreen/` | Chrome の tabCapture 音声ストリームと AudioContext / DSP graph の維持 | Chrome 専用。Firefox manifest からは offscreen / tabCapture を除外する |
 | `src/lib/audio-pipeline.js` | Chrome / Firefox で共有する DSP graph 構築と設定適用 | キャプチャ方法とメディア要素検出は呼び出し側が担当する |
 | `src/lib/scan-runner.js` / `src/lib/cleaner-core.js` / `src/content/early-framework.js` | DOM 監視、設定購読、document_start の先制非表示に共通するライフサイクル | サイト固有セレクタと表示内容は各 content script に残す |
-| `src/shared/kagayoi-support-*` | 問い合わせフォームと評価導線 | `kagayoi-support-extension` の exact 固定版から同梱するコピー。製品固有の配置・配色だけを popup 側で与える |
+| `src/shared/kagayoi-support-*` | 問い合わせフォームと評価導線 | `@kagayoi/support-extension` の exact 固定版から同梱するコピー。製品固有の配置・配色だけを popup 側で与える |
 | `_locales/{en,ja}/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする |
 | `test/` | 純粋関数、公開定数、機能件数、構文、manifest 差分、DSP、問い合わせ契約の drift 検知 | 実サイト DOM の時点依存挙動は手動・実ブラウザ確認で補う |
 | `../vps-web/lp/vuora/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | VPS の Caddy が静的素材を配信し、拡張の API backend にはならない（設定は「製品ページの配信先」を参照） |
@@ -104,7 +104,7 @@ Chrome は tabCapture により EME を含むタブ出力を処理できます�
 
 ### 問い合わせ部品は正本からローカル同梱する
 
-共通 UI と API 契約は `kagayoi-support-extension` に集約し、このリポジトリでは exact version と同期結果を保持します。これにより複数拡張の挙動を揃えつつ、MV3 のリモートコード禁止を満たします。代わりに package 更新時の同期漏れが生じうるため、専用 check と契約テストを置きます。
+共通 UI と API 契約は `@kagayoi/support-extension` に集約し、このリポジトリでは exact version と同期結果を保持します。これにより複数拡張の挙動を揃えつつ、MV3 のリモートコード禁止を満たします。代わりに package 更新時の同期漏れが生じうるため、専用 check と契約テストを置きます。
 
 ### リリース成果物を manifest 差し替えで分ける
 
