@@ -112,10 +112,9 @@ Chrome は `manifest.json`、Firefox は `manifest.firefox.json` を `manifest.j
 
 ## 検証と正本
 
-- 通常のコード検証は `pnpm test` と `pnpm run lint` です。
-- 共通問い合わせ部品の正本一致は `pnpm exec kagayoi-support-sync --check` です。
-- ストア成果物は `pwsh -NoProfile -File zip.ps1` または `./zip.sh` で Chrome / Firefox の両 variant を生成します。
-- version、公開名、機能件数、設定 schema などの可変値は文書へ固定値を増やさず、`AGENTS.md` が示す単一情報源とテスト結果を優先します。
+公開名・機能件数・設定 schema・manifest の整合性は自動テストで検証し、共通問い合わせ部品は配布元との一致チェックと契約テストで同梱内容を検証します。設定同期・インポート・設定適用のテストは、競合解決や古い画面からの書き込み防止を含むデータフローの契約を担います。
+
+検証・パッケージ生成の必須コマンドとテストの担当範囲は [AGENTS.md の Build Commands](AGENTS.md#build-commands)、公開名や機能件数の正本は [機能カウント早見表](AGENTS.md#機能カウント早見表単一情報源) を参照してください。
 
 ## 製品ページの配信先
 
