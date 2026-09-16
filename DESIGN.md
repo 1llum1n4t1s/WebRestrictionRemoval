@@ -98,6 +98,18 @@ Firefox では `manifest.firefox.json` だけが `volume-booster-mes.js` を読�
 
 権限処理を background、UI を popup、DOM 変更を content script に分けています。サイトごとの変化を局所化できる反面、SPA navigation と非同期 DOM の追跡が必要になるため、MutationObserver、設定再配信、context invalidation cleanup を共通パターンにしています。
 
+### サイト内 DOM と操作 UI の所有境界
+
+Instagram の非表示処理、動画操作、Instagram / TikTok の画像保存は別々の content script が担当し、マスターと各サブ機能の両方が ON のときだけ動作します。動画操作は `instagram-video-controls.js` が `CleanerCore` で既存の設定を購読し、追加の保存キーや外部通信を持ちません。
+
+- コメント非表示は本文を巻き込まないことを優先します。既知のコメント領域に加え、構造から推定する場合は各項目の時刻がコメント固有の permalink 内にあることを確認し、本文混在リストと外側のラッパーを除外します。
+- 投稿動画のブロックは表示を隠すだけでなく、ON 時と `play` イベント時に `article` 内の動画を一時停止します。OFF 時に自動再開はせず、動画操作側もブロック対象を除外します。
+- シークバーは動画と同寸の操作レイヤー、または既に配置基準を持つ同寸の祖先へ挿入します。適切な挿入先がなければ見送り、既存の static な親を relative に変えて動画の寸法を壊すことを避けます。有限で正の再生時間が得られるまでバーを隠します。
+- Space は対象動画があるときだけ capture で既存処理を抑止します。入力・編集中は除外し、長押しで再生状態を連続反転しません。対象選択は `InstagramCleaner.selectVideoCandidate`、DOM とキー購読の寿命は専用 script が管理します。OFF・DOM 切断・context 失効で所有 UI と監視を撤去します。
+- 画像保存ボタンはコンテナ単位ではなく画像単位で所有します。同じコンテナに複数画像があってもボタンの URL・位置・撤去先を対応させ、挿入時の所有先を記録して DOM 再構築後の別画像を巻き込みません。TikTok のリンク・picture・span は挿入先から外し、安全な祖先が body / html しかなければ挿入を見送ります。
+
+具体的な候補選択順やセレクタは [機能別実装詳細](references/architecture.md)、回帰テストと実ブラウザ確認の手順は [AGENTS.md](AGENTS.md#architecture) を参照してください。
+
 ### 音量処理はブラウザ別入口と共有 DSP にする
 
 Chrome は tabCapture により EME を含むタブ出力を処理できますが user gesture と共有表示が必要です。Firefox は MediaElementSource で自動適用できますが DRM と graph 解放に制約があります。この差を入口で分け、EQ・圧縮・低音カット等の DSP 定義だけを `audio-pipeline.js` で共有します。
