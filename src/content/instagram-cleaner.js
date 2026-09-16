@@ -40,6 +40,8 @@
   let domSweepDirty = false;
   /** @type {number|null} URL リダイレクト用ポーリングタイマー */
   let urlGuardTimer = null;
+  /** blockVideos ON 中だけ登録する再生抑止 listener の状態 */
+  let blockVideoPlayListenerActive = false;
 
   // i18n / セレクタ崩壊の watch dog (#10): href + aria-label の全バリアントが同時に DOM に
   // 見当たらないとき、Instagram の DOM 構造が根本変化した可能性を開発者コンソールに 1 度だけ警告。
@@ -77,6 +79,7 @@
   // ---------- 設定変更ディスパッチャ ----------
   function onSettingsChanged() {
     applyBodyClasses();
+    syncBlockVideoPlaybackGuard();
     if (active) {
       if (hasSweepFeature()) startDomSweep();
       else stopDomSweep();
@@ -187,12 +190,7 @@
     // body クラスが付いたまま剥がせなくなるため、検知時点で全マーカーを掃除して
     // タイマーも止める（次回ページリロードで新しい content script が再注入されるまで休眠）。
     if (!chrome.runtime?.id) {
-      active = false;
-      features = InstagramCleaner.mergeFeatures({});
-      applyBodyClasses();
-      cleanupMarkers();
-      stopDomSweep();
-      stopUrlGuard();
+      deactivateOrphan();
       return;
     }
     // タブが非表示のときは DOM スイープをスキップして CPU を節約。
@@ -207,24 +205,59 @@
   }
 
   /**
-   * `<article>` 内に `<video>` を含む投稿に対して、親 `<article>` にマーカークラスを付与する。
+   * `<article>` 内の `<video>` を停止し、親 `<article>` にマーカークラスを付与する。
    * 動画自体の隠蔽は CSS 側の `video { display: none }` に任せる。マーカーが付いた article は
-   * CSS で再生ボタン・音声トグル等の関連 UI を非表示にし、サムネ部分にプレースホルダーを描画する。
-   *
-   * 既処理 article は `:not()` で除外して再走査コストを削減。
+   * CSS で再生・音声トグルを非表示にし、サムネ部分にプレースホルダーを描画する。
    */
   function markArticlesContainingVideo() {
     try {
       document
-        .querySelectorAll("article:not(." + InstagramCleaner.ARTICLE_VIDEO_CLASS + ")")
-        .forEach((article) => {
-          if (article.querySelector("video")) {
-            article.classList.add(InstagramCleaner.ARTICLE_VIDEO_CLASS);
-          }
+        .querySelectorAll("article video")
+        .forEach((video) => {
+          pauseBlockedVideo(video);
+          video.closest("article")?.classList.add(InstagramCleaner.ARTICLE_VIDEO_CLASS);
         });
     } catch {
       // 一部 SubFrame で querySelector が例外を投げるケースをサイレントスキップ
     }
+  }
+
+  /** CSS で隠した動画がバックグラウンド再生を続けないよう、blockVideos ON 中は即座に停止する。 */
+  function pauseBlockedVideo(video) {
+    try {
+      video.pause();
+    } catch {}
+  }
+
+  function onBlockedVideoPlay(event) {
+    const video = event.target;
+    if (!f("blockVideos") || video?.localName !== "video" || !video.closest("article")) return;
+    pauseBlockedVideo(video);
+  }
+
+  function syncBlockVideoPlaybackGuard() {
+    if (f("blockVideos")) {
+      if (!blockVideoPlayListenerActive) {
+        document.addEventListener("play", onBlockedVideoPlay, true);
+        blockVideoPlayListenerActive = true;
+      }
+      // 設定を ON にした時点ですでに再生中の動画も、次の sweep を待たず停止する。
+      markArticlesContainingVideo();
+      return;
+    }
+    if (blockVideoPlayListenerActive) {
+      document.removeEventListener("play", onBlockedVideoPlay, true);
+      blockVideoPlayListenerActive = false;
+    }
+  }
+
+  /** 投稿本文の時刻を除外し、コメント permalink 内の時刻だけを持つ項目か判定する。 */
+  function isConfirmedCommentItem(element) {
+    const permalink = element.querySelector('a[href*="/c/"]')?.getAttribute("href") ?? "";
+    if (!/^\/(?:p|reels?|tv)\/[^/?#]+\/c\/[^/?#]+/i.test(permalink)) return false;
+    const allTimes = element.querySelectorAll("time");
+    if (allTimes.length === 0) return false;
+    return element.querySelectorAll('a[href*="/c/"] time').length === allTimes.length;
   }
 
   /**
@@ -238,18 +271,21 @@
    *   3. **コメントリスト `<ul>`（ホームフィード用）** — `article` 内の `<ul>` で以下を全て満たす:
    *      - `<li>` の数が 1〜15（それ以上は別種の UL の可能性が高い）
    *      - 80% 以上の `<li>` がユーザープロフィールリンク (`/<username>/`) を含む
+   *      - 全 `<li>` がコメント固有の `/p/<shortcode>/c/<comment-id>/` permalink を含む
    *   4. **コメントリストコンテナ（投稿詳細ページ + モーダル — UL/DIV 両対応）** —
    *      `<article>` 不在の `/p/`, `/reel/`, `/tv/` 直接アクセス、およびフィード/プロフィールから
    *      クリックで開く `[role="dialog"]` モーダル表示の両方をカバー。コメントは
    *      `<ul class="_a9z6">`（直系 `<div>`）または `<div>` 直下に並ぶ。コメント入力 textarea
-   *      が存在 + `main[role="main"]` または `[role="dialog"]` 配下 + `<article>` の外、で
-   *      子 2〜50 個 / 70%+ が `/<username>/` を持つ / 70%+ が `<time>` を含む / 異なる
-   *      username が 2 種類以上 — を全部満たす container をマーク。
+   *      が存在 + モーダル、または投稿詳細 URL の `main[role="main"]` 配下で、子 2〜50 個 /
+   *      全子の全 `<time>` がコメント permalink 内にある / 70%+ が `/<username>/` を持つ /
+   *      異なる username が 2 種類以上 — を全部満たす最内 container をマーク。
    *
    * 安全策（前回の「投稿本体を巻き込む」事故を防ぐ）:
-   *   - 4 はコメント入力 textarea 不在ページ（プロフィール / DM / 検索結果）に到達しないようガード
-   *   - 4 は **異なる username 2 種類以上 + `<time>` 70%+** を要件に追加し、タグ付けユーザー
-   *     パネル / liked_by 行 / プロフィールヘッダ / 単一ユーザー繰り返し UI を除外する
+   *   - 4 はモーダルを優先し、モーダル外では投稿詳細 URL の main だけを走査する
+   *   - 4 はコメント入力 textarea 不在 root（プロフィール / DM / 検索結果）に到達しないようガード
+   *   - 3 / 4 はコメント permalink を肯定条件にし、投稿本文を含む `_a9z6` は明示除外する
+   *   - 4 は **全時刻がコメント permalink 内 + 異なる username 2 種類以上**を要件にし、
+   *     投稿本文 / タグ付けユーザーパネル / liked_by 行 / 単一ユーザー繰り返し UI を除外する
    *   - 4 は article ガードを敢えて持たない（モーダル投稿は `<dialog>` 内の `<article>` で wrap
    *     されるため）。3. と重複マーク発生時は同 class の冪等 add で CSS 効果は同一。
    *   - 既処理は `:not()` で除外して 300ms ごとの再走査コストを削減
@@ -300,6 +336,7 @@
           if (items.length === 0 || items.length > 15) return;
           // 各 li 内にユーザープロフィールリンク（`/<username>/` 形式）があるかカウント
           let userLinkCount = 0;
+          let confirmedCommentCount = 0;
           for (const li of items) {
             const link = li.querySelector("a[href^='/']");
             const href = link?.getAttribute("href") ?? "";
@@ -307,9 +344,15 @@
             if (/^\/[\w.]{1,30}\/?($|\?)/.test(href)) {
               userLinkCount++;
             }
+            if (isConfirmedCommentItem(li)) confirmedCommentCount++;
           }
-          // 80% 以上が user link を持つ UL のみコメントリスト扱い
-          if (userLinkCount / items.length >= 0.8) {
+          // 全項目にコメント固有 permalink があり、80% 以上が user link を持つ UL だけを扱う。
+          // caption とコメントが同居する `_a9z6` は caption に permalink が無いため通らない。
+          if (
+            !ul.classList.contains("_a9z6") &&
+            confirmedCommentCount === items.length &&
+            userLinkCount / items.length >= 0.8
+          ) {
             ul.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
           }
         });
@@ -318,68 +361,63 @@
       //    `<article>` が無い投稿詳細ページに加え、フィード/プロフィールから投稿クリックで
       //    開く `[role="dialog"]` モーダル表示も対象。コメントは `<ul class="_a9z6">` (子は <div>) や
       //    `<div>` 直下に並ぶ（投稿によって異なるレイアウト）。安全策として下記ガードで誤マッチを防ぐ:
-      //      - 同一ページにコメント入力 textarea が存在する（= コメント可能ページのみ）
-      //      - スコープを `main[role="main"]` または `[role="dialog"]` 配下に限定
+      //      - 同じ root にコメント入力 textarea が存在する（= コメント可能 UI のみ）
+      //      - スコープをモーダル、または投稿詳細 URL の `main[role="main"]` に限定
       //    （`closest("article")` ガードは入れない — モーダル投稿は `<dialog>` 内の `<article>` で
       //     wrap されており、article ガードを入れると modal も skip されてしまうため。3. の UL
       //     ロジックと重複マーク発生時は同じ class を 2 回 add するだけで CSS 効果は同じ。）
-      //    判定条件（structural triple-gate）:
+      //    判定条件（複合 structural gate）:
       //      - 直系子が 2〜50 個
+      //      - 全ての子の全 `<time>` がコメント固有 permalink 内にある
       //      - 70% 以上の子が `/<username>/` 形式のリンクを含む
       //      - **異なる username が 2 種類以上**
-      //      - **70% 以上の子に `<time>` が含まれる**（タグ付けユーザーパネル等を除外）
-      const hasCommentInput = document.querySelector(
+      const dialog = document.querySelector('[role="dialog"]');
+      const isDetailPath = /^\/(?:p|reels?|tv)\/[^/]+(?:\/|$)/i.test(location.pathname);
+      const detectionRoot = dialog || (isDetailPath ? document.querySelector('main[role="main"]') : null);
+      const hasCommentInput = detectionRoot?.querySelector(
         'textarea[aria-label*="comment" i], textarea[aria-label*="コメント"], textarea[placeholder*="comment" i], textarea[placeholder*="コメント"]'
       );
-      if (hasCommentInput) {
-        const detectionRoots = [];
-        const main = document.querySelector('main[role="main"]');
-        const dialog = document.querySelector('[role="dialog"]');
-        if (main) detectionRoots.push(main);
-        // dialog が main の外側に居るときだけ別 root として追加（main 配下なら重複走査を避ける）
-        if (dialog && !main?.contains(dialog)) detectionRoots.push(dialog);
-        // 早期 return ガード (/rere レビュー C-#12):
-        // 既にマーク済みコンテナが detection root 内に存在する場合、SPA top-level 遷移までは
-        // 同じコメントリストが対象 = 再走査不要。10,000+ DOM ノードに対する 300ms 周期の
-        // querySelectorAll を完全スキップして累積 CPU 負荷を圧縮する。SPA 遷移時に
-        // <main> / <dialog> の子要素が差し替わるとマーク済み要素も消えるので、その瞬間から
-        // 自動的に再走査が再開される (= マーク済み要素が無いので早期 return を抜ける)。
-        const alreadyMarked = detectionRoots.some((root) =>
-          root.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
-        );
-        if (alreadyMarked) return;
+      if (detectionRoot && hasCommentInput) {
         const candidateSelector =
           "ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + "), div:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")";
-        for (const root of detectionRoots) {
-          root.querySelectorAll(candidateSelector).forEach((container) => {
-            const children = container.children;
-            const len = children.length;
-            if (len < 2 || len > 50) return;
-            let userLinkCount = 0;
-            let timeCount = 0;
-            const handles = new Set();
-            for (const child of children) {
-              const link = child.querySelector("a[href^='/']");
-              const href = link?.getAttribute("href") ?? "";
-              const m = href.match(/^\/([\w.]{1,30})\/?($|\?)/);
-              if (m) {
-                userLinkCount++;
-                handles.add(m[1]);
-              }
-              // コメントアイテムには必ず投稿時刻 `<time>` が含まれる。タグ付けユーザーパネル等は
-              // 含まないため、time 要素率でコメントリストを誤マッチから守る最終ゲート。
-              if (child.querySelector("time")) timeCount++;
+        const matches = [];
+        detectionRoot.querySelectorAll(candidateSelector).forEach((container) => {
+          // `_a9z6` は caption とコメントの混在リスト。article を内包する layout wrapper も対象外。
+          if (
+            container.classList.contains("_a9z6") ||
+            container.querySelector("article") ||
+            container.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
+          ) return;
+          const children = container.children;
+          const len = children.length;
+          if (len < 2 || len > 50) return;
+          let userLinkCount = 0;
+          let confirmedCommentCount = 0;
+          const handles = new Set();
+          for (const child of children) {
+            const link = child.querySelector("a[href^='/']");
+            const href = link?.getAttribute("href") ?? "";
+            const m = href.match(/^\/([\w.]{1,30})\/?($|\?)/);
+            if (m) {
+              userLinkCount++;
+              handles.add(m[1]);
             }
-            // 70% 以上 user link + handle 2 種類以上 + 70% 以上 time 要素
-            // （誤マッチ防止: タグ付けユーザーパネル / liked_by 行 / 単一ユーザー繰り返し UI を除外）
-            if (
-              userLinkCount / len >= 0.7 &&
-              handles.size >= 2 &&
-              timeCount / len >= 0.7
-            ) {
-              container.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
-            }
-          });
+            if (isConfirmedCommentItem(child)) confirmedCommentCount++;
+          }
+          // 全項目が comment permalink time + 70% 以上 user link + handle 2 種類以上
+          // （誤マッチ防止: タグ付けユーザーパネル / liked_by 行 / 単一ユーザー繰り返し UI を除外）
+          if (
+            confirmedCommentCount === len &&
+            userLinkCount / len >= 0.7 &&
+            handles.size >= 2
+          ) {
+            matches.push(container);
+          }
+        });
+        // 外側 wrapper と内側コメントリストが共に条件を満たす場合、caption 等を巻き込まない最内だけを隠す。
+        for (const container of matches) {
+          if (matches.some((other) => other !== container && container.contains(other))) continue;
+          container.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
         }
       }
     } catch {
@@ -470,6 +508,7 @@
   function startUrlGuard() {
     if (urlGuardTimer !== null) return;
     checkUrlRedirect();
+    if (!active) return;
     urlGuardTimer = setInterval(checkUrlRedirect, 300);
   }
 
@@ -484,9 +523,7 @@
     // 通常は dirty sweep / fallback が zombie 検知して stopUrlGuard を呼ぶが、
     // urlGuardTimer 単独経路で発火する race を塞ぐ保険として独立ガードを置く。
     if (!chrome.runtime?.id) {
-      active = false;
-      stopUrlGuard();
-      stopDomSweep();
+      deactivateOrphan();
       return;
     }
     if (!active) return;
@@ -521,6 +558,12 @@
   });
 
   // ---------- 機能 OFF 時の cleanup ----------
+  function deactivateOrphan() {
+    active = false;
+    features = InstagramCleaner.mergeFeatures({});
+    onSettingsChanged();
+  }
+
   function cleanupMarkers() {
     try {
       const markerClasses = [

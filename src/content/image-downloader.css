@@ -9,7 +9,7 @@
  *                                      overlay button の絶対配置のみが機能する。
  *                                      TikTok modal viewer の position:absolute 配下など、
  *                                      既存レイアウトを壊さない経路として使う。
- *   - .__cpa-img-dl-button           : 画像右上に注入されるダウンロードボタン。
+ *   - .__cpa-img-dl-button           : 画像左上に注入されるダウンロードボタン。
  *                                      hover / focus-within 時にだけ表示する。
  *   - .__cpa-img-dl-busy             : ダウンロード fetch 中のボタン状態（cursor: wait + 透過）。
  *

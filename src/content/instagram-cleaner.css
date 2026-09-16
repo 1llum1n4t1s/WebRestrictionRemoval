@@ -121,7 +121,7 @@ html.__cpa-ig-vanity .__cpa-ig-hide-counter {
 /* =============================================================
    7. 投稿内の動画ブロック
    ============================================================= */
-html.__cpa-ig-block-videos video {
+html.__cpa-ig-block-videos article video {
   display: none !important;
 }
 /* JS の markArticlesContainingVideo() が <article> に付与するマーカー */
@@ -130,8 +130,7 @@ html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="Play"],
 html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="Pause"],
 html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="再生"],
 html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="一時停止"],
-html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="ミュート"],
-html.__cpa-ig-block-videos article.__cpa-ig-article-video button[type="button"] {
+html.__cpa-ig-block-videos article.__cpa-ig-article-video [aria-label="ミュート"] {
   display: none !important;
 }
 html.__cpa-ig-block-videos article.__cpa-ig-article-video {
@@ -204,9 +203,9 @@ html.__cpa-ig-notes [aria-label="ノート"] {
 /* =============================================================
    10. 新規メッセージカウンター非表示（DM の赤バッジ）
    ============================================================= */
-/* aria-label に件数情報を含むバッジを識別 */
-html.__cpa-ig-msg-counters [aria-label*="unread" i],
-html.__cpa-ig-msg-counters [aria-label*="new message" i],
-html.__cpa-ig-msg-counters [aria-label*="未読"] {
+/* DM 入口リンク内のバッジだけを対象にし、未読スレッドやリンク自体は残す。 */
+html.__cpa-ig-msg-counters a[href="/direct/inbox/"] [aria-label*="unread" i],
+html.__cpa-ig-msg-counters a[href="/direct/inbox/"] [aria-label*="new message" i],
+html.__cpa-ig-msg-counters a[href="/direct/inbox/"] [aria-label*="未読"] {
   display: none !important;
 }

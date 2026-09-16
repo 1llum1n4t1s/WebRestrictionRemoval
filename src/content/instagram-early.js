@@ -136,7 +136,7 @@
   const observer = new MutationObserver((mutations) => {
     // zombie guard (PATTERN SYNC): orphan content script で observer が永久発火するのを停止
     if (!chrome.runtime?.id) {
-      disconnectObserver();
+      offRevert();
       return;
     }
     for (const m of mutations) {

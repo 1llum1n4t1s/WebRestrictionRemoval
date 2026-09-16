@@ -154,10 +154,12 @@
         //           (`<section data-e2e="feed-video">` 内、swiper カルーセルの ImgPhotoSlide)。
         // ⚠️ 重要: `<a href="/photo/">` / `<a href="/video/">` は CSS Grid + aspect-ratio
         // レイアウトを担う wrapper のため、ここに `__cpa-img-dl-host` を当てると width:0 で潰れる
-        // （実機検証で確定）。これを回避するため findHostEl の TikTok 経路で <a> を skip し、
-        // <picture> の親 <span style="position:absolute; inset:0">（= 画像と同サイズ）を host
-        // にする。<a> には一切触らないので Grid sizing は無傷。
-        const inModal = img.closest('[class*="DivBrowserModeContainer"], [class*="DivVideoContainer"]');
+        // （実機検証で確定）。これを回避するため findHostEl の TikTok 経路で <a> と
+        // <picture>/<span> wrapper を skip し、外側の block container を host にする。
+        // <a> には一切触らないので Grid sizing は無傷。
+        const inModal = img.closest(
+          '[class*="DivBrowserModeContainer"], [class*="DivVideoContainer"], [class*="DivPhotoVideoContainer"]'
+        );
         const inFeedItem = img.closest('[data-e2e*="feed-item" i], [data-e2e*="user-post-item" i]');
         const inPostLink = img.closest('a[href*="/photo/"], a[href*="/video/"]');
         const inFeedVideo = img.closest('[data-e2e="feed-video"]');
@@ -250,11 +252,14 @@
     // modal viewer / feed grid いずれでも同じ <picture>/<span>/<div> 構造で動作する想定。
     if (host === ImageDownloader.HOSTS.TIKTOK) {
       let el = img.parentElement;
-      // <picture> を skip して 1 階層上げる
-      if (el && el.tagName === "PICTURE") el = el.parentElement;
-      // <span> も skip して block 要素 <div> まで上げる
-      if (el && el.tagName === "SPAN") el = el.parentElement;
-      return el || img.parentElement;
+      // レイアウトを担う <a> と、overlay host に不向きな <picture>/<span> を連続して skip する。
+      // DOM が簡略化されて安全な祖先が body/html しかない場合は、広範囲へ position を付けず
+      // この画像へのボタン挿入自体を見送る。
+      while (el && (el.tagName === "A" || el.tagName === "PICTURE" || el.tagName === "SPAN")) {
+        el = el.parentElement;
+      }
+      if (!el || el.tagName === "BODY" || el.tagName === "HTML") return null;
+      return el;
     }
 
     let el = img.parentElement;
@@ -284,6 +289,10 @@
    * （contains / isConnected はレイアウト誘発なしの安価な判定）。
    */
   const hostElCache = new WeakMap();
+  /** 同じ host に複数画像がある場合も、button の click 対象と表示位置を画像ごとに一致させる。 */
+  let overlayByImage = new WeakMap();
+  /** DOM から切断された画像の所有 button を次回 scan で撤去するための走査対象。 */
+  const decoratedImages = new Set();
   function resolveHostEl(img) {
     const cached = hostElCache.get(img);
     if (cached && cached.isConnected && cached.contains(img)) return cached;
@@ -579,7 +588,11 @@
 
   function decorateImage(img) {
     const currentSrc = readImageSrcOrNull(img);
-    if (!currentSrc) return;
+    if (!currentSrc) {
+      // carousel の非表示 slide や DOM 切断後も、共有 host に古い button を残さない。
+      detachOverlayForImage(img);
+      return;
+    }
 
     const lastSrc = img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
 
@@ -588,11 +601,18 @@
     // SKIP マーカーが付いてる場合は decorate 対象外なので何もしない。
     if (lastSrc === currentSrc) {
       const hostElCached = resolveHostEl(img);
-      if (hostElCached) {
-        const existingBtn = hostElCached.querySelector(`:scope > .${ImageDownloader.BUTTON_CLASS}`);
-        if (existingBtn) syncButtonPosition(existingBtn, img);
+      const overlay = overlayByImage.get(img);
+      if (
+        hostElCached &&
+        overlay &&
+        overlay.hostEl === hostElCached &&
+        overlay.button.parentElement === hostElCached
+      ) {
+        syncButtonPosition(overlay.button, img);
+        return;
       }
-      return;
+      // サイト側の再描画で button または host が差し替わった場合は、古い所有物だけ外して再構築する。
+      if (overlay) detachOverlayForImage(img);
     }
 
     // src が変わった、または skip マーカーが残っているケース → 古い装飾を撤去して再評価
@@ -608,34 +628,39 @@
     if (!hostEl) return;
 
     applyHostPositionClass(hostEl);
-    if (!hostEl.querySelector(`:scope > .${ImageDownloader.BUTTON_CLASS}`)) {
-      const button = buildButton(img);
-      hostEl.appendChild(button);
-      // host サイズが img より大きいケース対策: JS で button 位置を img の rect に同期。
-      // 初回 sync + img の load (lazy load 等で後からサイズ確定する場合) で再同期。
-      syncButtonPosition(button, img);
-      if (!img.complete) {
-        img.addEventListener("load", () => syncButtonPosition(button, img), { once: true });
-      }
+    const button = buildButton(img);
+    hostEl.appendChild(button);
+    overlayByImage.set(img, { hostEl, button });
+    decoratedImages.add(img);
+    // host サイズが img より大きいケース対策: JS で button 位置を img の rect に同期。
+    // 初回 sync + img の load (lazy load 等で後からサイズ確定する場合) で再同期。
+    syncButtonPosition(button, img);
+    if (!img.complete) {
+      img.addEventListener("load", () => syncButtonPosition(button, img), { once: true });
     }
     img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] = currentSrc;
   }
 
   /**
    * 1 つの img に紐づく overlay (host class + button) を撤去する。
-   * 同じ hostEl に複数 img があるケースを考慮し、host class は他に dataset 持ち img が無い
-   * ことを確認してから外す（他の img 装飾を巻き込まないため）。
+   * 同じ hostEl に複数 img があるケースを考慮し、画像ごとの所有 button だけを外す。
+   * host class は同じ host に別の所有 button が無いことを確認してから外す。
    */
   function detachOverlayForImage(img) {
-    // cache 済み host があればそれを優先（button は cache 時点の host に append されているため、
-    // DOM 再構築後に findHostEl が別要素を返しても撤去先を取り違えない）
-    const hostEl = resolveHostEl(img);
-    if (!hostEl) return;
-    const btn = hostEl.querySelector(`:scope > .${ImageDownloader.BUTTON_CLASS}`);
-    if (btn) btn.remove();
-    // host に紐づく他の処理済み img が無ければ host class も外す
-    const stillTracked = hostEl.querySelector(ImageDownloader.SCANNED_SRC_ATTR_SELECTOR);
-    if (!stillTracked) {
+    // resolveHostEl の現在値ではなく、挿入時に記録した所有先を使う。DOM 再構築後も別画像の
+    // button を誤って消さず、この img に閉じた button だけを撤去できる。
+    const overlay = overlayByImage.get(img);
+    decoratedImages.delete(img);
+    if (img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] !== undefined) {
+      delete img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
+    }
+    if (!overlay) return;
+    overlayByImage.delete(img);
+    overlay.button.remove();
+    const hostEl = overlay.hostEl;
+    // 同じ host の別画像が所有する button が残っている間は配置クラスを維持する。
+    const hasAnotherButton = hostEl.querySelector(`:scope > .${ImageDownloader.BUTTON_CLASS}`);
+    if (!hasAnotherButton) {
       hostEl.classList.remove(ImageDownloader.HOST_CLASS);
       hostEl.classList.remove(ImageDownloader.HOST_POSITIONED_CLASS);
     }
@@ -644,6 +669,9 @@
   function scanAllImages() {
     if (!active) return;
     if (checkContextInvalidated()) return;
+    for (const img of decoratedImages) {
+      if (!img.isConnected) detachOverlayForImage(img);
+    }
     const imgs = document.querySelectorAll("img");
     for (const img of imgs) {
       decorateImage(img);
@@ -677,6 +705,8 @@
         delete el.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
       }
     });
+    overlayByImage = new WeakMap();
+    decoratedImages.clear();
   }
 
   function startObserver() {
