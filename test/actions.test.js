@@ -1331,7 +1331,7 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
   assert.equal(G.SearchFixer.FEATURES.length, 35, "SearchFixer.FEATURES は 35 件");
-  assert.equal(G.InstagramCleaner.FEATURES.length, 11, "InstagramCleaner.FEATURES は 11 件");
+  assert.equal(G.InstagramCleaner.FEATURES.length, 12, "InstagramCleaner.FEATURES は 12 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });
 
@@ -1349,6 +1349,36 @@ test("search-fixer: about 取得失敗はセッション予算を消費し、明
   assert.match(fetchChannelOrigin, /foreignFetchAbort = requestAbort/);
   assert.match(fetchChannelOrigin, /else if \(requestAbort\.signal\.aborted\) foreignFetchBudgetUsed--/);
   assert.doesNotMatch(fetchChannelOrigin, /else foreignFetchBudgetUsed--/);
+});
+
+test("InstagramCleaner: 動画コントロールの Space 判定と時刻整形", () => {
+  assert.equal(G.InstagramCleaner.DEFAULT_FEATURES.videoControls, false, "新機能は既定 OFF");
+  assert.equal(G.InstagramCleaner.isSpaceKey(" ", ""), true);
+  assert.equal(G.InstagramCleaner.isSpaceKey("Spacebar", ""), true);
+  assert.equal(G.InstagramCleaner.isSpaceKey("x", "Space"), true);
+  assert.equal(G.InstagramCleaner.isSpaceKey("Enter", "Enter"), false);
+  assert.equal(G.InstagramCleaner.formatVideoTime(0), "0:00");
+  assert.equal(G.InstagramCleaner.formatVideoTime(65.9), "1:05");
+  assert.equal(G.InstagramCleaner.formatVideoTime(3661), "1:01:01");
+  assert.equal(G.InstagramCleaner.formatVideoTime(Number.NaN), "0:00");
+});
+
+test("InstagramCleaner.selectVideoCandidate: 非表示を除外して再生中・直前操作・モーダルを優先", () => {
+  const select = G.InstagramCleaner.selectVideoCandidate;
+  const hiddenPlaying = { id: "hidden", visibleArea: 0, playing: true };
+  const feed = { id: "feed", visibleArea: 500, playing: false };
+  const modal = { id: "modal", visibleArea: 300, playing: false, dialog: true };
+  assert.equal(select([hiddenPlaying, feed, modal]), modal, "背面フィードよりモーダルを優先");
+
+  const playing = { id: "playing", visibleArea: 100, playing: true };
+  assert.equal(select([feed, modal, playing]), modal, "モーダル表示中は背面の再生動画を選ばない");
+  const modalPlaying = { id: "modal-playing", visibleArea: 100, playing: true, dialog: true };
+  assert.equal(select([feed, modal, modalPlaying]), modalPlaying, "モーダル内では再生動画を最優先");
+
+  const recent = { id: "recent", visibleArea: 80, recent: true };
+  assert.equal(select([feed, playing, recent]), playing, "モーダル無しでは再生動画を優先");
+  assert.equal(select([feed, recent]), recent, "一時停止後も直前動画を維持");
+  assert.equal(select([hiddenPlaying]), null, "可視動画が無ければ介入しない");
 });
 
 test("SearchFixer.detectTextOrigin: 自国固有スクリプトで home、別スクリプトで foreign", () => {

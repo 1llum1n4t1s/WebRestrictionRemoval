@@ -898,7 +898,7 @@ const AmazonMerchantInfo = Object.freeze({
  * @readonly Instagram クリーナーの機能定義と定数（独自実装）。
  *
  * Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント /
- * Notes / メッセージカウンター）を非表示にするための、クライアントサイド DOM/CSS 操作。
+ * Notes / メッセージカウンター）の整理と、動画シークバーを提供するクライアントサイド DOM/CSS 操作。
  * 外部送信ゼロのプライバシー方針。設定は `chrome.storage.local` の `instagramCleanerEnabled`
  * (master) と `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理する。
  *
@@ -919,6 +919,7 @@ const InstagramCleanerFeatures = Object.freeze([
   Object.freeze({ key: "comments", category: "ig_extra" }),
   Object.freeze({ key: "notes", category: "ig_extra" }),
   Object.freeze({ key: "msgCounters", category: "ig_extra" }),
+  Object.freeze({ key: "videoControls", category: "ig_extra" }),
   // === 画像ダウンロード（YouTube / Instagram / TikTok 共通機能。実装は src/content/image-downloader.js）===
   Object.freeze({ key: "imageDownload", category: "ig_extra" }),
 ]);
@@ -964,6 +965,46 @@ const InstagramCleaner = Object.freeze({
   COMMENT_VIEW_CLASS: "__cpa-ig-comment-view",
   /** comments 機能でコメントリスト `<ul>` に追加するマーカー（厳格な判定のもと付与） */
   COMMENT_LIST_CLASS: "__cpa-ig-comment-list",
+  /** videoControls 機能でシークバーの挿入先へ付ける cleanup 用マーカークラス */
+  VIDEO_CONTROL_PARENT_CLASS: "__cpa-ig-video-control-parent",
+  /** videoControls 機能が挿入するシークバー UI のルートクラス */
+  VIDEO_CONTROL_CLASS: "__cpa-ig-video-control",
+
+  /** Space ショートカットのブラウザ差を吸収する純粋判定。 */
+  isSpaceKey(key, code) {
+    return key === " " || key === "Spacebar" || code === "Space";
+  },
+
+  /** シークバー横へ表示する秒数を `m:ss` / `h:mm:ss` に整形する。 */
+  formatVideoTime(value) {
+    const total = Math.max(0, Math.floor(Number.isFinite(value) ? value : 0));
+    const seconds = String(total % 60).padStart(2, "0");
+    const minutes = Math.floor(total / 60) % 60;
+    const hours = Math.floor(total / 3600);
+    return hours > 0
+      ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
+      : `${minutes}:${seconds}`;
+  },
+
+  /**
+   * Space の対象動画を、モーダル内へ絞り込み → 再生中 → 直前操作 → 表示面積の順で選ぶ。
+   * DOM 非依存の候補レコードにして、非表示動画や背面フィードを選ばない優先順位をテスト可能にする。
+   */
+  selectVideoCandidate(candidates) {
+    if (!Array.isArray(candidates)) return null;
+    const visible = candidates.filter((candidate) =>
+      candidate && Number.isFinite(candidate.visibleArea) && candidate.visibleArea > 0
+    );
+    const largest = (items) => items.reduce((best, candidate) =>
+      best === null || candidate.visibleArea > best.visibleArea ? candidate : best, null);
+    const dialog = visible.filter((candidate) => candidate.dialog === true);
+    const scoped = dialog.length ? dialog : visible;
+    const playing = scoped.filter((candidate) => candidate.playing === true);
+    if (playing.length) return largest(playing);
+    const recent = scoped.find((candidate) => candidate.recent === true);
+    if (recent) return recent;
+    return largest(scoped);
+  },
 
   mergeFeatures(stored) {
     const out = { ...InstagramCleaner.DEFAULT_FEATURES };
@@ -2885,7 +2926,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube 機能拡張 (35 機能)・Instagram クリーナー (11 機能)・TikTok クリーナー (3 機能)
+ * YouTube 機能拡張 (35 機能)・Instagram クリーナー (12 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。

@@ -42,9 +42,9 @@ Vuora
   ※ 純粋な DOM 操作のみで、価格・履歴の取得や外部送信は一切行いません。
 
 ・📷 Instagram クリーナー（オプトイン・デフォルトOFF）
-  Instagram の冗長 UI を一括非表示にする 11 個のサブ機能を提供します。
+  Instagram の冗長 UI 整理と動画操作を行う 12 個のサブ機能を提供します。
   主要機能: Reels 削除（URL リダイレクト含む）/ Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示
-  追加機能: いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 画像ダウンロードボタン
+  追加機能: いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 動画シークバー（有効時はスペースキーで再生・一時停止） / 画像ダウンロードボタン
   ※ クライアント側の DOM 操作・CSS 適用のみで、外部送信は一切行いません。
 
 ・🎵 TikTok クリーナー（オプトイン・デフォルトOFF）
@@ -182,7 +182,7 @@ Vuora
   どちらも価格・履歴の取得や外部送信は一切行わず、読み取り情報は端末外へ送信しない。
 
   *://*.instagram.com/*:
-  Instagram クリーナー（11 サブ機能）のため。Reels / Explore / ストーリー段 / Threads 誘導 / いいね数・フォロワー数 / 動画再生 / コメント欄 / Notes / メッセージカウンター / 画像ダウンロードボタンの非表示・追加を、aria-label / href / role / data-pagelet / SVG path data ベースの意味論的セレクタで実装。/reels/ / /explore/ 等の URL リダイレクトもオプトイン。画像ダウンロードはユーザーがクリックした瞬間に正規 CDN（*.cdninstagram.com / scontent-*.fna.fbcdn.net）への画像 GET のみ発行し、credentials:omit + redirect:manual で第三者送信を遮断。読み取り情報は端末外へ送信しない。
+  Instagram クリーナー（12 サブ機能）のため。Reels / Explore / ストーリー段 / Threads 誘導 / いいね数・フォロワー数 / 動画再生 / コメント欄 / Notes / メッセージカウンター / 動画シークバー / 画像ダウンロードボタンの非表示・追加を、aria-label / href / role / data-pagelet / SVG path data ベースの意味論的セレクタで実装。/reels/ / /explore/ 等の URL リダイレクトもオプトイン。画像ダウンロードはユーザーがクリックした瞬間に正規 CDN（*.cdninstagram.com / scontent-*.fna.fbcdn.net）への画像 GET のみ発行し、credentials:omit + redirect:manual で第三者送信を遮断。読み取り情報は端末外へ送信しない。
 
   *://*.tiktok.com/*:
   TikTok クリーナー（3 サブ機能）のため。コメント欄 / おすすめのアカウント / 画像ダウンロードボタンを、data-e2e / [class*="..."] ベースの意味論的セレクタで実装。photo / video の直接 URL アクセス時は右パネル全体を非表示、modal viewer (Browser Mode) ではコメントリストのみピンポイント非表示。画像ダウンロードはユーザーがクリックした瞬間に正規 CDN（*.tiktokcdn.com / *.tiktokcdn-us.com）への画像 GET のみ発行する。読み取り情報は端末外へ送信しない。

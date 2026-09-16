@@ -467,6 +467,10 @@
   "feat_ig_notes_desc": { "message": "Hide the Notes row (short status messages over profile photos) at the top of the DM screen." },
   "feat_ig_msgCounters_label": { "message": "Hide unread DM badge" },
   "feat_ig_msgCounters_desc": { "message": "Hide the unread DM count badge (red circle with a number) on the navigation to ease notification pressure." },
+  "feat_ig_videoControls_label": { "message": "Show video seek bar" },
+  "feat_ig_videoControls_desc": { "message": "Show a seek bar for changing video position and use Space outside text fields to pause or resume playback." },
+  "instagramVideoControlsAria": { "message": "Video playback controls" },
+  "instagramVideoSeekAria": { "message": "Video position" },
   "feat_ig_imageDownload_label": { "message": "Show download button on images" },
   "feat_ig_imageDownload_desc": { "message": "Overlay a download button on the top-left of post photos (feed / profile grid / post detail) on hover. Picks the largest variant from srcset." },
 

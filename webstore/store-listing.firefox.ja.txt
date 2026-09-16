@@ -31,7 +31,8 @@ amazon.co.jp/auto-deliveries で配送月ごとの合計金額を自動算出し
 🔹 Amazon 販売元・出荷元バッジ
 商品ページの隠し div (#merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div) から販売元と出荷元を抽出し、商品情報最上部（ランキング移動ボタンの隣）に「📦 販売: XXX / 出荷: YYY」バッジを表示。Amazon 直販と マーケット出品 を視覚的に区別（直販 = 緑バッジ / マーケット = オレンジ警告バッジ）。詐欺マーケットプレイス出品の回避や Amazon 直販の確認が一目でできる。直販判定は Amazon 自身が出す isInternal フラグ（#merchantInfoFeature_feature_div 内 <script> 埋め込み JSON）を最優先とし、欠落時は販売元名で推定。純粋 DOM 操作のみ・外部送信ゼロ。
 
-🔹 Instagram クリーナー (11 サブ機能)
+🔹 Instagram クリーナー (12 サブ機能)
+動画シークバーと画像ダウンロードを追加できます。シークバー有効時はスペースキーで再生・一時停止できます。
 Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Notes / メッセージカウンター 等の冗長 UI を非表示。意味論的セレクタ (aria-label / role / data-pagelet) のみ使用、難読化 class には依存しません。
 
 🔹 TikTok クリーナー (3 サブ機能)

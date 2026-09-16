@@ -23,7 +23,7 @@
 - **`amazonDeliveryTotalEnabled`**（真偽値）: Amazon 定期おトク便ページの月別合計表示機能の有効/無効。
 - **`amazonRankingJumpEnabled`**（真偽値）: Amazon 商品ページの「この商品が所属するランキングへ移動」ボタンの有効/無効。デフォルト OFF。
 - **`instagramCleanerEnabled`**（真偽値）: Instagram クリーナー機能の有効/無効。
-- **`instagramCleanerFeatures`**（オブジェクト）: Instagram クリーナーの 11 個のサブ機能（Reels 削除 / Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示 / いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
+- **`instagramCleanerFeatures`**（オブジェクト）: Instagram クリーナーの 12 個のサブ機能（Reels 削除 / Explore 削除 / ストーリー段非表示 / Stories URL ホーム遷移 / Threads 誘導非表示 / いいね数・フォロワー数非表示 / 投稿内動画ブロック / コメント欄非表示 / Notes 非表示 / 新規メッセージカウンター非表示 / 動画シークバーと Space 再生切替 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`tiktokCleanerEnabled`**（真偽値）: TikTok クリーナー機能の有効/無効。
 - **`tiktokCleanerFeatures`**（オブジェクト）: TikTok クリーナーの 3 個のサブ機能（コメント欄非表示 / おすすめのアカウント非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`xCleanerEnabled`**（真偽値）: X（旧 Twitter）クリーナー機能の有効/無効。デフォルト OFF。

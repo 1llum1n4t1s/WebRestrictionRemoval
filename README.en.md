@@ -16,7 +16,7 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 | 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
-| 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + image download (**11 sub-features**) |
+| 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + video seek bar + image download (**12 sub-features**) |
 | 🎵 **TikTok cleaner** | Hide comments / suggested accounts + image download (**3 sub-features**) |
 | 🔊 **Volume Booster** | Amplify tab audio 0–300%. Distortion guard / night mode / wall-thump guard (bass cut) / mute + **10-band graphic equalizer (with presets)** |
 | 🎞️ **Video Gamma** | Adjust `<video>` brightness via slider (center 1.0 = no correction, left for darker, right for brighter) |
@@ -53,7 +53,7 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 - **Tune**: 11 master toggles + Volume slider + Gamma / Loupe
 - **YouTube**: 35 YouTube Enhancements sub-features
 - **X**: 9 X cleaner sub-features
-- **Instagram**: 11 Instagram cleaner sub-features
+- **Instagram**: 12 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
 - **Color Picker**: EyeDropper + history
 

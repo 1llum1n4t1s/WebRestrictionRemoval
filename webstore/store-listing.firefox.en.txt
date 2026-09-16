@@ -31,7 +31,8 @@ The bestseller-rank links in a product's detail section appear in different posi
 🔹 Amazon seller / shipper badge
 Extracts the seller and shipper from the product page's hidden divs (#merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div) and shows them as a "📦 Sold: XXX / Ships: YYY" badge at the top of the product info (right next to the jump-to-ranking button). **Amazon-fulfilled and marketplace listings are visually distinguished** (Amazon-fulfilled = green badge / marketplace = orange warning badge), making it easy to spot suspicious marketplace listings at a glance. The detection uses Amazon's own isInternal flag (embedded JSON in the <script> inside #merchantInfoFeature_feature_div) as the primary signal, with the seller name as a fallback. Pure DOM manipulation, zero external transmission.
 
-🔹 Instagram Cleaner (11 sub-features)
+🔹 Instagram Cleaner (12 sub-features)
+Adds an optional video seek bar and image download buttons. Space toggles playback while the seek bar option is enabled.
 Hides Reels / Explore / Stories / Threads / like counts / videos / comments / Notes / message counters, and similar verbose UI. Uses only semantic selectors (aria-label / role / data-pagelet); no dependency on obfuscated class names.
 
 🔹 TikTok Cleaner (3 sub-features)

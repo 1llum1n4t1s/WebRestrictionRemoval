@@ -40,9 +40,9 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
   ※ Pure DOM manipulation; no price/history reading or external transmission.
 
 · 📷 Instagram cleaner (opt-in, default OFF)
-  Hides Instagram's redundant UI through 11 sub-features.
+  Organizes Instagram UI and adds video controls through 12 sub-features.
   Main: Remove Reels (with URL redirect) / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion
-  Extras: Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Image download button
+  Extras: Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Video seek bar (Space toggles playback while enabled) / Image download button
   ※ Client-side DOM and CSS only; nothing is transmitted externally.
 
 · 🎵 TikTok cleaner (opt-in, default OFF)
@@ -180,7 +180,7 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   Neither feature reads price/history nor transmits anything externally; nothing read is transmitted off-device.
 
   *://*.instagram.com/*:
-  Required for the Instagram cleaner (11 sub-features). Hides / adds Reels / Explore / Stories tray / Threads promotion / vanity counts / video playback / comment list / Notes / message counters / image download button using semantic selectors based on aria-label / href / role / data-pagelet / SVG path data. URL redirects (e.g. /reels/, /explore/) are also opt-in. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.cdninstagram.com / scontent-*.fna.fbcdn.net), with credentials:omit + redirect:manual blocking third-party transmission. Nothing read is transmitted off-device.
+  Required for the Instagram cleaner (12 sub-features). Hides / adds Reels / Explore / Stories tray / Threads promotion / vanity counts / video playback / comment list / Notes / message counters / video seek bar / image download button using semantic selectors based on aria-label / href / role / data-pagelet / SVG path data. URL redirects (e.g. /reels/, /explore/) are also opt-in. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.cdninstagram.com / scontent-*.fna.fbcdn.net), with credentials:omit + redirect:manual blocking third-party transmission. Nothing read is transmitted off-device.
 
   *://*.tiktok.com/*:
   Required for the TikTok cleaner (3 sub-features). Comment list / suggested accounts / image download button are implemented via semantic selectors based on data-e2e and [class*="..."]. For direct photo / video URL access the entire right panel is hidden; in the modal viewer (Browser Mode) only the comment list is hidden. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.tiktokcdn.com / *.tiktokcdn-us.com). Nothing read is transmitted off-device.

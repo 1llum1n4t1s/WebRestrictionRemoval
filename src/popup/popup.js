@@ -1313,7 +1313,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * カテゴリをサブタブで切り替える DOM を構築する（YouTube / Instagram クリーナーで共用）。
    *
-   * 機能数が多いクリーナー（YouTube 32 機能 / Instagram 11 機能）を 1 画面に縦積みすると
+   * 機能数が多いクリーナー（YouTube 35 機能 / Instagram 12 機能）を 1 画面に縦積みすると
    * 非常に長くなるため、カテゴリごとにサブタブで切り替えられるようにして縦の情報量を圧縮する。
    * 各機能の `<input>` は全カテゴリ分まとめて DOM / inputMap に存在し続ける（非表示パネルでも
    * checked 状態は保持され、ON 数カウントや apply() の収集に影響しない）。

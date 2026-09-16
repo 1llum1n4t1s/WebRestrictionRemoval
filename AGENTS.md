@@ -15,7 +15,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 | 機能カテゴリ | 12 | `SettingsSchema` + `test/actions.test.js` |
 | マスタートグル | 11 | popup.html の独立 toggle-row 数（`toggle-row` クラスを持つ要素数 − `toggle-row--sub` クラスを持つ要素数。内訳の実数は `rg -c` で数え直す）。カラーピッカー除く 11 機能すべてが独立マスタートグル（独自 storage key + 独立 checkbox + SettingsSchema 独立エントリを持つ）。Shorts のみ YouTube 機能拡張配下サブ機能で独立トグルを持たない |
 | YouTube 機能拡張 サブ機能 | 35 | `SearchFixer.FEATURES`（内訳: 検索ノイズ除去 + Shorts 5 + 動画ページ整形 + 登録チャンネル拡張 3 + 接続モニター 1 + 配信時刻オーバーレイ 1 + 海外チャンネル除外 1 等） |
-| Instagram クリーナー サブ機能 | 11 | `InstagramCleaner.FEATURES` |
+| Instagram クリーナー サブ機能 | 12 | `InstagramCleaner.FEATURES` |
 | TikTok クリーナー サブ機能 | 3 | `TikTokCleaner.FEATURES` |
 | X クリーナー サブ機能 | 9 | `XCleaner.FEATURES`（レイアウト 4 + ノイズ除去 4 + タイムライン 1） |
 | Firefox 提供機能 | 12 | 全 12 機能（音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js`。EME_HOSTS の DRM サイトでは無効） |
@@ -30,7 +30,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 2. **Amazon 定期おトク便 月別合計**
 3. **Amazon ランキングへ移動ボタン** — 商品詳細欄の売れ筋リンクを商品情報最上部に集約、一番細かいサブカテゴリへ同タブ移動
 4. **Amazon 販売元・出荷元バッジ** — 緑（Amazon 直販）/ オレンジ（マーケット出品）の視覚区別、判定は `isInternal` JSON フラグ最優先
-5. **Instagram クリーナー** — 11 サブ機能
+5. **Instagram クリーナー** — 12 サブ機能（動画シークバー + Space 再生切替を含む）
 6. **TikTok クリーナー** — 3 サブ機能（コメント欄非表示 / おすすめアカウント非表示 / 画像ダウンロード）
 7. **X クリーナー** — 9 サブ機能（右ペイン / トレンド / おすすめユーザー / メッセージドック / 広告投稿 / プレミアム勧誘 / Grok / 反応数を非表示 + ホームを「フォロー中」で開く）
 8. **音量ブースター** — 自動歪み防止 / ナイトモード / 壁ドン対策モード（低音カット） / ミュートトグル + **10 バンドグラフィックイコライザ (プリアンプ + プリセット)**、設定グローバル永続化、タブ切替で自動適用。Chrome = tabCapture 経路 / Firefox = 専用 MES 経路（DRM サイト除く）の per-browser 2 実装
@@ -88,6 +88,7 @@ pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zi
 | `test/settings-sync.test.js` | 設定同期のオプトイン・競合解決・削除伝播・再起動回復・容量超過時の保持 |
 | `test/subscriptions-relevant.test.js` | 登録フィードの「関連が強い」欄だけの非表示と、OFF・SPA 遷移・DOM 再利用時の復元 |
 | `test/settings-application.test.js` | popup の部分更新・同期世代と保存キュー・Chrome 音量設定の全ブーストタブ反映 |
+| `test/instagram-video-controls.test.js` | Instagram 動画コントロールの Space 抑止・再生切替・入力除外・repeat・OFF cleanup |
 | `test/_load-actions.js` | 上記から共有する actions.js ロード用ヘルパー。Node.js の自動探索対象にもなるため、総件数は `pnpm test` の出力を正とする |
 
 ### 依存パッケージの運用
@@ -168,6 +169,7 @@ pnpm lint
 | `src/content/amazon-delivery-total.{js,css}` | Amazon 定期おトク便ページ: 月別合計を rAF coalesce + observer guard 駆動で挿入 + `__cpa-amzn-delivery-total` 配色 |
 | `src/content/instagram-early.js` | Instagram 向け `document_start` 注入の最小スクリプト。hideComments ON 時に `<html>` へ `__cpa-ig-comments-pre` クラスを最速付与し、`div:has(> ul._a9ym)`（各コメント UL の親 div）を CSS rule + MutationObserver inline force-hide で先制非表示にする。`_a9z6`（外側 UL）には post caption が同居しているので触らず、`_a9ym` 親 div だけを対象にして caption 巻き込み防止（actions.js は読み込まない） |
 | `src/content/instagram-cleaner.{js,css}` | Instagram クリーナー: master + features で body クラス駆動、URL リダイレクト + DOM スイープ + 意味論的セレクタのみ（aria-label / href / role / data-pagelet / SVG path data） |
+| `src/content/instagram-video-controls.{js,css}` | Instagram クリーナーの `videoControls` サブ機能: 動画と同じ領域の操作レイヤーへシークバーを挿入し、入力・編集欄以外の Space を capture して可視動画の再生 / 一時停止を切替。OFF・SPA detach・context 失効で全撤去 |
 | `src/content/tiktok-early.js` | TikTok 用 `document_start` 注入の最小スクリプト。`tiktokCleanerEnabled` + `tiktokCleanerFeatures` を読んで `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` 同期付与 + inline `<style>` で主要セレクタ焼き込み（FOUC 防止、actions.js 非依存） |
 | `src/content/tiktok-cleaner.{js,css}` | TikTok クリーナー: master + features で body クラス駆動、CSS-only 実装（DOM スイープ / URL リダイレクト不要）。photo / video 用 `[class*="RightPanelContainer"]` + modal viewer 用 `[class*="DivCommentListContainer"]` の 2 系統セレクタ併用 |
 | `src/content/x-early.js` | X 用 `document_start` 注入の最小スクリプト。`xCleanerEnabled` + `xCleanerFeatures` を読んで `<html>` に `__cpa-x-right-pane` / `__cpa-x-trends` / `__cpa-x-who-to-follow` を同期付与 + inline `<style>` で焼き込み（**レイアウトが動く 3 機能のみ**。FOUC 防止、actions.js 非依存） |
@@ -195,7 +197,7 @@ pnpm lint
 | `pnpm-workspace.yaml` | **overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` は使わない）。transitive 脆弱性は脆弱範囲だけに効く versioned selector で固定する。`minimumReleaseAgeExclude` の同一 package 複数版は pnpm 11.7.0 の既知問題を避けて `||` で 1 selector に統合する。詳細と保留中の既知脆弱性は §依存パッケージの運用 |
 | `.github/dependabot.yml` | github-actions（SHA ピン維持）と npm の weekly 更新 PR 設定。取り込みの正規ルートは `/deps` スキル |
 | `docs/privacy-policy.md` | プライバシーポリシー |
-| `test/actions.test.js` | 純粋関数テスト: globalThis 公開名 24 件の列挙 (SettingsSchema 含む。**この `required` 配列が公開定数の単一情報源**) / **FEATURES 件数アサート (SearchFixer 35 / IG 11 / TT 3 / X 9)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
+| `test/actions.test.js` | 純粋関数テスト: globalThis 公開名 24 件の列挙 (SettingsSchema 含む。**この `required` 配列が公開定数の単一情報源**) / **FEATURES 件数アサート (SearchFixer 35 / IG 12 / TT 3 / X 9)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
 | `test/syntax-check.test.js` / `test/manifest-drift.test.js` / `test/audio-pipeline.test.js` / `test/kagayoi-support.test.js` | 順に「`src/**/*.js` の動的列挙 + 構文 check」「`manifest.json` と `manifest.firefox.json` の content_scripts 一致検証」「`audio-pipeline.js` の DSP ヘルパー」「問い合わせ共通部品と組み込み契約の検証」。共有ローダーは `test/_load-actions.js` |
 | `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome step 失敗時も `if: success() \|\| failure()` で Firefox AMO step は独立実行する (ReplaceFontSelect 流派)。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.Codex/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
 | `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要。`/vava` Step 8.7-B (CWS drift check) からも自動参照される |

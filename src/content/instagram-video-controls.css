@@ -1,0 +1,53 @@
+/* Instagram 動画シークバー。親の position は動画レイアウトを壊すため変更しない。 */
+
+html .__cpa-ig-video-control {
+  position: absolute;
+  z-index: 2147483647;
+  right: 12px;
+  /* Instagram 純正のタグ / ミュートボタン列（下端 12px 前後）を避ける。 */
+  bottom: 54px;
+  left: 12px;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: rgb(0 0 0 / 72%);
+  color: #fff;
+  font: 600 12px/1.2 system-ui, sans-serif;
+  pointer-events: auto;
+  opacity: 0.94;
+}
+
+html .__cpa-ig-video-control[hidden] {
+  display: none !important;
+}
+
+html .__cpa-ig-video-control input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: #fff;
+  cursor: pointer;
+}
+
+html .__cpa-ig-video-control-time {
+  flex: 0 0 auto;
+  min-width: 76px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  html .__cpa-ig-video-control {
+    right: 8px;
+    bottom: 50px;
+    left: 8px;
+  }
+
+  html .__cpa-ig-video-control-time {
+    min-width: 68px;
+    font-size: 11px;
+  }
+}

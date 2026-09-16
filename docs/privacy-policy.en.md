@@ -21,7 +21,7 @@ The Extension stores the following settings on the user's device (`chrome.storag
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
 - **`amazonRankingJumpEnabled`** (boolean): whether the "Go to this product's ranking" button on Amazon product pages is enabled. Default OFF.
 - **`instagramCleanerEnabled`** (boolean): whether the Instagram cleaner is enabled.
-- **`instagramCleanerFeatures`** (object): on/off state of each of the 11 Instagram cleaner sub-features (Remove Reels / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion / Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Image download button).
+- **`instagramCleanerFeatures`** (object): on/off state of each of the 12 Instagram cleaner sub-features (Remove Reels / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion / Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Video seek bar and Space playback toggle / Image download button).
 - **`tiktokCleanerEnabled`** (boolean): whether the TikTok cleaner is enabled.
 - **`tiktokCleanerFeatures`** (object): on/off state of each of the 3 TikTok cleaner sub-features (Hide comments / Hide suggested accounts / Image download button).
 - **`xCleanerEnabled`** (boolean): whether the X (formerly Twitter) cleaner is enabled. Default OFF.
