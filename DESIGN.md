@@ -86,7 +86,7 @@ Firefox では `manifest.firefox.json` だけが `volume-booster-mes.js` を読�
 5. popup と content script の利用者向け文言は `_locales/{en,ja}/messages.json` と `chrome.i18n` を経由します。
 6. Manifest V3 の CSP に従い、実行 JavaScript はすべて拡張へ同梱します。問い合わせ共通部品もリモート実行せず、npm package から同期したファイルを配布物へ含めます。
 7. 外部通信はプライバシーポリシーの5例外だけです。画像取得、接続モニター、Gemini Notebook、問い合わせ、設定同期で扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。
-8. バージョンは Chrome / Firefox manifest、package metadata、lockfile 間で同期し、release ブランチから生成した成果物を同一バージョンとして公開します。
+8. バージョンは Chrome / Firefox manifest と `package.json` の間で同期し、`release/<manifest version>` ブランチから生成した成果物を同一バージョンとして公開します。`pnpm-lock.yaml` は依存解決の正本として frozen install で検証しますが、製品バージョンの正本にはしません。
 
 ## 採用済みの設計判断
 

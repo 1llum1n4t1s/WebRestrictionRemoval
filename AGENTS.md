@@ -51,7 +51,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
   - **例外 3: Gemini Notebook 送信** — ON 中の `https://notebooklm.google.com`（ユーザー自身の Google アカウント宛）との通信。**動画 URL とノートブック名を送るのはユーザーがボタンを押した瞬間のみ**で、対象ページで送信ボタンを出したときに行う**アカウント一覧 / ノートブック一覧の先読みは読み取りのみ**（視聴内容・動画 URL・識別子は送らない）。視聴履歴収集・バックグラウンド送信なし。詳細は §Gemini Notebook 送信。
   - **例外 4: お問い合わせフォーム** — popup 下部からユーザーが送信したときだけ `https://support.kagayoi.com` へ入力内容と製品 ID / バージョン / ロケールを送る。閲覧 URL・ページ内容・キャプチャ画像・拡張設定は送らない。初回のメール確認と認証セッションを含む詳細は `docs/privacy-policy.{md,en.md}` を正本とする。
   - **例外 5: 設定同期** — 各PCで明示的に ON にした場合だけ、機能設定とチャンネル除外リストをブラウザ標準の `storage.sync` へ保存する。認証情報・アカウント選択・キャッシュ・採色履歴・表示位置は端末内に保持する。実装は `src/background/settings-sync.js`、仕様は `DESIGN.md` とプライバシーポリシーを参照。
-- **バージョン管理**: バージョン番号は `/vava` スキル経由でのみ更新する（コード変更コミットで `manifest.json` / `package.json` / `pnpm-lock.yaml` の version フィールドには触らない）。
+- **バージョン管理**: バージョン番号は `/vava` スキル経由でのみ更新する（コード変更コミットで `manifest.json` / `manifest.firefox.json` / `package.json` の `version` フィールドには触らない）。
 - **旧呼称 drift check**: Vuora 改名前の「WEB閲覧アシスト」「Web Viewing Assist」「Web Restriction Removal Helper」が、`docs/privacy-policy.en.md` の `formerly` 表記・`docs/privacy-policy.md` の「旧称:」表記（いずれも意図的な改名履歴の明記）以外で意図せず残ってないか定期確認:
   ```bash
   rg -i "WEB閲覧アシスト|Web Viewing Assist|Web Restriction Removal Helper" -g '!node_modules' -g '!*.lock'
@@ -59,7 +59,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 
 popup は **7 タブ構成** (`調整 / YouTube / X / Instagram / TikTok / カラーピッカー / 設定`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。**サブタブ（調整タブの オーディオ / 映像 / Amazon、YouTube / Instagram のカテゴリ）も `POPUP_LAST_SUBTAB`（親タブ id → サブタブ id のレコード）に永続化**する（`PopupTabs.normalizeSubTabs` で形だけ正規化し、保存済み id が現存しないときは先頭サブタブにフォールバック。1 キーに複数タブ分が相乗りするので書き戻し前に storage 現在値を再取得してマージする）。
 
-設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（ブラウザ UI 言語が `ja` → 日本語 / それ以外 → 英語にフォールバック）。`manifest.json` の `default_locale: "en"` + `_locales/{en,ja}/messages.json` を単一情報源とし、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。バージョン番号は `/vava` スキル経由でのみ更新する。
+設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（ブラウザ UI 言語が `ja` → 日本語 / それ以外 → 英語にフォールバック）。`manifest.json` の `default_locale: "en"` + `_locales/{en,ja}/messages.json` を単一情報源とし、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。
 
 ## Build Commands
 
@@ -198,7 +198,7 @@ Instagram の非表示・動画操作・画像保存を変更するときは、[
 | `manifest.firefox.json` | Firefox AMO 申請用 manifest (Chrome 用 `manifest.json` から `offscreen` / `tabCapture` permission 除外 + `browser_specific_settings.gecko` + `background.scripts` 併記 + **Firefox 専用 MES 経路の content_scripts エントリ `volume-booster-mes.js` を追加**。Chrome 用 manifest.json はこのエントリを持たない)。zip スクリプトが Firefox xpi 生成時にこれを `manifest.json` として同梱する |
 | `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
-| `pnpm-workspace.yaml` | **overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` は使わない）。transitive 脆弱性は脆弱範囲だけに効く versioned selector で固定する。`minimumReleaseAgeExclude` の同一 package 複数版は pnpm 11.7.0 の既知問題を避けて `||` で 1 selector に統合する。詳細と保留中の既知脆弱性は §依存パッケージの運用 |
+| `pnpm-workspace.yaml` | **overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` は使わない）。transitive 脆弱性は脆弱範囲だけに効く versioned selector で固定する。`minimumReleaseAgeExclude` の同一 package 複数版は pnpm 11.7.0 の既知問題を避けて `||` で 1 selector に統合する。詳細は §依存パッケージの運用 |
 | `.github/dependabot.yml` | github-actions（SHA ピン維持）と npm の weekly 更新 PR 設定。取り込みの正規ルートは `/deps` スキル |
 | `docs/privacy-policy.md` | プライバシーポリシー |
 | `test/actions.test.js` | 純粋関数テスト: globalThis 公開名 24 件の列挙 (SettingsSchema 含む。**この `required` 配列が公開定数の単一情報源**) / **FEATURES 件数アサート (SearchFixer 35 / IG 12 / TT 3 / X 9)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / YouTube 廃止) / detectHost / buildFilename / **セッション維持 / RTX 動画強化 (v1.0.39 で撤去) の関連定数が actions.js から完全消去されている drift 検知** / **接続モニターが SearchFixer.FEATURES の connectionMonitor サブ機能 (watch_page) に統合・旧独立キー (CONNECTION_MONITOR_ENABLED / APPLY_CONNECTION_MONITOR_CS) 撤去済みの drift 検知 + ConnectionMonitor.classify 7 分類境界値 + median 境界値 + VERDICT 識別子固定 + endpoint URL 固定アサート (gstatic.com/generate_204 + speed.cloudflare.com/__down?bytes=10)** / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
