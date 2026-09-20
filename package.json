@@ -14,11 +14,11 @@
     "lint": "eslint src/ test/ scripts/"
   },
   "devDependencies": {
-    "chrome-webstore-upload-cli": "^4.0.1",
-    "eslint": "^10.10.0",
-    "globals": "^17.12.0",
     "@kagayoi/support-extension": "1.0.6",
-    "puppeteer": "^25.10.0",
+    "chrome-webstore-upload-cli": "^4.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "puppeteer": "^25.11.0",
     "sharp": "0.35.4",
     "web-ext": "^10.6.0"
   },

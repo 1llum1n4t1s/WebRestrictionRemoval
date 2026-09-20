@@ -96,7 +96,7 @@ pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zi
 ### 依存パッケージの運用
 
 - **`pnpm-workspace.yaml` が overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` ではない）。transitive 脆弱性は「脆弱範囲だけに効く versioned selector」で固定し、blast radius を最小化する。
-- `web-ext > addons-linter` 系の transitive 脆弱性は `pnpm-workspace.yaml` の versioned `overrides` で固定する。現時点の `pnpm audit` には、修正版が未公開の `image-size <=2.0.2` が同経路で 2 件残る。新規 advisory は `pnpm why <package>` で経路と修正版の有無を確認してから、互換性を保てる最小範囲だけ override する。
+- `web-ext` 配下の transitive 脆弱性は `pnpm-workspace.yaml` の versioned `overrides` で固定する。新規 advisory は `pnpm why <package>` で経路と修正版の有無を確認してから、互換性を保てる最小範囲だけ override する。
 - **`minimumReleaseAgeExclude` は pnpm v11 が自動追記する**（公開直後の版を一定期間使わない供給網ガードの例外記録）。pnpm 11.7.0 では同一 package の複数 exact version を別行にすると除外が不安定なため、同一 package 分だけ `package@version1 || version2` の 1 selector に統合する（pnpm issue #12463 の回避形式）。
 - `@kagayoi/support-extension` は exact 固定し、`pnpm sync:support` で `src/shared/kagayoi-support-*` を正本から同期する。同梱コピーへ製品固有の変更を加えず、正本一致は `pnpm exec kagayoi-support-sync --check` で検証する。
 - **GitHub Actions は SHA ピン + タグコメント運用**。Dependabot は SHA だけ更新して**コメントの version 表記は直さない**ので、bump PR を取り込んだら `gh api repos/<owner>/<repo>/git/matching-refs/tags` で SHA → タグを引き直してコメントを合わせる（実例: v6.0.0 表記のまま v7.0.1 へ上がっていた）。
