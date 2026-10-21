@@ -2,7 +2,7 @@
 #
 # GitHub Actions の SHA ピン留め推奨 (https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions)
 # に従い、Actions を SHA + タグコメントの形に段階移行するための自動 PR 設定。
-# npm 依存 (puppeteer / sharp / chrome-webstore-upload-cli) の脆弱性更新もまとめてカバー。
+# npm 依存 (puppeteer / sharp / web-ext) の脆弱性更新もまとめてカバー。
 version: 2
 updates:
   # GitHub Actions の SHA ピン留め維持

@@ -11,11 +11,10 @@
     "generate-screenshots": "node webstore/generate-screenshots.js",
     "build": "pnpm run generate-icons && pnpm run generate-screenshots",
     "test": "node --test",
-    "lint": "eslint src/ test/ scripts/"
+    "lint": "eslint src/ test/ scripts/ webstore/generate-screenshots.js"
   },
   "devDependencies": {
     "@kagayoi/support-extension": "1.0.6",
-    "chrome-webstore-upload-cli": "^4.0.2",
     "eslint": "^10.13.0",
     "globals": "^17.13.0",
     "puppeteer": "^25.14.0",

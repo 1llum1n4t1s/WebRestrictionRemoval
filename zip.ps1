@@ -14,7 +14,7 @@ param(
 
 # 検証済みの作業対象だけを標準APIで削除する。
 function Remove-LocalWorkItem {
-    param([string[]]$LiteralPath, [string]$AllowedRoot, [switch]$IgnoreMissing, [switch]$AllowLeafJunction)
+    param([string[]]$LiteralPath, [string]$AllowedRoot, [switch]$IgnoreMissing)
     if ([string]::IsNullOrWhiteSpace($AllowedRoot) -or -not [IO.Path]::IsPathRooted($AllowedRoot)) { throw 'Cleanup root must be absolute.' }
     $boundary = [IO.Path]::GetFullPath($AllowedRoot).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
     foreach ($target in $LiteralPath) {
@@ -25,7 +25,7 @@ function Remove-LocalWorkItem {
         while ($ancestor) {
             if (Test-Path -LiteralPath $ancestor) {
                 $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
-                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -and -not ($AllowLeafJunction -and $ancestor -eq $resolved -and $item.LinkType -eq 'Junction')) { throw 'Cleanup path contains a reparse point.' }
+                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Cleanup path contains a reparse point.' }
             }
             $ancestor = Split-Path $ancestor -Parent
         }
@@ -99,9 +99,8 @@ function Build-Package {
         # AMO linter の UNSUPPORTED_API 警告 3 件を消すため、__FIREFOX_STRIP_BEGIN__ から
         # __FIREFOX_STRIP_END__ までを (マーカー行を含めて) 削除する。
         $bgPath = "$tempDir/src/background/background.js"
-        $content = Get-Content $bgPath -Raw
-        $stripped = [regex]::Replace($content, '(?s)\s*//\s*__FIREFOX_STRIP_BEGIN__.*?//\s*__FIREFOX_STRIP_END__\s*\r?\n', "`n")
-        Set-Content -Path $bgPath -Value $stripped -NoNewline -Encoding UTF8
+        node scripts/strip-firefox-background.js $bgPath
+        if ($LASTEXITCODE -ne 0) { throw "Firefox 用コードの除外に失敗しました (exit $LASTEXITCODE)" }
         Write-Host "Firefox build: background.js の chrome.offscreen / chrome.tabCapture 呼び出しを strip 済み" -ForegroundColor DarkGray
     }
 

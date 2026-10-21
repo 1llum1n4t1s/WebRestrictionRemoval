@@ -111,7 +111,7 @@ jobs:
           cp -r _locales firefox-build/
           find firefox-build \( -name "*.DS_Store" -o -name "*.swp" -o -name "*~" \) -delete
           # Firefox 未対応 API 呼び出しブロックを strip (AMO linter UNSUPPORTED_API 警告対策)
-          perl -i -0pe 's{\s*//\s*__FIREFOX_STRIP_BEGIN__.*?//\s*__FIREFOX_STRIP_END__\s*\n}{\n}gs' firefox-build/src/background/background.js
+          node scripts/strip-firefox-background.js firefox-build/src/background/background.js
           echo "🦊 Firefox strip 完了 (chrome.offscreen / chrome.tabCapture 呼び出しを削除)"
           echo "📂 firefox-build 内容:"
           ls -la firefox-build/
