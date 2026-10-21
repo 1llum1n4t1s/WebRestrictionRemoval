@@ -165,9 +165,11 @@ const HTML_CONFIGS = [
  * 共有ブラウザインスタンスを使用してHTMLファイルから画像を生成
  */
 async function generateScreenshot(browser, htmlPath, outputPath, width, height) {
-  const page = await browser.newPage();
+  // 並列撮影とページ終了が同じコンテキストの撮影ロックを取り合わないよう分離する。
+  const context = await browser.createBrowserContext();
 
   try {
+    const page = await context.newPage();
     await page.setViewport({ width, height, deviceScaleFactor: 1 });
 
     // ストア素材は「初期インストール時の典型的見た目」をユーザーに伝えるため
@@ -207,7 +209,7 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
     // 握りつぶすと壊れた画像のまま CI が success 扱いになり、ストア申請 ZIP に混入しうる。
     throw error;
   } finally {
-    await page.close();
+    await context.close();
   }
 }
 
