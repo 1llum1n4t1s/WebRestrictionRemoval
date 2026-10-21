@@ -38,7 +38,7 @@
 
 [addons.mozilla.org](https://addons.mozilla.org/) で **「Vuora」** を検索してインストール。
 
-> Firefox 版でも **全 12 機能が利用できます**。音量ブースターは Firefox 専用のページ内音声処理（MediaElementSource）で動作し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。制約は 1 つだけ: DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）では音量ブースターは効きません（動画は普通に再生されます）。
+> Firefox 版でも **全 12 機能が利用できます**。音量ブースターはページ内で音声を処理し、popup を開かなくても設定が全タブに自動適用されます（タブ共有バナーも出ません）。ページ内でクリックなどの操作をした後、再生中の動画・音声が対象になります。DRM 保護動画のサイト（Netflix / Prime Video / DAZN / Disney+ 等）や、安全に音声を処理できない配信元では適用せず、通常再生を優先します。
 
 ---
 
@@ -102,9 +102,11 @@ YouTube / X / Instagram / TikTok のマスタートグルは、それぞれの�
 |------|------|
 | `activeTab` | popup から active tab を操作 (音量ブースター・ルーペ等) |
 | `storage` | 設定の保存と、任意のPC間同期 (`chrome.storage.local` / `sync`) |
-| `offscreen` | 音量ブースターの AudioContext / GainNode チェーンを Service Worker 外で維持するため |
-| `tabCapture` | 音量ブースターでタブ音声を取得して 0〜300% 増幅するため (全サイト共通) |
+| `offscreen`（Chrome / Edge のみ） | 音量ブースターの音声処理をポップアップを閉じても維持するため |
+| `tabCapture`（Chrome / Edge のみ） | 音量ブースターでタブ音声を取得して 0〜300% 増幅するため |
 | `host_permissions: <all_urls>` | ルーペが popup 自動クローズ後・SPA navigation 後でも画面キャプチャを取れるよう保証 (実質アクセス範囲は content_scripts 注入と同等) |
+
+Firefox では問い合わせの認証に必要な個人識別情報・認証情報のデータ利用許可をインストール時に確認し、問い合わせ本文を送信する前に追加で「個人的な通信」（`personalCommunications`）の許可を求めます。詳しくは [プライバシーポリシー](docs/privacy-policy.md#権限の使用目的) を参照してください。
 
 ---
 
@@ -115,7 +117,7 @@ YouTube / X / Instagram / TikTok のマスタートグルは、それぞれの�
 | **設定したのに効かない** | popup を一度閉じて開き直す。それでもダメなら拡張機能を 🔄 リロード |
 | **YouTube のサイドバーから Shorts が消えない** | YouTube 機能拡張 > Shorts サブ機能 4 つ (棚 / チップ / サイドバー / ボタン) が個別 ON か確認 |
 | **音量ブースターが効かない (Chrome)** | 音量ブースターは popup を開いた瞬間にアクティブタブで boost 開始します (user gesture 必須・Netflix 等の EME 動画含む全サイト共通)。動画再生中に popup を開いて音量を変えてみてください。ブースト中のタブには「このタブのコンテンツは共有されています」バナーが出ます (tabCapture の仕様) |
-| **音量ブースターが効かない (Firefox)** | Firefox 版はページ内音声処理 (MediaElementSource) で動作し、popup を開かなくても全タブに自動適用されます。DRM 保護動画のサイト (Netflix / Prime Video / DAZN / Disney+ 等) では仕様上効きません (動画は普通に再生されます)。設定変更後に効かない場合はページを再読み込みしてください |
+| **音量ブースターが効かない (Firefox)** | ページ内で一度クリックなどの操作をしてから動画を再生してください。対応範囲と制約は [Firefox のインストール説明](#firefox-142-以降) を参照してください。設定変更後も効かない場合はページを再読み込みしてください |
 
 ---
 

@@ -71,6 +71,8 @@ Chrome の音量設定変更はブースト中の全タブへ即時反映しま�
 
 Firefox では `manifest.firefox.json` だけが `volume-booster-mes.js` を読み込み、各 `<video>` / `<audio>` を `MediaElementSource` と共有 DSP pipeline へ接続します。Firefox では graph を閉じても直接出力へ戻せないため、OFF 時は dry bypass を維持します。EME / DRM サイトでは attach せず、通常再生を優先します。
 
+Firefox では attach を開始する前に、メタデータ取得済み・ページ内のユーザー操作済み・再生中という条件を確認します。これにより、自動再生中の音声が suspended な AudioContext に接続されて無音になることや、未再生のプレビューへの不要な graph 作成を避けます。ソースの安全性は `VolumeBooster.classifyMesSource` で判定します。CORS 検証付きのソースや blob / data URL は接続可能とし、それ以外の同一オリジン HTTP(S) ソースは最小 Range GET と `redirect: "manual"` でリダイレクトも確認します。安全性を確認できない場合は接続せず、元の音声出力を保ちます。
+
 ### 権限を伴う機能
 
 - ルーペは content script から background へ撮影を要求し、`captureVisibleTab` の JPEG を Blob URL に変換してレンズへ表示します。撤去時に Blob URL を解放します。

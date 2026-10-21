@@ -317,10 +317,10 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 
 ### /rere レビュー TODO 集約 (議題化のみ・実装は次バッチ判断)
 
-ここは /rere レビューで信頼度 medium 以下に降格した、または arch-judgment として議題化のみと判定された項目を集約する。新しい /rere レビューを実行する前に必ず読み返し、`[active]` のみ再評価対象とする。
+ここは /rere レビューで信頼度 medium 以下に降格した、または arch-judgment として議題化のみと判定された項目を集約する。新しい /rere レビューでは、今回の対象・問いに関係する項目の必要箇所だけを確認し、`[active]` のみ再評価対象とする。
 
 **状態タグ凡例**:
-- `[active]` — 議題継続中。次の /rere バッチで再評価対象
+- `[active]` — 議題継続中。今回の対象・問いに関係する /rere レビューで再評価対象
 - `[settled YYYY-MM-DD: 理由]` — 設計判断として議題打ち切り。同じ提案が再浮上したら settle 理由を参照
 - `[resolved YYYY-MM-DD: 実装位置]` — 実装で解消済み。記録のみ残置
 
@@ -380,7 +380,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 
 ### 撤去済み機能と教訓
 
-過去に実装したが運用上の問題で完全撤去した機能と、その撤去から得た教訓を集約する。本文の他箇所の言及は本セクションを参照する記法に統一する。**新規機能設計時に同じ罠を踏まないため、必ず読む**。
+過去に実装したが運用上の問題で完全撤去した機能と、その撤去から得た教訓を集約する。本文の他箇所の言及は本セクションを参照する記法に統一する。**新規機能の設計が撤去済み機能の用途・制約と関係する場合だけ、該当する撤去理由・教訓を確認する**。
 
 #### セッション維持 (撤去: v1.0.39、当初導入: 〜v1.0.33)
 - **何だったか**: 指定したサイトを「ログイン状態保持」用に定期的に open / fetch して認証セッションを延命する機能。`keepAliveOrigins` 配列でサイト単位 ON/OFF。
@@ -392,7 +392,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 #### RTX 動画強化 (撤去: v1.0.39、当初導入: 〜v1.0.33)
 - **何だったか**: NVIDIA RTX Video Super Resolution / HDR を `<video>` 要素にトリガーする機能 (chrome:// flag を user に推奨 + content script 側で video element に必要な属性を付与)。
 - **撤去理由**: (1) Chrome 内部実装変更で動作再現性が安定せず、(2) GPU / Chrome バージョンごとに有効性がばらつき、(3) extension で誘導する性質ではなく Chrome 側の機能制御に委ねるべきと判断。
-- **撤去内容**: `rtx-enhancer.js` content script / `rtxEnhancerEnabled` storage key を `onInstalled` legacy 削除リストに集約。test/actions.test.js に撤去 drift 検知アサート追加。
+- **撤去内容**: `rtx-enhancer.js` content script / `rtxEnhancerEnabled` storage key を `onInstalled` legacy 削除リストに集約。当時追加した定数の不在検知テストは、撤去済み機能の検証整理で削除済み。
 - **教訓 1 (popup `stored` get リスト欠落で master 永久 OFF 化の致命バグ)**: 本機能の master キーが popup の `stored = chrome.storage.local.get([...])` リストに **#4 だけ漏れていて**、popup 表示が常に OFF → 別トグル変更で全 settings 上書き → storage の既存 true が破壊される事例があった。→ §APPLY_SETTINGS 経路の partial payload 防御 経路 D の 6 ポイントチェックリスト を新規 master トグル追加時に必ず通すこと。
 - **教訓 2 (chrome:// flag 誘導機能は採用しない)**: 「ユーザーに `chrome://flags/#...` を開いて設定変更してもらう」前提の機能は、Chrome バージョン更新で flag id 変更・廃止が頻発するため壊れやすい。代わりに Chrome 標準 API で完結する設計を採用する。
 
@@ -407,11 +407,10 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 #### 自動音量正規化 (撤去: 2026-06-19、当初導入: v1.0.20 系)
 - **何だったか**: 音量ブースターのサブ機能 (`volumeBoosterNormalizeEnabled`)。`AnalyserNode.getFloatTimeDomainData()` で短時間 RMS を測り、timer 駆動の自動 GainNode で「動画 / 配信ごとの平均音量」を目標 RMS (`NORMALIZE_TARGET_RMS_DB`) に寄せるラウドネス補正 (リアルタイム AGC)。offscreen のノードチェーン前段 (`normalizerAnalyzer → normalizerGainNode`) + `NORMALIZE_*` DSP 定数群 + audio-pipeline.js の normalizer 6 関数 (clampNormalizerGain / scheduleNormalizerGain / tickLoudnessNormalizer / startLoudnessNormalizer / stopLoudnessNormalizer / updateLoudnessNormalizer) で構成。
 - **撤去理由**: ゆろさん判断「現実的でない」。EMA 平滑化 / silence gate 二重判定 / dead zone / 非対称 ramp 等を v1.0.38 / v1.0.39 / 2026-06-07 と何度もチューニングしたが、BGM の verse↔chorus・喋りの息継ぎ・シーン切替での「効き」と「ポンピング抑制」の両立が安定せず、リアルタイム AGC として実用水準に達しなかった。
-- **撤去内容**: `volumeBoosterNormalizeEnabled` storage key を `onInstalled` legacy 削除リストに集約。actions.js の `VOLUME_BOOSTER_NORMALIZE_ENABLED` + `NORMALIZE_*` 10 定数、audio-pipeline.js の normalizer 6 関数 + `dbToGain` (normalizer 専用だったため)、offscreen のノードチェーン前段 + normalizer state フィールド、background / popup の normalize 配線、messages.json の volumeNormalize ラベル/説明を完全削除。test/actions.test.js に撤去 drift 検知アサート追加。音量サブトグルは自動歪み防止 / ナイトモードの 2 つ、storage key は 6 → 5、popup 直書きキーは 5 → 4 に減少。
+- **撤去内容**: `volumeBoosterNormalizeEnabled` storage key を `onInstalled` legacy 削除リストに集約。actions.js の `VOLUME_BOOSTER_NORMALIZE_ENABLED` + `NORMALIZE_*` 10 定数、audio-pipeline.js の normalizer 6 関数 + `dbToGain` (normalizer 専用だったため)、offscreen のノードチェーン前段 + normalizer state フィールド、background / popup の normalize 配線、messages.json の volumeNormalize ラベル/説明を完全削除。当時追加した定数不在だけのテストは、実動作の不具合を検出しないため整理時に削除した。音量サブトグルは自動歪み防止 / ナイトモードの 2 つ、storage key は 6 → 5、popup 直書きキーは 5 → 4 に減少。
 - **教訓 1 (リアルタイム AGC は難物)**: 「動画ごとの平均音量を自動で揃える」は ReplayGain のような事前解析方式なら容易だが、リアルタイムでは測定窓・追従速度・無音判定の三つ巴チューニングが必要で、どれかを立てると別が崩れる。同種の「連続測定 → 連続補正」機能を再導入するときは、まず実用水準に届くかを小さく検証してから本実装する。
 - **教訓 2 (audio-pipeline.js の構造は維持)**: normalizer 6 関数の撤去で一時 applyCompressorPreset のみになったが、後に 10 バンド EQ を追加した際に dbToGain (プリアンプの dB→倍率変換) / applyEqualizer (preamp + 10 バンド peaking gain 適用) / createEqChain (EQ チェーン構築) を再導入し、さらに壁ドン対策モードで applyFilterPreset (BiquadFilterNode の frequency/Q 一括設定) と createBassCutChain (highpass 2 段の構築)、Chrome / Firefox の最上位配線を固定する connectAudioGraph を追加、現在は **dbToGain / applyCompressorPreset / applyFilterPreset / createBassCutChain / applyEqualizer / createEqChain / connectAudioGraph の 7 関数構成** (Key Files 表 §audio-pipeline.js と整合)。当初の機能撤去 → 共有モジュール構造維持 → EQ 追加 → 壁ドン対策追加で再活用、という流れで「globalThis.AudioPipeline 公開定数 + Firefox catch-up 時の再利用枠を残す」判断が結果的に活きた事例。
 
 #### 撤去パターン共通の不変条件
 - **`onInstalled` で legacy storage key を必ず削除**: 廃止キーを残すと storage に dead value が永遠に残る + 将来 同名キーを再利用する場合に「OFF 化したつもりが ON で復元される」事故源。撤去時は必ず `onInstalled` の legacy 削除リストに追加。
-- **`test/actions.test.js` に drift 検知アサート追加**: 撤去機能の定数・アクション・FEATURES エントリが actions.js から完全消去されていることをテストで物理確認。CI で再発防止。
 - **AGENTS.md からの参照削除は本セクション 1 箇所に集約**: 本文の他箇所 (Project Overview / Key Files / Important Patterns) は撤去機能に言及しない。教訓だけは「→ §撤去済み機能と教訓」リンクで本セクションを参照する。

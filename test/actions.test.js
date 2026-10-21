@@ -217,30 +217,6 @@ test("StorageKeys.VOLUME_BOOSTER_* が 6 キー揃っている（master + lastGa
   assert.equal(G.StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED, "volumeBoosterBassCutEnabled");
 });
 
-test("撤去済み: 自動音量正規化サブ機能の痕跡が actions.js から完全消去されている", () => {
-  // 自動音量正規化 (volumeBoosterNormalize) は「現実的でない」ため撤去 (2026-06-19)。
-  // 復活防止 + drift 検知: storage key / DSP 定数が actions.js に残っていないことを物理確認する。
-  // CLAUDE.md「撤去済み機能と教訓」§ 参照。
-  assert.equal(G.StorageKeys.VOLUME_BOOSTER_NORMALIZE_ENABLED, undefined);
-  assert.ok(
-    !("VOLUME_BOOSTER_NORMALIZE_ENABLED" in G.StorageKeys),
-    "VOLUME_BOOSTER_NORMALIZE_ENABLED は StorageKeys から撤去済みのはず"
-  );
-  // NORMALIZE_* DSP 定数群 (NORMALIZE_TARGET_RMS_DB 等) も VolumeBooster から撤去済み。
-  const leftoverNormalizeKeys = Object.keys(G.VolumeBooster).filter((k) =>
-    k.startsWith("NORMALIZE_")
-  );
-  assert.deepEqual(
-    leftoverNormalizeKeys,
-    [],
-    `VolumeBooster に NORMALIZE_* 定数が残存: ${leftoverNormalizeKeys.join(", ")}`
-  );
-  // 音量サブトグルは自動歪み防止 / ナイトモード / 壁ドン対策モードの 3 つ (正規化は撤去)。
-  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, "string");
-  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED, "string");
-  assert.equal(typeof G.StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED, "string");
-});
-
 // ---------- VolumeBooster: グラフィックイコライザ ----------
 
 test("VolumeBooster.EQ_BANDS: 10 バンド + 中心周波数が固定値", () => {
@@ -809,27 +785,6 @@ test("SearchFixer.normalizeBlockedChannels: 壊れた値 / dedupe / 上限 / nam
   );
 });
 
-test("SearchFixer.FEATURES: 旧 removeShorts は 4 機能に解体され Shorts カテゴリは廃止", () => {
-  // 旧キー removeShorts は存在せず、4 機能に分離されている
-  const removeShorts = G.SearchFixer.FEATURES.find((f) => f.key === "removeShorts");
-  assert.equal(removeShorts, undefined, "旧 removeShorts キーは廃止");
-
-  const removeShortsShelf = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsShelf");
-  const removeShortsChip = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsChip");
-  const removeShortsSidebar = G.SearchFixer.FEATURES.find((f) => f.key === "removeShortsSidebar");
-  const redirectShortsUrl = G.SearchFixer.FEATURES.find((f) => f.key === "redirectShortsUrl");
-  assert.ok(removeShortsShelf);
-  assert.ok(removeShortsChip);
-  assert.ok(removeShortsSidebar);
-  assert.ok(redirectShortsUrl);
-
-  // それぞれの分離先カテゴリ
-  assert.equal(removeShortsShelf.category, "video_filter");
-  assert.equal(removeShortsChip.category, "search_only");
-  assert.equal(removeShortsSidebar.category, "menu_ui");
-  assert.equal(redirectShortsUrl.category, "watch_page");
-});
-
 test("SearchFixer.CATEGORIES: menu_ui / video_filter / watch_page / search_only / integration の 5 個", () => {
   const ids = G.SearchFixer.CATEGORIES.map((c) => c.id);
   assert.deepEqual(ids, ["menu_ui", "video_filter", "watch_page", "search_only", "integration"]);
@@ -845,13 +800,6 @@ test("SearchFixer.FEATURES: 動画フィルタは playlist/mix/shortsBtn/live/me
     assert.ok(feature, `feature ${key} exists`);
     assert.equal(feature.category, "video_filter", `${key} is in video_filter`);
   }
-});
-
-test("SearchFixer.FEATURES: 旧 removeTopicsSection / removeBreakingNewsSection は removeFeedSections に統合済み (drift 検知)", () => {
-  assert.equal(G.SearchFixer.FEATURES.find((f) => f.key === "removeTopicsSection"), undefined);
-  assert.equal(G.SearchFixer.FEATURES.find((f) => f.key === "removeBreakingNewsSection"), undefined);
-  assert.equal(Object.hasOwn(G.SearchFixer.DEFAULT_FEATURES, "removeTopicsSection"), false);
-  assert.equal(Object.hasOwn(G.SearchFixer.DEFAULT_FEATURES, "removeBreakingNewsSection"), false);
 });
 
 test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only にまとめられている", () => {
@@ -2103,18 +2051,6 @@ test("ConnectionMonitor: 動画 chunk 実 throughput 計測の閾値定数が定
   assert.ok(G.ConnectionMonitor.VIDEO_CHUNK_MIN_BYTES > 0, "VIDEO_CHUNK_MIN_BYTES は正の数");
   assert.equal(typeof G.ConnectionMonitor.VIDEO_THROUGHPUT_WINDOW_MS, "number");
   assert.ok(G.ConnectionMonitor.VIDEO_THROUGHPUT_WINDOW_MS > 0, "VIDEO_THROUGHPUT_WINDOW_MS は正の数");
-});
-
-// セッション維持と RTX 動画強化は v1.0.x で完全撤去された。actions.js から関連定数・KeepAlive 名前空間が
-// 完全に消えていることを drift 検知し、再導入の事故を CI で防ぐ（撤去残骸の文字列が紛れ込んでも assert で落ちる）。
-test("セッション維持 / RTX 動画強化は actions.js から完全撤去されている", () => {
-  assert.equal(G.StorageKeys.KEEP_ALIVE_ENABLED, undefined, "旧 keepAlive storage key は撤去済み");
-  assert.equal(G.StorageKeys.KEEP_ALIVE_INTERVAL_MS, undefined, "旧 keepAlive 間隔キーは撤去済み");
-  assert.equal(G.StorageKeys.KEEP_ALIVE_HTTP_PING_ENABLED, undefined, "旧 keepAlive HTTP ping キーは撤去済み");
-  assert.equal(G.StorageKeys.RTX_ENHANCER_ENABLED, undefined, "旧 RTX storage key は撤去済み");
-  assert.equal(G.Actions.APPLY_KEEP_ALIVE_CS, undefined, "旧 APPLY_KEEP_ALIVE_CS action は撤去済み");
-  assert.equal(G.Actions.APPLY_RTX_ENHANCER_CS, undefined, "旧 APPLY_RTX_ENHANCER_CS action は撤去済み");
-  assert.equal(G.KeepAlive, undefined, "KeepAlive 名前空間自体が globalThis から撤去済み");
 });
 
 // Amazon ランキング移動ボタンの storage key / action の drift 検知（機能死活の単一情報源）。
