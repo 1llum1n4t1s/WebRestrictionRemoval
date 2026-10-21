@@ -13,7 +13,7 @@ All features start OFF — opt in only to what you need. Normal browsing assista
 |---------|-------------|
 | 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / send to Gemini Notebook and more — **35 sub-features** |
 | 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" (**9 sub-features**) |
-| 📦 **Amazon Subscribe & Save monthly total** | Shows unit price × quantity totals in each delivery's Manage page. Lists without prices link you to Manage; legacy monthly pages remain supported |
+| 📦 **Amazon Subscribe & Save monthly total** | Shows unit price × quantity totals, including future deliveries whose prices are not listed. Retrieves current subscription prices and labels reference totals; previous-order prices are identified when used as a fallback. Legacy monthly pages remain supported |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
 | 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + video seek bar + image download (**12 sub-features**) |
@@ -64,7 +64,7 @@ The YouTube / X / Instagram / TikTok master toggles are in their respective tabs
 
 ## 🔒 Privacy
 
-- **Normal processing stays on-device** — external communication is limited to six exceptions: Instagram / TikTok image retrieval, the YouTube connection monitor, Send to Gemini Notebook, the contact form, optional settings sync, and subscription channel thumbnails.
+- **Normal processing stays on-device** — external communication is limited to seven exceptions: Instagram / TikTok image retrieval, the YouTube connection monitor, Send to Gemini Notebook, the contact form, optional settings sync, subscription channel thumbnails, and same-origin Amazon price retrieval for deliveries whose prices are not listed.
 - **Personal information only for support** — the email address and message entered in the contact form are sent to Kagayoi Support only when you submit it.
 - **Opt-in by design** — everything is OFF on install; only what you enable runs.
 - **Open source** — code is published in this repository for anyone to inspect.

@@ -73,7 +73,7 @@ When settings sync is enabled, the settings described in Exception 5 are shared 
 
 ## Network communication
 
-The Extension does not communicate with any external servers, with the six explicit exceptions listed below.
+The Extension does not communicate with any external servers, with the seven explicit exceptions listed below.
 
 ### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
@@ -139,6 +139,14 @@ On first use, the six-digit code delivered by email is sent to Kagayoi Support t
 When both "Grid layout for subscribed channels" (`searchFixerFeatures.subsChannelsGrid`, opt-in, default OFF) and the YouTube Enhancements master toggle are ON, the Extension automatically retrieves video thumbnails for channel cards near the visible area (including preloading up to 300 pixels beyond the viewport) of the subscriptions channel list. It reads the channel's video/live listings within YouTube to choose a thumbnail. Without a local cache entry, it issues HEAD requests to `https://i.ytimg.com/vi/<video-ID>/maxresdefault.jpg` or `hqdefault.jpg`, using `credentials: "omit"`, `redirect: "manual"`, and `referrerPolicy: "no-referrer"`.
 
 The selected image is displayed through a normal image request to the same CDN, falling back to `mqdefault.jpg` if loading fails. Images also use `no-referrer`. The CDN receives the requested video ID and the IP address required for the connection; normal browser cookie controls apply to image requests. Nothing is sent to the developer's server. Thumbnail URLs, channel IDs, and retrieval timestamps are cached only on the device and excluded from settings sync. These requests are not issued when the feature is OFF.
+
+### Exception 7: Amazon Subscribe & Save price retrieval
+
+While "Amazon Subscribe & Save totals" is ON (opt-in, default OFF), if the list at `https://www.amazon.co.jp/auto-deliveries` has no prices, the Extension automatically reads the linked delivery management pages to total unit price × quantity. If a management page also omits an item's price, as can happen for next month's and later deliveries, it reads the subscription information to find the product link, then checks the product page's current Subscribe & Save price against the item's discount rate. Only for individual products whose current price is also unavailable, it reads that subscription's delivery history and previous order details, then multiplies the same product's previous unit price by the upcoming delivery quantity. Order totals and other products' prices are not used. Delivery prices take priority. Current-price estimates are labeled "Estimated total (current prices)"; estimates using a previous price are labeled "Estimated total (includes previous prices)". The billed amount may change and coupons are not included. If the history or product cannot be verified, or prices and quantities are not available for every item, no partial total or substitute zero is shown.
+
+Requests are read-only GETs limited to delivery management, subscription information, product pages, delivery history, and order details on the same `https://www.amazon.co.jp` origin. Amazon authentication cookies are sent only to Amazon; Amazon receives delivery, subscription, history, and order identifiers, product URLs, and the IP address required for the connection. Other origins and redirects are rejected, and no referrer is sent. The Extension does not change orders, make purchases, or change deliveries, and sends nothing to the developer's server.
+
+Retrieved pages may contain addresses or payment information. The Extension does not save, log, or display those details; it extracts only the necessary product identifiers, prices, and quantities. At most two requests run concurrently, and duplicate requests are shared. Results are held only in the current page's memory. Turning the feature OFF or navigating away cancels requests and discards results; reloading fetches them again. They are not saved to files or settings sync.
 
 ## Permission usage
 

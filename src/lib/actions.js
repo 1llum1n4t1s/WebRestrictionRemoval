@@ -746,6 +746,10 @@ const AmazonDeliveryTotal = Object.freeze({
   DELIVERY_ITEM_SELECTOR: '[data-testid="desktop-subscription-tile"]',
   DELIVERY_PRICE_SELECTOR: '[data-testid="product-price"]',
   DELIVERY_QUANTITY_SELECTOR: '[data-testid="product-qty-frequency"]',
+  OVERVIEW_CARD_SELECTOR: '#deliveriesDesktopScroller .hub-delivery-card',
+  FETCH_TIMEOUT_MS: 15000,
+  FETCH_CONCURRENCY: 2,
+  MANAGE_QUERY_KEYS: Object.freeze(["_encoding", "shipId", "deliveryDate", "deliveryBundleDate", "deliveryBundleId", "isMixedBundle", "enableMydExperience", "ref_", "sourcePage", "pf_rd_p", "pf_rd_r"]),
   TOTAL_ROOT_CLASS: "__cpa-amzn-delivery-total",
   PRICE_NORMALIZE_RE: /\D/g,
 });
@@ -2218,7 +2222,7 @@ const ConnectionMonitor = Object.freeze({
     if (!Array.isArray(values)) return null;
     const xs = values.filter((v) => Number.isFinite(v));
     if (xs.length === 0) return null;
-    const sorted = xs.slice().sort((a, b) => a - b);
+    const sorted = xs.sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
     return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   },

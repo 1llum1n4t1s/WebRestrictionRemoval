@@ -22,7 +22,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 | `src/shared/kagayoi-support-*` | 問い合わせフォームと評価導線 | `@kagayoi/support-extension` の exact 固定版から同梱するコピー。製品固有の配置・配色だけを popup 側で与える |
 | `_locales/{en,ja}/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする |
 | `test/` | 純粋関数、公開定数、機能件数、構文、manifest 差分、DSP、問い合わせ契約の drift 検知 | 実サイト DOM の時点依存挙動は手動・実ブラウザ確認で補う |
-| `../vps-web/lp/vuora/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | VPS の Caddy が静的素材を配信し、拡張の API backend にはならない（設定は「製品ページの配信先」を参照） |
+| `../vps-web/lp/vuora/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | Cloudflare Workers Static Assets の `vps-web-lp` が配信し、拡張の API backend にはならない（設定は「製品ページの配信先」を参照） |
 
 ## データフロー
 
@@ -87,7 +87,7 @@ Firefox では attach を開始する前に、メタデータ取得済み・ペ�
 4. DOM 監視は rAF coalesce と observer の再入防止を行い、extension context 失効時は observer、timer、listener、注入 DOM、inline style、Blob URL を片付けます。
 5. popup と content script の利用者向け文言は `_locales/{en,ja}/messages.json` と `chrome.i18n` を経由します。
 6. Manifest V3 の CSP に従い、実行 JavaScript はすべて拡張へ同梱します。問い合わせ共通部品もリモート実行せず、npm package から同期したファイルを配布物へ含めます。
-7. 外部通信はプライバシーポリシーの6例外だけです。画像取得、接続モニター、Gemini Notebook、問い合わせ、設定同期、登録チャンネルのサムネイル取得で扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。
+7. 外部通信はプライバシーポリシーの7例外だけです。画像取得、接続モニター、Gemini Notebook、問い合わせ、設定同期、登録チャンネルのサムネイル取得、Amazon 定期おトク便の金額取得で扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。Amazon の取得はマスター ON 時のみ、同一の `https://www.amazon.co.jp` に認証 Cookie 付きの読み取り GET を行います。配送価格を優先し、現在価格も取得できない個別商品だけ前回配送の実単価で補います。現在価格で補う場合は「参考合計（現在価格）」、前回単価を使う場合は「参考合計（前回価格を含む）」とし、請求額の変動を注記します。履歴・注文詳細は読み取り専用で、当該商品の単価だけを将来明細の数量に適用し、注文全体や他商品の金額は使いません。全明細が揃わなければ部分合計や代わりの0円を表示せず、取得結果はページ内メモリだけに保持して OFF・遷移時に中止・破棄します。
 8. バージョンは Chrome / Firefox manifest と `package.json` の間で同期し、`release/<manifest version>` ブランチから生成した成果物を同一バージョンとして公開します。`pnpm-lock.yaml` は依存解決の正本として frozen install で検証しますが、製品バージョンの正本にはしません。
 
 ## 採用済みの設計判断
@@ -132,6 +132,5 @@ Chrome は `manifest.json`、Firefox は `manifest.firefox.json` を `manifest.j
 
 ## 製品ページの配信先
 
-製品ページの配信HTMLは `../vps-web/lp/vuora/`（編集元は `../vps-web/tools/lp/templates/`）、公開実体はVPSの `/srv/www/lp/vuora/`。
-直接配信の設定は `../vps-web/deploy/caddy-sites/lp-vuora.caddy` に置く。
-公開URLを維持し、静的ファイルの配信は `vps-web/deploy/deploy-lp.ps1` へ統一する。
+製品ページの配信HTMLは `../vps-web/lp/vuora/`（編集元は `../vps-web/tools/lp/templates/`）で、公開実体は Cloudflare Workers Static Assets の `vps-web-lp`。対象ホストと配信ファイルは `../vps-web/deploy/lp-sites.json`、Worker の設定は `../vps-web/deploy/cloudflare/sites.json` を正本とします。
+公開URLを維持し、静的ファイルの配信は `vps-web/deploy/deploy-lp.ps1 -Product vuora` へ統一します。限定配信には現在の本番バージョンと一致する配信台帳が必要です。旧 Caddy 設定は、既存の証明書とフォールバックのため保持します。

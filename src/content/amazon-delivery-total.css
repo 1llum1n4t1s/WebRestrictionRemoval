@@ -65,6 +65,19 @@
   margin-left: 1px;
 }
 
+.__cpa-amzn-delivery-total__note {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #5b4322;
+}
+
+/* Amazon の固定カルーセル高で合計が隠れないよう、表示中だけ内容に合わせる。 */
+#deliveriesDesktopScroller:has(.__cpa-amzn-delivery-total) .a-carousel-viewport,
+#deliveriesDesktopScroller:has(.__cpa-amzn-delivery-total) .a-carousel {
+  height: auto !important;
+}
+
 /* ホバーで微かな影（同月の合計だと意識させる視覚フィードバック） */
 .__cpa-amzn-delivery-total {
   transition: box-shadow 160ms ease, transform 160ms ease;

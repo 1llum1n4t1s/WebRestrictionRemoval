@@ -144,7 +144,7 @@
 
   "amazonDeliveryMaster": { "message": "定期おトク便 月別合計" },
   "amazonDeliveryMasterDescPre": { "message": "配送月ごとの合計金額を " },
-  "amazonDeliveryMasterDescPost": { "message": " ページに表示" },
+  "amazonDeliveryMasterDescPost": { "message": " ページに表示。未掲載の価格はAmazonから現在の定期便価格を取得し、取得できない場合は前回の配送単価で補完" },
   "amazonRankingJumpMaster": { "message": "ランキングへ移動ボタン" },
   "amazonRankingJumpMasterDesc": {
     "message": "商品ページ上部に「この商品が所属するランキングへ移動」ボタンを表示",
@@ -366,7 +366,12 @@
   "amazonTotalUnit": { "message": "円" },
   "amazonTotalAriaLabel": { "message": "この月の合計金額" },
   "amazonDeliveryTotalAriaLabel": { "message": "この配送の合計金額" },
-  "amazonTotalDetailsHint": { "message": "合計金額は各お届け日の「管理」を開くと表示されます。" },
+  "amazonTotalDetailsHint": { "message": "価格が未掲載の場合は、現在の定期便価格または前回の配送単価で参考合計を表示します。" },
+  "amazonTotalReference": { "message": "参考合計（現在価格）" },
+  "amazonTotalPreviousReference": { "message": "参考合計（前回価格を含む）" },
+  "amazonTotalReferenceNote": { "message": "請求額は変わる場合があります" },
+  "amazonTotalLoading": { "message": "合計金額を取得中…" },
+  "amazonTotalUnavailable": { "message": "合計金額を取得できませんでした" },
   "subsAllShortcutLabel": { "message": "すべての登録チャンネル" },
   "subsSearchPlaceholder": { "message": "チャンネル名で絞り込み" },
   "imageDownloadButtonLabel": { "message": "画像をダウンロード" },

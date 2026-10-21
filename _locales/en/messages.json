@@ -145,7 +145,7 @@
 
   "amazonDeliveryMaster": { "message": "Subscribe & Save monthly total" },
   "amazonDeliveryMasterDescPre": { "message": "Show a per-month total on the " },
-  "amazonDeliveryMasterDescPost": { "message": " page." },
+  "amazonDeliveryMasterDescPost": { "message": " page. For missing prices, retrieve current Subscribe & Save prices from Amazon, using the previous delivery's unit price when unavailable." },
   "amazonRankingJumpMaster": { "message": "Jump-to-ranking button" },
   "amazonRankingJumpMasterDesc": {
     "message": "Show a \"Go to this product's ranking\" button at the top of product pages.",
@@ -367,7 +367,12 @@
   "amazonTotalUnit": { "message": "yen" },
   "amazonTotalAriaLabel": { "message": "Monthly total" },
   "amazonDeliveryTotalAriaLabel": { "message": "Delivery total" },
-  "amazonTotalDetailsHint": { "message": "Open Manage for each delivery date to see its total." },
+  "amazonTotalDetailsHint": { "message": "When delivery prices are missing, an estimate uses current Subscribe & Save prices or the previous delivery's unit price." },
+  "amazonTotalReference": { "message": "Estimated total (current prices)" },
+  "amazonTotalPreviousReference": { "message": "Estimated total (includes previous prices)" },
+  "amazonTotalReferenceNote": { "message": "The billed amount may change" },
+  "amazonTotalLoading": { "message": "Loading total…" },
+  "amazonTotalUnavailable": { "message": "Could not retrieve the total" },
   "subsAllShortcutLabel": { "message": "All subscriptions" },
   "subsSearchPlaceholder": { "message": "Filter by channel name" },
   "imageDownloadButtonLabel": { "message": "Download image" },
