@@ -765,11 +765,11 @@
       overlayMetricEl.textContent = metricText;
     }
 
-    renderDetail(result);
+    renderDetail(result, throughputStats);
   }
 
   /** 詳細セクション 3 種を更新（経路 RTT 個別 / 直近 buffering 履歴 / 帯域 60 秒統計） */
-  function renderDetail(result) {
+  function renderDetail(result, throughputStats) {
     if (!overlayPathRttEl || !overlayBufferLogEl || !overlayBwEl) return;
     // 折りたたみ時は CSS で hidden なので、DOM 書き換え自体をスキップする（描画コスト削減に加え、
     // #movie_player 直下での不要な MutationRecord 発生も抑える）。展開時は次の render() 呼び出し
@@ -827,7 +827,7 @@
     // (3) 過去 60 秒の動画 chunk 実 throughput 統計: min / avg / max
     // navigator.connection.downlink (粗い概算) ではなく PerformanceObserver 経由の実測値を使う。
     // throughput サンプル無いとき (動画読み込み開始直後・広告中等) は「未計測」を出す
-    const ts = computeThroughputStats();
+    const ts = throughputStats;
     const bwText = !ts
       ? i18n("cmDetailNotMeasured", "未計測")
       : i18n("cmBwStat", "最小 {0} / 平均 {1} / 最大 {2}")

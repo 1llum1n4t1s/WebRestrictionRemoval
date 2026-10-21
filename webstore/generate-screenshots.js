@@ -3,6 +3,7 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const http = require('node:http');
 
 // ディレクトリパス
 const TEMPLATE_DIR = __dirname;
@@ -67,7 +68,7 @@ window.chrome = {
   runtime: {
     sendMessage: () => Promise.resolve({ ok: true }),
     onMessage: { addListener: () => {}, removeListener: () => {} },
-    getURL: (p) => p,
+    getURL: (p) => new URL('../' + p, window.location.href).href,
     id: "mock-render-extension",
     lastError: null,
   },
@@ -100,13 +101,13 @@ function generatePopupRenderHtml() {
 
   // 相対パス調整: `src/popup/popup.html` → `webstore/popup-render.html` へ移すと
   // 隣接リソースの相対パスがずれるため、すべて webstore からの相対パスに書き換える。
-  html = html
-    .replace(/href="popup\.css"/g, 'href="../src/popup/popup.css"')
-    .replace(/src="\.\.\/lib\/actions\.js"/g, 'src="../src/lib/actions.js"')
-    .replace(/src="popup\.js"/g, 'src="../src/popup/popup.js"')
-    .replace(/src="settings-sync\.js"/g, 'src="../src/popup/settings-sync.js"')
-    .replace(/src="\.\.\/lib\/settings-backup\.js"/g, 'src="../src/lib/settings-backup.js"')
-    .replace(/src="settings-backup\.js"/g, 'src="../src/popup/settings-backup.js"');
+  html = html.replace(/\b(href|src)="([^"]+)"/g, (attribute, name, value) => {
+    // SVG symbol・外部 URL・絶対パスは移動しても参照先が変わらない。
+    if (/^(?:#|\/|[a-z][a-z\d+.-]*:)/i.test(value)) return attribute;
+    const source = path.resolve(path.dirname(POPUP_HTML_SRC), value);
+    const relative = path.relative(path.dirname(POPUP_RENDER_DST), source).split(path.sep).join('/');
+    return `${name}="${relative}"`;
+  });
 
   // chrome.* API shim を <head> 末尾に注入（外部 JS ファイル参照、CSP 準拠）。
   // actions.js / popup.js より先に <head> 内で読み込まれるため shim が確実に先行する。
@@ -164,7 +165,7 @@ const HTML_CONFIGS = [
 /**
  * 共有ブラウザインスタンスを使用してHTMLファイルから画像を生成
  */
-async function generateScreenshot(browser, htmlPath, outputPath, width, height) {
+async function generateScreenshot(browser, baseUrl, htmlPath, outputPath, width, height) {
   // 並列撮影とページ終了が同じコンテキストの撮影ロックを取り合わないよう分離する。
   const context = await browser.createBrowserContext();
 
@@ -180,8 +181,8 @@ async function generateScreenshot(browser, htmlPath, outputPath, width, height) 
       { name: 'prefers-color-scheme', value: 'light' },
     ]);
 
-    const absolutePath = path.resolve(htmlPath);
-    await page.goto(`file://${absolutePath}`, {
+    const relativePath = path.relative(path.join(__dirname, '..'), htmlPath).split(path.sep).join('/');
+    await page.goto(new URL(relativePath, baseUrl).href, {
       waitUntil: 'networkidle0',
       timeout: 30000
     });
@@ -233,6 +234,45 @@ function findChromeExecutable() {
   return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
 }
 
+// file:// では module と crossorigin フォントが CORS で拒否されるため、
+// 同梱素材だけを loopback で配信する。外部インターフェースには公開しない。
+async function startPreviewServer() {
+  const root = path.resolve(__dirname, '..');
+  const templates = new Set(HTML_CONFIGS.map(config => path.relative(root, config.input).split(path.sep).join('/')));
+  templates.add('webstore/popup-render.html');
+  templates.add('webstore/popup-shim.js');
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' };
+  const server = http.createServer((request, response) => {
+    let file;
+    try {
+      file = path.resolve(root, '.' + decodeURIComponent(new URL(request.url, 'http://localhost').pathname));
+    } catch {
+      response.writeHead(400).end();
+      return;
+    }
+    const relative = path.relative(root, file);
+    const resource = relative.split(path.sep).join('/');
+    const allowed = templates.has(resource)
+      || /^src\/popup\/(?:[^/.]+\.(?:js|css)|fonts\/[^/.]+\.woff2)$/.test(resource)
+      || /^src\/lib\/(?:actions|settings-backup)\.js$/.test(resource)
+      || /^src\/shared\/kagayoi-support-[^/.]+\.(?:js|css)$/.test(resource);
+    if (relative.startsWith('..') || path.isAbsolute(relative) || !allowed) {
+      response.writeHead(403).end();
+      return;
+    }
+    fs.readFile(file, (error, body) => {
+      if (error) { response.writeHead(404).end(); return; }
+      response.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+      response.end(body);
+    });
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  return { server, baseUrl: `http://127.0.0.1:${server.address().port}/` };
+}
+
 /**
  * メイン処理
  */
@@ -257,8 +297,10 @@ async function main() {
   }
 
   const browser = await puppeteer.launch(launchOptions);
+  let preview;
 
   try {
+    preview = await startPreviewServer();
     // 複数ページを並列生成（Puppeteer の page は独立しているため CPU 競合のみ）。
     // 絵文字レンダリングが重いため concurrency を 2 に絞って過負荷を回避する。
     const CONCURRENCY = 2;
@@ -268,12 +310,16 @@ async function main() {
         const config = queue.shift();
         if (!config) break;
         const outputPath = path.join(OUTPUT_DIR, config.output);
-        await generateScreenshot(browser, config.input, outputPath, config.width, config.height);
+        await generateScreenshot(browser, preview.baseUrl, config.input, outputPath, config.width, config.height);
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, runWorker));
   } finally {
-    await browser.close();
+    try {
+      await browser.close();
+    } finally {
+      if (preview) await new Promise(resolve => preview.server.close(resolve));
+    }
   }
 
   console.log('\n✨ すべての画像生成が完了しました！');

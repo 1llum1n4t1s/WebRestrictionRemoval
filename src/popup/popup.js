@@ -1537,18 +1537,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (seq !== applySeq) return;
       if (res?.ok) {
         showStatus(
-          buildOkMessage(
-            $searchFixerToggle.checked,
-            $amazonDeliveryToggle.checked,
-            $amazonRankingJumpToggle.checked,
-            $amazonMerchantInfoToggle.checked,
-            $instagramCleanerToggle.checked,
-            $tiktokCleanerToggle.checked,
-            $xCleanerToggle.checked,
-            $videoGammaToggle.checked,
-            $videoFillToggle.checked,
-            $loupeToggle.checked
-          ),
+          buildOkMessage(),
           "ok"
         );
       } else {
@@ -1561,29 +1550,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
 
-  function buildOkMessage(
-    searchFixerEnabled,
-    amazonDeliveryTotalEnabled,
-    amazonRankingJumpEnabled,
-    amazonMerchantInfoEnabled,
-    instagramCleanerEnabled,
-    tiktokCleanerEnabled,
-    xCleanerEnabled,
-    videoGammaEnabled,
-    videoFillEnabled,
-    loupeEnabled
-  ) {
+  function buildOkMessage() {
     const parts = [];
-    if (searchFixerEnabled) parts.push(i18n("applyOkSearchFixer"));
-    if (amazonDeliveryTotalEnabled) parts.push(i18n("applyOkAmazon"));
-    if (amazonRankingJumpEnabled) parts.push(i18n("applyOkAmazonRanking"));
-    if (amazonMerchantInfoEnabled) parts.push(i18n("applyOkAmazonMerchantInfo"));
-    if (instagramCleanerEnabled) parts.push(i18n("applyOkInstagram"));
-    if (tiktokCleanerEnabled) parts.push(i18n("applyOkTiktok"));
-    if (xCleanerEnabled) parts.push(i18n("applyOkX"));
-    if (videoGammaEnabled) parts.push(i18n("applyOkVideoGamma"));
-    if (videoFillEnabled) parts.push(i18n("applyOkVideoFill"));
-    if (loupeEnabled) parts.push(i18n("applyOkLoupe"));
+    for (const [checkbox, messageKey] of [
+      [$searchFixerToggle, "applyOkSearchFixer"],
+      [$amazonDeliveryToggle, "applyOkAmazon"],
+      [$amazonRankingJumpToggle, "applyOkAmazonRanking"],
+      [$amazonMerchantInfoToggle, "applyOkAmazonMerchantInfo"],
+      [$instagramCleanerToggle, "applyOkInstagram"],
+      [$tiktokCleanerToggle, "applyOkTiktok"],
+      [$xCleanerToggle, "applyOkX"],
+      [$videoGammaToggle, "applyOkVideoGamma"],
+      [$videoFillToggle, "applyOkVideoFill"],
+      [$loupeToggle, "applyOkLoupe"],
+    ]) {
+      if (checkbox.checked) parts.push(i18n(messageKey));
+    }
     if (parts.length === 0) return i18n("applyOkAllStopped");
     return i18n("applyOkPrefix") + parts.join(i18n("applyOkSeparator"));
   }
@@ -2072,10 +2054,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     $paletteThumb.style.left = `${paletteHsv.s}%`;
     $paletteThumb.style.top = `${100 - paletteHsv.v}%`;
     if ($paletteHue.value !== String(paletteHsv.h)) $paletteHue.value = String(paletteHsv.h);
-    $palettePill.textContent = currentHex
+    const paletteText = currentHex
       ? i18n("palettePillValue", String(paletteHsv.h), String(paletteHsv.s), String(paletteHsv.v)) ||
         `${paletteHsv.h}° / ${paletteHsv.s}% / ${paletteHsv.v}%`
       : "— — —";
+    if ($palettePill.textContent !== paletteText) $palettePill.textContent = paletteText;
     $paletteAddBtn.disabled = !currentHex;
     $paletteResetBtn.disabled = !paletteBaseHex || paletteBaseHex === currentHex;
   }
@@ -2274,14 +2257,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     // （旧 "No. — —" は履歴番号なのか何なのか伝わらなかった）
     const idx = findHistoryIndex(history, norm);
     const no = String(idx + 1).padStart(2, "0");
-    $specimenNo.textContent =
+    const specimenNo =
       idx >= 0
         ? i18n("specimenNoSaved", no) || `No. ${no}`
         : i18n("specimenNoEmpty") || "—";
-    $specimenTime.textContent = Number.isFinite(time)
+    if ($specimenNo.textContent !== specimenNo) $specimenNo.textContent = specimenNo;
+    const specimenTime = Number.isFinite(time)
       ? i18n("specimenTimeSaved", formatTime(time)) || formatTime(time)
       : i18n("specimenTimeEmpty") || "—";
-    $specimenPill.textContent = norm.toUpperCase();
+    if ($specimenTime.textContent !== specimenTime) $specimenTime.textContent = specimenTime;
+    const specimenPill = norm.toUpperCase();
+    if ($specimenPill.textContent !== specimenPill) $specimenPill.textContent = specimenPill;
     for (const btn of $copyBtns) btn.disabled = false;
   }
 
