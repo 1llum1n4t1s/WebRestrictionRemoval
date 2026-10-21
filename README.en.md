@@ -3,7 +3,7 @@
 > [日本語版](README.md) もあります。
 
 A Chrome / Firefox extension that consolidates **12 features for comfortable browsing** into a single popup.
-All features start OFF — opt in only to what you need. Zero external transmission, zero personal data collection.
+All features start OFF — opt in only to what you need. Normal browsing assistance stays on-device; network requests run only for the features you explicitly enable or operate.
 
 ---
 
@@ -13,7 +13,7 @@ All features start OFF — opt in only to what you need. Zero external transmiss
 |---------|-------------|
 | 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / send to Gemini Notebook and more — **35 sub-features** |
 | 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" (**9 sub-features**) |
-| 📦 **Amazon Subscribe & Save monthly total** | Computes per-month total and displays it on the `/auto-deliveries` page |
+| 📦 **Amazon Subscribe & Save monthly total** | Shows unit price × quantity totals in each delivery's Manage page. Lists without prices link you to Manage; legacy monthly pages remain supported |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
 | 📷 **Instagram cleaner** | Hide Reels / Explore / Stories tray / Threads promotion etc. + video seek bar + image download (**12 sub-features**) |
@@ -50,19 +50,22 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 4. Settings are persisted across sessions.
 
 ### Popup tabs
-- **Tune**: 11 master toggles + Volume slider + Gamma / Loupe
+- **Tune**: Audio / Video / Amazon features and their settings
 - **YouTube**: 35 YouTube Enhancements sub-features
 - **X**: 9 X cleaner sub-features
 - **Instagram**: 12 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
-- **Color Picker**: EyeDropper + history
+- **Color Picker**: Pick, enter, adjust, and copy colors + history
+- **Settings**: Settings sync across PCs + settings export / import
+
+The YouTube / X / Instagram / TikTok master toggles are in their respective tabs.
 
 ---
 
 ## 🔒 Privacy
 
-- **Zero external transmission** — this extension does not send anything to any server.
-- **No personal data collected** — all processing happens locally on your device.
+- **Normal processing stays on-device** — external communication is limited to six exceptions: Instagram / TikTok image retrieval, the YouTube connection monitor, Send to Gemini Notebook, the contact form, optional settings sync, and subscription channel thumbnails.
+- **Personal information only for support** — the email address and message entered in the contact form are sent to Kagayoi Support only when you submit it.
 - **Opt-in by design** — everything is OFF on install; only what you enable runs.
 - **Open source** — code is published in this repository for anyone to inspect.
 

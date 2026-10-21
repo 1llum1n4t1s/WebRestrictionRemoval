@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: September 9, 2026
+Last updated: October 21, 2026
 
 ## Introduction
 
@@ -73,7 +73,7 @@ When settings sync is enabled, the settings described in Exception 5 are shared 
 
 ## Network communication
 
-The Extension does not communicate with any external servers, with the five explicit exceptions listed below.
+The Extension does not communicate with any external servers, with the six explicit exceptions listed below.
 
 ### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
@@ -133,6 +133,12 @@ On first use, the six-digit code delivered by email is sent to Kagayoi Support t
 ### Exception 5: Settings sync across PCs
 
 “Sync settings across PCs” is OFF by default. When enabled on each PC, feature toggles, sub-features, audio/equalizer, video/loupe settings, blocked channels, and color copy format are stored in the browser’s storage.sync. If browser sync is enabled, the browser provider (Google for Chrome, Mozilla for Firefox) shares them with PCs using the same browser and account. Nothing is sent to the developer’s server. Authentication, destination accounts, account caches, color history, selected popup tabs, HUD positions, browsing URLs, page content, audio, and images are excluded. Update timestamps, logical counters, a randomly generated extension device ID, and deletion records are also synced to resolve conflicts. The ID is not derived from hardware names or account information and is not used for advertising or analytics. The opt-in switch and applied-state bookkeeping remain local. Turning sync off stops this PC from sending or applying settings, but does not delete data already in browser sync storage.
+
+### Exception 6: Subscription channel thumbnails (YouTube Enhancements sub-feature)
+
+When both "Grid layout for subscribed channels" (`searchFixerFeatures.subsChannelsGrid`, opt-in, default OFF) and the YouTube Enhancements master toggle are ON, the Extension automatically retrieves video thumbnails for channel cards near the visible area (including preloading up to 300 pixels beyond the viewport) of the subscriptions channel list. It reads the channel's video/live listings within YouTube to choose a thumbnail. Without a local cache entry, it issues HEAD requests to `https://i.ytimg.com/vi/<video-ID>/maxresdefault.jpg` or `hqdefault.jpg`, using `credentials: "omit"`, `redirect: "manual"`, and `referrerPolicy: "no-referrer"`.
+
+The selected image is displayed through a normal image request to the same CDN, falling back to `mqdefault.jpg` if loading fails. Images also use `no-referrer`. The CDN receives the requested video ID and the IP address required for the connection; normal browser cookie controls apply to image requests. Nothing is sent to the developer's server. Thumbnail URLs, channel IDs, and retrieval timestamps are cached only on the device and excluded from settings sync. These requests are not issued when the feature is OFF.
 
 ## Permission usage
 

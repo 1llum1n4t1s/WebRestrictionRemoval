@@ -47,9 +47,9 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-7 タブ構成（調整 / YouTube / X / Instagram / TikTok / カラーピッカー / 設定）。**10 マスタートグル**（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ トグル + プリセット dropdown + プリアンプ縦スライダー + 10 バンド縦スライダー）** + 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル × 3（YouTube 機能拡張 35 機能 / Instagram クリーナー 12 機能 / TikTok クリーナー 3 機能）。Shorts 削除・コメント欄非表示・接続モニター・配信時刻オーバーレイは YouTube 機能拡張のサブ機能（`removeShortsShelf` 等 / `hideComments` / `connectionMonitor` / `broadcastClock`）として統合され、専用パネルのアコーディオン（接続モニター・配信時刻オーバーレイは `watch_page` カテゴリ）に FEATURES 駆動で自動描画される。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+7 タブ構成（調整 / YouTube / X / Instagram / TikTok / カラーピッカー / 設定）。**マスタートグル（件数は [AGENTS.md の早見表](../AGENTS.md) を参照）**（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / X クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ トグル + プリセット dropdown + プリアンプ縦スライダー + 10 バンド縦スライダー）** + 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル（YouTube / X / Instagram / TikTok。サブ機能数は同早見表を参照）。Shorts 削除・コメント欄非表示・接続モニター・配信時刻オーバーレイは YouTube 機能拡張のサブ機能（`removeShortsShelf` 等 / `hideComments` / `connectionMonitor` / `broadcastClock`）として統合され、専用パネル（接続モニター・配信時刻オーバーレイは `watch_page` カテゴリ）に FEATURES 駆動で自動描画される。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
 
-**クリーナーアコーディオン**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
+**クリーナーの機能一覧**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
 **テーマ**: 「生成り × 葡萄酒」。ライトは低彩度の生成りに葡萄酒（`--accent: #805160`）、ダークは低彩度の葡萄酒に金（`--accent: #c8ae7b`）を合わせる。背景は単色、境界線は薄く、選択状態は淡い差し色の面と枠で示す。カードの角丸は8px、ボタン・入力は6px、スイッチは大小とも丸型。文字の影や金属風の光沢は使わず、本文の字間を抑えて読みやすさを優先する。タブ幅のアニメーションと常時点滅は撤去し、パネルは120msのフェード、操作状態は短い色変化で示す。`prefers-reduced-motion` では全アニメーション・遷移を停止する。フォーカスは差し色のリングで示し、色見本と採色履歴は無彩色の台と実際の色値を維持する。色の正本は `popup.css` のライト／ダークのトークンとし、差し色の上の文字には `--on-accent` を使う。
 
@@ -182,7 +182,7 @@ Service worker。役割:
 2. `runRenderInsideObserverGuard()` 内で `observer.disconnect()` → `renderAllTotals()` → `observer.takeRecords()`（蓄積分を破棄）→ `observer.observe()` で再接続
 3. `priceEl.textContent` は変化時のみ更新（同じ文字列の再代入でも `MutationRecord` は積まれるため）
 
-**動作対象**: top frame 限定、`[data-delivery-type]` セクションの `.subscription-price` を `/\D/g` で数値化して合計、各セクションの `.a-fixed-left-grid-col` に `__cpa-amzn-delivery-total` クラスのルート要素を append。OFF 時は observer 切断 + 既存挿入要素を全部撤去（撤去操作も同じ guard 経由）。
+**動作対象**: top frame 限定。従来画面は `[data-delivery-type]` セクションの `.subscription-price` を合計し、`.a-fixed-left-grid-col` に表示する。現行の配送詳細は `[data-testid^="desktop-delivery-card-list-"]` ごとに `desktop-subscription-tile` の `product-price`（単価）× `product-qty-frequency`（数量）を集計し、`desktop-delivery-card` に表示する。割引率・過去の節約額・詳細モーダルの価格は集計しない。明細が未読込・価格や数量が不明なら部分合計を表示しない。価格のない現行一覧（`#deliveriesDesktopScroller`）には各配送の「管理」への案内だけを表示し、追加通信や価格キャッシュは使わない。OFF 時は observer 切断 + 合計と案内を全撤去。
 
 ### Amazon ランキングへ移動ボタン (`src/content/amazon-ranking-jump.js` + `src/content/amazon-ranking-jump.css`)
 `*://www.amazon.co.jp/*` 限定（top frame のみ）。`amazonRankingJumpEnabled` (boolean、デフォルト OFF オプトイン) 1 storage key で master 制御。商品詳細欄の「Amazon 売れ筋ランキング」リンクは商品ページごとに出現位置がバラバラで探しにくいので、商品情報の最上部（`#title_feature_div` の直前を第一候補にフォールバック順に挿入）に「この商品が所属するランキングへ移動」ボタン (`<a href>`) を 1 つ集約して表示する。クリックでブラウザ標準ナビゲーションにより**同じタブ**でランキングへ移動。外部送信ゼロ・純粋 DOM 操作（価格・履歴の取得は一切しない）。
@@ -324,7 +324,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 
 **ライフサイクル**:
 1. popup で YouTube 機能拡張の接続モニターサブ機能を ON → `APPLY_SETTINGS` → background → `notifyContentScripts` (YouTube タブ判定分岐) → `APPLY_SEARCH_FIXER_CS` を top frame に送信 (search-fixer.js / youtube-shorts.js と共有の 1 メッセージ)
-2. content script: `readSettingsAndApply()` を `applyInFlight`/`applyQueued` で直列化 (ルーペと同じパターン)。`computeActive()` = `searchFixerEnabled` AND `searchFixerFeatures.connectionMonitor` が true なら `activate()`、false なら `deactivate()`
+2. content script: manifest で先行読込した `CleanerCore.subscribeStored` に設定再取得の直列化と購読を委ねる。`computeActive()` = `searchFixerEnabled` AND `searchFixerFeatures.connectionMonitor` が true なら `activate()`、false なら `deactivate()`
 3. `activate()`: 初期スキャン + MutationObserver / `yt-navigate-finish` 登録。`isLiveVideo()`（DOM シグナル判定、上記参照）true のライブ視聴時に sample timer (1s) + diagnosis timer (5s) + video イベントリスナー + overlay DOM を起動
 4. SPA 遷移で VOD に戻ったら overlay 撤去 (timer は live 再検出のため軽量に維持)、別のライブに遷移したらそのまま継続
 5. サブ機能 OFF / master OFF / `pagehide`(persisted=false) / `chrome.runtime?.id` 消失 で `deactivate()` (stopMeasuring + video/yt-navigate-finish/drag listener + MutationObserver + overlay を全撤去)
@@ -332,7 +332,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 **実装上の不変条件**:
 - top frame 限定 (`window === window.top` 早期 return)
 - `window.__cpaConnectionMonitorRunning` で二重実行防止
-- 設定購読 (`readSettingsAndApply`) は `applyInFlight`/`applyQueued` で並列実行を直列化 (storage.onChanged / runtime.onMessage / SPA 遷移の重複呼出で activate と deactivate が race するのを防ぐ。ルーペと同じ /rere B1-E3 パターン)
+- 設定購読は `CleanerCore.subscribeStored` で再取得を直列化し、storage.onChanged / runtime.onMessage の重複呼出をまとめる。HUD 行は最大 5 件を再利用し、表示が変わった箇所だけ更新する
 - HUD render は 250ms スロットルで rAF coalesce、ring buffer 更新は毎秒 + 古いサンプル切り捨て
 - Extension context invalidation guard を sample / diagnose / observer callback の入口に配置、orphan 化したら全 timer clear + observer disconnect + overlay 撤去
 - DOM 構築は `createElement` ベース (YouTube の Trusted Types policy に対応、isolated world でも安全側)
@@ -389,7 +389,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 
 - **送信先候補は先読みし、送信先タブは background が開く**: (1) ボタンを置けた時点で `prefetchDestinations()` がアカウント一覧とノートブック一覧を 1 回だけ取りに行く（初回クリックでセレクタが番号表示のまま待たされるのを消す）。アカウント probe は**並列 + メールが見つかった時点でストリームを abort**（キーは HTML 先頭 10% にあるので転送量が 1 桁減る）+ `NOTEBOOK_LM_ACCOUNTS_CACHE` に 12 時間キャッシュ。(2) 送信完了後のタブは **background の `chrome.tabs.create`** で開く。content script の `window.open` は送信の await を跨ぐと transient user activation 切れで popup blocker に弾かれ、退避用の「開く」リンクが常態化していた（/rere RC-L）。(3) パネルの `<a>` 要素には `box-sizing: border-box` を明示する（UA 既定が content-box なので padding のぶん横スクロールバーが出る）
 
-**その他の不変条件**: 対象ページは `/watch`（単一）/ `/results` / `/playlist` / チャンネルの `/videos` `/streams`（一括）。一括系は**描画済みカードのみ**が対象で、件数をボタンに出すので「全部入っていない」誤解を防ぐ。URL は `NotebookLm.normalizeWatchUrl` で `watch?v=<id>` に正規化（`&list=` 等が残ると Gemini Notebook 側で重複ソース化する）。上限超過分は黙って捨てず件数を表示する。`createElement` ベースで Trusted Types 安全、`applyInFlight`/`applyQueued` 直列化、context invalidation guard、`pagehide(persisted=false)` teardown、`__cpa-nlm-` プレフィックス。
+**その他の不変条件**: 対象ページは `/watch`（単一）/ `/results` / `/playlist` / チャンネルの `/videos` `/streams`（一括）。一括系は**描画済みカードのみ**が対象で、件数をボタンに出すので「全部入っていない」誤解を防ぐ。URL は `NotebookLm.normalizeWatchUrl` で `watch?v=<id>` に正規化（`&list=` 等が残ると Gemini Notebook 側で重複ソース化する）。上限超過分は黙って捨てず件数を表示する。`createElement` ベースで Trusted Types 安全、`CleanerCore.subscribeStored` による設定再取得の直列化、context invalidation guard、`pagehide(persisted=false)` teardown、`__cpa-nlm-` プレフィックス。
 
 ### 配信時刻オーバーレイ (`src/content/youtube-broadcast-clock.{js,css}`)
 `*://*.youtube.com/*` の top frame に注入（`document_idle`、**接続モニターと同じ content_scripts エントリに相乗り**で actions.js 二重ロードを回避）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.broadcastClock`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず、`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と共に購読し `computeActive()` で判定。接続モニター / Shorts 5 サブ機能と同じ統合方式）。**ライブ配信のアーカイブ（過去ライブの VOD）再生中に、その瞬間が実際に配信されていた時刻を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・ローカルタイム）で HUD 表示する（body 直下 `position:fixed`、初期位置はプレーヤー左上付近、ドラッグで動画の外側を含む viewport 上の任意位置へ移動可）**。純粋ロジックは `actions.js` の `BroadcastClock` namespace、DOM / fetch / lifecycle のみ本 cs が担当。
@@ -406,6 +406,6 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 - **body 直下の `position:fixed`** な ROG クリムゾン HUD。初期位置はプレーヤー左上付近（接続モニターは右上なのでデフォルト位置を分けて衝突回避）、ドラッグで**動画の外側を含む viewport 上の任意位置**へ移動可。位置は `localStorage`（`__cpa_bc_overlay_pos`、viewport 座標）に永続化し、resize / フルスクリーン切替で viewport 内へ clamp。フルスクリーン中は `fullscreenchange` で `document.fullscreenElement` へ reparent（top layer 配下でないと描画されないため）。`#movie_player` への attach に依存しないので、機能 ON 直後やプレーヤー再構築中でもリロード不要で表示できる
 - 時刻更新は video の `timeupdate` / `seeked` イベント駆動 + `RENDER_THROTTLE_MS`（250ms）throttle の rAF coalesce（一時停止中は currentTime 固定なので最後の値で静止）
 - `createElement` ベースで Trusted Types 安全、`__cpa-bc-` クラスプレフィックスで名前空間化
-- `applyInFlight`/`applyQueued` で設定購読を直列化、SPA 追跡は MutationObserver + `yt-navigate-finish`、`pagehide(persisted=false)` で teardown（bfcache 凍結は温存）
+- manifest で先行読込した `CleanerCore.subscribeStored` で設定再取得を直列化、SPA 追跡は MutationObserver + `yt-navigate-finish`、`pagehide(persisted=false)` で teardown（bfcache 凍結は温存）
 - context invalidation guard（`chrome.runtime?.id`）で orphan 化時に observer / listener / overlay を撤去
 - top frame 限定（`window === window.top`）、`window.__cpaBroadcastClockRunning` で二重実行防止

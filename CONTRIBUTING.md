@@ -35,7 +35,7 @@ pnpm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppe
 ### テスト・lint
 
 ```bash
-pnpm test          # Node.js 標準 test runner、77 件
+pnpm test          # Node.js 標準 test runner（件数は出力サマリを参照）
 pnpm run lint      # ESLint v10 flat config
 ```
 
@@ -56,8 +56,8 @@ bash ./zip.sh firefox
 ```
 
 生成物:
-- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (11 機能フル対応、音量ブースターは tabCapture 経路)
-- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (11 機能フル対応。音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js` = manifest.firefox.json のみに登録される content script で提供、DRM サイトでは無効。background の tabCapture 経路は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip)
+- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (12 機能フル対応、音量ブースターは tabCapture 経路)
+- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (12 機能フル対応。音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js` = manifest.firefox.json のみに登録される content script で提供、DRM サイトでは無効。background の tabCapture 経路は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip)
 
 ## ローカル動作確認
 
@@ -134,7 +134,7 @@ Popup (src/popup/popup.{html,js,css})
 | `src/offscreen/` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体・Chrome の唯一の経路) |
 | `src/popup/` | popup UI |
 | `_locales/{en,ja}/` | i18n (Chrome i18n API) |
-| `test/actions.test.js` | 純粋関数テスト (77 件、件数 drift 検知 + CI 整合性チェック含む) |
+| `test/actions.test.js` | 純粋関数テスト（FEATURES / 公開定数の drift 検知を含む。件数は実行結果を参照） |
 | `webstore/` | ストア申請用 HTML テンプレート / 画像生成 / store-listing テキスト |
 | `vava.config.json` | `/vava` スキル (ストア listing 同期スクリプト) 用のプロジェクト固有設定 |
 
@@ -143,7 +143,7 @@ Popup (src/popup/popup.{html,js,css})
 詳細は [AGENTS.md](AGENTS.md) を参照。要点だけ抜粋:
 
 - **新機能追加は `src/lib/actions.js` から手をつける** (FEATURES 配列 / StorageKeys / Actions が単一情報源)
-- **デフォルト OFF 方針徹底** — 9 マスタートグルすべて初期 OFF
+- **デフォルト OFF 方針徹底** — 11 マスタートグルすべて初期 OFF（機能数の正本は AGENTS.md の早見表）
 - **`SenderCheck` で sender 検証必須** — background の各 message handler 冒頭
 - **MutationObserver で DOM 書き戻すときは `ScanRunner.create()` を使う** (rAF coalesce + disconnect→render→takeRecords→observe ガード)
 - **Extension context invalidation guard** — `chrome.runtime?.id` 検知 + observer/timer 停止 + cleanup (PATTERN SYNC は 14 ファイル実装済み)
@@ -151,9 +151,8 @@ Popup (src/popup/popup.{html,js,css})
 
 ## プライバシー方針
 
-- 外部送信ゼロ (本拡張機能側からは)
-- 個人情報の収集ゼロ
-- すべての処理はユーザーの端末内で完結
+- 通常処理は端末内で完結。外部通信はプライバシーポリシーの6例外に限定
+- 問い合わせ時に入力したメールアドレス・本文だけをサポート窓口へ送信
 - 詳細は [プライバシーポリシー](docs/privacy-policy.md)
 
 ## ライセンス
