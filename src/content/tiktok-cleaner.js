@@ -41,14 +41,9 @@
     onUpdate: (patch) => {
       if ("active" in patch) active = patch.active;
       if ("features" in patch) features = patch.features;
-      onSettingsChanged();
+      applyBodyClasses();
     },
   });
-
-  // ---------- 設定変更ディスパッチャ ----------
-  function onSettingsChanged() {
-    applyBodyClasses();
-  }
 
   /** 各機能フラグに応じて document.documentElement にクラスを付け外し。 */
   function applyBodyClasses() {

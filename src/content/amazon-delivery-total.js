@@ -7,9 +7,9 @@
  * vanilla JS 実装。React や bundler は使用せず、軽量に動作する。
  *
  * 機能:
- *   - `/auto-deliveries*` ページ内の `[data-delivery-type]` 要素（=月単位セクション）を走査
- *   - 各セクション内の `.subscription-price` の数値合計を計算
- *   - 各セクションの `.a-fixed-left-grid-col` に「合計金額: ¥XX,XXX 円」を挿入
+ *   - 従来の月別セクションと、現行の配送詳細カードを走査
+ *   - 従来は .subscription-price、現行は product-price の単価 × 数量で集計
+ *   - 金額を持たない現行一覧では「管理」画面への案内を表示（追加通信なし）
  *
  * 設計判断:
  *   - master トグル `amazonDeliveryTotalEnabled` で制御。OFF にしたら挿入要素を撤去
@@ -34,27 +34,17 @@
   const runner = ScanRunner.create({
     render: renderAllTotals,
     cleanup: removeAllTotals,
+    observeOptions: {
+      childList: true, subtree: true, characterData: true,
+      attributes: true, attributeFilter: ["aria-label"],
+    },
   });
 
   // ---------- 状態購読 ----------
-  chrome.storage.local
-    .get(StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED)
-    .then((stored) => {
-      apply(stored[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] === true);
-    })
-    .catch(() => {});
-
-  chrome.runtime.onMessage.addListener((request, sender) => {
-    if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action !== Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS) return;
-    apply(request.data?.enabled === true);
-  });
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    if (StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED in changes) {
-      apply(changes[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED].newValue === true);
-    }
+  CleanerCore.subscribeBoolean({
+    masterKey: StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
+    applyAction: Actions.APPLY_AMAZON_DELIVERY_TOTAL_CS,
+    onUpdate: apply,
   });
 
   function apply(enabled) {
@@ -65,15 +55,32 @@
   // ---------- レンダリング ----------
 
   function renderAllTotals() {
-    const sections = document.querySelectorAll(AmazonDeliveryTotal.SECTION_SELECTOR);
+    const countText = document.querySelector('[data-testid="delivery-item-count-desktop"]')?.textContent ?? "";
+    const countMatch = countText.normalize("NFKC").match(/\d+/);
+    const expectedCount = countMatch ? Number(countMatch[0]) : null;
+    const deliveryItems = document.querySelectorAll(
+      `${AmazonDeliveryTotal.DELIVERY_SECTION_SELECTOR} ${AmazonDeliveryTotal.DELIVERY_ITEM_SELECTOR}`
+    );
+    const completeDelivery = expectedCount !== null && deliveryItems.length === expectedCount;
+    const sections = document.querySelectorAll(
+      `${AmazonDeliveryTotal.SECTION_SELECTOR},${AmazonDeliveryTotal.DELIVERY_SECTION_SELECTOR}`
+    );
     sections.forEach((section) => {
-      const total = computeSectionTotal(section);
-      const target = section.querySelector(AmazonDeliveryTotal.INSERT_TARGET_SELECTOR);
-      if (!target) return;
+      const delivery = section.matches(AmazonDeliveryTotal.DELIVERY_SECTION_SELECTOR);
+      const total = delivery
+        ? (completeDelivery ? computeDeliveryTotal(section) : null)
+        : computeSectionTotal(section);
+      const target = section.querySelector(delivery
+        ? AmazonDeliveryTotal.DELIVERY_TARGET_SELECTOR
+        : AmazonDeliveryTotal.INSERT_TARGET_SELECTOR);
+      if (total === null || !target) {
+        section.querySelector(`.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}`)?.remove();
+        return;
+      }
 
       let root = section.querySelector(`.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}`);
       if (!root) {
-        root = buildTotalNode();
+        root = buildTotalNode(delivery);
         target.append(root);
       }
       const priceEl = root.querySelector(`.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__price`);
@@ -84,6 +91,45 @@
         if (priceEl.textContent !== next) priceEl.textContent = next;
       }
     });
+    renderOverviewHint();
+  }
+
+  function computeDeliveryTotal(section) {
+    const items = section.querySelectorAll(AmazonDeliveryTotal.DELIVERY_ITEM_SELECTOR);
+    if (!items.length) return null;
+    let total = 0;
+    for (const item of items) {
+      const priceEl = item.querySelector(AmazonDeliveryTotal.DELIVERY_PRICE_SELECTOR);
+      const priceText = priceEl?.textContent?.trim()
+        || priceEl?.querySelector("[aria-label]")?.getAttribute("aria-label") || "";
+      const priceMatch = priceText.normalize("NFKC").match(/^[¥￥]\s*(\d[\d,]*)(?:\.(\d{1,2}))?\s*$/);
+      const quantityText = item.querySelector(AmazonDeliveryTotal.DELIVERY_QUANTITY_SELECTOR)?.textContent ?? "";
+      const quantityMatch = quantityText.normalize("NFKC").match(/(\d+)\s*(?:ユニット|個|units?\b)/i);
+      if (!priceMatch || !quantityMatch) return null;
+      const price = Number(priceMatch[1].replaceAll(",", "") + (priceMatch[2] ? `.${priceMatch[2]}` : ""));
+      const quantity = Number(quantityMatch[1]);
+      if (!Number.isFinite(price) || !Number.isSafeInteger(quantity) || quantity < 1) return null;
+      total += price * quantity;
+    }
+    return Number.isFinite(total) ? total : null;
+  }
+
+  function renderOverviewHint() {
+    const overview = document.getElementById("deliveriesDesktopScroller");
+    const selector = `.${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}[data-overview-hint]`;
+    const existing = document.querySelector(selector);
+    if (!overview) {
+      existing?.remove();
+      return;
+    }
+    if (existing && existing.previousElementSibling === overview) return;
+    existing?.remove();
+    const hint = document.createElement("div");
+    hint.className = AmazonDeliveryTotal.TOTAL_ROOT_CLASS;
+    hint.dataset.overviewHint = "true";
+    hint.setAttribute("role", "note");
+    hint.textContent = ScanRunner.safeMsg("amazonTotalDetailsHint", "合計金額は各お届け日の「管理」を開くと表示されます。");
+    overview.after(hint);
   }
 
   function computeSectionTotal(section) {
@@ -100,11 +146,13 @@
     return total;
   }
 
-  function buildTotalNode() {
+  function buildTotalNode(delivery = false) {
     const root = document.createElement("div");
     root.className = AmazonDeliveryTotal.TOTAL_ROOT_CLASS;
     root.setAttribute("role", "note");
-    root.setAttribute("aria-label", ScanRunner.safeMsg("amazonTotalAriaLabel", "この月の合計金額"));
+    root.setAttribute("aria-label", delivery
+      ? ScanRunner.safeMsg("amazonDeliveryTotalAriaLabel", "この配送の合計金額")
+      : ScanRunner.safeMsg("amazonTotalAriaLabel", "この月の合計金額"));
 
     const inner = document.createElement("div");
     inner.className = `${AmazonDeliveryTotal.TOTAL_ROOT_CLASS}__inner`;

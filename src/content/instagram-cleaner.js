@@ -382,15 +382,15 @@
           "ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + "), div:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")";
         const matches = [];
         detectionRoot.querySelectorAll(candidateSelector).forEach((container) => {
+          const children = container.children;
+          const len = children.length;
+          if (len < 2 || len > 50) return;
           // `_a9z6` は caption とコメントの混在リスト。article を内包する layout wrapper も対象外。
           if (
             container.classList.contains("_a9z6") ||
             container.querySelector("article") ||
             container.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
           ) return;
-          const children = container.children;
-          const len = children.length;
-          if (len < 2 || len > 50) return;
           let userLinkCount = 0;
           let confirmedCommentCount = 0;
           const handles = new Set();

@@ -365,6 +365,8 @@
   "amazonTotalText": { "message": "合計金額" },
   "amazonTotalUnit": { "message": "円" },
   "amazonTotalAriaLabel": { "message": "この月の合計金額" },
+  "amazonDeliveryTotalAriaLabel": { "message": "この配送の合計金額" },
+  "amazonTotalDetailsHint": { "message": "合計金額は各お届け日の「管理」を開くと表示されます。" },
   "subsAllShortcutLabel": { "message": "すべての登録チャンネル" },
   "subsSearchPlaceholder": { "message": "チャンネル名で絞り込み" },
   "imageDownloadButtonLabel": { "message": "画像をダウンロード" },

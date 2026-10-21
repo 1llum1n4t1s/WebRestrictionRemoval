@@ -16,7 +16,7 @@
 //   - 経路診断 fetch は `mode:"no-cors" + credentials:"omit" + referrerPolicy:"no-referrer"` 固定で
 //     クロスオリジン Cookie 送信ゼロ・リファラ送信ゼロ
 //   - context invalidation 後は全 timer / listener を必ず解除（CPU リーク防止、rtx-enhancer と同パターン）
-//   - 既存の rtx-enhancer.js / loupe.js と同じ readSettingsAndApply 直列化パターンを踏襲
+//   - CleanerCore.subscribeStored が保存値の再取得を直列化
 
 (() => {
   // 同一フレームでの二重実行防止（manifest content_scripts が二重ロードされた場合の保険）
@@ -100,9 +100,6 @@
   let active = false;
   /** @type {boolean} 計測ループ起動中フラグ（ライブ視聴中だけ true） */
   let measuring = false;
-  /** master 読み込み中の並列化フラグ */
-  let applyInFlight = false;
-  let applyQueued = false;
   /** MutationObserver callback の rescanForLiveVideo を rAF coalesce するフラグ */
   let rescanScheduled = false;
 
@@ -795,8 +792,7 @@
     }
 
     // (2) 直近 buffering 履歴: 新しい順に最大 5 件、相対時刻
-    // 相対時刻表示 (formatRelativeTime) は経過時間そのものが毎秒変わるため差分チェックの効果は薄いが、
-    // 「バッファ無し」の空状態が続くケースだけは再構築を省略できる。
+    // 行は位置ごとに再利用し、相対時刻・帯域の表示が変わったときだけ文字列を更新する。
     if (bufferingEvents.length === 0) {
       if (overlayBufferLogEl.childElementCount !== 1 || !overlayBufferLogEl.firstElementChild?.classList.contains("__cpa-cm-detail-empty")) {
         clearChildren(overlayBufferLogEl);
@@ -806,15 +802,25 @@
         overlayBufferLogEl.appendChild(li);
       }
     } else {
-      clearChildren(overlayBufferLogEl);
       const now = Date.now();
       const recent = bufferingEvents.slice(-5).reverse();
-      for (const ev of recent) {
-        const li = document.createElement("li");
+      for (let index = 0; index < recent.length; index += 1) {
+        const ev = recent[index];
+        let li = overlayBufferLogEl.children[index];
+        if (!li) {
+          li = document.createElement("li");
+          overlayBufferLogEl.appendChild(li);
+        }
+        if (li.classList.contains("__cpa-cm-detail-empty")) {
+          li.classList.remove("__cpa-cm-detail-empty");
+        }
         const rel = formatRelativeTime(now - ev.ts);
         const bw = Number.isFinite(ev.downlink) && ev.downlink > 0 ? formatMbps(ev.downlink) : null;
-        li.textContent = bw ? `${rel} · ${bw}` : rel;
-        overlayBufferLogEl.appendChild(li);
+        const text = bw ? `${rel} · ${bw}` : rel;
+        if (li.textContent !== text) li.textContent = text;
+      }
+      while (overlayBufferLogEl.childElementCount > recent.length) {
+        overlayBufferLogEl.lastElementChild.remove();
       }
     }
 
@@ -998,64 +1004,20 @@
     return SearchFixer.mergeFeatures(featuresRaw).connectionMonitor === true;
   }
 
-  async function readSettingsAndApply() {
-    if (!chrome?.runtime?.id) return;
-    if (applyInFlight) {
-      applyQueued = true;
-      return;
-    }
-    applyInFlight = true;
-    try {
-      const stored = await chrome.storage.local.get([
-        StorageKeys.SEARCH_FIXER_ENABLED,
-        StorageKeys.SEARCH_FIXER_FEATURES,
-      ]);
-      if (!chrome?.runtime?.id) return;
+  CleanerCore.subscribeStored({
+    keys: [
+      StorageKeys.SEARCH_FIXER_ENABLED,
+      StorageKeys.SEARCH_FIXER_FEATURES,
+    ],
+    applyAction: Actions.APPLY_SEARCH_FIXER_CS,
+    onStored(stored) {
       if (computeActive(stored[StorageKeys.SEARCH_FIXER_ENABLED], stored[StorageKeys.SEARCH_FIXER_FEATURES])) {
         activate();
       } else {
         deactivate();
       }
-    } catch {
-      // storage 読み取り失敗は次回 storage.onChanged / APPLY で再試行されるため何もしない
-    } finally {
-      applyInFlight = false;
-      if (applyQueued) {
-        applyQueued = false;
-        readSettingsAndApply();
-      }
-    }
-  }
-
-  // 初回適用
-  readSettingsAndApply();
-
-  // storage 変更で同期（popup 操作 / 他タブからの変更）。master / features どちらの変化も拾う。
-  try {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (!chrome?.runtime?.id) return;
-      if (areaName !== "local") return;
-      if (
-        StorageKeys.SEARCH_FIXER_ENABLED in changes ||
-        StorageKeys.SEARCH_FIXER_FEATURES in changes
-      ) {
-        readSettingsAndApply();
-      }
-    });
-  } catch {}
-
-  // popup → background → content script: APPLY_SEARCH_FIXER_CS で再適用。
-  // search-fixer.js / youtube-shorts.js と同じメッセージを購読し、接続モニターは
-  // connectionMonitor サブ機能フラグだけを見て activate/deactivate する。
-  try {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (!chrome?.runtime?.id) return;
-      if (!SenderCheck.isFromBackground(sender)) return;
-      if (request?.action !== Actions.APPLY_SEARCH_FIXER_CS) return;
-      readSettingsAndApply();
-      try { sendResponse({ ok: true }); } catch {}
-    });
-  } catch {}
+    },
+  });
 
   // pagehide: bfcache 凍結 (persisted=true) は observer/timer を温存して復帰後そのまま継続させる
   // （disconnect すると pageshow 再初期化経路が無く復帰後に効かなくなるため。video-fill.js / loupe.js PATTERN SYNC）。

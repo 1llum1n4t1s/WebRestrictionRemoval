@@ -25,7 +25,7 @@
 //   - master OFF / サブ機能 OFF / 拡張機能 disable / 非アーカイブ / SPA 離脱時は HUD・listener を撤去
 //   - top frame 限定（埋め込みプレイヤーには介入しない）
 //   - context invalidation 後は MutationObserver / listener を必ず解除
-//   - readSettingsAndApply は applyInFlight/applyQueued で直列化（activate/deactivate の race 防止）
+//   - CleanerCore.subscribeStored が保存値の再取得を直列化（activate/deactivate の race 防止）
 //   - 精度の限界: 配信途中の回線断・編集カットがあるアーカイブは線形マッピングが崩れて実時刻がずれる
 
 (() => {
@@ -73,9 +73,6 @@
   let mutationObserver = null;
   /** @type {boolean} 機能 ON / activate 中フラグ */
   let active = false;
-  /** master 読み込み中の並列化フラグ */
-  let applyInFlight = false;
-  let applyQueued = false;
   /** MutationObserver callback の rescan を rAF coalesce するフラグ */
   let rescanScheduled = false;
   /** window resize の clamp を rAF coalesce するフラグ */
@@ -606,64 +603,20 @@
     return SearchFixer.mergeFeatures(featuresRaw).broadcastClock === true;
   }
 
-  async function readSettingsAndApply() {
-    if (!chrome?.runtime?.id) return;
-    if (applyInFlight) {
-      applyQueued = true;
-      return;
-    }
-    applyInFlight = true;
-    try {
-      const stored = await chrome.storage.local.get([
-        StorageKeys.SEARCH_FIXER_ENABLED,
-        StorageKeys.SEARCH_FIXER_FEATURES,
-      ]);
-      if (!chrome?.runtime?.id) return;
+  CleanerCore.subscribeStored({
+    keys: [
+      StorageKeys.SEARCH_FIXER_ENABLED,
+      StorageKeys.SEARCH_FIXER_FEATURES,
+    ],
+    applyAction: Actions.APPLY_SEARCH_FIXER_CS,
+    onStored(stored) {
       if (computeActive(stored[StorageKeys.SEARCH_FIXER_ENABLED], stored[StorageKeys.SEARCH_FIXER_FEATURES])) {
         activate();
       } else {
         deactivate();
       }
-    } catch {
-      // storage 読み取り失敗は次回 storage.onChanged / APPLY で再試行されるため何もしない
-    } finally {
-      applyInFlight = false;
-      if (applyQueued) {
-        applyQueued = false;
-        readSettingsAndApply();
-      }
-    }
-  }
-
-  // 初回適用
-  readSettingsAndApply();
-
-  // storage 変更で同期（popup 操作 / 他タブからの変更）。master / features どちらの変化も拾う。
-  try {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (!chrome?.runtime?.id) return;
-      if (areaName !== "local") return;
-      if (
-        StorageKeys.SEARCH_FIXER_ENABLED in changes ||
-        StorageKeys.SEARCH_FIXER_FEATURES in changes
-      ) {
-        readSettingsAndApply();
-      }
-    });
-  } catch {}
-
-  // popup → background → content script: APPLY_SEARCH_FIXER_CS で再適用。
-  // search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と同じメッセージを購読し、
-  // broadcastClock サブ機能フラグだけを見て activate/deactivate する。
-  try {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (!chrome?.runtime?.id) return;
-      if (!SenderCheck.isFromBackground(sender)) return;
-      if (request?.action !== Actions.APPLY_SEARCH_FIXER_CS) return;
-      readSettingsAndApply();
-      try { sendResponse({ ok: true }); } catch {}
-    });
-  } catch {}
+    },
+  });
 
   // pagehide: bfcache 凍結（persisted=true）は observer/listener を温存して復帰後そのまま継続させる
   // （youtube-connection-monitor.js / video-fill.js / loupe.js PATTERN SYNC）。

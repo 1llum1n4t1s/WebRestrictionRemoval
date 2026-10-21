@@ -232,8 +232,10 @@ const FakeElement = class {
 };
 
 const createBehaviorHarness = () => {
+  const documentEvents = new EventTarget();
   const document = {
     elements: [],
+    addEventListener: documentEvents.addEventListener.bind(documentEvents),
     createElement(tagName) {
       return new FakeElement(tagName, document);
     },

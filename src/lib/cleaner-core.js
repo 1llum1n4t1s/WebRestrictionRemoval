@@ -1,11 +1,13 @@
 "use strict";
 
 /**
- * cleaner-core.js — body-class クリーナーの設定購読共通ランタイム
+ * cleaner-core.js — content script の設定購読共通ランタイム
  *
  * /opop で抽出した共通モジュール。Instagram / TikTok クリーナーが同型コピーで持っていた
  * 「master + features の 2 キー設定購読 3 経路 (初期 storage.get / runtime.onMessage gate /
  * storage.onChanged 部分更新)」を集約する。
+ * 単一 boolean の直接通知は subscribeBoolean、保存値を直列再取得する通知は subscribeStored が担う。
+ * 直接通知と保存値再取得の契約は分け、サイト固有の状態・適用処理は呼び出し側に残す。
  *
  * 設計判断:
  *   - active / features の保持と applyBodyClasses / 固有ロジック (Instagram の DOM スイープ・
@@ -71,5 +73,74 @@
     });
   }
 
-  globalThis.CleanerCore = Object.freeze({ subscribe });
+  /** 単一 boolean の直接通知。読み取り失敗時は現在の状態を保持する。 */
+  function subscribeBoolean({ masterKey, applyAction, onUpdate }) {
+    chrome.storage.local.get(masterKey)
+      .then((stored) => onUpdate(stored[masterKey] === true))
+      .catch(() => {});
+
+    chrome.runtime.onMessage.addListener((request, sender) => {
+      if (!SenderCheck.isFromBackground(sender)) return;
+      if (request?.action !== applyAction) return;
+      onUpdate(request.data?.enabled === true);
+    });
+
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local") return;
+      if (masterKey in changes) onUpdate(changes[masterKey].newValue === true);
+    });
+  }
+
+  /**
+   * 通知を契機に保存値を再取得し、並行する要求は 1 回の後追いへまとめる。
+   * changeKeys は取得キーの一部だけを変更契機にする場合に指定する。
+   * onStored のサイト固有適用を含めて失敗時は保持し、次の通知で再試行する。
+   */
+  function subscribeStored({ keys, changeKeys = keys, applyAction, onStored }) {
+    let inFlight = false;
+    let queued = false;
+
+    async function readSettingsAndApply() {
+      if (!chrome?.runtime?.id) return;
+      if (inFlight) {
+        queued = true;
+        return;
+      }
+      inFlight = true;
+      try {
+        const stored = await chrome.storage.local.get(keys);
+        if (!chrome?.runtime?.id) return;
+        onStored(stored);
+      } catch {
+        // 次の storage.onChanged / APPLY で再試行する。
+      } finally {
+        inFlight = false;
+        if (queued) {
+          queued = false;
+          readSettingsAndApply();
+        }
+      }
+    }
+
+    readSettingsAndApply();
+    try {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (!chrome?.runtime?.id) return;
+        if (areaName !== "local") return;
+        if (changeKeys.some((key) => key in changes)) readSettingsAndApply();
+      });
+    } catch {}
+
+    try {
+      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (!chrome?.runtime?.id) return;
+        if (!SenderCheck.isFromBackground(sender)) return;
+        if (request?.action !== applyAction) return;
+        readSettingsAndApply();
+        try { sendResponse({ ok: true }); } catch {}
+      });
+    } catch {}
+  }
+
+  globalThis.CleanerCore = Object.freeze({ subscribe, subscribeBoolean, subscribeStored });
 })();

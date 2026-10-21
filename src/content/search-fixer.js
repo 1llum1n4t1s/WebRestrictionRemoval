@@ -30,6 +30,8 @@
   let active = false;
   /** @type {Record<string, boolean>} 個別機能フラグ（定数定義からマージ済み） */
   let features = SearchFixer.mergeFeatures({});
+  // 高頻度コールバックでも namespace を再解決せず、共有の抽出関数を使う。
+  const extractHandleFromHref = SearchFixer.extractHandleFromHref;
   /** @type {0|4|5|6} ホームグリッド列数（0 = YouTube デフォルト） */
   let gridItems = 0;
   /** @type {Array<{key: string, name: string}>} 検索結果から除外するチャンネル（channelBlocklist 機能）。
@@ -1015,20 +1017,6 @@
    */
   /** @type {{region: string|null, lang: string, aliases: Set<string>, knownCountries: Set<string>}|null} 自国情報（初回利用時に解決） */
   let foreignHomeInfo = null;
-  /**
-   * 既知の国名集合を作るための候補コード（AA〜ZZ の 676 通り）。
-   * `Intl` は region コードの列挙 API を持たないため総当たりで引き、`Intl.DisplayNames` が
-   * 変換できたものだけを既知の国名として採用する（未割り当てコードは入力がそのまま返る）。
-   * ハードコードした国コード表を持たずに済み、ICU の更新にも自動追従する。
-   * 生成は getForeignHomeInfo の初回呼び出し 1 回だけ。
-   */
-  const FOREIGN_REGION_CODES = (() => {
-    const out = [];
-    for (let a = 65; a <= 90; a++) {
-      for (let b = 65; b <= 90; b++) out.push(String.fromCharCode(a, b));
-    }
-    return out;
-  })();
   /** @type {Map<string, "home"|"foreign"|"unknown">} チャンネルキー → 判定結果（メモリキャッシュ） */
   const foreignOriginCache = new Map();
   /** @type {Map<string, string>} 未取得チャンネルキー → about ページのパス（fetch 待ち行列） */
@@ -1068,6 +1056,20 @@
     const aliases = new Set();
     const knownCountries = new Set();
     if (region) {
+      /**
+       * 既知の国名集合を作るための候補コード（AA〜ZZ の 676 通り）。
+       * `Intl` は region コードの列挙 API を持たないため総当たりで引き、`Intl.DisplayNames` が
+       * 変換できたものだけを既知の国名として採用する（未割り当てコードは入力がそのまま返る）。
+       * ハードコードした国コード表を持たずに済み、ICU の更新にも自動追従する。
+       * 生成は getForeignHomeInfo の初回呼び出し 1 回だけ。
+       */
+      const regionCodes = (() => {
+        const out = [];
+        for (let a = 65; a <= 90; a++) {
+          for (let b = 65; b <= 90; b++) out.push(String.fromCharCode(a, b));
+        }
+        return out;
+      })();
       aliases.add(region.toLowerCase());
       // YouTube の UI 言語 → ブラウザの言語 → 英語 の順で照合ロケールを集める。
       const pageLang = document.documentElement.getAttribute("lang");
@@ -1080,7 +1082,7 @@
           const display = new Intl.DisplayNames([locale], { type: "region" });
           const homeName = display.of(region);
           if (homeName) aliases.add(String(homeName).trim().toLowerCase());
-          for (const code of FOREIGN_REGION_CODES) {
+          for (const code of regionCodes) {
             const name = display.of(code);
             // Intl.DisplayNames は未知コードで入力をそのまま返すため、変換できた分だけ採用する。
             if (name && name !== code) knownCountries.add(String(name).trim().toLowerCase());
@@ -2098,33 +2100,6 @@
       }
     }
     return null;
-  }
-
-  /**
-   * `/@handle` 形式の href から @handle 部分を抽出する。
-   *
-   * actions.js の `SearchFixer.extractHandleFromHref` と同等の実装をローカルにも持つ。
-   * テスト容易性のため pure function は actions.js 側に move したが、IntersectionObserver の
-   * 高頻度コールバックパスでは `SearchFixer` namespace の解決失敗 (load 順 / cache) に起因する
-   * silent TypeError でサムネ inject 全体が止まる障害が観測されたため、防御的にローカルにも
-   * 同じロジックを残す（2026-05-13 subsChannelsGrid サムネ取得失敗バグ修正）。
-   *
-   * Unicode 対応:
-   *   - YouTube のハンドルは ASCII (`@nagumorui`) だけでなく日本語 / 韓国語 / 中国語 /
-   *     アクセント記号を含むケースが多数ある (`@むめいの有名になりたい` 等)。
-   *   - DOM の `href` は URL エンコード形式 (`/@%E3%82%80...`) で保持されるため、
-   *     `decodeURIComponent` でデコードしてから Unicode property escapes でマッチする。
-   */
-  function extractHandleFromHref(href) {
-    if (!href) return null;
-    let decoded;
-    try {
-      decoded = decodeURIComponent(href);
-    } catch {
-      decoded = href;
-    }
-    const m = decoded.match(/(@[\p{L}\p{N}._-]{1,60})(?:\/|$|\?|#)/u);
-    return m ? m[1] : null;
   }
 
   /** subs section に既にネイティブで存在するチャンネルの handle を集合で返す（重複注入防止）。 */
@@ -3346,6 +3321,7 @@
               method: "HEAD",
               credentials: "omit",
               redirect: "manual",
+              referrerPolicy: "no-referrer",
               signal,
             }).then((r) => ({ vid, ok: r.ok }))
           )
@@ -3368,6 +3344,7 @@
                 method: "HEAD",
                 credentials: "omit",
                 redirect: "manual",
+                referrerPolicy: "no-referrer",
                 signal,
               }).then((r) => ({
                 vid,
@@ -3406,6 +3383,7 @@
     if (card.querySelector(`.${SUBS_THUMB_CLASS}`)) return;
     const img = document.createElement("img");
     img.className = SUBS_THUMB_CLASS;
+    img.referrerPolicy = "no-referrer";
     img.src = normalizeAvatarUrl(thumbUrl);
     img.loading = "lazy";
     img.alt = "";

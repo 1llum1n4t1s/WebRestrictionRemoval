@@ -267,8 +267,11 @@
   function updateTime(record, current, duration) {
     const currentText = InstagramCleaner.formatVideoTime(current);
     const durationText = InstagramCleaner.formatVideoTime(duration);
-    record.time.textContent = `${currentText} / ${durationText}`;
-    record.range.setAttribute("aria-valuetext", `${currentText} / ${durationText}`);
+    const label = `${currentText} / ${durationText}`;
+    if (record.time.textContent !== label) record.time.textContent = label;
+    if (record.range.getAttribute("aria-valuetext") !== label) {
+      record.range.setAttribute("aria-valuetext", label);
+    }
   }
 
   function isControlTarget(target) {

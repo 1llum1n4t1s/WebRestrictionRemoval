@@ -25,7 +25,7 @@
 //   - master OFF / サブ機能 OFF / 非対象ページ / SPA 離脱時は UI・listener を撤去
 //   - top frame 限定、`window.__cpaNotebookLmRunning` で二重実行防止
 //   - context invalidation 後は MutationObserver / listener を必ず解除
-//   - readSettingsAndApply は applyInFlight/applyQueued で直列化（activate/deactivate の race 防止）
+//   - CleanerCore.subscribeStored が保存値の再取得を直列化（activate/deactivate の race 防止）
 //   - DOM 構築は createElement ベース（YouTube の Trusted Types 対応）
 
 (() => {
@@ -50,8 +50,6 @@
   /** @type {HTMLElement | null} */ let panelEl = null;
   /** @type {MutationObserver | null} */ let mutationObserver = null;
   let active = false;
-  let applyInFlight = false;
-  let applyQueued = false;
   let rescanScheduled = false;
   let lastCountAt = 0;
   /** @type {number|null} スロットル窓の末尾で 1 回だけ件数を再計算するタイマー */
@@ -65,6 +63,9 @@
   let accountIndex = 0;
   /** @type {Array<{index: number, email: string}> | null} ログイン中アカウント（取得できるまで null） */
   let accounts = null;
+  // 応答順序の逆転と OFF→ON をまたぐ旧応答から、現在の送信先候補を守る。
+  let notebooksRequestId = 0;
+  let accountsRequestId = 0;
   /** @type {"loading"|"list"|"error"} パネルの表示状態（後から届いたデータで誤って上書きしないため） */
   let panelState = "loading";
   /** ボタンを実際に置けたときに 1 回だけ走る送信先の事前取得（初回クリックの待ちを消す） */
@@ -314,7 +315,10 @@
     // row = アンカーの下に 1 行として置くレイアウト（プレイリストの「すべて再生」直下）
     rootEl.classList.toggle("__cpa-nlm-root--row", anchor.row);
     rootEl.style.float = anchor.row ? "none" : BUTTON_ANCHORS[kind].float;
-    if (!sending) btnEl.textContent = `📓 ${buildButtonLabel(kind, count)}`;
+    if (!sending) {
+      const label = `📓 ${buildButtonLabel(kind, count)}`;
+      if (btnEl.textContent !== label) btnEl.textContent = label;
+    }
     // ボタンが実際に置けた = このページで送信しうる状態。ここで送信先候補を取りに行き、
     // 初回クリック時にアカウントセレクタが番号表示のまま待たされるのを消す。
     void prefetchDestinations();
@@ -442,6 +446,8 @@
    */
   function renderPanelShell(buildBody) {
     if (!panelEl) return;
+    const focusKey = panelEl.contains(document.activeElement)
+      ? document.activeElement.dataset.nlmFocusKey : undefined;
     panelEl.textContent = "";
 
     const head = document.createElement("div");
@@ -453,12 +459,19 @@
     const create = document.createElement("button");
     create.type = "button";
     create.className = "__cpa-nlm-item __cpa-nlm-item--new";
+    create.dataset.nlmFocusKey = "new";
     create.textContent = i18n("nlmNewNotebook", "＋ 新しいノートブックを作成");
     create.addEventListener("click", () => void send(null));
     panelEl.appendChild(create);
 
     for (const el of buildBody()) panelEl.appendChild(el);
     positionPanel();
+    // 今回の置換で失われたフォーカスだけを同じ操作へ戻す。外側への移動は奪わない。
+    if (focusKey !== undefined && panelEl.isConnected && document.activeElement === document.body) {
+      const replacement = Array.from(panelEl.querySelectorAll("[data-nlm-focus-key]"))
+        .find((el) => el.dataset.nlmFocusKey === focusKey);
+      replacement?.focus({ preventScroll: true });
+    }
   }
 
   function renderPanelError(text) {
@@ -500,6 +513,7 @@
     label.textContent = i18n("nlmAccount", "Google アカウント");
 
     const select = document.createElement("select");
+    select.dataset.nlmFocusKey = "account";
     select.className = "__cpa-nlm-account-select";
     select.setAttribute("aria-label", i18n("nlmAccount", "Google アカウント"));
     // アカウント一覧が取れていればメールアドレスで、取れなければ番号だけで並べる。
@@ -562,6 +576,7 @@
         const item = document.createElement("button");
         item.type = "button";
         item.className = "__cpa-nlm-item";
+        item.dataset.nlmFocusKey = `notebook:${nb.id}`;
         const name = document.createElement("span");
         name.className = "__cpa-nlm-name";
         name.textContent = `${nb.emoji} ${nb.name}`;
@@ -584,9 +599,11 @@
    * したときも黙って番号表示を続け、送信自体はブロックしない。
    */
   async function loadAccounts() {
-    if (accounts || !chrome?.runtime?.id) return;
+    if (!active || accounts || !chrome?.runtime?.id) return;
+    const requestId = ++accountsRequestId;
     try {
       const res = await chrome.runtime.sendMessage({ action: Actions.NOTEBOOK_LM_ACCOUNTS });
+      if (!active || !chrome?.runtime?.id || requestId !== accountsRequestId) return;
       if (!res?.ok || !Array.isArray(res.accounts) || res.accounts.length === 0) return;
       accounts = res.accounts;
       // エラー表示は上書きしない。読み込み中／一覧のどちらでもセレクタだけ実名に差し替わる。
@@ -599,9 +616,14 @@
   }
 
   async function loadNotebooks() {
-    if (!chrome?.runtime?.id) return;
+    if (!active || !chrome?.runtime?.id) return;
+    const requestId = ++notebooksRequestId;
+    const requestedAccount = accountIndex;
+    const isCurrent = () => active && chrome?.runtime?.id
+      && requestId === notebooksRequestId && requestedAccount === accountIndex;
     try {
-      const res = await chrome.runtime.sendMessage({ action: Actions.NOTEBOOK_LM_LIST, data: { accountIndex } });
+      const res = await chrome.runtime.sendMessage({ action: Actions.NOTEBOOK_LM_LIST, data: { accountIndex: requestedAccount } });
+      if (!isCurrent()) return;
       if (!res?.ok) {
         // 表示済みの一覧を一時的な失敗で消さない（キャッシュのまま操作を続けられる）
         if (panelEl && !notebooks) renderPanelError(formatError(res?.error));
@@ -611,6 +633,7 @@
       notebooks = res.notebooks ?? [];
       if (panelEl) renderPanelList();
     } catch {
+      if (!isCurrent()) return;
       if (panelEl && !notebooks) renderPanelError(formatError("rpc-failed"));
     }
   }
@@ -674,6 +697,7 @@
         // 送信先は background が開く。開けなかったときだけリンクに退避する。
         if (!res.opened) openNotebook(res.url);
         // 送信でノートブックの中身（件数・新規作成）が変わるので、キャッシュを捨てて次回取り直す
+        notebooksRequestId++;
         notebooks = null;
       } else if (btnEl) {
         btnEl.textContent = `⚠ ${formatError(res?.error)}`;
@@ -788,6 +812,9 @@
   function deactivate() {
     if (!active && !rootEl) return;
     active = false;
+    notebooksRequestId++;
+    accountsRequestId++;
+    prefetchStarted = false;
     try { mutationObserver?.disconnect(); } catch {}
     mutationObserver = null;
     try { document.removeEventListener("yt-navigate-finish", onYtNavigateFinish, true); } catch {}
@@ -799,6 +826,8 @@
   /** 拡張機能リロードで orphan 化したときの後始末（chrome API に触らない）。 */
   function teardownOrphan() {
     active = false;
+    notebooksRequestId++;
+    accountsRequestId++;
     try { mutationObserver?.disconnect(); } catch {}
     mutationObserver = null;
     try { document.removeEventListener("yt-navigate-finish", onYtNavigateFinish, true); } catch {}
@@ -834,65 +863,35 @@
     return SearchFixer.mergeFeatures(featuresRaw).notebookLmSend === true;
   }
 
-  async function readSettingsAndApply() {
-    if (!chrome?.runtime?.id) return;
-    if (applyInFlight) {
-      applyQueued = true;
-      return;
-    }
-    applyInFlight = true;
-    try {
-      const stored = await chrome.storage.local.get([
-        StorageKeys.SEARCH_FIXER_ENABLED,
-        StorageKeys.SEARCH_FIXER_FEATURES,
-        StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX,
-      ]);
-      if (!chrome?.runtime?.id) return;
-      accountIndex = NotebookLm.normalizeAccountIndex(stored[StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX]);
-      const shouldBeActive = computeActive(
-        stored[StorageKeys.SEARCH_FIXER_ENABLED],
-        stored[StorageKeys.SEARCH_FIXER_FEATURES]
-      );
-      if (shouldBeActive) {
+  CleanerCore.subscribeStored({
+    keys: [
+      StorageKeys.SEARCH_FIXER_ENABLED,
+      StorageKeys.SEARCH_FIXER_FEATURES,
+      StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX,
+    ],
+    changeKeys: [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES],
+    applyAction: Actions.APPLY_SEARCH_FIXER_CS,
+    onStored(stored) {
+      const nextAccountIndex = NotebookLm.normalizeAccountIndex(stored[StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX]);
+      const accountChanged = nextAccountIndex !== accountIndex;
+      if (accountChanged) {
+        accountIndex = nextAccountIndex;
+        notebooksRequestId++;
+        notebooks = null;
+      }
+      if (computeActive(stored[StorageKeys.SEARCH_FIXER_ENABLED], stored[StorageKeys.SEARCH_FIXER_FEATURES])) {
+        const wasActive = active;
         activate();
+        // 別タブでのアカウント変更も、既に表示・先読みした候補へ反映する。
+        if (accountChanged && wasActive) {
+          if (panelEl) renderPanelLoading();
+          if (panelEl || prefetchStarted) void loadNotebooks();
+        }
       } else {
         deactivate();
       }
-    } catch {
-      // storage 読み取り失敗は次回 storage.onChanged / APPLY で再試行されるため何もしない
-    } finally {
-      applyInFlight = false;
-      if (applyQueued) {
-        applyQueued = false;
-        readSettingsAndApply();
-      }
-    }
-  }
-
-  readSettingsAndApply();
-
-  try {
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (!chrome?.runtime?.id) return;
-      if (areaName !== "local") return;
-      if (
-        StorageKeys.SEARCH_FIXER_ENABLED in changes ||
-        StorageKeys.SEARCH_FIXER_FEATURES in changes
-      ) {
-        readSettingsAndApply();
-      }
-    });
-  } catch {}
-
-  try {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      if (!chrome?.runtime?.id) return;
-      if (!SenderCheck.isFromBackground(sender)) return;
-      if (request?.action !== Actions.APPLY_SEARCH_FIXER_CS) return;
-      readSettingsAndApply();
-      try { sendResponse({ ok: true }); } catch {}
-    });
-  } catch {}
+    },
+  });
 
   // bfcache 凍結（persisted=true）は温存し、実ドキュメント破棄のときだけフル解放する
   window.addEventListener("pagehide", (ev) => {

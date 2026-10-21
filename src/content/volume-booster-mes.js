@@ -863,7 +863,7 @@
           if (!(node instanceof Element)) continue;
           if (node.matches?.("video, audio")) scheduleDetachedCheck(node);
           if (node.querySelectorAll) {
-            node.querySelectorAll("video, audio").forEach(scheduleDetachedCheck);
+            node.querySelectorAll("video, audio").forEach((media) => scheduleDetachedCheck(media));
           }
         }
       }

@@ -38,24 +38,10 @@
   });
 
   // ---------- 状態購読 ----------
-  chrome.storage.local
-    .get(StorageKeys.AMAZON_RANKING_JUMP_ENABLED)
-    .then((stored) => {
-      apply(stored[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] === true);
-    })
-    .catch(() => {});
-
-  chrome.runtime.onMessage.addListener((request, sender) => {
-    if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action !== Actions.APPLY_AMAZON_RANKING_JUMP_CS) return;
-    apply(request.data?.enabled === true);
-  });
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    if (StorageKeys.AMAZON_RANKING_JUMP_ENABLED in changes) {
-      apply(changes[StorageKeys.AMAZON_RANKING_JUMP_ENABLED].newValue === true);
-    }
+  CleanerCore.subscribeBoolean({
+    masterKey: StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
+    applyAction: Actions.APPLY_AMAZON_RANKING_JUMP_CS,
+    onUpdate: apply,
   });
 
   function apply(enabled) {

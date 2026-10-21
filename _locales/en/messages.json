@@ -366,6 +366,8 @@
   "amazonTotalText": { "message": "Total" },
   "amazonTotalUnit": { "message": "yen" },
   "amazonTotalAriaLabel": { "message": "Monthly total" },
+  "amazonDeliveryTotalAriaLabel": { "message": "Delivery total" },
+  "amazonTotalDetailsHint": { "message": "Open Manage for each delivery date to see its total." },
   "subsAllShortcutLabel": { "message": "All subscriptions" },
   "subsSearchPlaceholder": { "message": "Filter by channel name" },
   "imageDownloadButtonLabel": { "message": "Download image" },

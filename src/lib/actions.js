@@ -735,13 +735,17 @@ const SearchFixer = Object.freeze({
  * Amazon 定期おトク便ページの DOM 構造を解析し、配送月ごとの合計金額を独自に計算・表示する。
  * 動作対象: `https://www.amazon.co.jp/auto-deliveries*` のみ。外部送信ゼロ。
  *
- * セレクタは Amazon が公開する DOM 属性（`[data-delivery-type]`, `.subscription-price`,
- * `.a-fixed-left-grid-col`）に依存する事実情報。
+ * 従来の月別 DOM 属性と、現行の配送詳細に付く data-testid を使用する。
  */
 const AmazonDeliveryTotal = Object.freeze({
   SECTION_SELECTOR: "[data-delivery-type]",
   PRICE_SELECTOR: ".subscription-price",
   INSERT_TARGET_SELECTOR: ".a-fixed-left-grid-col",
+  DELIVERY_SECTION_SELECTOR: '[data-testid^="desktop-delivery-card-list-"]',
+  DELIVERY_TARGET_SELECTOR: '[data-testid="desktop-delivery-card"]',
+  DELIVERY_ITEM_SELECTOR: '[data-testid="desktop-subscription-tile"]',
+  DELIVERY_PRICE_SELECTOR: '[data-testid="product-price"]',
+  DELIVERY_QUANTITY_SELECTOR: '[data-testid="product-qty-frequency"]',
   TOTAL_ROOT_CLASS: "__cpa-amzn-delivery-total",
   PRICE_NORMALIZE_RE: /\D/g,
 });
@@ -2557,7 +2561,16 @@ const NotebookLm = Object.freeze({
    * @returns {Array<{id: string, name: string, sources: number, emoji: string}>}
    */
   parseNotebookList(text) {
-    const rows = NotebookLm.parseBatchPayload(text)?.[0];
+    return NotebookLm.normalizeNotebookList(NotebookLm.parseBatchPayload(text));
+  },
+
+  /**
+   * 解析済み batchexecute payload をノートブック一覧に正規化する。
+   * @param {unknown[]|null} payload
+   * @returns {Array<{id: string, name: string, sources: number, emoji: string}>}
+   */
+  normalizeNotebookList(payload) {
+    const rows = payload?.[0];
     if (!Array.isArray(rows)) return [];
     const out = [];
     for (const row of rows) {

@@ -39,19 +39,15 @@
  * 例外オブジェクトに message 属性が無い (string で throw 等) ケースでも安全に出力できるよう
  * 三項分岐で表示する。
  */
-function logStorageError(context) {
-  return (err) => {
+function createErrorLogger(failure) {
+  return (context) => (err) => {
     const msg = err && err.message ? err.message : String(err);
-    console.warn(`[WebViewingAssist popup] storage write failed (${context}): ${msg}`);
+    console.warn(`[WebViewingAssist popup] ${failure} (${context}): ${msg}`);
   };
 }
 
-function logVolumeError(context) {
-  return (err) => {
-    const msg = err && err.message ? err.message : String(err);
-    console.warn(`[WebViewingAssist popup] volume apply failed (${context}): ${msg}`);
-  };
-}
+const logStorageError = createErrorLogger("storage write failed");
+const logVolumeError = createErrorLogger("volume apply failed");
 
 /**
  * `chrome.i18n.getMessage(key, substitutions)` の薄いラッパ。
@@ -1310,6 +1306,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     rootEl.appendChild(frag);
   }
 
+  /** サブタブの操作・フォーカス・保存済み選択の復元を共通化する。表示方法は各呼出元が持つ。 */
+  function bindSubTabControls(tablist, tabs, ids, groupKey, setPanelActive) {
+    const activate = (idx, { persist = true } = {}) => {
+      tabs.forEach((tab, i) => {
+        const on = i === idx;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+        setPanelActive(i, on);
+      });
+      if (persist && ids[idx] !== undefined) persistSubTab(groupKey, ids[idx]);
+    };
+
+    tabs.forEach((tab, idx) => tab.addEventListener("click", () => activate(idx)));
+    tablist.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+      const current = tabs.findIndex((tab) => tab.classList.contains("is-active"));
+      if (current < 0) return;
+      const next = ev.key === "ArrowRight"
+        ? (current + 1) % tabs.length
+        : (current - 1 + tabs.length) % tabs.length;
+      activate(next);
+      tabs[next].focus();
+      ev.preventDefault();
+    });
+
+    activate(0, { persist: false });
+    subTabSelectors.set(groupKey, (subId) => {
+      const idx = ids.indexOf(subId);
+      if (idx >= 0) activate(idx, { persist: false });
+    });
+  }
+
   /**
    * カテゴリをサブタブで切り替える DOM を構築する（YouTube / Instagram クリーナーで共用）。
    *
@@ -1338,20 +1367,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tabs = [];
     const panels = [];
 
-    // idx 番目のサブタブをアクティブにし、他を非アクティブ化する（roving tabindex）。
-    // persist: false は storage からの復元時（自分が書いた値を書き戻さない）。
-    const activate = (idx, { persist = true } = {}) => {
-      tabs.forEach((tab, i) => {
-        const on = i === idx;
-        tab.classList.toggle("is-active", on);
-        tab.setAttribute("aria-selected", on ? "true" : "false");
-        tab.tabIndex = on ? 0 : -1;
-        panels[i].hidden = !on;
-      });
-      if (persist && cats[idx]) persistSubTab(groupKey, cats[idx].id);
-    };
-
-    cats.forEach((cat, idx) => {
+    cats.forEach((cat) => {
       const items = features.filter((f) => f.category === cat.id);
 
       const tab = document.createElement("button");
@@ -1372,33 +1388,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       panel.setAttribute("role", "tabpanel");
       panel.appendChild(_buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix));
 
-      tab.addEventListener("click", () => activate(idx));
-
       tabs.push(tab);
       panels.push(panel);
       tablist.appendChild(tab);
       panelsWrap.appendChild(panel);
     });
 
-    // ← / → でサブタブ間を移動（role="tablist" の標準キーボード操作）。
-    tablist.addEventListener("keydown", (e) => {
-      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-      const current = tabs.findIndex((t) => t.classList.contains("is-active"));
-      if (current < 0) return;
-      const next = e.key === "ArrowRight"
-        ? (current + 1) % tabs.length
-        : (current - 1 + tabs.length) % tabs.length;
-      activate(next);
-      tabs[next].focus();
-      e.preventDefault();
-    });
-
-    activate(0, { persist: false });
-    // 保存済みサブタブの復元は storage 取得後（restoreSubTabs）にレジストリ経由で行う。
-    subTabSelectors.set(groupKey, (subId) => {
-      const idx = cats.findIndex((cat) => cat.id === subId);
-      if (idx >= 0) activate(idx, { persist: false });
-    });
+    bindSubTabControls(tablist, tabs, cats.map((cat) => cat.id), groupKey,
+      (i, on) => { panels[i].hidden = !on; });
     rootEl.append(tablist, panelsWrap);
   }
 
@@ -1474,10 +1471,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateXCleanerDimState() { updateCleanerDim($xFeatureCategories, $xCleanerToggle); }
 
   /**
-   * 調整タブ（#panelTune）の 4 セクションをサブタブで切り替えられるようにする。
+   * 調整タブ（#panelTune）の 3 セクションをサブタブで切り替えられるようにする。
    *
-   * クリーナータブと違い「単一マスター + 動的 FEATURES」ではなく、オーディオ / 映像 / Amazon /
-   * セッションという 4 つの静的セクション（各自マスタートグルを持つ）を縦積みしているため、
+   * クリーナータブと違い「単一マスター + 動的 FEATURES」ではなく、オーディオ / 映像 / Amazon の
+   * 3 つの静的セクション（各自マスタートグルを持つ）を縦積みしているため、
    * FEATURES ベースの _buildSubTabbedCategories ではなく、既存セクションの表示切替で実装する。
    * サブタブの見た目（.cat-subtabs / .cat-subtab）はクリーナーと共通の CSS を再利用する。
    * オーディオセクションは Firefox でも表示する (音量ブースターは MES 経路で提供、2026-07-02)。
@@ -1506,18 +1503,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const tabs = [];
 
-    const activate = (idx, { persist = true } = {}) => {
-      entries.forEach((e, i) => {
-        const on = i === idx;
-        tabs[i].classList.toggle("is-active", on);
-        tabs[i].setAttribute("aria-selected", on ? "true" : "false");
-        tabs[i].tabIndex = on ? 0 : -1;
-        e.section.classList.toggle("tune-section-hidden", !on);
-      });
-      if (persist && entries[idx]) persistSubTab(PopupTabs.TUNE, entries[idx].id);
-    };
-
-    entries.forEach((e, idx) => {
+    entries.forEach((e) => {
       const tab = document.createElement("button");
       tab.type = "button";
       tab.className = "cat-subtab";
@@ -1530,30 +1516,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       label.textContent = i18n(e.labelKey);
 
       tab.append(icon, label);
-      tab.addEventListener("click", () => activate(idx));
       tabs.push(tab);
       tablist.appendChild(tab);
     });
 
-    // ← / → でサブタブ間を移動（role="tablist" の標準キーボード操作）。
-    tablist.addEventListener("keydown", (ev) => {
-      if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
-      const cur = tabs.findIndex((t) => t.classList.contains("is-active"));
-      if (cur < 0) return;
-      const next = ev.key === "ArrowRight"
-        ? (cur + 1) % tabs.length
-        : (cur - 1 + tabs.length) % tabs.length;
-      activate(next);
-      tabs[next].focus();
-      ev.preventDefault();
-    });
-
     panel.insertBefore(tablist, panel.firstChild);
-    activate(0, { persist: false });
-    subTabSelectors.set(PopupTabs.TUNE, (subId) => {
-      const idx = entries.findIndex((e) => e.id === subId);
-      if (idx >= 0) activate(idx, { persist: false });
-    });
+    bindSubTabControls(tablist, tabs, entries.map((entry) => entry.id), PopupTabs.TUNE,
+      (i, on) => entries[i].section.classList.toggle("tune-section-hidden", !on));
   }
 
   // ----- 適用 -----

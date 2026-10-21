@@ -32,67 +32,49 @@ chrome.runtime.onInstalled.addListener(async () => {
   // 重要: SearchFixer.mergeFeatures(...) は default false で 5 機能を seed するため、merged 側を
   // 見て undefined チェックすると seed された false を「ユーザー明示 false」と誤認する罠がある
   // （Codex P2 指摘）。必ず existingFeatures (storage 生値) を判定基準にする。
-  const legacy = await chrome.storage.local
-    .get(["ytShortsRemovalEnabled", StorageKeys.SEARCH_FIXER_FEATURES, StorageKeys.SEARCH_FIXER_ENABLED])
-    .catch(() => ({}));
-  const existingFeatures =
-    legacy?.[StorageKeys.SEARCH_FIXER_FEATURES] && typeof legacy[StorageKeys.SEARCH_FIXER_FEATURES] === "object"
-      ? legacy[StorageKeys.SEARCH_FIXER_FEATURES]
-      : {};
-  const legacyShortsActive =
-    legacy?.ytShortsRemovalEnabled === true || existingFeatures.removeShorts === true;
-  if (legacyShortsActive) {
-    const mergedFeatures = SearchFixer.mergeFeatures(existingFeatures);
-    // 5 機能とも storage 生値で未設定なら true に転写。明示 false は尊重。
-    if (existingFeatures.removeShortsShelf === undefined) mergedFeatures.removeShortsShelf = true;
-    if (existingFeatures.removeShortsChip === undefined) mergedFeatures.removeShortsChip = true;
-    if (existingFeatures.removeShortsSidebar === undefined) mergedFeatures.removeShortsSidebar = true;
-    if (existingFeatures.redirectShortsUrl === undefined) mergedFeatures.redirectShortsUrl = true;
-    if (existingFeatures.shortsBtn === undefined) mergedFeatures.shortsBtn = true;
-    // 旧キー removeShorts は新構造に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
-    const migrate = {
-      [StorageKeys.SEARCH_FIXER_FEATURES]: mergedFeatures,
-    };
-    // 旧 ytShortsRemovalEnabled === true の人は YouTube 機能拡張マスターも ON にしないと
-    // サブ機能が動かない（master 必須）。マイグレーションでは「動作継続」を最優先で master ON。
-    if (legacy?.ytShortsRemovalEnabled === true) {
-      migrate[StorageKeys.SEARCH_FIXER_ENABLED] = true;
-    }
-    await chrome.storage.local.set(migrate).catch(() => {});
-  }
-
-  // 旧 removeTopicsSection / removeBreakingNewsSection サブ機能を removeFeedSections に統合。
-  // どちらかが true だったユーザーは新キーへ ON を転写する（新キーが storage 生値で明示設定済みなら尊重）。
-  // 旧キー自体は新 FEATURES に存在しないため mergeFeatures の戻り値には含まれず自動消滅する。
-  //
-  // 重要 (Codex P2): 判定は必ず「最初の get の生値 existingFeatures」を基準にする。上の Shorts
-  // migration が走った場合、mergeFeatures 済みの書き込みで旧セクションキーは既に strip され、
-  // removeFeedSections も default false で seed されているため、書き込み後の再取得値で判定すると
-  // (1) hasLegacySectionKeys が常に false になり転写が走らない
-  // (2) seed された false を「ユーザー明示 false」と誤認する
-  // の 2 重の罠がある（Shorts migration 冒頭コメントと同じ existingFeatures 基準の原則）。
-  {
+  let youtubeMigrationComplete = false;
+  try {
+    const legacy = await chrome.storage.local.get([
+      "ytShortsRemovalEnabled", StorageKeys.SEARCH_FIXER_FEATURES, StorageKeys.SEARCH_FIXER_ENABLED,
+    ]);
+    const existingFeatures =
+      legacy?.[StorageKeys.SEARCH_FIXER_FEATURES] && typeof legacy[StorageKeys.SEARCH_FIXER_FEATURES] === "object"
+        ? legacy[StorageKeys.SEARCH_FIXER_FEATURES]
+        : {};
+    const legacyShortsActive =
+      legacy?.ytShortsRemovalEnabled === true || existingFeatures.removeShorts === true;
     const hasLegacySectionKeys =
       existingFeatures.removeTopicsSection !== undefined ||
       existingFeatures.removeBreakingNewsSection !== undefined;
-    if (hasLegacySectionKeys) {
-      // 書き込み base は Shorts migration の反映後を尊重したいので storage を再取得する
-      // （取得失敗・欠落時は existingFeatures にフォールバック）。
-      const cur = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_FEATURES).catch(() => ({}));
-      const curFeatures = cur?.[StorageKeys.SEARCH_FIXER_FEATURES];
-      const mergedFeatures = SearchFixer.mergeFeatures(
-        curFeatures && typeof curFeatures === "object" ? curFeatures : existingFeatures
-      );
+    if (legacyShortsActive || hasLegacySectionKeys) {
+      // 同じ生値から一括転写する。別々に保存すると、片方の失敗時にもう片方が旧キーを
+      // strip し、次回に再試行するための情報を失う。
+      const mergedFeatures = SearchFixer.mergeFeatures(existingFeatures);
+      if (legacyShortsActive) {
+        if (existingFeatures.removeShortsShelf === undefined) mergedFeatures.removeShortsShelf = true;
+        if (existingFeatures.removeShortsChip === undefined) mergedFeatures.removeShortsChip = true;
+        if (existingFeatures.removeShortsSidebar === undefined) mergedFeatures.removeShortsSidebar = true;
+        if (existingFeatures.redirectShortsUrl === undefined) mergedFeatures.redirectShortsUrl = true;
+        if (existingFeatures.shortsBtn === undefined) mergedFeatures.shortsBtn = true;
+      }
+      // 旧セクションのどちらかが ON なら統合先へ転写。現行キーの明示 false は尊重する。
       const legacySectionActive =
         existingFeatures.removeTopicsSection === true ||
         existingFeatures.removeBreakingNewsSection === true;
       if (legacySectionActive && existingFeatures.removeFeedSections === undefined) {
         mergedFeatures.removeFeedSections = true;
       }
-      await chrome.storage.local
-        .set({ [StorageKeys.SEARCH_FIXER_FEATURES]: mergedFeatures })
-        .catch(() => {});
+      const migrate = { [StorageKeys.SEARCH_FIXER_FEATURES]: mergedFeatures };
+      // 旧単独トグルの動作継続のため、未設定のマスターだけ ON。現行の明示 OFF は保つ。
+      if (legacy?.ytShortsRemovalEnabled === true && legacy[StorageKeys.SEARCH_FIXER_ENABLED] === undefined) {
+        migrate[StorageKeys.SEARCH_FIXER_ENABLED] = true;
+      }
+      await chrome.storage.local.set(migrate);
     }
+    youtubeMigrationComplete = true;
+  } catch (err) {
+    // 旧値と未設定状態を残し、次回の install / update で再試行できるようにする。
+    console.warn("[WebViewingAssist] onInstalled YouTube migration failed:", err);
   }
 
   // 廃止キーの削除（v1.0.x 系 + v1.0.17 + v1.0.18 で統合した ytShortsRemovalEnabled）
@@ -103,7 +85,7 @@ chrome.runtime.onInstalled.addListener(async () => {
       "copyPasteSettings",
       "enabled",
       "contextMenuAllowDomains",
-      "ytShortsRemovalEnabled",
+      ...(youtubeMigrationComplete ? ["ytShortsRemovalEnabled"] : []),
       "popupCleanerAccordionOpen",
       "popupIgCleanerAccordionOpen",
       "searchFixerScope",
@@ -135,171 +117,54 @@ chrome.runtime.onInstalled.addListener(async () => {
     ])
     .catch(() => {});
 
-  const stored = await chrome.storage.local.get([
-    StorageKeys.SEARCH_FIXER_ENABLED,
-    StorageKeys.SEARCH_FIXER_FEATURES,
-    StorageKeys.SEARCH_FIXER_GRID_ITEMS,
-    StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
-    // NOTEBOOK_LM_ACCOUNT_INDEX を get リストから漏らすと、storage.get は要求キーしか返さないため
-    // `!(key in stored)` が毎回 true になり、install / update のたびに 0 で上書きされる
-    // （マルチアカウント利用者の選んだ authuser が更新後に既定アカウントへ戻る）。
-    StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX,
-    StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
-    StorageKeys.AMAZON_RANKING_JUMP_ENABLED,
-    StorageKeys.AMAZON_MERCHANT_INFO_ENABLED,
-    StorageKeys.INSTAGRAM_CLEANER_ENABLED,
-    StorageKeys.INSTAGRAM_CLEANER_FEATURES,
-    StorageKeys.TIKTOK_CLEANER_ENABLED,
-    StorageKeys.TIKTOK_CLEANER_FEATURES,
-    StorageKeys.X_CLEANER_ENABLED,
-    StorageKeys.X_CLEANER_FEATURES,
-    StorageKeys.VOLUME_BOOSTER_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
-    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
-    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
-    StorageKeys.VOLUME_BOOSTER_EQ_PRESET,
-    StorageKeys.VIDEO_GAMMA_ENABLED,
-    StorageKeys.VIDEO_GAMMA_VALUE,
-    StorageKeys.VIDEO_FILL_ENABLED,
-    StorageKeys.VIDEO_FILL_MODE,
-    StorageKeys.VIDEO_FILL_TARGET,
-    StorageKeys.LOUPE_ENABLED,
-    StorageKeys.LOUPE_ZOOM,
-    StorageKeys.LOUPE_SIZE,
-    StorageKeys.COLOR_PICKER_HISTORY,
-    StorageKeys.COLOR_PICKER_DEFAULT_FORMAT,
-    StorageKeys.COLOR_PICKER_HEX_HASH,
-    StorageKeys.POPUP_LAST_TAB,
-    StorageKeys.POPUP_LAST_SUBTAB,
-  ]);
+  // 読み取り対象と欠落時の既定値を同じ表から導出し、既存値は型を問わず保持する。
+  // 配列・オブジェクトは install / update ごとに新しく作る。
+  const initialDefaults = {
+    [StorageKeys.SEARCH_FIXER_ENABLED]: false,
+    [StorageKeys.SEARCH_FIXER_FEATURES]: SearchFixer.mergeFeatures({}),
+    [StorageKeys.SEARCH_FIXER_GRID_ITEMS]: 0,
+    [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: [],
+    [StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX]: 0,
+    [StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED]: false,
+    [StorageKeys.AMAZON_RANKING_JUMP_ENABLED]: false,
+    [StorageKeys.AMAZON_MERCHANT_INFO_ENABLED]: false,
+    [StorageKeys.INSTAGRAM_CLEANER_ENABLED]: false,
+    [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: InstagramCleaner.mergeFeatures({}),
+    [StorageKeys.TIKTOK_CLEANER_ENABLED]: false,
+    [StorageKeys.TIKTOK_CLEANER_FEATURES]: TikTokCleaner.mergeFeatures({}),
+    [StorageKeys.X_CLEANER_ENABLED]: false,
+    [StorageKeys.X_CLEANER_FEATURES]: XCleaner.mergeFeatures({}),
+    [StorageKeys.VOLUME_BOOSTER_ENABLED]: false,
+    [StorageKeys.VOLUME_BOOSTER_LAST_GAIN]: VolumeBooster.DEFAULT,
+    [StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: false,
+    [StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: false,
+    [StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED]: false,
+    [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: false,
+    [StorageKeys.VOLUME_BOOSTER_EQ_ENABLED]: false,
+    [StorageKeys.VOLUME_BOOSTER_EQ_GAINS]: VolumeBooster.clampEqGains([]),
+    [StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]: VolumeBooster.EQ_PREAMP_DEFAULT,
+    [StorageKeys.VOLUME_BOOSTER_EQ_PRESET]: VolumeBooster.EQ_PRESET_DEFAULT,
+    [StorageKeys.VIDEO_GAMMA_ENABLED]: false,
+    [StorageKeys.VIDEO_GAMMA_VALUE]: VideoGamma.DEFAULT,
+    [StorageKeys.VIDEO_FILL_ENABLED]: false,
+    [StorageKeys.VIDEO_FILL_MODE]: VideoFill.DEFAULT_MODE,
+    [StorageKeys.VIDEO_FILL_TARGET]: VideoFill.DEFAULT_TARGET,
+    [StorageKeys.LOUPE_ENABLED]: false,
+    [StorageKeys.LOUPE_ZOOM]: Loupe.DEFAULT_ZOOM,
+    [StorageKeys.LOUPE_SIZE]: Loupe.SIZE_DEFAULT,
+    [StorageKeys.COLOR_PICKER_HISTORY]: [],
+    [StorageKeys.COLOR_PICKER_DEFAULT_FORMAT]: ColorPicker.DEFAULT_FORMAT,
+    [StorageKeys.COLOR_PICKER_HEX_HASH]: true,
+    [StorageKeys.POPUP_LAST_TAB]: PopupTabs.TUNE,
+    [StorageKeys.POPUP_LAST_SUBTAB]: {},
+  };
+  const stored = await chrome.storage.local.get(Object.keys(initialDefaults));
   const defaults = {};
-  if (!(StorageKeys.SEARCH_FIXER_ENABLED in stored)) {
-    defaults[StorageKeys.SEARCH_FIXER_ENABLED] = false;
-  }
-  if (!(StorageKeys.SEARCH_FIXER_FEATURES in stored)) {
-    defaults[StorageKeys.SEARCH_FIXER_FEATURES] = SearchFixer.mergeFeatures({});
-  }
-  if (!(StorageKeys.SEARCH_FIXER_GRID_ITEMS in stored)) {
-    defaults[StorageKeys.SEARCH_FIXER_GRID_ITEMS] = 0;
-  }
-  if (!(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS in stored)) {
-    defaults[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS] = [];
-  }
-  if (!(StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX in stored)) {
-    // NotebookLM 送信の送信先 Google アカウント（0 = 既定アカウント / rere D-5）
-    defaults[StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX] = 0;
-  }
-  if (!(StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED in stored)) {
-    defaults[StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED] = false;
-  }
-  if (!(StorageKeys.AMAZON_RANKING_JUMP_ENABLED in stored)) {
-    defaults[StorageKeys.AMAZON_RANKING_JUMP_ENABLED] = false;
-  }
-  if (!(StorageKeys.AMAZON_MERCHANT_INFO_ENABLED in stored)) {
-    defaults[StorageKeys.AMAZON_MERCHANT_INFO_ENABLED] = false;
-  }
-  if (!(StorageKeys.INSTAGRAM_CLEANER_ENABLED in stored)) {
-    defaults[StorageKeys.INSTAGRAM_CLEANER_ENABLED] = false;
-  }
-  if (!(StorageKeys.INSTAGRAM_CLEANER_FEATURES in stored)) {
-    defaults[StorageKeys.INSTAGRAM_CLEANER_FEATURES] = InstagramCleaner.mergeFeatures({});
-  }
-  if (!(StorageKeys.TIKTOK_CLEANER_ENABLED in stored)) {
-    defaults[StorageKeys.TIKTOK_CLEANER_ENABLED] = false;
-  }
-  if (!(StorageKeys.TIKTOK_CLEANER_FEATURES in stored)) {
-    defaults[StorageKeys.TIKTOK_CLEANER_FEATURES] = TikTokCleaner.mergeFeatures({});
-  }
-  if (!(StorageKeys.X_CLEANER_ENABLED in stored)) {
-    defaults[StorageKeys.X_CLEANER_ENABLED] = false;
-  }
-  if (!(StorageKeys.X_CLEANER_FEATURES in stored)) {
-    defaults[StorageKeys.X_CLEANER_FEATURES] = XCleaner.mergeFeatures({});
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_ENABLED] = false;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_LAST_GAIN in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] = VolumeBooster.DEFAULT;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] = false;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] = false;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] = false;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] = false;
-  }
-  // イコライザ: OFF / 全バンド 0dB / プリアンプ 0dB / プリセット flat で初期化（OFF なので素通り）
-  if (!(StorageKeys.VOLUME_BOOSTER_EQ_ENABLED in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] = false;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_EQ_GAINS in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_EQ_GAINS] = VolumeBooster.clampEqGains([]);
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_EQ_PREAMP in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP] = VolumeBooster.EQ_PREAMP_DEFAULT;
-  }
-  if (!(StorageKeys.VOLUME_BOOSTER_EQ_PRESET in stored)) {
-    defaults[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] = VolumeBooster.EQ_PRESET_DEFAULT;
-  }
-  // 動画ガンマ補正: master OFF / 値 1.0 で初期化（インストール直後は完全に無処理）
-  if (!(StorageKeys.VIDEO_GAMMA_ENABLED in stored)) {
-    defaults[StorageKeys.VIDEO_GAMMA_ENABLED] = false;
-  }
-  if (!(StorageKeys.VIDEO_GAMMA_VALUE in stored)) {
-    defaults[StorageKeys.VIDEO_GAMMA_VALUE] = VideoGamma.DEFAULT;
-  }
-  // 動画黒帯除去: master OFF / モード zoom / ターゲット DEFAULT_TARGET で初期化（インストール直後は完全に無処理）
-  if (!(StorageKeys.VIDEO_FILL_ENABLED in stored)) {
-    defaults[StorageKeys.VIDEO_FILL_ENABLED] = false;
-  }
-  if (!(StorageKeys.VIDEO_FILL_MODE in stored)) {
-    defaults[StorageKeys.VIDEO_FILL_MODE] = VideoFill.DEFAULT_MODE;
-  }
-  if (!(StorageKeys.VIDEO_FILL_TARGET in stored)) {
-    defaults[StorageKeys.VIDEO_FILL_TARGET] = VideoFill.DEFAULT_TARGET;
-  }
-  // ルーペ: master OFF / 倍率 DEFAULT_ZOOM (2.5) / サイズ SIZE_DEFAULT (220) で初期化。
-  // インストール直後は完全に無処理（content script ロードはされるが activate しない）。
-  if (!(StorageKeys.LOUPE_ENABLED in stored)) {
-    defaults[StorageKeys.LOUPE_ENABLED] = false;
-  }
-  // 接続モニターは searchFixerFeatures.connectionMonitor サブ機能に統合済み。SearchFixer.mergeFeatures が
-  // 未設定キーを false に埋めるため、独立した onInstalled 初期化は不要（master searchFixerEnabled も既定 OFF）。
-  if (!(StorageKeys.LOUPE_ZOOM in stored)) {
-    defaults[StorageKeys.LOUPE_ZOOM] = Loupe.DEFAULT_ZOOM;
-  }
-  if (!(StorageKeys.LOUPE_SIZE in stored)) {
-    defaults[StorageKeys.LOUPE_SIZE] = Loupe.SIZE_DEFAULT;
-  }
-  // 顔料アトリエ（カラーピッカー）の新規キー: 履歴は空配列、既定形式は HEX、
-  // 最終タブは「アシスト」で初期化。後追いキーが undefined のまま UI に出ないよう
-  // 明示的に書き込む（CLAUDE.md の onInstalled 初期化方針）。
-  if (!(StorageKeys.COLOR_PICKER_HISTORY in stored)) {
-    defaults[StorageKeys.COLOR_PICKER_HISTORY] = [];
-  }
-  if (!(StorageKeys.COLOR_PICKER_DEFAULT_FORMAT in stored)) {
-    defaults[StorageKeys.COLOR_PICKER_DEFAULT_FORMAT] = ColorPicker.DEFAULT_FORMAT;
-  }
-  if (!(StorageKeys.COLOR_PICKER_HEX_HASH in stored)) {
-    defaults[StorageKeys.COLOR_PICKER_HEX_HASH] = true;
-  }
-  if (!(StorageKeys.POPUP_LAST_TAB in stored)) {
-    defaults[StorageKeys.POPUP_LAST_TAB] = PopupTabs.TUNE;
-  }
-  if (!(StorageKeys.POPUP_LAST_SUBTAB in stored)) {
-    // 空レコード = 各タブとも先頭サブタブから開始（popup 側が実在判定でフォールバックする）
-    defaults[StorageKeys.POPUP_LAST_SUBTAB] = {};
+  for (const key of Object.keys(initialDefaults)) {
+    // 失敗後に false を seed すると、次回の移行が明示 OFF と誤認して回復不能になる。
+    if (!youtubeMigrationComplete &&
+        (key === StorageKeys.SEARCH_FIXER_ENABLED || key === StorageKeys.SEARCH_FIXER_FEATURES)) continue;
+    if (!(key in stored)) defaults[key] = initialDefaults[key];
   }
   if (Object.keys(defaults).length > 0) {
     // defaults 書き込みが reject しても直後の INSTALL_SENTINEL 書き込み（破損検知の要）に
@@ -743,11 +608,12 @@ async function listNotebookLmNotebooks(accountIndex) {
   if (text == null) return { ok: false, error: "rpc-failed" };
   // 応答形式が変わった場合の空配列と「ノートブック 0 件の新規ユーザー」を区別する（/rere RC-J）。
   // 旧実装はどちらも同じ空パネルになり、故障が正常動作に見えていた。
-  if (NotebookLm.parseBatchPayload(text) == null) {
+  const payload = NotebookLm.parseBatchPayload(text);
+  if (payload == null) {
     logNotebookLm("notebook list payload unparsable — NotebookLM 側の仕様変更の可能性");
     return { ok: false, error: "protocol-changed" };
   }
-  return { ok: true, notebooks: NotebookLm.parseNotebookList(text) };
+  return { ok: true, notebooks: NotebookLm.normalizeNotebookList(payload) };
 }
 
 /**
@@ -887,6 +753,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // `chrome.storage.onChanged` で invalidate する方式にする (/rere C 2-A)。
 // 注: SW 再起動でこの変数は消えるため、初回呼び出し時の null フォールバックは必須。
 let cachedVolumeSettings = null;
+// 同世代のタブ間では取得中の Promise も共有し、旧世代の完了で新世代の共有を消さない。
+let inFlightVolumeSettings = null;
 // /rere F-003 race protection: cachedVolumeSettings の fetch 中に onChanged が invalidate しても、
 // await 完了時に stale な fetch 結果で cache が上書きされる race を seqId で検出する。
 // fetch 前と fetch 後で cacheSeqId が変わっていたら、その fetch 結果は stale なので破棄して再帰 fetch。
@@ -908,17 +776,29 @@ async function autoApplyVolumeBooster(tabId) {
   if (!boostedTabIds.has(tabId)) return;
   if (cachedVolumeSettings === null) {
     const seqAtFetch = cacheSeqId;
-    const fetched = await chrome.storage.local.get([
-      StorageKeys.VOLUME_BOOSTER_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
-      StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
-      StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
-      StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
-    ]);
+    if (inFlightVolumeSettings?.seqId !== seqAtFetch) {
+      inFlightVolumeSettings = {
+        seqId: seqAtFetch,
+        promise: chrome.storage.local.get([
+          StorageKeys.VOLUME_BOOSTER_ENABLED,
+          StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
+          StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
+          StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+          StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
+          StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
+          StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
+          StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
+          StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
+        ]),
+      };
+    }
+    const fetchState = inFlightVolumeSettings;
+    let fetched;
+    try {
+      fetched = await fetchState.promise;
+    } finally {
+      if (inFlightVolumeSettings === fetchState) inFlightVolumeSettings = null;
+    }
     // fetch 中に onChanged が cache を invalidate していたら、この fetch 結果は stale。
     // cache 代入をスキップし、再帰呼び出しで fresh fetch を試みる (cacheSeqId は invalidate 側で進む)。
     if (seqAtFetch !== cacheSeqId) {
@@ -1692,23 +1572,24 @@ async function setVolumeBoosterGainImpl(
   if (operationGeneration !== volumeReleaseGeneration) {
     return { ok: false, error: "release-all-during-set" };
   }
+  const sendGain = (streamId) => chrome.runtime.sendMessage({
+    target: Offscreen.TARGET,
+    action: Offscreen.ACTION_VOLUME_SET_GAIN,
+    tabId,
+    streamId,
+    gain: clamped,
+    antiClip: antiClipFlag,
+    nightMode: nightModeFlag,
+    bassCut: bassCutFlag,
+    muted: mutedFlag,
+    eqEnabled: eqActiveFlag,
+    eqGains,
+    eqPreamp,
+  });
   if (Number.isFinite(existing?.gain)) {
     let res;
     try {
-      res = await chrome.runtime.sendMessage({
-        target: Offscreen.TARGET,
-        action: Offscreen.ACTION_VOLUME_SET_GAIN,
-        tabId,
-        streamId: null,
-        gain: clamped,
-        antiClip: antiClipFlag,
-        nightMode: nightModeFlag,
-        bassCut: bassCutFlag,
-        muted: mutedFlag,
-        eqEnabled: eqActiveFlag,
-        eqGains,
-        eqPreamp,
-      });
+      res = await sendGain(null);
     } catch (err) {
       // 例外: offscreen がリスタート途中など → fresh 取得経路へフォールスルー。
       // silent failure を防ぐため診断ログを残す（実害は fresh 経路で自己修復されるため軽微）。
@@ -1761,20 +1642,7 @@ async function setVolumeBoosterGainImpl(
   }
 
   try {
-    const res = await chrome.runtime.sendMessage({
-      target: Offscreen.TARGET,
-      action: Offscreen.ACTION_VOLUME_SET_GAIN,
-      tabId,
-      streamId,
-      gain: clamped,
-      antiClip: antiClipFlag,
-      nightMode: nightModeFlag,
-      bassCut: bassCutFlag,
-      muted: mutedFlag,
-      eqEnabled: eqActiveFlag,
-      eqGains,
-      eqPreamp,
-    });
+    const res = await sendGain(streamId);
     if (operationGeneration !== volumeReleaseGeneration) {
       if (res?.ok) await releaseVolumeBoosterTabDirect(tabId).catch(() => {});
       return { ok: false, error: "release-all-during-set" };

@@ -45,6 +45,12 @@
 
   /** scheduleScan の debounce 時間。SPA で大量 DOM 変更が走るので 200ms に集約。 */
   const SCAN_DEBOUNCE_MS = 200;
+  const OBSERVER_OPTIONS = {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["src", "srcset"],
+  };
   /** triggerBlobDownload で `<a>` を DOM から外す前の delay。Chrome がダウンロードを内部キューに
    *  載せるまでの猶予を確保し、`URL.revokeObjectURL` が早すぎて Blob が破棄される race を防ぐ。
    *  低スペック環境や高負荷時の DL 失敗対策。 */
@@ -60,7 +66,7 @@
   let active = false;
   let mutationObserver = null;
   let scanScheduled = false;
-  /** active な fetch 群を一括キャンセルするための AbortController（OFF 時に abort） */
+  /** fetch 群と画像 load 購読を一括解除する AbortController（OFF 時に abort） */
   let abortController = null;
   /** 拡張機能リロード後の orphan content script 検出フラグ。一度 true になったら以後の処理は全て早期 return。 */
   let contextInvalidated = false;
@@ -669,12 +675,21 @@
   function scanAllImages() {
     if (!active) return;
     if (checkContextInvalidated()) return;
-    for (const img of decoratedImages) {
-      if (!img.isConnected) detachOverlayForImage(img);
-    }
-    const imgs = document.querySelectorAll("img");
-    for (const img of imgs) {
-      decorateImage(img);
+    const observer = mutationObserver;
+    // 自身のボタン追加・撤去で次の全画像走査を予約しない。
+    observer?.disconnect();
+    try {
+      for (const img of decoratedImages) {
+        if (!img.isConnected) detachOverlayForImage(img);
+      }
+      const imgs = document.querySelectorAll("img");
+      for (const img of imgs) {
+        decorateImage(img);
+      }
+    } finally {
+      if (active && observer && mutationObserver === observer && !checkContextInvalidated()) {
+        observer.observe(document.documentElement, OBSERVER_OPTIONS);
+      }
     }
   }
 
@@ -712,13 +727,14 @@
   function startObserver() {
     if (mutationObserver) return;
     abortController = new AbortController();
+    // サイズ未確定で初回走査を通過しなかった画像も、読み込み完了後に評価する。
+    // load は bubble しないため capture し、装飾済み画像の位置同期は既存 listener に任せる。
+    document.addEventListener("load", (event) => {
+      const img = event.target;
+      if (img?.tagName === "IMG" && !overlayByImage.has(img)) scheduleScan();
+    }, { capture: true, signal: abortController.signal });
     mutationObserver = new MutationObserver(() => scheduleScan());
-    mutationObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["src", "srcset"],
-    });
+    mutationObserver.observe(document.documentElement, OBSERVER_OPTIONS);
     scheduleScan();
   }
 
