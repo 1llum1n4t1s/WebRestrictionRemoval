@@ -84,8 +84,8 @@ jobs:
           # 含めないと CWS の Submit for review で `PKG_DEFAULT_LOCALE_MISSING` エラー。
           # 2026-05-13: Draft only 時代はフル validation が走らず通過していたが、auto-publish
           # 化で発覚した bug。zip.ps1 / zip.sh は最初から _locales を含めている。
-          zip -r web-viewing-assist.zip manifest.json icons src _locales \
-            -x "*.DS_Store" "*.swp" "*~"
+          node scripts/copy-package-files.js chrome chrome-build
+          (cd chrome-build && zip -r ../web-viewing-assist.zip .)
           ls -lh web-viewing-assist.zip
 
       - name: ZIP artifact を保存
@@ -105,11 +105,7 @@ jobs:
         # ここでは source dir のまま保存する (二度手間の zip 化を避ける)。
         run: |
           mkdir -p firefox-build
-          cp manifest.firefox.json firefox-build/manifest.json
-          cp -r icons firefox-build/
-          cp -r src firefox-build/
-          cp -r _locales firefox-build/
-          find firefox-build \( -name "*.DS_Store" -o -name "*.swp" -o -name "*~" \) -delete
+          node scripts/copy-package-files.js firefox firefox-build
           # Firefox 未対応 API 呼び出しブロックを strip (AMO linter UNSUPPORTED_API 警告対策)
           node scripts/strip-firefox-background.js firefox-build/src/background/background.js
           echo "🦊 Firefox strip 完了 (chrome.offscreen / chrome.tabCapture 呼び出しを削除)"

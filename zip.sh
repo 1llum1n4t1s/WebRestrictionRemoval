@@ -50,13 +50,7 @@ build_pkg() {
   mkdir -p "$tmp"
 
   # manifest を variant 用にコピー (Firefox は manifest.firefox.json を manifest.json にリネーム)
-  cp "$manifest_src" "$tmp/manifest.json"
-  cp -r icons "$tmp/"
-  cp -r src "$tmp/"
-  cp -r _locales "$tmp/"
-
-  # 不要ファイル除去
-  find "$tmp" \( -name "*.DS_Store" -o -name "*.swp" -o -name "*~" \) -delete
+  node scripts/copy-package-files.js "$variant" "$tmp"
 
   if [ "$variant" = "firefox" ]; then
     # Firefox 版は chrome.offscreen / chrome.tabCapture の呼び出しブロックを物理削除する。

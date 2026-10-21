@@ -86,13 +86,8 @@ function Build-Package {
     Write-Host "ファイルをコピー中 ($ManifestSource → manifest.json)..." -ForegroundColor Yellow
     # Firefox 版は manifest.firefox.json を manifest.json として配置する。
     # Chrome 版は manifest.json をそのまま使う。
-    Copy-Item $ManifestSource -Destination "$tempDir/manifest.json"
-    Copy-Item "icons" -Destination $tempDir -Recurse
-    Copy-Item "src" -Destination $tempDir -Recurse
-    Copy-Item "_locales" -Destination $tempDir -Recurse
-
-    # 不要ファイル除去
-    Get-ChildItem -Path $tempDir -Recurse -Include "*.DS_Store","*.swp","*~" | ForEach-Object { Remove-LocalWorkItem -LiteralPath $_.FullName -AllowedRoot $PSScriptRoot -IgnoreMissing }
+    node scripts/copy-package-files.js $Variant $tempDir
+    if ($LASTEXITCODE -ne 0) { throw "配布ファイルのコピーに失敗しました (exit $LASTEXITCODE)" }
 
     if ($Variant -eq "firefox") {
         # Firefox 版は chrome.offscreen / chrome.tabCapture の呼び出しブロックを物理削除する。
