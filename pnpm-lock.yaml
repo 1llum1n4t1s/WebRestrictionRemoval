@@ -18,8 +18,8 @@ importers:
   .:
     devDependencies:
       '@kagayoi/support-extension':
-        specifier: 1.0.6
-        version: 1.0.6
+        specifier: 1.0.8
+        version: 1.0.8
       eslint:
         specifier: ^10.13.0
         version: 10.13.0
@@ -319,8 +319,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@kagayoi/support-extension@1.0.6':
-    resolution: {integrity: sha512-nxQqhZWbfXDrmjDg8dKk4/RU7IUXyTkQ7XlcKwKNLR+srCX+KzsMEPETOsa35vDL4cQ4fWqrxl6rW8ddE/sYDQ==}
+  '@kagayoi/support-extension@1.0.8':
+    resolution: {integrity: sha512-NbEvdncBUrKG7suocyhbeO+B1QSURBaEg6OL7n6EoR0EeDKAJyOJiY37tIVUbDrtTM9A/CaOMd13/MrVwLDWeA==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -1840,7 +1840,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.5':
     optional: true
 
-  '@kagayoi/support-extension@1.0.6': {}
+  '@kagayoi/support-extension@1.0.8': {}
 
   '@keyv/bigmap@1.3.1(keyv@5.6.0)':
     dependencies:
