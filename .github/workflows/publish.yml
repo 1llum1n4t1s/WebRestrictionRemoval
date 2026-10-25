@@ -17,6 +17,8 @@ jobs:
       # 同 version が既に存在する場合、CWS は upload のみ、AMO は submission 全体を skip して
       # 「同 version 重複 push 拒否」エラーを未然に防ぐ (/rere F-002 修正)。
       version: ${{ steps.version.outputs.version }}
+      chrome-sha256: ${{ steps.verify-chrome.outputs.sha256 }}
+      firefox-sha256: ${{ steps.verify-firefox.outputs.sha256 }}
     steps:
       # サプライチェーン攻撃対策で SHA ピン留め (#6)。タグは指すコミットを書き換え可能なため
       # 信頼境界として弱い。Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の
@@ -88,6 +90,12 @@ jobs:
           (cd chrome-build && zip -r ../web-viewing-assist.zip .)
           ls -lh web-viewing-assist.zip
 
+      - name: Chrome 最終 ZIP の配布 metadata・参照・hash を検証
+        id: verify-chrome
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/verify-release-artifact.py chrome web-viewing-assist.zip
+
       - name: ZIP artifact を保存
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -112,6 +120,12 @@ jobs:
           echo "📂 firefox-build 内容:"
           ls -la firefox-build/
 
+      - name: Firefox 提出ソースの配布 metadata・参照・全ファイル hash を検証
+        id: verify-firefox
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/verify-release-artifact.py firefox firefox-build
+
       - name: Firefox source artifact を保存
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -130,6 +144,13 @@ jobs:
         with:
           name: web-viewing-assist-zip
           path: .
+
+      - name: ダウンロードした送信 ZIP と検証済み ZIP の同一性を確認
+        env:
+          EXPECTED_SHA256: ${{ needs.package.outputs.chrome-sha256 }}
+        run: |
+          test -n "$EXPECTED_SHA256"
+          echo "$EXPECTED_SHA256  web-viewing-assist.zip" | sha256sum --check --strict
 
       - name: バージョン pre-flight check (CWS / 既存 version と一致なら upload のみ skip)
         # /rere F-002 修正 + セルフレビュー 2 巡目修正: 同 version 再 upload は CWS API が
@@ -355,6 +376,14 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"
         run: pnpm install --frozen-lockfile
+
+      - name: ダウンロードした実 source-dir と検証済みソースの同一性を確認
+        env:
+          EXPECTED_VERSION: ${{ needs.package.outputs.version }}
+          EXPECTED_SHA256: ${{ needs.package.outputs.firefox-sha256 }}
+        run: |
+          test -n "$EXPECTED_SHA256"
+          python3 scripts/verify-release-artifact.py firefox firefox-build
 
       - name: バージョン pre-flight check (AMO / 既 submission 済み version なら skip)
         # /rere F-002 修正 + セルフレビュー #2/#4 修正:
