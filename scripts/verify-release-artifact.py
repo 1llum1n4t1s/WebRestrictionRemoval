@@ -45,6 +45,12 @@ for name in files:
 
 # copy-package-files.js の選択範囲と一致させ、動的読込み用ファイルの欠落も止める。
 expected_files = {"manifest.json"}
+source_name = "manifest.firefox.json" if variant == "firefox" else "manifest.json"
+source_manifest = json.loads((root / source_name).read_text(encoding="utf-8"))
+# PNG は package job で生成するため、公開 job の checkout には存在しない。
+# 期待するファイルは manifest の参照からも加え、実物の寸法は後段で検証する。
+expected_files.update(source_manifest.get("icons", {}).values())
+expected_files.update(source_manifest.get("action", {}).get("default_icon", {}).values())
 for directory in ("icons", "src", "_locales"):
     for item in (root / directory).rglob("*"):
         if not item.is_file() or re.search(r"(?:\.DS_Store|\.swp|~)$", item.name):
@@ -65,8 +71,7 @@ def present(name):
 
 present("manifest.json")
 manifest = json.loads(files["manifest.json"])
-source_name = "manifest.firefox.json" if variant == "firefox" else "manifest.json"
-require(manifest == json.loads((root / source_name).read_text(encoding="utf-8")),
+require(manifest == source_manifest,
         "Packaged manifest differs from release source")
 for name in ("manifest.json", "manifest.firefox.json", "package.json"):
     require(json.loads((root / name).read_text(encoding="utf-8"))["version"] == expected_version,
