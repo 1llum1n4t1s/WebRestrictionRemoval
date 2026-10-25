@@ -214,6 +214,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }).then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false, error: "import-failed" }));
     return true;
+  } else if (request.action === "APPLY_YOUTUBE_PLAYER_SETTINGS") {
+    if (!SenderCheck.isFromPopup(sender)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    globalThis.enqueueSettingsWrite(async () => {
+      const K = StorageKeys;
+      const current = await chrome.storage.local.get([K.YOUTUBE_PLAYER_SETTINGS, K.SETTINGS_SYNC_APPLIED]);
+      if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
+      const value = SearchFixer.PLAYER_CONTROLS.mergeSettings(current[K.YOUTUBE_PLAYER_SETTINGS], request.data);
+      await chrome.storage.local.set({ [K.YOUTUBE_PLAYER_SETTINGS]: value });
+    }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
+    return true;
   } else if (request.action === Actions.APPLY_SETTINGS) {
     if (!SenderCheck.isFromPopup(sender)) {
       sendResponse({ ok: false, error: "sender-rejected" });
@@ -1738,3 +1748,15 @@ async function releaseVolumeBoosterTabDirect(tabId) {
   }
   return { ok: true };
 }
+
+// 既定キーは割り当てず、ブラウザの拡張ショートカット設定から利用する。
+chrome.commands?.onCommand?.addListener(async (command) => {
+  const match = /^youtube-(quality|rate|volume)-(\d+)$/.exec(command);
+  if (!match) return;
+  const kind = match[1]; const index = Number(match[2]) - 1;
+  if (index < 0 || index >= ({ quality: 9, rate: 16, volume: 5 })[kind]) return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) await chrome.tabs.sendMessage(tab.id, { action: "YOUTUBE_PLAYER_COMMAND", kind, index });
+  } catch { /* 対象タブが閉じた場合やYouTube以外では適用先がない。 */ }
+});

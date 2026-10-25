@@ -1278,7 +1278,7 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 35, "SearchFixer.FEATURES は 35 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 39, "SearchFixer.FEATURES は 39 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 12, "InstagramCleaner.FEATURES は 12 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });

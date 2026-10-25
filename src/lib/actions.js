@@ -129,10 +129,11 @@ const StorageKeys = Object.freeze({
   SETTINGS_SYNC_STATUS: "_settingsSyncStatus",
   SETTINGS_SYNC_RETRY: "_settingsSyncRetry",
   SETTINGS_SYNC_APPLIED: "_settingsSyncApplied",
-  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 35 サブ機能の親） */
+  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 39 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube 機能拡張の個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
+  YOUTUBE_PLAYER_SETTINGS: "youtubePlayerSettings",
   /** ホームページのリッチグリッド列数（0 = YouTube デフォルト、4/5/6 が選択肢） */
   SEARCH_FIXER_GRID_ITEMS: "searchFixerGridItems",
   /** 検索結果から除外するチャンネルのリスト（{key, name} 配列。key = "@handle" 小文字 or "UC..." チャンネル ID）。
@@ -348,6 +349,10 @@ const SearchFixerFeatures = Object.freeze([
   // されていた時刻 (yyyy/MM/dd　hh:mm:ss) をプレーヤー内 HUD に重ねる。純粋ロジックは
   // BroadcastClock namespace、実装は専用 content script youtube-broadcast-clock.js。
   Object.freeze({ key: "broadcastClock", category: "watch_page" }),
+  Object.freeze({ key: "liveLatency", category: "watch_page" }),
+  Object.freeze({ key: "playbackQuality", category: "watch_page" }),
+  Object.freeze({ key: "playbackRate", category: "watch_page" }),
+  Object.freeze({ key: "playerVolume", category: "watch_page" }),
   Object.freeze({ key: "redirectShortsUrl", category: "watch_page" }),
   Object.freeze({ key: "searchGrid", category: "search_only" }),
   Object.freeze({ key: "removeShortsChip", category: "search_only" }),
@@ -434,7 +439,40 @@ const SearchFixerDefaultRegions = Object.freeze({
   hi: "IN", sv: "SE", no: "NO", da: "DK", fi: "FI", cs: "CZ", el: "GR",
 });
 
+const YouTubePlayerControls = (() => {
+  const DEFAULT_SETTINGS = {"latency":{"enabled":true,"playbackRate":1.25,"showPlaybackRate":false,"showLatency":false,"showHealth":false,"showEstimation":false,"showCurrent":false,"smooth":false,"smoothThreshold":3,"smoothAuto":true,"skip":false,"skipThreshold":300},"quality":{"values":["tiny","small","medium","large","hd720","hd1080","hd1440","auto","hd2160"],"enabled":[true,false,false,true,false,true,false,false,false]},"rate":{"values":[0.25,0.5,0.75,1,1.25,1.5,2,1.75,3,4,5,6,8,10,12,16],"enabled":[false,false,false,true,false,false,true,false,false,false,false,false,false,false,false,false]},"volume":{"values":[0,25,50,75,100],"enabled":[false,true,true,true,true],"hideSlider":false,"hideVolumeIcon":false}};
+  for (const group of Object.values(DEFAULT_SETTINGS)) { for (const value of Object.values(group)) if (Array.isArray(value)) Object.freeze(value); Object.freeze(group); }
+  Object.freeze(DEFAULT_SETTINGS);
+  const QUALITY_VALUES = DEFAULT_SETTINGS.quality.values;
+  const RATE_VALUES = DEFAULT_SETTINGS.rate.values;
+  const number = (v, d, min, max, step) => typeof v === "number" && Number.isFinite(v) ? Number((Math.round(Math.min(max, Math.max(min, v)) / step) * step).toFixed(2)) : d;
+  function normalizeSettings(raw) {
+    const out = {};
+    for (const [group, defaults] of Object.entries(DEFAULT_SETTINGS)) {
+      const data = raw?.[group]; out[group] = {};
+      for (const [key, fallback] of Object.entries(defaults)) {
+        const value = data?.[key];
+        if (Array.isArray(fallback)) out[group][key] = fallback.map((d, i) => key === "enabled" ? (typeof value?.[i] === "boolean" ? value[i] : d) : group === "quality" ? (QUALITY_VALUES.includes(value?.[i]) ? value[i] : d) : number(value?.[i], d, group === "rate" ? 0.1 : 0, group === "rate" ? 16 : 100, group === "rate" ? 0.05 : 1));
+        else if (typeof fallback === "boolean") out[group][key] = typeof value === "boolean" ? value : fallback;
+        else out[group][key] = number(value, fallback, key === "playbackRate" ? 1.05 : key === "skipThreshold" ? 1 : 0, key === "playbackRate" ? 16 : key === "skipThreshold" ? 999999 : 120, key === "skipThreshold" ? 1 : 0.05);
+      }
+    }
+    return out;
+  }
+  function mergeSettings(current, patch) {
+    const out = normalizeSettings(current);
+    for (const group of Object.keys(out)) for (const [key, value] of Object.entries(patch?.[group] ?? {})) {
+      if (!Object.hasOwn(out[group], key)) continue;
+      if (Array.isArray(out[group][key])) { for (const [index, item] of Object.entries(value ?? {})) if (/^\d+$/.test(index) && Number(index) < out[group][key].length) out[group][key][index] = item; }
+      else out[group][key] = value;
+    }
+    return normalizeSettings(out);
+  }
+  return Object.freeze({ DEFAULT_SETTINGS, QUALITY_VALUES, RATE_VALUES, normalizeSettings, mergeSettings });
+})();
+
 const SearchFixer = Object.freeze({
+  PLAYER_CONTROLS: YouTubePlayerControls,
   FEATURES: SearchFixerFeatures,
 
   // category.label は _locales/.../messages.json の `category<CamelId>` (例: categoryMenuUi)。
@@ -2943,7 +2981,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube 機能拡張 (35 機能)・Instagram クリーナー (12 機能)・TikTok クリーナー (3 機能)
+ * YouTube 機能拡張 (39 機能)・Instagram クリーナー (12 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。

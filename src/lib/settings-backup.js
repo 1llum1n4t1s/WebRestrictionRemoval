@@ -45,6 +45,15 @@
   add(K.POPUP_LAST_SUBTAB, {}, (v) => object(v) && Object.entries(v).every(([k, x]) =>
     PopupTabs.isValid(k) && typeof x === "string" && x.length > 0 && x.length <= 100), PopupTabs.normalizeSubTabs);
 
+  const sameShapeAndValues = (value, normalized) => {
+    if (Array.isArray(normalized)) return Array.isArray(value) && value.length === normalized.length && value.every((item, i) => sameShapeAndValues(item, normalized[i]));
+    if (object(normalized)) return object(value) && Object.keys(value).length === Object.keys(normalized).length && Object.entries(normalized).every(([key, item]) => Object.hasOwn(value, key) && sameShapeAndValues(value[key], item));
+    return value === normalized;
+  };
+  add(K.YOUTUBE_PLAYER_SETTINGS, SearchFixer.PLAYER_CONTROLS.DEFAULT_SETTINGS, (v) =>
+    object(v) && sameShapeAndValues(v, SearchFixer.PLAYER_CONTROLS.normalizeSettings(v)),
+    SearchFixer.PLAYER_CONTROLS.normalizeSettings);
+
   const MAX_BYTES = 5 * 1024 * 1024;
   function parse(text) {
     if (typeof text !== "string" || new TextEncoder().encode(text).length > MAX_BYTES) return fail();

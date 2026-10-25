@@ -1919,6 +1919,8 @@
   const subsThumbFetchQueue = [];
   let subsThumbFetchActive = 0;
   let subsThumbFetchAbort = null;
+  // 初回の候補抽出時だけ生成し、matchAll が元の lastIndex を変更しない性質で共有する。
+  let subsThumbPatterns = null;
   /** @type {{toolbar:HTMLElement,search:HTMLInputElement,observer:IntersectionObserver|null}|null} */
   let subsGridState = null;
   /** @type {MutationObserver|null} ネイティブ sort dropdown 操作後の card 再 hydrate を検出する observer */
@@ -3199,12 +3201,12 @@
 
   /**
    * カードがビューポートに入ったタイミングで、対応するチャンネルの Featured 動画サムネを取得。
-   * `/${handle}` HTML 内の `"videoId":"..."` 出現順上位 10 件を候補に、**2 段階で並列 HEAD 篩い分け** (v6 仕様):
+   * `/videos` と必要時の `/streams` HTML 内の videoId を候補に、**2 段階で並列 HEAD 篩い分け** (最大 10 件):
    *
    *   1. maxresdefault.jpg HEAD 200 を探す → 採用 (`https://i.ytimg.com/vi/{vid}/maxresdefault.jpg`, 1280x720)
-   *   2. 全 404 なら hqdefault.jpg のサイズ > 30KB を探す → 採用 (480x360, Shorts / HD なし動画救済)
+   *   2. maxres に採用候補がなければ hqdefault.jpg HEAD 200 + 有効長さ > 30KB を探す → 採用 (Shorts / HD なし動画救済)
    *   3. それも見つからなければ thumbUrl=null (空白カード、灰色プレースホルダー画像は絶対表示しない)
-   *
+   * null 保存は要求 HTML 取得済み・候補あり・全 maxres 404・全 hq が404または200かつ有効長さ30KB以下のときだけ。
    * 旧 v5 ロジックは「HTML 内最初の `videoId`」を盲信して削除済み動画の灰色プレースホルダー画像
    * (maxres 404 / 1097B、hq < 16KB) を表示してしまう問題があった (2026-05-13 ユロさん指摘で発覚)。
    * 旧 Stage2 (`/feeds/videos.xml?channel_id=...`) は YouTube が 2026-05 までに 404 化したため撤去。
@@ -3228,8 +3230,8 @@
           subsThumbFetchAbort.signal,
           AbortSignal.timeout(SearchFixer.SUBS_FETCH_TIMEOUT_MS),
         ]);
-        // v7 (2026-05-28): `/${handle}` (チャンネルトップ) 1 fetch → `/${handle}/videos` +
-        // `/${handle}/streams` 2 fetch 並列に切替。ライブ配信中の動画 (LIVE) を最優先 + 配信
+        // v7 (2026-05-28): チャンネルトップ取得から /videos を先行取得し、LIVE がなければ
+        // /streams を遅延取得する方式へ変更。ライブ配信中の動画 (LIVE) を最優先 + 配信
         // 予定 (UPCOMING、雑談チャット用が混じることが多い) を除外できるようになった。
         //
         // 取得元の使い分け:
@@ -3265,15 +3267,17 @@
         const videosHtml = await fetch(`/${handle}/videos`, { credentials: "same-origin", redirect: "manual", signal })
           .then((r) => (r.ok ? r.text() : null))
           .catch(() => null);
-        // 軽量 LIVE 検出: 1 マッチで早期判定 (matchAll の前段、lastIndex 進行を避けるため new RegExp)
+        if (signal.aborted) return;
+        // 軽量 LIVE 検出: バッジの完全一致文字列で早期判定
         const liveDetectedInVideos =
           videosHtml != null &&
-          new RegExp('"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"').test(videosHtml);
+          videosHtml.includes('"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"');
         let streamsHtml = null;
         if (!liveDetectedInVideos) {
           streamsHtml = await fetch(`/${handle}/streams`, { credentials: "same-origin", redirect: "manual", signal })
             .then((r) => (r.ok ? r.text() : null))
             .catch(() => null);
+          if (signal.aborted) return;
         }
         if (!videosHtml && !streamsHtml) return;
 
@@ -3285,9 +3289,11 @@
         //   - LIVE: badgeStyle が SOMETHING_LIVE の 400 文字以内に animationActivationTargetId
         //   - UPCOMING (除外): text が UPCOMING 多言語パターンの 400 文字以内に animationActivationTargetId
         //     (multilang: 日本語「配信予定」+ 英語「Upcoming」「Scheduled」「Premieres」+ 中国語「首播」をカバー)
-        const LIVE_BADGE_RE = /"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"[\s\S]{0,400}?"animationActivationTargetId":"([a-zA-Z0-9_-]{11})"/g;
-        const UPCOMING_TEXT_RE = /"text":"(?:配信予定|Upcoming|Scheduled|Premieres|首播)[^"]*"[\s\S]{0,400}?"animationActivationTargetId":"([a-zA-Z0-9_-]{11})"/g;
-        const VIDEO_ID_RE = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+        const { LIVE_BADGE_RE, UPCOMING_TEXT_RE, VIDEO_ID_RE } = subsThumbPatterns ??= {
+          LIVE_BADGE_RE: /"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"[\s\S]{0,400}?"animationActivationTargetId":"([a-zA-Z0-9_-]{11})"/g,
+          UPCOMING_TEXT_RE: /"text":"(?:配信予定|Upcoming|Scheduled|Premieres|首播)[^"]*"[\s\S]{0,400}?"animationActivationTargetId":"([a-zA-Z0-9_-]{11})"/g,
+          VIDEO_ID_RE: /"videoId":"([a-zA-Z0-9_-]{11})"/g,
+        };
 
         const liveSet = new Set();
         const upcomingSet = new Set();
@@ -3314,7 +3320,7 @@
         const maxresChecks = await Promise.allSettled(
           candidateIds.map((vid) =>
             // `redirect: "manual"` で 3xx を opaqueredirect として捕捉する。CDN 設定変更や中間者による
-            // 認証ドメインへの 302 を `r.ok === false` 扱いにして候補スキップする防御
+            // 認証ドメインへの 302 を HTTP 200 以外として候補スキップする防御
             // (/rere レビュー A2-I-4)。`credentials: "omit"` + redirect:manual の組み合わせは
             // image-downloader.js と同じパターン (外部 CDN fetch の 4 原則、CLAUDE.md「外部 fetch allowlist 設計」参照)。
             fetch(`https://i.ytimg.com/vi/${vid}/maxresdefault.jpg`, {
@@ -3323,19 +3329,21 @@
               redirect: "manual",
               referrerPolicy: "no-referrer",
               signal,
-            }).then((r) => ({ vid, ok: r.ok }))
+            }).then((r) => ({ vid, status: r.status }))
           )
         );
+        if (signal.aborted) return;
         let validVideoId = null;
         let thumbVariant = "maxresdefault";
+        let confirmedMissing = false;
         for (let i = 0; i < candidateIds.length; i++) {
           const c = maxresChecks[i];
-          if (c.status === "fulfilled" && c.value?.ok) {
+          if (c.status === "fulfilled" && c.value.status === 200) {
             validVideoId = candidateIds[i];
             break;
           }
         }
-        // Stage 2: maxres 全 404 のとき hqdefault のサイズで Shorts / HD なし動画を救済
+        // Stage 2: maxres に採用候補がないとき hqdefault のサイズで Shorts / HD なし動画を救済
         if (!validVideoId) {
           const hqChecks = await Promise.allSettled(
             candidateIds.map((vid) =>
@@ -3346,25 +3354,36 @@
                 redirect: "manual",
                 referrerPolicy: "no-referrer",
                 signal,
-              }).then((r) => ({
-                vid,
-                len: parseInt(r.headers.get("content-length") || "0", 10),
-              }))
+              }).then((r) => {
+                const rawLength = r.headers.get("content-length");
+                const len = rawLength !== null && /^\d+$/.test(rawLength)
+                  && Number.isSafeInteger(Number(rawLength)) ? Number(rawLength) : null;
+                return { vid, status: r.status, len };
+              })
             )
           );
+          if (signal.aborted) return;
           for (let i = 0; i < candidateIds.length; i++) {
             const c = hqChecks[i];
-            if (c.status === "fulfilled" && c.value.len > 30000) {
+            if (c.status === "fulfilled" && c.value.status === 200 && c.value.len > 30000) {
               validVideoId = candidateIds[i];
               thumbVariant = "hqdefault";
               break;
             }
           }
+          // 通信失敗や部分 HTML は不存在と区別し、確認できた負の結果だけを保存する。
+          confirmedMissing = videosHtml !== null && (liveDetectedInVideos || streamsHtml !== null)
+            && candidateIds.length > 0 && maxresChecks.every((c) => c.status === "fulfilled" && c.value.status === 404)
+            && hqChecks.every((c) => c.status === "fulfilled" && (c.value.status === 404
+              || (c.value.status === 200 && c.value.len !== null && c.value.len <= 30000)));
         }
         thumbUrl = validVideoId
           ? `https://i.ytimg.com/vi/${validVideoId}/${thumbVariant}.jpg`
           : null;
-        writeSubsThumbCache(handle, { thumbUrl, channelId, ts: Date.now() });
+        if (signal.aborted) return;
+        if (thumbUrl || confirmedMissing) {
+          writeSubsThumbCache(handle, { thumbUrl, channelId, ts: Date.now() });
+        }
       } catch {
         return;
       }

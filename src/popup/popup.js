@@ -298,6 +298,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.SETTINGS_SYNC_APPLIED,
     StorageKeys.SEARCH_FIXER_ENABLED,
     StorageKeys.SEARCH_FIXER_FEATURES,
+    StorageKeys.YOUTUBE_PLAYER_SETTINGS,
     StorageKeys.SEARCH_FIXER_GRID_ITEMS,
     StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
     StorageKeys.AMAZON_DELIVERY_TOTAL_ENABLED,
@@ -334,6 +335,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.POPUP_LAST_SUBTAB,
     StorageKeys.INSTALL_SENTINEL,
   ]);
+
+  buildPlayerSettings(stored);
 
   // P0-#3 storage 破損検知: onInstalled で必ず書き込まれる sentinel が消えていれば、
   // chrome.storage.local がリセット・破損した可能性。本番ユーザーへ telemetry 送信は行わず
@@ -1262,6 +1265,72 @@ document.addEventListener("DOMContentLoaded", async () => {
    * 1 カテゴリ分の `cat-list`（機能トグル行の集合）を構築して返す。
    * menu_ui カテゴリのときは先頭にホーム列数行を挿入する。
    */
+  // 詳細値は部分パッチだけを保存し、他の画面・同期による編集を維持する。
+  function buildPlayerSettings(stored) {
+    const spec = SearchFixer.PLAYER_CONTROLS;
+    let settings = spec.normalizeSettings(stored[StorageKeys.YOUTUBE_PLAYER_SETTINGS]);
+    const bindings = [];
+    const status = document.createElement("p"); status.className = "fr-desc"; status.setAttribute("role", "status");
+    const groups = { liveLatency: "latency", playbackQuality: "quality", playbackRate: "rate", playerVolume: "volume" };
+    const numericChoices = (group, key) => {
+      if (group === "volume") return Array.from({ length: 101 }, (_, i) => i);
+      if (group === "rate") return [.1, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 16];
+      if (key === "playbackRate") return [1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2, 3, 4, 5, 6, 8, 10, 12, 16];
+      if (key === "smoothThreshold") return [0, .5, 1, 2, 3, 5, 10, 15, 20, 30, 60, 120];
+      return [1, 3, 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 999999];
+    };
+    const addNumericOption = (input, group, key, value) => {
+      if (Array.from(input.options).some((option) => option.value === String(value))) return;
+      const option = document.createElement("option");
+      option.value = String(value);
+      option.textContent = `${value}${group === "rate" || key === "playbackRate" ? "x" : group === "volume" ? "%" : ""}`;
+      input.append(option);
+    };
+    const refresh = () => { for (const { input, group, key, index } of bindings) {
+      const value = index === undefined ? settings[group][key] : settings[group][key][index];
+      // 同期・バックアップで復元された既存の値も、選択肢へ残して表示する。
+      if (typeof value === "number") addNumericOption(input, group, key, value);
+      if (input.type === "checkbox") input.checked = value; else input.value = value;
+    } };
+    const add = (parent, group, key, index) => {
+      const fallback = index === undefined ? settings[group][key] : settings[group][key][index];
+      const label = document.createElement("label"); label.className = "player-settings-row";
+      const text = document.createElement("span");
+      text.textContent = index === undefined ? i18n("yp_" + key) : i18n(key === "enabled" ? "yp_showButton" : "yp_buttonValue", String(index + 1));
+      const input = document.createElement(typeof fallback === "boolean" ? "input" : "select");
+      if (typeof fallback === "string") for (const value of spec.QUALITY_VALUES) { const option = document.createElement("option"); option.value = value; option.textContent = ({ tiny: "144p", small: "240p", medium: "360p", large: "480p", hd720: "720p", hd1080: "1080p", hd1440: "1440p", hd2160: "2160p", auto: i18n("yp_auto") })[value]; input.append(option); }
+      else if (typeof fallback === "number") {
+        input.required = true;
+        for (const value of numericChoices(group, key)) addNumericOption(input, group, key, value);
+      } else input.type = "checkbox";
+      input.addEventListener("change", async () => {
+        if (!input.checkValidity()) { input.reportValidity(); refresh(); return; }
+        const value = input.type === "checkbox" ? input.checked : typeof fallback === "number" ? Number(input.value) : input.value;
+        const patch = { [group]: { [key]: index === undefined ? value : { [index]: value } } };
+        try { const response = await chrome.runtime.sendMessage({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data: patch, syncGeneration: stored[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null });
+          if (!response?.ok) throw new Error("save-failed");
+          settings = spec.mergeSettings(settings, patch); status.textContent = "";
+        } catch { status.textContent = i18n("applyError"); }
+        refresh();
+      });
+      bindings.push({ input, group, key, index }); label.append(text, input); parent.append(label);
+    };
+    for (const [feature, group] of Object.entries(groups)) {
+      const toggle = featureInputs.get(feature); if (!toggle) continue;
+      const details = document.createElement("details"); details.className = "player-settings";
+      const summary = document.createElement("summary"); summary.textContent = i18n("yp_details"); details.append(summary);
+      const note = document.createElement("p"); note.className = "fr-desc"; note.textContent = i18n(group === "latency" ? "yp_latencyNote" : "yp_buttonNote"); details.append(note);
+      for (const [key, value] of Object.entries(settings[group])) {
+        if (Array.isArray(value)) value.forEach((_, index) => add(details, group, key, index));
+        else add(details, group, key);
+      }
+      toggle.closest(".feature-row").after(details);
+    }
+    featureInputs.get("playerVolume")?.closest(".feature-row").after(status);
+    chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes[StorageKeys.YOUTUBE_PLAYER_SETTINGS]) { settings = spec.normalizeSettings(changes[StorageKeys.YOUTUBE_PLAYER_SETTINGS].newValue); refresh(); } });
+    refresh();
+  }
+
   function _buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix) {
     const list = document.createElement("div");
     list.className = "cat-list";
@@ -1342,7 +1411,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * カテゴリをサブタブで切り替える DOM を構築する（YouTube / Instagram クリーナーで共用）。
    *
-   * 機能数が多いクリーナー（YouTube 35 機能 / Instagram 12 機能）を 1 画面に縦積みすると
+   * 機能数が多いクリーナー（YouTube 39 機能 / Instagram 12 機能）を 1 画面に縦積みすると
    * 非常に長くなるため、カテゴリごとにサブタブで切り替えられるようにして縦の情報量を圧縮する。
    * 各機能の `<input>` は全カテゴリ分まとめて DOM / inputMap に存在し続ける（非表示パネルでも
    * checked 状態は保持され、ON 数カウントや apply() の収集に影響しない）。

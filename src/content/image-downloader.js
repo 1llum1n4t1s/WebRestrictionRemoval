@@ -547,7 +547,7 @@
             if (!res.ok) throw new Error("not ok: " + res.status);
             const blob = await res.blob();
             if (!blob || blob.size === 0) throw new Error("empty blob");
-            states[index] = { status: "fulfilled", value: { url, blob } };
+            states[index] = { status: "fulfilled", value: { blob } };
           })
           .catch(() => {
             states[index] = { status: "rejected", value: null };

@@ -12,6 +12,8 @@
   const PREFIX = "vuora.settings.v2.";
   const LEGACY_PREFIX = "vuora.settings.v1.";
   const EQ = "equalizer";
+  const playerGroups = Object.keys(SearchFixer.PLAYER_CONTROLS.DEFAULT_SETTINGS);
+  const playerPrefix = K.YOUTUBE_PLAYER_SETTINGS + "/";
   const eqKeys = [K.VOLUME_BOOSTER_EQ_ENABLED, K.VOLUME_BOOSTER_EQ_GAINS,
     K.VOLUME_BOOSTER_EQ_PREAMP, K.VOLUME_BOOSTER_EQ_PRESET];
   const features = new Map([
@@ -25,9 +27,10 @@
     K.VOLUME_BOOSTER_BASS_CUT_ENABLED, K.VOLUME_BOOSTER_MUTED_ENABLED,
     K.LOUPE_ZOOM, K.LOUPE_SIZE, K.COLOR_PICKER_DEFAULT_FORMAT, K.COLOR_PICKER_HEX_HASH,
   ])];
-  const keys = [...scalarKeys, ...features.keys(), ...eqKeys, K.SEARCH_FIXER_BLOCKED_CHANNELS];
+  const keys = [K.YOUTUBE_PLAYER_SETTINGS, ...scalarKeys, ...features.keys(), ...eqKeys, K.SEARCH_FIXER_BLOCKED_CHANNELS];
   const fixedBuckets = new Map(scalarKeys.map((key) => [key, key]));
   fixedBuckets.set(EQ, EQ);
+  for (const group of playerGroups) fixedBuckets.set(playerPrefix + group, playerPrefix + group);
   for (const [key, spec] of features) {
     for (const name of Object.keys(spec.DEFAULT_FEATURES)) fixedBuckets.set(`${key}/${name}`, key);
   }
@@ -77,6 +80,10 @@
         s[1] >= Number.MAX_SAFE_INTEGER || typeof s[2] !== "string" || !/^[\w-]{1,64}$/.test(s[2])) return false;
     if (record.deleted === true) return id !== EQ && !features.has(bucketFor(id));
     if (!Object.hasOwn(record, "value")) return false;
+    if (id.startsWith(playerPrefix)) {
+      const group = id.slice(playerPrefix.length);
+      return equal(record.value, SearchFixer.PLAYER_CONTROLS.normalizeSettings({ [group]: record.value })[group]);
+    }
     if (features.has(bucketFor(id))) return typeof record.value === "boolean";
     if (id === EQ) return record.value && typeof record.value === "object" &&
       eqKeys.every((key) => Object.hasOwn(record.value, key)) && equal(record.value, snapshot(record.value)[EQ].value);
@@ -93,6 +100,8 @@
     for (const [key, spec] of features) {
       for (const [name, value] of Object.entries(spec.mergeFeatures(view[key]))) out[`${key}/${name}`] = { value };
     }
+    const player = SearchFixer.PLAYER_CONTROLS.normalizeSettings(view[K.YOUTUBE_PLAYER_SETTINGS]);
+    for (const group of playerGroups) out[playerPrefix + group] = { value: player[group] };
     out[EQ] = { value: {
       [K.VOLUME_BOOSTER_EQ_ENABLED]: view[K.VOLUME_BOOSTER_EQ_ENABLED] === true,
       [K.VOLUME_BOOSTER_EQ_GAINS]: VolumeBooster.clampEqGains(view[K.VOLUME_BOOSTER_EQ_GAINS]),
@@ -178,6 +187,11 @@
         const record = state.records[`${key}/${name}`];
         if (record) view[key][name] = record.value;
       }
+    }
+    view[K.YOUTUBE_PLAYER_SETTINGS] = SearchFixer.PLAYER_CONTROLS.normalizeSettings(view[K.YOUTUBE_PLAYER_SETTINGS]);
+    for (const group of playerGroups) {
+      const record = state.records[playerPrefix + group];
+      if (record) view[K.YOUTUBE_PLAYER_SETTINGS][group] = record.deleted ? SearchFixer.PLAYER_CONTROLS.DEFAULT_SETTINGS[group] : record.value;
     }
     if (state.records[EQ]) Object.assign(view, state.records[EQ].value);
     view[K.SEARCH_FIXER_BLOCKED_CHANNELS] = SearchFixer.normalizeBlockedChannels(Object.entries(state.records)

@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -22,6 +22,25 @@
     "service_worker": "src/background/background.js"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.youtube-nocookie.com/*"
+      ],
+      "exclude_matches": [
+        "*://*.youtube.com/live_chat*"
+      ],
+      "js": [
+        "src/lib/actions.js",
+        "src/lib/cleaner-core.js",
+        "src/content/youtube-player-controls.js"
+      ],
+      "css": [
+        "src/content/youtube-player-controls.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
     {
       "matches": ["*://*.youtube.com/*"],
       "js": ["src/content/early-framework.js", "src/content/youtube-early.js"],
@@ -121,5 +140,108 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'; frame-ancestors 'none'"
   },
-  "minimum_chrome_version": "140"
+  "minimum_chrome_version": "140",
+  "commands": {
+    "youtube-quality-1": {
+      "description": "__MSG_ypcCommand_quality_1__"
+    },
+    "youtube-quality-2": {
+      "description": "__MSG_ypcCommand_quality_2__"
+    },
+    "youtube-quality-3": {
+      "description": "__MSG_ypcCommand_quality_3__"
+    },
+    "youtube-quality-4": {
+      "description": "__MSG_ypcCommand_quality_4__"
+    },
+    "youtube-quality-5": {
+      "description": "__MSG_ypcCommand_quality_5__"
+    },
+    "youtube-quality-6": {
+      "description": "__MSG_ypcCommand_quality_6__"
+    },
+    "youtube-quality-7": {
+      "description": "__MSG_ypcCommand_quality_7__"
+    },
+    "youtube-quality-8": {
+      "description": "__MSG_ypcCommand_quality_8__"
+    },
+    "youtube-quality-9": {
+      "description": "__MSG_ypcCommand_quality_9__"
+    },
+    "youtube-rate-1": {
+      "description": "__MSG_ypcCommand_rate_1__"
+    },
+    "youtube-rate-2": {
+      "description": "__MSG_ypcCommand_rate_2__"
+    },
+    "youtube-rate-3": {
+      "description": "__MSG_ypcCommand_rate_3__"
+    },
+    "youtube-rate-4": {
+      "description": "__MSG_ypcCommand_rate_4__"
+    },
+    "youtube-rate-5": {
+      "description": "__MSG_ypcCommand_rate_5__"
+    },
+    "youtube-rate-6": {
+      "description": "__MSG_ypcCommand_rate_6__"
+    },
+    "youtube-rate-7": {
+      "description": "__MSG_ypcCommand_rate_7__"
+    },
+    "youtube-rate-8": {
+      "description": "__MSG_ypcCommand_rate_8__"
+    },
+    "youtube-rate-9": {
+      "description": "__MSG_ypcCommand_rate_9__"
+    },
+    "youtube-rate-10": {
+      "description": "__MSG_ypcCommand_rate_10__"
+    },
+    "youtube-rate-11": {
+      "description": "__MSG_ypcCommand_rate_11__"
+    },
+    "youtube-rate-12": {
+      "description": "__MSG_ypcCommand_rate_12__"
+    },
+    "youtube-rate-13": {
+      "description": "__MSG_ypcCommand_rate_13__"
+    },
+    "youtube-rate-14": {
+      "description": "__MSG_ypcCommand_rate_14__"
+    },
+    "youtube-rate-15": {
+      "description": "__MSG_ypcCommand_rate_15__"
+    },
+    "youtube-rate-16": {
+      "description": "__MSG_ypcCommand_rate_16__"
+    },
+    "youtube-volume-1": {
+      "description": "__MSG_ypcCommand_volume_1__"
+    },
+    "youtube-volume-2": {
+      "description": "__MSG_ypcCommand_volume_2__"
+    },
+    "youtube-volume-3": {
+      "description": "__MSG_ypcCommand_volume_3__"
+    },
+    "youtube-volume-4": {
+      "description": "__MSG_ypcCommand_volume_4__"
+    },
+    "youtube-volume-5": {
+      "description": "__MSG_ypcCommand_volume_5__"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/youtube-player-controls-main.js"
+      ],
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://*.youtube-nocookie.com/*"
+      ]
+    }
+  ]
 }

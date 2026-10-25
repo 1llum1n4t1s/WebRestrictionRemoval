@@ -89,7 +89,7 @@ Service worker。役割:
 ### YouTube 機能拡張 (`src/content/search-fixer.js`)
 
 `hideSubscriptionsRelevant` は「動画フィルタ」内の既定OFFオプション。`/feed/subscriptions` で `ytd-rich-shelf-renderer #rich-shelf-header h2` が「関連が強い」または「Most relevant」と一致する `ytd-rich-section-renderer` だけをクラスで非表示にする（日本語DOMは実機確認済み）。見出し・動画・展開ボタン・区切り線を含む欄全体が対象で、通常の新着動画とShorts欄は保持する。既存の設定購読・フィード監視から再判定し、個別OFF・マスターOFF・SPA遷移・終了時はクラスを除去する。
-`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) と `searchFixerBlockedChannels` (配列) の 4 キーで管理（変数名は履歴的に `searchFixer*` を使用）。35 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
+`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) と `searchFixerBlockedChannels` (配列) の 4 キーで管理（変数名は履歴的に `searchFixer*` を使用）。39 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
 
 **チャンネルブロックリスト (`channelBlocklist`、video_filter カテゴリ)**: YouTube ホームの公式「このチャンネルは表示しない」の拡張版。`searchFixerBlockedChannels` (storage key、`{key, name}` 配列) に登録されたチャンネルの動画を **検索結果 + ホーム / 登録チャンネル / 急上昇等のフィードページの両方**から除去する（2026-07-14 に検索結果限定からフィードページへ拡張、category も `search_only` → `video_filter` に変更）。登録 UI は従来どおり **検索結果限定**: 未登録チャンネルのカードに **hover 表示の 🚫 登録ボタン**（`.__cpa-sfx-block-btn`）をチャンネル名 (`ytd-channel-name`) の直後 sibling として注入する（`<a>` の**外**に置く — 中に置くとクリックがナビゲーションと競合する）。実装上の要点:
 - **検索結果の除去 + 登録ボタンは `applyChannelBlocklist()`**（`ytd-video-renderer` / `ytd-channel-renderer` が対象、`removeDistractions()` 内で `isResultsPage()` ゲート済み）
@@ -128,7 +128,7 @@ Service worker。役割:
 **復活禁止の失敗パターン**: 詳細列挙は本ドキュメント末尾の Important Patterns「hideLiveChat（YouTube ライブチャット非表示）」を参照。要約すると `display:none` / `height:0` / `setAttribute("collapsed")` / `#chat-container:has(...){display:none}` / 独自クラスでの frame 全体非表示はすべて NG（SPA panel state を破壊して player 副作用 / 「パネルを開く」消失 / 再展開不能になる）。`visibility:hidden` は layout のみへの影響で Polymer state に介入しないため安全。
 
 **登録チャンネル拡張（v1.0.27 で完成）**: 3 機能セットで構成される。
-1. **`subsChannelsGrid`**: `/feed/channels` をレスポンシブグリッドに変形 + 検索ボックス。各カードは IntersectionObserver で viewport 進入時 lazy fetch で **チャンネルの `/videos` + `/streams` を並列取得** (v7、2026-05-28 から)、HTML 内の thumbnailBadgeViewModel から **LIVE 配信中の videoId を最優先**（`"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"` + `animationActivationTargetId`、言語非依存）、**配信予定 (UPCOMING) の videoId は除外**（`"text":"配信予定"` (ja) / `"Upcoming"` / `"Scheduled"` / `"Premieres"` / `"首播"` 多言語パターンマッチ、雑談チャット用枠の混入を防ぐ）。残り候補は HTML 出現順上位 10 件で maxresdefault HEAD 200 確認 → 全 404 なら hqdefault 30KB 超で Shorts 救済 (v6 から継承)。`sessionStorage` に handle 単位 24h cache (prefix `__cpa_subs_thumb_v5::`)。**サムネ取得は YouTube が `/feeds/videos.xml` を 404 化したため HTML 内 videoId 抽出方式に切替済 (v1.0.27)、その後 v6 で削除済み動画プレースホルダー除外、v7 で LIVE 優先 + UPCOMING 除外**。
+1. **`subsChannelsGrid`**: `/feed/channels` をレスポンシブグリッドに変形 + 検索ボックス。各カードは IntersectionObserver で viewport 進入時にチャンネルの `/videos` を lazy fetch し、LIVE バッジがなければ `/streams` を追加取得する。HTML 内の thumbnailBadgeViewModel から **LIVE 配信中の videoId を最優先**（`"badgeStyle":"THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"` + `animationActivationTargetId`、言語非依存）、**配信予定 (UPCOMING) の videoId は除外**（`"text":"配信予定"` (ja) / `"Upcoming"` / `"Scheduled"` / `"Premieres"` / `"首播"` 多言語パターンマッチ、雑談チャット用枠の混入を防ぐ）。残り候補は HTML 出現順上位 10 件で maxresdefault HEAD 200 を優先し、採用できなければ hqdefault HEAD 200 かつ有効な Content-Length が 30KB 超の画像で Shorts を救済する。`sessionStorage` に handle 単位 24h cache (prefix `__cpa_subs_thumb_v6::`)。null の負キャッシュは、要求した HTML をすべて取得でき、候補が1件以上あり、全候補で maxresdefault 404 かつ hqdefault が404または200・有効長さ30KB以下と確認できた場合だけ保存する。通信失敗・中断・判定不能は負キャッシュに保存せず、中断した処理は正キャッシュも保存しない。**サムネ取得は YouTube が `/feeds/videos.xml` を 404 化したため HTML 内 videoId 抽出方式に切替済 (v1.0.27)、その後 v6 で削除済み動画プレースホルダー除外、v7 で LIVE 優先 + UPCOMING 除外**。
 2. **`subsLeftnavInjectAll`**: YouTube が表示上限で隠す登録チャンネルも全件 leftnav に inline 注入。`/feed/channels` から同一オリジン取得、24h cache。`#items` の中（Polymer dom-repeat 配下）に `<a>` を直接 inject する安全パターン。
 3. **`subsAllShortcut`**: `/feed/channels` への 1 クリックエントリを「登録チャンネル」section の `#items` 内、最初のチャンネル entry の直前に entry エントリ風（高さ 40px / icon 24px / text 72px 位置）で挿入し、公式メニューの一部に見せる。
 
@@ -218,9 +218,9 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 
 **実装パターン**:
 1. **body クラスベースの CSS 駆動**: `applyBodyClasses()` で `<html>` に `__cpa-ig-{reels,explore,stories,...}` クラスを付け外し。CSS 側は各セレクタを `html.__cpa-ig-XXX` で prefix し、クラスが付いていないときは完全に不活性化する
-2. **DOM スイープ (300ms ポーリング)**: `block_videos` 機能では `<article>` 内 `<video>` を検出 → 親に `__cpa-ig-article-video` マーカーを付与 → CSS でサムネ差し替え。ON 直後と capture の `play` イベントで投稿動画を一時停止し、OFF 時に購読を解除する（自動再開はしない）。`vanity` 機能では `<article>` 内 `<button>` の innerText が純粋な数値表現（カンマ・小数点・k/M/万 単位等）にマッチする場合に `__cpa-ig-hide-counter` マーカーを付ける
-3. **URL リダイレクト (300ms ポーリング)**: `reels` / `explore` / `storiesAll` 機能が ON のとき、対応する URL パスでホーム `/` に `location.assign("/")`。SPA の history hook より単純で確実
-4. **master OFF 時の cleanup**: domSweepTimer / urlGuardTimer を停止し、付与済みマーカークラスをすべて剥がして元の Instagram UI に戻す
+2. **DOM スイープ (MutationObserver＋300ms debounce・5秒 fallback)**: DOM 変更を dirty フラグへ集約して走査を予約し、非表示中は走査せず復帰時に再評価する。`block_videos` 機能では `<article>` 内 `<video>` を検出 → 親に `__cpa-ig-article-video` マーカーを付与 → CSS でサムネ差し替え。ON 直後と capture の `play` イベントで投稿動画を一時停止し、OFF 時に購読を解除する（自動再開はしない）。`vanity` 機能では `<article>` 内 `<button>` の innerText が純粋な数値表現（カンマ・小数点・k/M/万 単位等）にマッチする場合に `__cpa-ig-hide-counter` マーカーを付ける
+3. **URL リダイレクト (300ms ポーリング)**: `reels` / `explore` / `storiesAll` 機能が ON のとき、対応する URL パスからホーム `/` に `location.replace("/")` で移動する（失敗時は `location.href`）。履歴へ禁止ページを追加せず、「戻る」による再進入を避ける
+4. **master OFF 時の cleanup**: DOM observer、debounce / fallback timer、urlGuardTimer を停止し、付与済みマーカークラスをすべて剥がして元の Instagram UI に戻す
 
 コメントリストは各項目の時刻がコメント固有の `/c/` permalink 内にあることを確認し、本文混在リストを除外する。詳細ページとモーダルの DIV 判定は最内コンテナだけを対象にし、既に隠したコメントの外側を後続走査で隠さない。
 
@@ -413,3 +413,11 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 - manifest で先行読込した `CleanerCore.subscribeStored` で設定再取得を直列化、SPA 追跡は MutationObserver + `yt-navigate-finish`、`pagehide(persisted=false)` で teardown（bfcache 凍結は温存）
 - context invalidation guard（`chrome.runtime?.id`）で orphan 化時に observer / listener / overlay を撤去
 - top frame 限定（`window === window.top`）、`window.__cpaBroadcastClockRunning` で二重実行防止
+
+### YouTube プレイヤー操作
+
+`liveLatency` / `playbackQuality` / `playbackRate` / `playerVolume` は `watch_page` の既定OFFサブ機能です。詳細値は `SearchFixer.PLAYER_CONTROLS` で正規化し `youtubePlayerSettings` に保存します。popup の詳細設定から追従・しきい値・5表示、画質9枠、速度16枠、音量5枠、標準音量UI表示を編集できます。画質・速度・音量はボタン押下時に切り替えます。既定割当なしの30個の commands はアクティブタブへ `YOUTUBE_PLAYER_COMMAND` を配信します。
+
+詳細設定の画質・速度・音量・しきい値はドロップダウンで選びます。既存設定が候補にない数値を持つ場合も、その値を選択肢へ追加して保持します。
+
+`youtube-player-controls.js` は YouTube / youtube-nocookie の通常ページと埋込フレームへ注入し、live_chat は対象外です。機能ON時だけ `youtube-player-controls-main.js` を読み込み、プレイヤーAPI境界を接続します。MAIN向け公開資源はこのファイルだけをYouTubeに限定します。

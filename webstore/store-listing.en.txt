@@ -18,7 +18,8 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
 
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
-  In addition, the YouTube Enhancements offers 35 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, hiding "Most relevant" in Subscriptions, live-stream connection monitor).
+  YouTube Enhancements offers 39 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, hiding "Most relevant" in Subscriptions, live-stream connection monitor, live-latency reduction, and quality / playback-speed / player-volume buttons).
+  Detailed player settings let you choose visible buttons, their values, and live catch-up behavior. Choose quality and numeric values from dropdowns; quality, speed, and volume buttons apply when clicked. Assign shortcuts in your browser's extension settings.
 
 · 🐦 X cleaner (opt-in, default OFF)
   Nine sub-features that hide distracting UI on X (formerly Twitter).
@@ -169,7 +170,7 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   None of these read, modify, or transmit the page DOM (Video Gamma / Remove video black bars only attach a filter / transform to <video>; they do not read or save video data).
 
   *://*.youtube.com/*:
-  Required for the YouTube Enhancements (35 sub-features including Shorts removal, subscriptions enhancements, and the connection monitor). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view are all implemented via DOM/CSS only. Nothing read is transmitted off-device.
+  Required for YouTube Enhancements (39 sub-features including Shorts removal, subscriptions enhancements, the connection monitor, live-latency reduction, and quality / speed / volume buttons). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view use DOM/CSS operations. Player controls also use YouTube's in-page player API. Nothing read is transmitted off-device.
 
   *://www.amazon.co.jp/auto-deliveries*:
   Required to show Amazon recurring-delivery totals. The script reads unit prices and quantities in Manage pages, or `subscription-price` on legacy monthly pages, and inserts the total into the same page. Nothing read is transmitted off-device.

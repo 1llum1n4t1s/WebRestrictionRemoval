@@ -2098,3 +2098,8 @@ kagayoi-support-footer {
 .range:focus-visible,
 .eq-slider:focus-visible,
 .volume-step-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.player-settings { padding: 8px 12px; border-bottom: 1px solid var(--rule); font-size: 12px; }
+.player-settings summary { cursor: pointer; }
+.player-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 7px 0; }
+.player-settings-row select { width: 100px; background: var(--bg); color: inherit; border: 1px solid var(--rule); border-radius: 6px; padding: 4px; }
