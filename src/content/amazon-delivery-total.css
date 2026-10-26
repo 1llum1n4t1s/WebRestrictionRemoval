@@ -12,7 +12,11 @@
  */
 
 .__cpa-amzn-delivery-total {
-  display: block;
+  /* 直前の Amazon 注意表示（float: left）の下で、内容も独立して全幅に配置する。 */
+  display: flow-root;
+  clear: both;
+  box-sizing: border-box;
+  width: 100%;
   margin-top: 12px;
   padding: 10px 14px;
   background: linear-gradient(180deg, #fff8ec 0%, #ffeed1 100%);
@@ -47,6 +51,7 @@
 }
 
 .__cpa-amzn-delivery-total__price {
+  white-space: nowrap;
   /* 数字を tabular で整列 */
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
