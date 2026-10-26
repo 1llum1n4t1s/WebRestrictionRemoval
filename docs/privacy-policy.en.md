@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: October 21, 2026
+Last updated: October 27, 2026
 
 ## Introduction
 

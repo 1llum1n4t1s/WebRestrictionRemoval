@@ -2,7 +2,7 @@
 
 > [English version](privacy-policy.en.md) is also available.
 
-最終更新日: 2026年10月21日
+最終更新日: 2026年10月27日
 
 ## はじめに
 
