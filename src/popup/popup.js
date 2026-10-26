@@ -1290,14 +1290,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       const value = index === undefined ? settings[group][key] : settings[group][key][index];
       // 同期・バックアップで復元された既存の値も、選択肢へ残して表示する。
       if (typeof value === "number") addNumericOption(input, group, key, value);
-      if (input.type === "checkbox") input.checked = value; else input.value = value;
+      if (input.type === "checkbox") input.checked = value;
+      else input.value = key === "values" && !settings[group].enabled[index] ? "disabled" : value;
     } };
     const add = (parent, group, key, index) => {
       const fallback = index === undefined ? settings[group][key] : settings[group][key][index];
+      const buttonSlot = key === "values" && index !== undefined;
       const label = document.createElement("label"); label.className = "player-settings-row";
       const text = document.createElement("span");
-      text.textContent = index === undefined ? i18n("yp_" + key) : i18n(key === "enabled" ? "yp_showButton" : "yp_buttonValue", String(index + 1));
+      text.textContent = index === undefined ? i18n("yp_" + key) : i18n("yp_buttonValue", String(index + 1));
       const input = document.createElement(typeof fallback === "boolean" ? "input" : "select");
+      if (buttonSlot) {
+        const disabled = document.createElement("option");
+        disabled.value = "disabled";
+        disabled.textContent = i18n("yp_disabled");
+        input.append(disabled);
+      }
       if (typeof fallback === "string") for (const value of spec.QUALITY_VALUES) { const option = document.createElement("option"); option.value = value; option.textContent = ({ tiny: "144p", small: "240p", medium: "360p", large: "480p", hd720: "720p", hd1080: "1080p", hd1440: "1440p", hd2160: "2160p", auto: i18n("yp_auto") })[value]; input.append(option); }
       else if (typeof fallback === "number") {
         input.required = true;
@@ -1305,8 +1313,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else input.type = "checkbox";
       input.addEventListener("change", async () => {
         if (!input.checkValidity()) { input.reportValidity(); refresh(); return; }
+        const disabled = buttonSlot && input.value === "disabled";
         const value = input.type === "checkbox" ? input.checked : typeof fallback === "number" ? Number(input.value) : input.value;
-        const patch = { [group]: { [key]: index === undefined ? value : { [index]: value } } };
+        // 値と有効状態は同じパッチで保存し、無効化では以前の値を保持する。
+        const patch = buttonSlot
+          ? { [group]: { enabled: { [index]: !disabled }, ...(!disabled ? { values: { [index]: value } } : {}) } }
+          : { [group]: { [key]: index === undefined ? value : { [index]: value } } };
         try { const response = await chrome.runtime.sendMessage({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data: patch, syncGeneration: stored[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null });
           if (!response?.ok) throw new Error("save-failed");
           settings = spec.mergeSettings(settings, patch); status.textContent = "";
@@ -1321,6 +1333,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const summary = document.createElement("summary"); summary.textContent = i18n("yp_details"); details.append(summary);
       const note = document.createElement("p"); note.className = "fr-desc"; note.textContent = i18n(group === "latency" ? "yp_latencyNote" : "yp_buttonNote"); details.append(note);
       for (const [key, value] of Object.entries(settings[group])) {
+        if (key === "enabled" && Array.isArray(value)) continue;
         if (Array.isArray(value)) value.forEach((_, index) => add(details, group, key, index));
         else add(details, group, key);
       }

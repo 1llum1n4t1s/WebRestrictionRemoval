@@ -82,7 +82,7 @@ Service worker。役割:
 
 **5 サブ機能 + 1 グローバル nav**: Shelf / Chip / Sidebar / Redirect / Btn の 5 サブ機能と「ホーム / Shorts / 登録チャンネル」global nav を 1 ファイルで担当。CSS は機能ごとに `__cpa-yt-shorts-hide-shelf` / `__cpa-yt-shorts-hide-chip` / `__cpa-yt-shorts-hide-sidebar` / `__cpa-yt-shorts-redirect-active` クラスを `<html>` に付け外し（per-feature 独立化、Claude Code P2 指摘で v1.0.18 にて分割済）。
 
-**YouTube 機能拡張への統合**: 独立 storage key と独自メッセージは持たず、YouTube 機能拡張のサブ機能として動作（`searchFixerFeatures.removeShortsShelf` / `removeShortsChip` / `removeShortsSidebar` / `redirectShortsUrl` / `removeShortsBtn`）。アクティブ判定は `searchFixerEnabled === true` AND 各 features フラグの AND。`APPLY_SEARCH_FIXER_CS` メッセージを search-fixer.js と共に購読する（同一 isolated world で同じメッセージを 2 ファイルが受けて、それぞれの責務に応じて反応する設計）。`storage.onChanged` は片方の key だけ変わった場合に備え、両 key を再取得してから `computeActive()` で判定する（変更されてないキーが undefined になる罠を回避）。
+**YouTube 機能拡張への統合**: 独立 storage key と独自メッセージは持たず、YouTube 機能拡張のサブ機能として動作（`searchFixerFeatures.removeShortsShelf` / `removeShortsChip` / `removeShortsSidebar` / `redirectShortsUrl` / `removeShortsBtn`）。アクティブ判定は `searchFixerEnabled === true` AND 各 features フラグの AND。`APPLY_SEARCH_FIXER_CS` メッセージを search-fixer.js と共に購読する（同一 isolated world で同じメッセージを 2 ファイルが受けて、それぞれの責務に応じて反応する設計）。`storage.onChanged` は通知された key の値を保持状態へ直接反映し、`computeActive()` で判定する。初回取得は未通知の key だけを補完し、遅れて届いた初期値で新しい通知値を上書きしない。
 
 **サイドバー 多言語対応**: `aria-label="Shorts"` (英語) と `aria-label="ショート"` (日本語) を CSS selector に併記する。日本語ロケールの初期 flash を CSS で即時非表示にするため。`title` 属性も同様。
 
@@ -310,15 +310,14 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 - **動画 chunk 実 throughput 計測 (PerformanceObserver)**: `navigator.connection.downlink` は Chromium のプライバシー保護で bucket 化された粗い見積もり値（10 Mbps 以上で頭打ち等、ゆろ君環境実測で常に 10.0 固定）なため、`PerformanceObserver({ type: "resource", buffered: true })` で `googlevideo.com` の resource entries を拾い `transferSize / (responseEnd - responseStart)` から実 throughput を計算してリング (30 サンプル) に蓄積する。**TAO（Timing-Allow-Origin）ヘッダ無しの cross-origin リクエストは `transferSize === 0` で除外**、**`VIDEO_CHUNK_MIN_BYTES` (50 KB) 未満の小 chunk は warmup overhead 支配で除外**。HUD のコンパクト Mbps と「帯域 60 秒」min/avg/max は **この実 throughput median を優先**、未計測時のみ `navigator.connection.downlink` にフォールバック（実機実測で navigator.connection 10.0 固定 vs 実 throughput min 0.08 / median 32.15 / max 34.9 Mbps と段違いの精度差を確認）
 - **経路診断 (5 秒周期)**: `https://www.gstatic.com/generate_204` (Google エッジ) と `https://speed.cloudflare.com/__down?bytes=10` (Cloudflare 国際ベースライン) に対して **`fetch(url, { mode: "no-cors", credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.any([diagnosisAbort.signal, AbortSignal.timeout(4500)]) })`** を発射し `performance.now()` 差分で RTT 実測。レスポンス本文は破棄、`response.ok` も見ない (no-cors なので opaque)。timeout / network error は `null` 扱いで ring buffer (6 サンプル = 30 秒) に格納し median を分類器に渡す
 - **分類 (`ConnectionMonitor.classify(input)`)**: 純粋関数として `actions.js` に集約。直近 60 秒のバッファ回数 + buffering 時の downlink / baseline downlink / dropped frame 比率 / Google RTT / Cloudflare RTT を入力に **7 分類**: `stable` / `network` (回線) / `device` (端末性能) / `youtube_cdn` (YouTube CDN 個別不調) / `routing` (Google エッジ・ルーティング) / `international` (国際線・中継 ISP) / `unknown` (計測中)
-- **HUD UI (2 段構成: コンパクト + 詳細展開)**: in-player 右上 (`#movie_player` の絶対配置子) に表示。
-  - **コンパクト時 (デフォルト)**: 判定ラベル (verdict) + メトリクス 1 行 (`バッファ N 回 / 1 分 · BW Mbps · RTT ms`) を常時表示
-  - **▼ ボタンで詳細展開**: コンパクトに加えて 3 つの詳細セクションが下に追加される
+- **共通オーバーレイの接続状態行**: 分類名・判定ラベル (verdict) と、数値・詳細を分けて表示する。
+  - **数値メトリクス**: `バッファ N 回 / 1 分 · BW Mbps · RTT ms` を常時表示
+  - **詳細**: 次の 3 セクションも常時表示し、項目が多い場合は共通枠内をスクロールする
     1. **経路 RTT 個別**: Google / Cloudflare それぞれの median と sample 数を 2 行で（例: `Google: 23 ms (6 回)` / `Cloudflare: 18 ms (6 回)`）→ 経路切り分けの根拠が見える
     2. **直近バッファ履歴**: 最大 5 件、新しい順、相対時刻 + 起きた瞬間の帯域（例: `12 秒前 · 8.1 Mbps`）→ 「ちょうど今クルクルしたよね？」の客観タイムスタンプ
     3. **帯域 60 秒統計**: `最小 / 平均 / 最大` Mbps → 平均だけだと隠れる「瞬間的な帯域低下」を可視化
   - **dropped frames（端末性能指標）は表示しない方針** — ローカル GPU/CPU の性能は端末利用者が対処不能な情報のため UI で表示しない（内部で `device` 判定の根拠として使うが、それは verdict ラベルだけで十分）
-  - **ドラッグで位置移動**・**▼ ボタンで折りたたみ ⇔ 展開**、位置と折りたたみ状態は `localStorage` に永続化 (`__cpa_cm_overlay_pos` / `__cpa_cm_overlay_collapsed`)。`:fullscreen` でも追従
-  - 折りたたみ時の CSS 対象は `.__cpa-cm-detail` のみ（`.__cpa-cm-body` 全体ではない）→ metric 1 行は常時見える設計
+  - **画質・再生速度・音量と共通のオーバーレイ**に接続状態の分類行を登録する。判定・数値メトリクス・詳細を表示し、個別のドラッグ・折りたたみ・位置保存は行わない。プレイヤー内への設置・全画面追従は `youtube-player-overlay.js` が担当する
 
 **プライバシー / セキュリティ**:
 - **endpoint は HTTPS 公開ヘルスチェックの 2 つに固定** (`actions.js` の `ConnectionMonitor.ENDPOINT_GOOGLE` / `ENDPOINT_CLOUDFLARE`、テスト `test/actions.test.js` で値固定をアサート)。任意 URL fetch / DNS query 可能化はしない
@@ -340,7 +339,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 - HUD render は 250ms スロットルで rAF coalesce、ring buffer 更新は毎秒 + 古いサンプル切り捨て
 - Extension context invalidation guard を sample / diagnose / observer callback の入口に配置、orphan 化したら全 timer clear + observer disconnect + overlay 撤去
 - DOM 構築は `createElement` ベース (YouTube の Trusted Types policy に対応、isolated world でも安全側)
-- fetch には `AbortSignal.timeout(4500)` 必須 (永久 pending を防ぐ、5s 周期より短い)。次サイクル開始時の in-flight キャンセルと両立させるため `AbortSignal.any([diagnosisAbort.signal, AbortSignal.timeout(ENDPOINT_TIMEOUT_MS)])` で 2 signal を束ねる (手動 setTimeout/clearTimeout は使わない、min Chrome 140 で `AbortSignal.any` = 124+ / `AbortSignal.timeout` = 116+ 利用可)
+- fetch には `AbortSignal.timeout(4500)` 必須 (永久 pending を防ぐ、5s 周期より短い)。background で設定 OFF・遷移時の in-flight キャンセルと両立させるため `AbortSignal.any([record.controller.signal, AbortSignal.timeout(ENDPOINT_TIMEOUT_MS)])` で 2 signal を束ねる (手動 setTimeout/clearTimeout は使わない、min Chrome 140 で `AbortSignal.any` = 124+ / `AbortSignal.timeout` = 116+ 利用可)
 
 **分類器 (`ConnectionMonitor.classify`) の優先順位**: `actions.js` の純粋関数として `test/actions.test.js` で境界値テスト済み。
 1. バッファ 0 回 → `stable`
@@ -396,7 +395,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 **その他の不変条件**: 対象ページは `/watch`（単一）/ `/results` / `/playlist` / チャンネルの `/videos` `/streams`（一括）。一括系は**描画済みカードのみ**が対象で、件数をボタンに出すので「全部入っていない」誤解を防ぐ。URL は `NotebookLm.normalizeWatchUrl` で `watch?v=<id>` に正規化（`&list=` 等が残ると Gemini Notebook 側で重複ソース化する）。上限超過分は黙って捨てず件数を表示する。`createElement` ベースで Trusted Types 安全、`CleanerCore.subscribeStored` による設定再取得の直列化、context invalidation guard、`pagehide(persisted=false)` teardown、`__cpa-nlm-` プレフィックス。
 
 ### 配信時刻オーバーレイ (`src/content/youtube-broadcast-clock.{js,css}`)
-`*://*.youtube.com/*` の top frame に注入（`document_idle`、**接続モニターと同じ content_scripts エントリに相乗り**で actions.js 二重ロードを回避）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.broadcastClock`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず、`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と共に購読し `computeActive()` で判定。接続モニター / Shorts 5 サブ機能と同じ統合方式）。**ライブ配信のアーカイブ（過去ライブの VOD）再生中に、その瞬間が実際に配信されていた時刻を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・ローカルタイム）で HUD 表示する（body 直下 `position:fixed`、初期位置はプレーヤー左上付近、ドラッグで動画の外側を含む viewport 上の任意位置へ移動可）**。純粋ロジックは `actions.js` の `BroadcastClock` namespace、DOM / fetch / lifecycle のみ本 cs が担当。
+`*://*.youtube.com/*` の top frame に注入（`document_idle`、**接続モニターと同じ content_scripts エントリに相乗り**で actions.js 二重ロードを回避）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.broadcastClock`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず、`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と共に購読し `computeActive()` で判定。接続モニター / Shorts 5 サブ機能と同じ統合方式）。**ライブ配信のアーカイブ（過去ライブの VOD）再生中に、その瞬間が実際に配信されていた時刻を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・ローカルタイム）で HUD 表示する（画質・再生速度・音量と共通のプレイヤー内オーバーレイ）**。純粋ロジックは `actions.js` の `BroadcastClock` namespace、DOM / fetch / lifecycle のみ本 cs が担当。
 
 **配信時刻の算出**: `配信時刻 = liveBroadcastDetails.startTimestamp + video.currentTime`。`BroadcastClock.computeBroadcastEpochMs(startMs, currentTimeSec)` で epoch を出し `BroadcastClock.formatTimestamp(epochMs)` で整形する（両純粋関数とも `test/actions.test.js` で境界値テスト。全角スペース・ゼロ埋め・24 時間制を固定アサート）。
 
@@ -407,7 +406,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 **精度の限界**: `currentTime=0` が配信開始ちょうどに対応する線形マッピング前提のため、配信途中の回線断・再接続や編集カットがあるアーカイブでは、その地点以降に実時刻がずれる（原理的限界でどんな実装でも避けられない。messages.json の機能説明にも明記）。
 
 **HUD UI / 実装上の不変条件（youtube-connection-monitor.js PATTERN SYNC）**:
-- **body 直下の `position:fixed`** な ROG クリムゾン HUD。初期位置はプレーヤー左上付近（接続モニターは右上なのでデフォルト位置を分けて衝突回避）、ドラッグで**動画の外側を含む viewport 上の任意位置**へ移動可。位置は `localStorage`（`__cpa_bc_overlay_pos`、viewport 座標）に永続化し、resize / フルスクリーン切替で viewport 内へ clamp。フルスクリーン中は `fullscreenchange` で `document.fullscreenElement` へ reparent（top layer 配下でないと描画されないため）。`#movie_player` への attach に依存しないので、機能 ON 直後やプレーヤー再構築中でもリロード不要で表示できる
+- **画質・再生速度・音量と共通のオーバーレイ**に「配信時刻」の分類行を登録する。独立した浮遊枠・ドラッグ・位置保存は持たず、プレイヤー再構築時の再接続・全画面追従は `youtube-player-overlay.js` が担当する
 - 時刻更新は video の `timeupdate` / `seeked` イベント駆動 + `RENDER_THROTTLE_MS`（250ms）throttle の rAF coalesce（一時停止中は currentTime 固定なので最後の値で静止）
 - `createElement` ベースで Trusted Types 安全、`__cpa-bc-` クラスプレフィックスで名前空間化
 - manifest で先行読込した `CleanerCore.subscribeStored` で設定再取得を直列化、SPA 追跡は MutationObserver + `yt-navigate-finish`、`pagehide(persisted=false)` で teardown（bfcache 凍結は温存）
@@ -416,8 +415,14 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 
 ### YouTube プレイヤー操作
 
+`youtube-player-overlay.js` は画質・再生速度・音量・ライブ遅延指標、接続モニター、配信時刻の共通ホストを所有する。両 manifest で利用側より前に読み込み、重複ロードを防止する。`mount(name, node)` / `remove(name)` で各機能の分類を登録し、表示順はプレイヤー操作 → 配信時刻 → 接続モニター。プレイヤーの既存操作領域の上へ単一のスクロール可能な枠を設置し、各分類を見出しとセパレーターで分ける。登録が残る間はプレイヤー・操作領域の生成を待ち、差し替え時は同じ分類ノードを再配置する。全登録の撤去時にホストと監視を解放し、context 失効・通常の pagehide でも撤去する。bfcache の pagehide では登録を保ち、pageshow で再接続する。接続モニターと配信時刻はプレイヤー操作の設定や MAIN セッションから独立して表示できる。
+
 `liveLatency` / `playbackQuality` / `playbackRate` / `playerVolume` は `watch_page` の既定OFFサブ機能です。詳細値は `SearchFixer.PLAYER_CONTROLS` で正規化し `youtubePlayerSettings` に保存します。popup の詳細設定から追従・しきい値・5表示、画質9枠、速度16枠、音量5枠、標準音量UI表示を編集できます。画質・速度・音量はボタン押下時に切り替えます。既定割当なしの30個の commands はアクティブタブへ `YOUTUBE_PLAYER_COMMAND` を配信します。
 
 詳細設定の画質・速度・音量・しきい値はドロップダウンで選びます。既存設定が候補にない数値を持つ場合も、その値を選択肢へ追加して保持します。
 
-`youtube-player-controls.js` は YouTube / youtube-nocookie の通常ページと埋込フレームへ注入し、live_chat は対象外です。機能ON時だけ `youtube-player-controls-main.js` を読み込み、プレイヤーAPI境界を接続します。MAIN向け公開資源はこのファイルだけをYouTubeに限定します。
+画質・速度・音量の各ボタン枠は、値のドロップダウンに「無効」を含め、有効状態のチェックボックスを分けません。値を選ぶと `values[index]` と `enabled[index]=true` を同じ部分パッチで保存し、「無効」は `enabled[index]=false` だけを保存して既存の値を保持します。保存形式・同期・手動バックアップの契約は維持します。
+
+`youtube-player-controls.js` は YouTube / youtube-nocookie の通常ページと埋込フレームへ注入し、live_chat は対象外です。`youtube-player-controls-main.js` は同じ範囲へ manifest の `world: "MAIN"` で直接注入します。ページへ `<script src="chrome-extension://…">` を追加する経路と、そのための web_accessible_resources は持ちません。MAIN は開始メッセージの受付だけを常駐させ、機能 ON 時に isolated 側のセッション付き slot を確認して操作エンジンを開始します。`available` / `start` / `ready` / `settings` の通知と heartbeat により読込順・プレイヤー生成待ちに対応し、OFF・SPA・期限切れでエンジンを撤去して再開可能にします。MAIN は権限 API・fetch・保存を持ちません。
+
+接続モニターの固定経路 RTT は `src/background/connection-monitor.js` が実行します。content script は UUID 付きの計測・取消メッセージだけを送り、background は自拡張の top frame・YouTube HTTPS の動画 URL・設定 ON・現在のタブの動画を検証します。URL は受け取らず固定 2 endpoint だけへ送信し、本文を破棄して RTT の数値だけ返します。認可待ちから世代を予約し、タブ単位で最低 5 秒の開始間隔、4.5 秒 timeout、OFF・遷移・タブ終了時の abort を適用します。content script は遅着した旧応答を破棄し、遷移開始時にライブの sticky 判定を解除して finish まで再開しません。Chrome の importScripts と Firefox の background.scripts で同じモジュールを先行ロードします。

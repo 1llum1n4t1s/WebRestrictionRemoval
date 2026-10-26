@@ -2,13 +2,9 @@
 //
 // ライブ配信のアーカイブ（過去のライブを VOD 化したもの）を再生中、その瞬間が「実際に
 // 配信されていた時刻」を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・
-// ローカルタイム）で HUD 表示する。overlay は body 直下の position:fixed 要素で、ドラッグで
-// 動画の外側を含む viewport 上の任意位置へ移動できる（初期位置はプレーヤー左上付近、位置は
-// localStorage 永続化 + viewport 内へ clamp）。`#movie_player` への attach に依存しないため、
-// プレーヤー DOM の再構築タイミングに関係なく表示できる。`*://*.youtube.com/*` の top frame
-// のみで動作し、配信アーカイブ（liveBroadcastDetails を持ち isLiveNow !== true）のときだけ出す。
-// フルスクリーン中は top layer の :fullscreen 要素配下でないと描画されないため、
-// fullscreenchange で document.fullscreenElement へ reparent する。
+// ローカルタイム）で、プレーヤー操作と共通の枠内に表示する。
+// YouTube の top frame のみで動作し、配信アーカイブ
+// （liveBroadcastDetails を持ち isLiveNow !== true）のときだけ出す。
 //
 // 有効化は YouTube 機能拡張のサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.broadcastClock` の両方 true で activate（独立 storage key は持たず、
@@ -40,9 +36,6 @@
   if (!chrome?.runtime?.id) return;
 
   // ---------- 定数 / クラス名 ----------
-  const ROOT_CLASS = "__cpa-bc-overlay";
-  const ROOT_DRAG_CLASS = "__cpa-bc-dragging";
-  const HANDLE_CLASS = "__cpa-bc-handle";
   const TIME_CLASS = "__cpa-bc-time";
 
   // ---------- 状態 ----------
@@ -75,16 +68,9 @@
   let active = false;
   /** MutationObserver callback の rescan を rAF coalesce するフラグ */
   let rescanScheduled = false;
-  /** window resize の clamp を rAF coalesce するフラグ */
-  let resizeClampScheduled = false;
 
   /** @type {number} 最終 render 時刻（throttle 判定） */
   let lastRenderAt = 0;
-
-  /** ドラッグ状態 */
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-  let dragging = false;
 
   // ---------- ユーティリティ ----------
 
@@ -97,24 +83,6 @@
       }
     } catch {}
     return fallback ?? "";
-  }
-
-  /** localStorage 読み込み（解析失敗・利用不可は null） */
-  function readLocal(key) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  /** localStorage 書き込み（失敗は無視） */
-  function writeLocal(key, value) {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
   }
 
   /** sessionStorage 読み込み（解析失敗・利用不可は null） */
@@ -155,11 +123,6 @@
   function findPlayerVideo() {
     const v = document.querySelector("ytd-player video, #movie_player video, video.html5-main-video, video");
     return v instanceof HTMLVideoElement ? v : null;
-  }
-
-  /** プレーヤーコンテナ要素を返す（オーバーレイの位置決め基準） */
-  function findPlayerContainer() {
-    return document.querySelector("#movie_player") || document.querySelector("ytd-player");
   }
 
   // ---------- 配信情報の取得（fetch + cache） ----------
@@ -214,133 +177,33 @@
 
   function buildOverlay() {
     if (overlayEl) return overlayEl;
-
     overlayEl = document.createElement("div");
-    overlayEl.className = ROOT_CLASS;
+    overlayEl.className = "__cpa-ypc-group __cpa-bc-section";
     overlayEl.setAttribute("role", "status");
     overlayEl.setAttribute("aria-live", "off");
-    // Trusted Types 環境（YouTube は対応サイト）でも安全に動くよう innerHTML は使わず createElement で構築
-
-    // ハンドル: アイコン + ラベル（ドラッグで移動）
-    const handle = document.createElement("div");
-    handle.className = HANDLE_CLASS;
-    handle.setAttribute("aria-label", i18n("bcDragHandle", "ドラッグで移動"));
-
-    const icon = document.createElement("span");
-    icon.className = "__cpa-bc-icon";
-    icon.textContent = "🔴";
-    handle.appendChild(icon);
-
+    const heading = document.createElement("div");
+    heading.className = "__cpa-ypc-heading";
     const label = document.createElement("span");
-    label.className = "__cpa-bc-label";
+    label.className = "__cpa-ypc-label";
     label.textContent = i18n("bcOverlayLabel", "配信時刻");
-    handle.appendChild(label);
-
-    overlayEl.appendChild(handle);
-
-    // 時刻表示
+    heading.appendChild(label);
+    overlayEl.appendChild(heading);
     overlayTimeEl = document.createElement("div");
     overlayTimeEl.className = TIME_CLASS;
     overlayTimeEl.textContent = "—";
     overlayEl.appendChild(overlayTimeEl);
-
-    // ドラッグ
-    handle.addEventListener("mousedown", onDragStart, true);
-
-    // 位置: ユーザーがドラッグした位置（viewport 座標）があれば復元。無ければプレーヤー左上
-    // 付近を初期位置にする（プレーヤー未検出時は CSS デフォルトの viewport 左上 12px）。
-    const pos = readLocal(BroadcastClock.LS_KEY_OVERLAY_POS);
-    if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
-      overlayEl.style.left = `${pos.left}px`;
-      overlayEl.style.top = `${pos.top}px`;
-      overlayEl.style.right = "auto";
-    } else {
-      const rect = findPlayerContainer()?.getBoundingClientRect();
-      if (rect && rect.width > 0) {
-        overlayEl.style.left = `${Math.max(0, rect.left + 12)}px`;
-        overlayEl.style.top = `${Math.max(0, rect.top + 12)}px`;
-        overlayEl.style.right = "auto";
-      }
-    }
-
     return overlayEl;
-  }
-
-  /** overlay の親要素（フルスクリーン中は top layer の :fullscreen 要素配下でないと描画されない） */
-  function currentOverlayHost() {
-    return document.fullscreenElement || document.body || document.documentElement;
   }
 
   function attachOverlay() {
     if (!overlayEl) return;
-    const host = currentOverlayHost();
-    if (!host) return;
-    // position:fixed なので親はどこでも座標は viewport 基準。プレーヤー DOM に依存しない
-    if (overlayEl.parentElement !== host) {
-      host.appendChild(overlayEl);
-    }
-    clampOverlayIntoViewport();
-  }
-
-  /** 保存位置がウィンドウリサイズ / フルスクリーン切替で viewport 外に取り残されないよう clamp する */
-  function clampOverlayIntoViewport() {
-    if (!overlayEl) return;
-    const rect = overlayEl.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return; // 未レイアウト
-    const maxLeft = Math.max(0, window.innerWidth - rect.width);
-    const maxTop = Math.max(0, window.innerHeight - rect.height);
-    const left = Math.max(0, Math.min(maxLeft, rect.left));
-    const top = Math.max(0, Math.min(maxTop, rect.top));
-    if (left !== rect.left || top !== rect.top) {
-      overlayEl.style.left = `${left}px`;
-      overlayEl.style.top = `${top}px`;
-      overlayEl.style.right = "auto";
-    }
+    window.__cpaYouTubeOverlay.mount("broadcast", overlayEl);
   }
 
   function removeOverlay() {
-    if (!overlayEl) return;
-    try { overlayEl.remove(); } catch {}
+    window.__cpaYouTubeOverlay.remove("broadcast");
     overlayEl = null;
     overlayTimeEl = null;
-  }
-
-  function onDragStart(ev) {
-    if (!overlayEl) return;
-    if (ev.button !== 0) return;
-    const rect = overlayEl.getBoundingClientRect();
-    dragOffsetX = ev.clientX - rect.left;
-    dragOffsetY = ev.clientY - rect.top;
-    dragging = true;
-    overlayEl.classList.add(ROOT_DRAG_CLASS);
-    document.addEventListener("mousemove", onDragMove, true);
-    document.addEventListener("mouseup", onDragEnd, true);
-    ev.preventDefault();
-  }
-
-  function onDragMove(ev) {
-    if (!dragging || !overlayEl) return;
-    // position:fixed の viewport 座標で clamp。プレーヤーの内外を問わず画面内の任意位置へ置ける
-    const left = Math.max(0, Math.min(window.innerWidth - overlayEl.offsetWidth, ev.clientX - dragOffsetX));
-    const top = Math.max(0, Math.min(window.innerHeight - overlayEl.offsetHeight, ev.clientY - dragOffsetY));
-    overlayEl.style.left = `${left}px`;
-    overlayEl.style.top = `${top}px`;
-    overlayEl.style.right = "auto";
-  }
-
-  function onDragEnd() {
-    if (!dragging) return;
-    dragging = false;
-    if (overlayEl) {
-      overlayEl.classList.remove(ROOT_DRAG_CLASS);
-      const left = parseFloat(overlayEl.style.left);
-      const top = parseFloat(overlayEl.style.top);
-      if (Number.isFinite(left) && Number.isFinite(top)) {
-        writeLocal(BroadcastClock.LS_KEY_OVERLAY_POS, { left, top });
-      }
-    }
-    document.removeEventListener("mousemove", onDragMove, true);
-    document.removeEventListener("mouseup", onDragEnd, true);
   }
 
   // ---------- 描画 ----------
@@ -377,22 +240,6 @@
   }
   function onLoadedMetadata() {
     rescan();
-  }
-
-  /** フルスクリーン切替: overlay を描画可能な host（:fullscreen 要素 / body）へ付け替える */
-  function onFullscreenChange() {
-    if (!active || !overlayEl) return;
-    attachOverlay();
-  }
-
-  /** ウィンドウリサイズ: 保存位置が viewport 外に取り残されないよう rAF coalesce で clamp */
-  function onWindowResize() {
-    if (!active || !overlayEl || resizeClampScheduled) return;
-    resizeClampScheduled = true;
-    requestAnimationFrame(() => {
-      resizeClampScheduled = false;
-      clampOverlayIntoViewport();
-    });
   }
 
   function attachVideoListeners(video) {
@@ -550,8 +397,6 @@
     } catch {}
 
     document.addEventListener("yt-navigate-finish", onYtNavigateFinish, true);
-    document.addEventListener("fullscreenchange", onFullscreenChange, true);
-    window.addEventListener("resize", onWindowResize, true);
   }
 
   function onYtNavigateFinish() {
@@ -577,17 +422,7 @@
     }
     try {
       document.removeEventListener("yt-navigate-finish", onYtNavigateFinish, true);
-      document.removeEventListener("fullscreenchange", onFullscreenChange, true);
-      window.removeEventListener("resize", onWindowResize, true);
     } catch {}
-    // ドラッグ中に master OFF / orphan 化した場合の document リスナー残留を防ぐ
-    if (dragging) {
-      dragging = false;
-      try {
-        document.removeEventListener("mousemove", onDragMove, true);
-        document.removeEventListener("mouseup", onDragEnd, true);
-      } catch {}
-    }
     hideClock();
   }
 

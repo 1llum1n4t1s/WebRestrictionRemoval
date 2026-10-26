@@ -1,23 +1,51 @@
-.__cpa-ypc-controls {
+.__cpa-ypc-overlay {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 0;
   max-width: 100%;
   position: absolute;
   left: 0;
   right: 0;
   bottom: 100%;
-  max-height: 120px;
+  max-height: min(360px, 50vh);
+  box-sizing: border-box;
+  padding: 4px 10px;
   overflow-y: auto;
-  background: rgb(0 0 0 / 65%);
+  background: rgb(0 0 0 / 80%);
   border-radius: 4px;
   scrollbar-width: none;
   vertical-align: top;
+  color: #eee;
+  font: 12px / 1.4 sans-serif;
 }
-.__cpa-ypc-controls[hidden], .__cpa-ypc-controls [hidden] { display: none !important; }
-.__cpa-ypc-group { display: inline-flex; flex-wrap: wrap; align-items: center; max-width: 100%; }
-.__cpa-ypc-group + .__cpa-ypc-group { margin-left: 6px; }
+.__cpa-ypc-overlay[hidden], .__cpa-ypc-overlay [hidden] { display: none !important; }
+.__cpa-ypc-controls { display: flex; flex-direction: column; min-width: 0; }
+.__cpa-ypc-controls:not(:has(.__cpa-ypc-heading, button:not([hidden]))) { display: none; }
+.__cpa-ypc-player:not(:has(.__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
+.__cpa-ypc-overlay:not(:has(> .__cpa-ypc-section:not(.__cpa-ypc-player), .__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
+.__cpa-ypc-section { flex: none; min-width: 0; }
+.__cpa-ypc-section:not(.__cpa-ypc-player) ~ .__cpa-ypc-section,
+.__cpa-ypc-player:has(.__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden]))) ~ .__cpa-ypc-section { border-top: 1px solid rgb(255 255 255 / 25%); }
+.__cpa-ypc-group { display: flex; align-items: stretch; min-width: 0; max-width: 100%; padding: 6px 0; }
+.__cpa-ypc-group + .__cpa-ypc-group { border-top: 1px solid rgb(255 255 255 / 25%); }
+.__cpa-ypc-heading {
+  display: flex;
+  flex: 0 0 104px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  margin-right: 10px;
+  padding-right: 10px;
+  border-right: 1px solid rgb(255 255 255 / 25%);
+  font: 12px / 1.4 sans-serif;
+  color: #fff;
+}
+.__cpa-ypc-label { font-weight: 600; }
+.__cpa-ypc-current { color: #ffaaa5; font-variant-numeric: tabular-nums; }
+.__cpa-ypc-choices { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-width: 0; }
+.__cpa-ypc-live { flex-wrap: wrap; }
+.__cpa-ypc-live:not(:has(button:not([hidden]))) { display: none; }
 .ytp-button.__cpa-ypc-button {
   width: auto;
   min-width: 34px;

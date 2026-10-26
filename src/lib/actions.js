@@ -19,6 +19,9 @@ const Actions = Object.freeze({
   /** ポップアップ → background: 設定変更を反映 */
   APPLY_SETTINGS: "applySettings",
   IMPORT_SETTINGS: "importSettings",
+  /** 接続モニター content script → background: 固定経路の RTT 計測と中止 */
+  CONNECTION_MONITOR_PROBE: "connectionMonitorProbe",
+  CONNECTION_MONITOR_CANCEL: "connectionMonitorCancel",
   /** background → YouTube content script: YouTube 機能拡張設定を反映（Shorts 削除も含む） */
   APPLY_SEARCH_FIXER_CS: "applySearchFixerCS",
   /** background → Amazon 定期おトク便 content script: 合計金額表示の有効/無効を反映 */
@@ -2247,11 +2250,6 @@ const ConnectionMonitor = Object.freeze({
     UNKNOWN: "unknown",
   }),
 
-  /** オーバーレイ位置（ドラッグで動かしたあとの座標）の localStorage キー */
-  LS_KEY_OVERLAY_POS: "__cpa_cm_overlay_pos",
-  /** オーバーレイ折りたたみ状態の localStorage キー */
-  LS_KEY_OVERLAY_COLLAPSED: "__cpa_cm_overlay_collapsed",
-
   /**
    * 数値列の中央値（不正値・空配列で null を返す純粋関数）。
    * baseline 計算 / RTT サンプル集約に使う。
@@ -2352,12 +2350,12 @@ const ConnectionMonitor = Object.freeze({
  * は test/actions.test.js で境界値テストする。
  */
 const BroadcastClock = Object.freeze({
+  /** 同一オリジンの配信情報取得を待つ上限。 */
+  FETCH_TIMEOUT_MS: 15000,
+
   /** 配信情報（startMs / endMs / isLiveNow）の sessionStorage cache prefix（videoId 単位）。
    *  HTML fetch を動画ごと 1 回に抑える。負例（通常動画＝配信由来でない）も `{ none: true }` で cache する */
   CACHE_PREFIX: "__cpa_bc_info_v1::",
-
-  /** オーバーレイ位置（ドラッグ後の座標）の localStorage キー */
-  LS_KEY_OVERLAY_POS: "__cpa_bc_overlay_pos",
 
   /** HUD 再描画の最小間隔（時刻表示は秒粒度なので 250ms で十分） */
   RENDER_THROTTLE_MS: 250,

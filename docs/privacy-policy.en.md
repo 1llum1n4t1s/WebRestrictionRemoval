@@ -88,10 +88,12 @@ When the YouTube Enhancements's "Connection monitor" sub-feature (`searchFixerFe
 
 These fetches run with the following privacy controls:
 
-- `mode: "no-cors"`: the response body is delivered as an **unreadable** (opaque) response. The Extension only measures the round-trip time via `performance.now()` deltas
+- `mode: "no-cors"`: the response body is discarded without being read or parsed. The Extension only measures the round-trip time via `performance.now()` deltas
 - `credentials: "omit"`: no cookies are sent
 - `referrerPolicy: "no-referrer"`: no referrer is sent
 - `AbortSignal.timeout(4500)`: every request is forcibly aborted after 4.5 seconds
+
+Requests run in the extension background, and only the measured RTT numbers are returned to the page-side component. The sender, enabled settings, and current video are checked. Turning the feature off, navigating away, or closing the tab cancels pending authorization and requests. Redirect destinations are not followed.
 
 **The only information conveyed to the endpoints is "the fact that Vuora is ON" and "the approximate time the user is viewing a live stream."** No user identifier, cookies, YouTube watch history, channel names, video IDs, or other personal data are transmitted (the user's IP address inevitably reaches the destination server as part of the HTTP request protocol, but this is the same property as any ordinary web browsing). The destination URLs are hard-coded constants in `actions.js` and cannot be changed by any user action or setting (a unit test asserts the URLs are fixed). Both endpoints are public measurement endpoints operated by Google and Cloudflare; the Extension does **not** operate any server of its own.
 

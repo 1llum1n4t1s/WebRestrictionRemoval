@@ -5,10 +5,8 @@
   const featureKeys = ["liveLatency", "playbackQuality", "playbackRate", "playerVolume"];
   let state = null;
   let session = null;
-  let script = null;
   let stopped = false;
   let heartbeat = null;
-  let generation = 0;
 
   function targetPage() {
     return location.pathname === "/watch" || /^\/(embed|live)\//.test(location.pathname);
@@ -20,11 +18,9 @@
   }
 
   function stopSession() {
-    generation++;
     post("stop");
     session = null;
-    script?.remove();
-    script = null;
+    window.__cpaYouTubeOverlay.remove("player");
   }
 
   function sendSettings() {
@@ -40,25 +36,16 @@
         if (session) stopSession();
         return;
       }
-      if (session) return sendSettings();
-      session = crypto.randomUUID();
-      const ownGeneration = ++generation;
-      const node = document.createElement("script");
-      script = node;
-      node.dataset.cpaPlayerSession = session;
-      node.src = chrome.runtime.getURL("src/content/youtube-player-controls-main.js");
-      node.onload = () => {
-        node.remove();
-        if (generation === ownGeneration && script === node) {
-          script = null;
-          sendSettings();
-        }
-      };
-      node.onerror = () => {
-        node.remove();
-        if (generation === ownGeneration && script === node) stopSession();
-      };
-      (document.head || document.documentElement)?.append(node);
+      if (!session) {
+        session = crypto.randomUUID();
+        const slot = document.createElement("div");
+        slot.className = "__cpa-ypc-player";
+        slot.dataset.cpaPlayerSession = session;
+        window.__cpaYouTubeOverlay.mount("player", slot);
+      }
+      // MAIN は manifest から直接読み込む。順序差・プレイヤー生成待ちは再通知で吸収する。
+      post("start");
+      sendSettings();
     } catch {
       teardown();
     }
@@ -79,7 +66,9 @@
     if (event.source !== window || event.origin !== location.origin || typeof event.data !== "string" || event.data.length > 256) return;
     try {
       const data = JSON.parse(event.data);
-      if (data.channel !== CHANNEL || data.session !== session) return;
+      if (data.channel !== CHANNEL) return;
+      if (data.type === "available") { refresh(); return; }
+      if (data.session !== session) return;
       if (data.type === "ready") sendSettings();
       if (data.type === "expired") { stopSession(); refresh(); }
     } catch { /* ページから来る JSON 以外の通知は無視する。 */ }

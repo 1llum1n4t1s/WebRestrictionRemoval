@@ -51,6 +51,8 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 The YouTube watch-page category includes live-latency reduction and buttons for quality, playback speed, and player volume. Open each feature's detailed settings to choose which buttons appear, their values, and live catch-up behavior. Numeric values and quality levels use dropdowns. Quality, speed, and volume buttons apply their values when clicked. Assign shortcuts in your browser's extension settings.
 
+The connection monitor and archive broadcast time appear as labeled sections in the same overlay as quality, playback speed, and volume. Each feature can be enabled independently, including the monitor or broadcast time on its own. Separate drag and collapse controls are removed; scroll within the shared overlay when needed.
+
 ### Popup tabs
 - **Tune**: Audio / Video / Amazon features and their settings
 - **YouTube**: 39 YouTube Enhancements sub-features

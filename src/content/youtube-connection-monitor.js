@@ -1,9 +1,9 @@
 // YouTube ライブ配信の接続モニター
 //
 // ライブ視聴中に「クルクル（バッファリング）の原因」を切り分けるための HUD を
-// プレーヤー内右上に重ねて表示する独自実装。`*://*.youtube.com/*` の top frame のみで
-// 動作し、`<video>.duration === Infinity` のライブ配信のときだけ計測ループとオーバーレイを
-// 起動する（通常動画では一切介入しない）。
+// プレーヤー操作と共通の枠内に表示する独自実装。`*://*.youtube.com/*` の top frame のみで
+// 動作し、動画ページの DOM シグナルでライブと判定したときだけ計測ループとオーバーレイを
+// 起動する（通常動画・履歴・ホームでは計測しない）。
 //
 // 有効化は YouTube 機能拡張のサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.connectionMonitor` の両方 true で activate（独立 storage key は持たず、
@@ -13,8 +13,7 @@
 //   - master OFF / サブ機能 OFF / 拡張機能 disable / 非ライブ / SPA 離脱時は HUD・タイマー・listener をすべて撤去
 //   - top frame 限定（埋め込みプレイヤーには介入しない）
 //   - 計測 1 秒間隔・経路診断 5 秒間隔・rAF 描画は RENDER_THROTTLE_MS でスロットル
-//   - 経路診断 fetch は `mode:"no-cors" + credentials:"omit" + referrerPolicy:"no-referrer"` 固定で
-//     クロスオリジン Cookie 送信ゼロ・リファラ送信ゼロ
+//   - 経路診断は background へ固定経路の計測を依頼し、Cookie・リファラ・動画情報を endpoint へ送らない
 //   - context invalidation 後は全 timer / listener を必ず解除（CPU リーク防止、rtx-enhancer と同パターン）
 //   - CleanerCore.subscribeStored が保存値の再取得を直列化
 
@@ -30,10 +29,6 @@
   if (!chrome?.runtime?.id) return;
 
   // ---------- 定数 / クラス名 ----------
-  const ROOT_CLASS = "__cpa-cm-overlay";
-  const ROOT_DRAG_CLASS = "__cpa-cm-dragging";
-  const ROOT_COLLAPSED_CLASS = "__cpa-cm-collapsed";
-  const HANDLE_CLASS = "__cpa-cm-handle";
   const BODY_CLASS = "__cpa-cm-body";
   const VERDICT_ATTR = "data-verdict";
 
@@ -60,13 +55,13 @@
   // ---------- 状態 ----------
   /** @type {HTMLElement | null} 現在のオーバーレイ root */
   let overlayEl = null;
-  /** @type {HTMLElement | null} オーバーレイ body（数値表示部、折りたたみ時に hidden） */
+  /** @type {HTMLElement | null} 共通枠内の数値表示部 */
   let overlayBodyEl = null;
   /** @type {HTMLElement | null} verdict ラベル（絵文字 + テキスト） */
   let overlayVerdictEl = null;
   /** @type {HTMLElement | null} 数値メトリクス行 */
   let overlayMetricEl = null;
-  /** @type {HTMLElement | null} 詳細セクション root（▼ 展開時のみ表示） */
+  /** @type {HTMLElement | null} 常時表示する詳細セクション root */
   let overlayDetailEl = null;
   /** @type {HTMLElement | null} 経路 RTT 詳細（Google + Cloudflare 個別） */
   let overlayPathRttEl = null;
@@ -103,8 +98,11 @@
   /** MutationObserver callback の rescanForLiveVideo を rAF coalesce するフラグ */
   let rescanScheduled = false;
 
-  /** @type {AbortController | null} 経路診断 fetch の abort 用 */
-  let diagnosisAbort = null;
+  /** background に依頼中の経路診断の世代 */
+  let diagnosisRequestId = null;
+  let latestDiagnosisRequestId = null;
+  let navigating = false;
+  let trackedVideoKey = null;
 
   /** @type {number} 最終 render 時刻（throttle 判定） */
   let lastRenderAt = 0;
@@ -138,11 +136,6 @@
   /** 直近 dropped frames 値（buffering イベント時の起点記録に使う） */
   let lastDroppedFrames = 0;
 
-  /** waiting → playing でドラッグ操作中だった場合の保険 */
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-  let dragging = false;
-
   // ---------- ユーティリティ ----------
 
   /** chrome.i18n.getMessage の薄いラッパ（chrome 未注入時も throw しない） */
@@ -154,24 +147,6 @@
       }
     } catch {}
     return fallback ?? "";
-  }
-
-  /** localStorage 読み込み（解析失敗・利用不可は null） */
-  function readLocal(key) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  /** localStorage 書き込み（失敗は無視） */
-  function writeLocal(key, value) {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
   }
 
   /** Mbps を「N.N Mbps」形式に */
@@ -300,44 +275,21 @@
       deactivate();
       return;
     }
-    if (!measuring) return;
-
-    // 前回の in-flight があれば abort（次サイクル開始時に古い fetch が残らないように）
-    if (diagnosisAbort) {
-      try { diagnosisAbort.abort(); } catch {}
+    if (!measuring || navigating || diagnosisRequestId) return;
+    const requestId = crypto.randomUUID();
+    diagnosisRequestId = requestId;
+    latestDiagnosisRequestId = requestId;
+    let result;
+    try {
+      result = await chrome.runtime.sendMessage({ action: Actions.CONNECTION_MONITOR_PROBE, requestId });
+    } catch { return; }
+    finally {
+      if (diagnosisRequestId === requestId) diagnosisRequestId = null;
     }
-    diagnosisAbort = new AbortController();
-    // タイムアウトは AbortSignal.timeout で付与（規約: 永久 pending 防止、5s 周期より短い 4.5s）。
-    // diagnosisAbort.signal と AbortSignal.any で束ね、「次サイクル開始時のキャンセル」と
-    // 「ENDPOINT_TIMEOUT_MS タイムアウト」を 1 つの signal で両立する（手動 setTimeout/clearTimeout を廃止）。
-    const signal = AbortSignal.any([
-      diagnosisAbort.signal,
-      AbortSignal.timeout(ConnectionMonitor.ENDPOINT_TIMEOUT_MS),
-    ]);
-
-    const measure = async (url) => {
-      const start = performance.now();
-      try {
-        await fetch(url, {
-          method: "GET",
-          mode: "no-cors",
-          credentials: "omit",
-          referrerPolicy: "no-referrer",
-          cache: "no-store",
-          signal,
-        });
-        return performance.now() - start;
-      } catch {
-        return null;
-      }
-    };
-
-    const [googleRtt, cfRtt] = await Promise.all([
-      measure(ConnectionMonitor.ENDPOINT_GOOGLE),
-      measure(ConnectionMonitor.ENDPOINT_CLOUDFLARE),
-    ]);
-
-    if (!chrome?.runtime?.id || !measuring) return;
+    // 停止・遷移・新しい世代へ切替済みの結果を HUD に混ぜない。
+    if (!chrome?.runtime?.id || !measuring || navigating || result?.ok !== true ||
+        requestId !== latestDiagnosisRequestId) return;
+    const { googleRtt, cloudflareRtt: cfRtt } = result;
 
     if (Number.isFinite(googleRtt)) pushRing(googleRttSamples, googleRtt, ConnectionMonitor.DIAGNOSIS_BUFFER_SIZE);
     if (Number.isFinite(cfRtt)) pushRing(cloudflareRttSamples, cfRtt, ConnectionMonitor.DIAGNOSIS_BUFFER_SIZE);
@@ -560,35 +512,24 @@
     if (overlayEl) return overlayEl;
 
     overlayEl = document.createElement("div");
-    overlayEl.className = ROOT_CLASS;
+    overlayEl.className = "__cpa-ypc-group __cpa-cm-section";
     overlayEl.setAttribute(VERDICT_ATTR, ConnectionMonitor.VERDICT.UNKNOWN);
     overlayEl.setAttribute("role", "status");
     overlayEl.setAttribute("aria-live", "polite");
     // Trusted Types 環境（YouTube は対応サイト）でも安全に動くよう、innerHTML は使わず createElement で構築
 
-    // ヘッダ（ハンドル）: 絵文字 + verdict ラベル + 折りたたみボタン
-    const handle = document.createElement("div");
-    handle.className = HANDLE_CLASS;
-    handle.setAttribute("aria-label", i18n("cmDragHandle", "ドラッグで移動 / クリックで折りたたみ"));
-
+    const heading = document.createElement("div");
+    heading.className = "__cpa-ypc-heading";
+    const label = document.createElement("span");
+    label.className = "__cpa-ypc-label";
+    label.textContent = i18n("feat_sf_connectionMonitor_label", "ライブ配信の接続モニター");
+    heading.appendChild(label);
     overlayVerdictEl = document.createElement("span");
     overlayVerdictEl.className = "__cpa-cm-verdict";
-    handle.appendChild(overlayVerdictEl);
+    heading.appendChild(overlayVerdictEl);
+    overlayEl.appendChild(heading);
 
-    const collapseBtn = document.createElement("button");
-    collapseBtn.type = "button";
-    collapseBtn.className = "__cpa-cm-collapse-btn";
-    collapseBtn.setAttribute("aria-label", i18n("cmToggleCollapse", "折りたたみ / 展開"));
-    collapseBtn.textContent = "▾";
-    collapseBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      toggleCollapsed();
-    });
-    handle.appendChild(collapseBtn);
-
-    overlayEl.appendChild(handle);
-
-    // body: 数値メトリクス（常時）+ 詳細セクション（▼ 展開時のみ）
+    // 数値メトリクスとすべての詳細を常時表示する
     overlayBodyEl = document.createElement("div");
     overlayBodyEl.className = BODY_CLASS;
 
@@ -596,7 +537,7 @@
     overlayMetricEl.className = "__cpa-cm-metric";
     overlayBodyEl.appendChild(overlayMetricEl);
 
-    // 詳細セクション root（CSS で .__cpa-cm-collapsed のとき display:none）
+    // 経路・バッファ履歴・帯域統計
     overlayDetailEl = document.createElement("div");
     overlayDetailEl.className = "__cpa-cm-detail";
 
@@ -619,38 +560,16 @@
 
     overlayEl.appendChild(overlayBodyEl);
 
-    // ドラッグ
-    handle.addEventListener("mousedown", onDragStart, true);
-
-    // 折りたたみ状態と位置の復元
-    const collapsed = readLocal(ConnectionMonitor.LS_KEY_OVERLAY_COLLAPSED) === true;
-    if (collapsed) overlayEl.classList.add(ROOT_COLLAPSED_CLASS);
-
-    // 位置: 初期は右上、ユーザーがドラッグした位置があれば復元
-    const pos = readLocal(ConnectionMonitor.LS_KEY_OVERLAY_POS);
-    if (pos && Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
-      overlayEl.style.left = `${pos.left}px`;
-      overlayEl.style.top = `${pos.top}px`;
-      overlayEl.style.right = "auto";
-    }
-
     return overlayEl;
   }
 
   function attachOverlayToPlayer() {
     if (!overlayEl) return;
-    const container = findPlayerContainer();
-    if (!container) return;
-    // 親コンテナに position:relative がなければ overlay は親 stacking context に出る。
-    // YouTube の #movie_player は元々 position:relative なので安心して absolute 配置できる。
-    if (overlayEl.parentElement !== container) {
-      container.appendChild(overlayEl);
-    }
+    window.__cpaYouTubeOverlay.mount("connection", overlayEl);
   }
 
   function removeOverlay() {
-    if (!overlayEl) return;
-    try { overlayEl.remove(); } catch {}
+    window.__cpaYouTubeOverlay.remove("connection");
     overlayEl = null;
     overlayBodyEl = null;
     overlayVerdictEl = null;
@@ -659,58 +578,6 @@
     overlayPathRttEl = null;
     overlayBufferLogEl = null;
     overlayBwEl = null;
-  }
-
-  function toggleCollapsed() {
-    if (!overlayEl) return;
-    const collapsed = overlayEl.classList.toggle(ROOT_COLLAPSED_CLASS);
-    writeLocal(ConnectionMonitor.LS_KEY_OVERLAY_COLLAPSED, collapsed);
-    // 展開直後は renderDetail() の折りたたみ早期 return で止まっていた詳細セクションを
-    // 即座に最新化する（次の sample tick まで最大 1 秒待たせない）
-    if (!collapsed) render();
-  }
-
-  function onDragStart(ev) {
-    if (!overlayEl) return;
-    if (ev.button !== 0) return;
-    // ボタンクリックはドラッグしない
-    if (ev.target instanceof HTMLElement && ev.target.tagName === "BUTTON") return;
-    const rect = overlayEl.getBoundingClientRect();
-    const parent = overlayEl.parentElement?.getBoundingClientRect();
-    if (!parent) return;
-    dragOffsetX = ev.clientX - rect.left;
-    dragOffsetY = ev.clientY - rect.top;
-    dragging = true;
-    overlayEl.classList.add(ROOT_DRAG_CLASS);
-    document.addEventListener("mousemove", onDragMove, true);
-    document.addEventListener("mouseup", onDragEnd, true);
-    ev.preventDefault();
-  }
-
-  function onDragMove(ev) {
-    if (!dragging || !overlayEl) return;
-    const parent = overlayEl.parentElement?.getBoundingClientRect();
-    if (!parent) return;
-    const left = Math.max(0, Math.min(parent.width - overlayEl.offsetWidth, ev.clientX - parent.left - dragOffsetX));
-    const top = Math.max(0, Math.min(parent.height - overlayEl.offsetHeight, ev.clientY - parent.top - dragOffsetY));
-    overlayEl.style.left = `${left}px`;
-    overlayEl.style.top = `${top}px`;
-    overlayEl.style.right = "auto";
-  }
-
-  function onDragEnd() {
-    if (!dragging) return;
-    dragging = false;
-    if (overlayEl) {
-      overlayEl.classList.remove(ROOT_DRAG_CLASS);
-      const left = parseFloat(overlayEl.style.left);
-      const top = parseFloat(overlayEl.style.top);
-      if (Number.isFinite(left) && Number.isFinite(top)) {
-        writeLocal(ConnectionMonitor.LS_KEY_OVERLAY_POS, { left, top });
-      }
-    }
-    document.removeEventListener("mousemove", onDragMove, true);
-    document.removeEventListener("mouseup", onDragEnd, true);
   }
 
   // ---------- 描画 ----------
@@ -771,10 +638,6 @@
   /** 詳細セクション 3 種を更新（経路 RTT 個別 / 直近 buffering 履歴 / 帯域 60 秒統計） */
   function renderDetail(result, throughputStats) {
     if (!overlayPathRttEl || !overlayBufferLogEl || !overlayBwEl) return;
-    // 折りたたみ時は CSS で hidden なので、DOM 書き換え自体をスキップする（描画コスト削減に加え、
-    // #movie_player 直下での不要な MutationRecord 発生も抑える）。展開時は次の render() 呼び出し
-    // (最大 RENDER_THROTTLE_MS 後) で最新状態に追いつく。
-    if (overlayEl.classList.contains(ROOT_COLLAPSED_CLASS)) return;
 
     // (1) 経路 RTT 個別: Google / Cloudflare それぞれの median と sample 数
     const gN = googleRttSamples.length;
@@ -843,12 +706,22 @@
 
   function rescanForLiveVideo() {
     if (!active) return;
+    const key = currentVideoKey();
+    if (navigating || !key) {
+      resetTrackedVideo();
+      return;
+    }
+    if (trackedVideoKey !== key) {
+      resetTrackedVideo();
+      trackedVideoKey = key;
+    }
     const v = findPlayerVideo();
     if (!v) {
-      stopMeasuring();
+      resetTrackedVideo();
       return;
     }
     if (trackedVideo !== v) {
+      stopMeasuring();
       detachVideoListeners(trackedVideo);
       trackedVideo = v;
       attachVideoListeners(v);
@@ -894,6 +767,14 @@
   }
 
   function stopMeasuring() {
+    latestDiagnosisRequestId = null;
+    if (diagnosisRequestId) {
+      const requestId = diagnosisRequestId;
+      diagnosisRequestId = null;
+      try {
+        void chrome.runtime.sendMessage({ action: Actions.CONNECTION_MONITOR_CANCEL, requestId }).catch(() => {});
+      } catch {}
+    }
     if (!measuring) {
       // 念のためオーバーレイが残っていたら撤去
       removeOverlay();
@@ -908,15 +789,38 @@
       clearInterval(diagnosisTimer);
       diagnosisTimer = 0;
     }
-    if (diagnosisAbort) {
-      try { diagnosisAbort.abort(); } catch {}
-      diagnosisAbort = null;
-    }
     stopThroughputMeasure();
     removeOverlay();
   }
 
   // ---------- activate / deactivate ----------
+
+  function currentVideoKey() {
+    const url = new URL(location.href);
+    const id = url.pathname === "/watch" ? url.searchParams.get("v") :
+      /^\/live\/([^/]+)\/?$/.exec(url.pathname)?.[1];
+    return typeof id === "string" && /^[\w-]{11}$/.test(id) ? id : null;
+  }
+
+  function resetTrackedVideo() {
+    stopMeasuring();
+    detachVideoListeners(trackedVideo);
+    trackedVideo = null;
+    trackedVideoKey = null;
+    isLiveTrackedVideo = false;
+    lastDroppedFrames = 0;
+    samples.length = 0;
+    bufferingEvents.length = 0;
+    pendingBuffering = null;
+    googleRttSamples.length = 0;
+    cloudflareRttSamples.length = 0;
+    videoThroughputSamples.length = 0;
+  }
+
+  function onYtNavigateStart() {
+    navigating = true;
+    if (active) resetTrackedVideo();
+  }
 
   function activate() {
     if (active) return;
@@ -945,11 +849,10 @@
       mutationObserver.observe(document.documentElement, { childList: true, subtree: true });
     } catch {}
 
-    // SPA URL 変化 (yt-navigate-finish) で再評価
-    document.addEventListener("yt-navigate-finish", onYtNavigateFinish, true);
   }
 
   function onYtNavigateFinish() {
+    navigating = false;
     if (!active) return;
     // 新ページの video DOM 出現を rAF 経由で待つ
     requestAnimationFrame(() => {
@@ -965,31 +868,11 @@
       return;
     }
     active = false;
-    stopMeasuring();
-    detachVideoListeners(trackedVideo);
-    trackedVideo = null;
-    isLiveTrackedVideo = false;
+    resetTrackedVideo();
     if (mutationObserver) {
       try { mutationObserver.disconnect(); } catch {}
       mutationObserver = null;
     }
-    try {
-      document.removeEventListener("yt-navigate-finish", onYtNavigateFinish, true);
-    } catch {}
-    // ドラッグ中に master OFF / orphan 化した場合の document リスナー残留を防ぐ（mousemove は高頻度で CPU リーク源）
-    if (dragging) {
-      dragging = false;
-      try {
-        document.removeEventListener("mousemove", onDragMove, true);
-        document.removeEventListener("mouseup", onDragEnd, true);
-      } catch {}
-    }
-    samples.length = 0;
-    bufferingEvents.length = 0;
-    googleRttSamples.length = 0;
-    cloudflareRttSamples.length = 0;
-    videoThroughputSamples.length = 0;
-    pendingBuffering = null;
   }
 
   // ---------- 設定購読 ----------
@@ -1019,10 +902,14 @@
     },
   });
 
+  // OFF→ON が遷移中に起きても finish を見失わないよう、遷移ゲートだけは常時購読する。
+  document.addEventListener("yt-navigate-start", onYtNavigateStart, true);
+  document.addEventListener("yt-navigate-finish", onYtNavigateFinish, true);
+
   // pagehide: bfcache 凍結 (persisted=true) は observer/timer を温存して復帰後そのまま継続させる
   // （disconnect すると pageshow 再初期化経路が無く復帰後に効かなくなるため。video-fill.js / loupe.js PATTERN SYNC）。
   // 実ドキュメント破棄 (persisted=false) のときだけ deactivate() でフル解放する
-  // （yt-navigate-finish / video / drag リスナー + MutationObserver + active=false を一括撤去）。
+  // （video リスナー + MutationObserver + active=false を一括撤去）。
   window.addEventListener(
     "pagehide",
     (ev) => {
