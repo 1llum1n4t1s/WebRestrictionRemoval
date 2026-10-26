@@ -208,47 +208,63 @@
     }
   }
 
+  // 初回取得より新しい通知をキー単位で優先し、未変更キーは初回値で補完する。
+  const updatedSettings = new Set();
+
+  function applyStoredSettings(s, initial = false) {
+    if (StorageKeys.VIDEO_FILL_ENABLED in s && (!initial || !updatedSettings.has(StorageKeys.VIDEO_FILL_ENABLED))) {
+      if (!initial) updatedSettings.add(StorageKeys.VIDEO_FILL_ENABLED);
+      enabled = s[StorageKeys.VIDEO_FILL_ENABLED] === true;
+    }
+    if (StorageKeys.VIDEO_FILL_MODE in s && (!initial || !updatedSettings.has(StorageKeys.VIDEO_FILL_MODE))) {
+      if (!initial) updatedSettings.add(StorageKeys.VIDEO_FILL_MODE);
+      mode = VideoFill.normalizeMode(s[StorageKeys.VIDEO_FILL_MODE]);
+    }
+    if (StorageKeys.VIDEO_FILL_TARGET in s && (!initial || !updatedSettings.has(StorageKeys.VIDEO_FILL_TARGET))) {
+      if (!initial) updatedSettings.add(StorageKeys.VIDEO_FILL_TARGET);
+      targetAspect = VideoFill.targetAspect(VideoFill.normalizeTarget(s[StorageKeys.VIDEO_FILL_TARGET]));
+    }
+    applyState();
+  }
+
   function readSettingsAndApply() {
-    // zombie guard (PATTERN SYNC): orphan 化した content script は chrome.runtime.id が undefined。
     if (!chrome.runtime?.id) {
       teardownOrphan();
       return;
     }
     chrome.storage.local
-      .get([
-        StorageKeys.VIDEO_FILL_ENABLED,
-        StorageKeys.VIDEO_FILL_MODE,
-        StorageKeys.VIDEO_FILL_TARGET,
-      ])
+      .get([StorageKeys.VIDEO_FILL_ENABLED, StorageKeys.VIDEO_FILL_MODE, StorageKeys.VIDEO_FILL_TARGET])
       .then((s) => {
-        enabled = s[StorageKeys.VIDEO_FILL_ENABLED] === true;
-        mode = VideoFill.normalizeMode(s[StorageKeys.VIDEO_FILL_MODE]);
-        targetAspect = VideoFill.targetAspect(VideoFill.normalizeTarget(s[StorageKeys.VIDEO_FILL_TARGET]));
-        applyState();
+        // 削除済みキーも既定値へ戻すため、初回結果に全キーを含める。
+        applyStoredSettings({
+          [StorageKeys.VIDEO_FILL_ENABLED]: s[StorageKeys.VIDEO_FILL_ENABLED],
+          [StorageKeys.VIDEO_FILL_MODE]: s[StorageKeys.VIDEO_FILL_MODE],
+          [StorageKeys.VIDEO_FILL_TARGET]: s[StorageKeys.VIDEO_FILL_TARGET],
+        }, true);
       })
       .catch(() => {});
   }
 
-  // background → content script の即時通知（active tab の全フレームに broadcast される）。
+  // background からの部分通知は、有効なキーだけ更新する。
   chrome.runtime.onMessage.addListener((req, sender) => {
     if (!SenderCheck.isFromBackground(sender)) return;
     if (req?.action !== Actions.APPLY_VIDEO_FILL_CS) return;
     const d = req.data ?? {};
-    if (typeof d.enabled === "boolean") enabled = d.enabled;
-    if (typeof d.mode === "string") mode = VideoFill.normalizeMode(d.mode);
-    if (typeof d.target === "string") targetAspect = VideoFill.targetAspect(VideoFill.normalizeTarget(d.target));
-    applyState();
+    const patch = {};
+    if (typeof d.enabled === "boolean") patch[StorageKeys.VIDEO_FILL_ENABLED] = d.enabled;
+    if (typeof d.mode === "string") patch[StorageKeys.VIDEO_FILL_MODE] = d.mode;
+    if (typeof d.target === "string") patch[StorageKeys.VIDEO_FILL_TARGET] = d.target;
+    applyStoredSettings(patch);
   });
 
-  // 非 active タブも storage.onChanged で同期する。3 キーのいずれか変化したときだけ再取得。
+  // 通知値を直接反映し、再取得の逆順完了による巻き戻りを防ぐ。
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    const changed =
-      changes[StorageKeys.VIDEO_FILL_ENABLED] !== undefined ||
-      changes[StorageKeys.VIDEO_FILL_MODE] !== undefined ||
-      changes[StorageKeys.VIDEO_FILL_TARGET] !== undefined;
-    if (!changed) return;
-    readSettingsAndApply();
+    const patch = {};
+    for (const key of [StorageKeys.VIDEO_FILL_ENABLED, StorageKeys.VIDEO_FILL_MODE, StorageKeys.VIDEO_FILL_TARGET]) {
+      if (key in changes) patch[key] = changes[key].newValue;
+    }
+    if (Object.keys(patch).length) applyStoredSettings(patch);
   });
 
   // CodeRabbit 4 巡目 (Major): ページ遷移時のリソース解放。orphan 検知 (chrome.runtime?.id) は

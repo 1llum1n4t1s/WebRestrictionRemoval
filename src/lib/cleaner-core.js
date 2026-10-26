@@ -40,15 +40,18 @@
    */
   function subscribe(config) {
     const { masterKey, featuresKey, applyAction, mergeFeatures, onUpdate } = config;
+    let masterNotified = false;
+    let featuresNotified = false;
 
     // 経路 1: 初期 storage.get — master / features 両方を通知
     chrome.storage.local
       .get([masterKey, featuresKey])
       .then((stored) => {
-        onUpdate({
-          active: stored[masterKey] === true,
-          features: mergeFeatures(stored[featuresKey]),
-        });
+        // 初期取得より後の通知をキーごとに優先し、未通知キーだけを補完する。
+        const patch = {};
+        if (!masterNotified) patch.active = stored[masterKey] === true;
+        if (!featuresNotified) patch.features = mergeFeatures(stored[featuresKey]);
+        if ("active" in patch || "features" in patch) onUpdate(patch);
       })
       .catch(() => {});
 
@@ -57,6 +60,8 @@
       if (!SenderCheck.isFromBackground(sender)) return;
       if (request?.action !== applyAction) return;
       const data = request.data ?? {};
+      masterNotified = true;
+      featuresNotified = true;
       onUpdate({
         active: data.enabled === true,
         features: mergeFeatures(data.features),
@@ -67,27 +72,40 @@
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
       const patch = {};
-      if (masterKey in changes) patch.active = changes[masterKey].newValue === true;
-      if (featuresKey in changes) patch.features = mergeFeatures(changes[featuresKey].newValue);
+      if (masterKey in changes) {
+        masterNotified = true;
+        patch.active = changes[masterKey].newValue === true;
+      }
+      if (featuresKey in changes) {
+        featuresNotified = true;
+        patch.features = mergeFeatures(changes[featuresKey].newValue);
+      }
       if ("active" in patch || "features" in patch) onUpdate(patch);
     });
   }
 
   /** 単一 boolean の直接通知。読み取り失敗時は現在の状態を保持する。 */
   function subscribeBoolean({ masterKey, applyAction, onUpdate }) {
+    let notified = false;
     chrome.storage.local.get(masterKey)
-      .then((stored) => onUpdate(stored[masterKey] === true))
+      .then((stored) => {
+        if (!notified) onUpdate(stored[masterKey] === true);
+      })
       .catch(() => {});
 
     chrome.runtime.onMessage.addListener((request, sender) => {
       if (!SenderCheck.isFromBackground(sender)) return;
       if (request?.action !== applyAction) return;
+      notified = true;
       onUpdate(request.data?.enabled === true);
     });
 
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;
-      if (masterKey in changes) onUpdate(changes[masterKey].newValue === true);
+      if (masterKey in changes) {
+        notified = true;
+        onUpdate(changes[masterKey].newValue === true);
+      }
     });
   }
 

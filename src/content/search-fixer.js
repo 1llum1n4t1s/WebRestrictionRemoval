@@ -175,6 +175,8 @@
   const f = (key) => active && features[key] === true;
 
   // ---------- 状態購読 ----------
+  // 通知で更新したキーだけ初回取得から保護し、残りの初期設定は取り込む。
+  const updatedSettings = new Set();
   chrome.storage.local
     .get([
       StorageKeys.SEARCH_FIXER_ENABLED,
@@ -183,10 +185,18 @@
       StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
     ])
     .then((stored) => {
-      active = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
-      features = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
-      gridItems = SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]);
-      blockedChannels = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
+      if (!updatedSettings.has(StorageKeys.SEARCH_FIXER_ENABLED)) {
+        active = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
+      }
+      if (!updatedSettings.has(StorageKeys.SEARCH_FIXER_FEATURES)) {
+        features = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
+      }
+      if (!updatedSettings.has(StorageKeys.SEARCH_FIXER_GRID_ITEMS)) {
+        gridItems = SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]);
+      }
+      if (!updatedSettings.has(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS)) {
+        blockedChannels = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
+      }
       onSettingsChanged();
     })
     .catch(() => {});
@@ -196,6 +206,9 @@
     if (!SenderCheck.isFromBackground(sender)) return;
     if (request?.action !== Actions.APPLY_SEARCH_FIXER_CS) return;
     const data = request.data ?? {};
+    updatedSettings.add(StorageKeys.SEARCH_FIXER_ENABLED);
+    updatedSettings.add(StorageKeys.SEARCH_FIXER_FEATURES);
+    updatedSettings.add(StorageKeys.SEARCH_FIXER_GRID_ITEMS);
     active = data.enabled === true;
     features = SearchFixer.mergeFeatures(data.features);
     gridItems = SearchFixer.clampGridItems(data.gridItems);
@@ -206,18 +219,22 @@
     if (areaName !== "local") return;
     let touched = false;
     if (StorageKeys.SEARCH_FIXER_ENABLED in changes) {
+      updatedSettings.add(StorageKeys.SEARCH_FIXER_ENABLED);
       active = changes[StorageKeys.SEARCH_FIXER_ENABLED].newValue === true;
       touched = true;
     }
     if (StorageKeys.SEARCH_FIXER_FEATURES in changes) {
+      updatedSettings.add(StorageKeys.SEARCH_FIXER_FEATURES);
       features = SearchFixer.mergeFeatures(changes[StorageKeys.SEARCH_FIXER_FEATURES].newValue);
       touched = true;
     }
     if (StorageKeys.SEARCH_FIXER_GRID_ITEMS in changes) {
+      updatedSettings.add(StorageKeys.SEARCH_FIXER_GRID_ITEMS);
       gridItems = SearchFixer.clampGridItems(changes[StorageKeys.SEARCH_FIXER_GRID_ITEMS].newValue);
       touched = true;
     }
     if (StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS in changes) {
+      updatedSettings.add(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS);
       blockedChannels = SearchFixer.normalizeBlockedChannels(
         changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS].newValue
       );

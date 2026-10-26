@@ -636,13 +636,20 @@
     applyHostPositionClass(hostEl);
     const button = buildButton(img);
     hostEl.appendChild(button);
-    overlayByImage.set(img, { hostEl, button });
+    const overlay = { hostEl, button, loadHandler: null };
+    overlayByImage.set(img, overlay);
     decoratedImages.add(img);
     // host サイズが img より大きいケース対策: JS で button 位置を img の rect に同期。
     // 初回 sync + img の load (lazy load 等で後からサイズ確定する場合) で再同期。
     syncButtonPosition(button, img);
     if (!img.complete) {
-      img.addEventListener("load", () => syncButtonPosition(button, img), { once: true });
+      overlay.loadHandler = () => {
+        img.removeEventListener("load", overlay.loadHandler);
+        overlay.loadHandler = null;
+        if (overlayByImage.get(img) !== overlay || !active || checkContextInvalidated()) return;
+        syncButtonPosition(button, img);
+      };
+      img.addEventListener("load", overlay.loadHandler, { once: true });
     }
     img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] = currentSrc;
   }
@@ -662,6 +669,10 @@
     }
     if (!overlay) return;
     overlayByImage.delete(img);
+    if (overlay.loadHandler) {
+      img.removeEventListener("load", overlay.loadHandler);
+      overlay.loadHandler = null;
+    }
     overlay.button.remove();
     const hostEl = overlay.hostEl;
     // 同じ host の別画像が所有する button が残っている間は配置クラスを維持する。
@@ -704,6 +715,14 @@
   }
 
   function removeAllOverlays() {
+    // DOM から切断済みの画像も含め、装飾が所有する遅延 load 購読を先に解除する。
+    for (const img of decoratedImages) {
+      const overlay = overlayByImage.get(img);
+      if (overlay?.loadHandler) {
+        img.removeEventListener("load", overlay.loadHandler);
+        overlay.loadHandler = null;
+      }
+    }
     // /opop PF-4: 4 連 document.querySelectorAll を `:is()` 統合で 1 回スキャンに圧縮。
     // 大規模 DOM (IG フィード ~10 万ノード) で OFF 切替時の hitch (10-30ms) を削減。
     // 関心事 (button.remove / host class / scanned dataset) は要素ごとに分岐する。
@@ -758,6 +777,7 @@
   }
 
   function applyState(stored) {
+    if (checkContextInvalidated()) return;
     const next = computeActive(stored);
     if (next === active) {
       // 同 ON のときは DOM 更新だけトリガ（features の他キー変更で呼ばれた場合の保険）
@@ -771,31 +791,38 @@
 
   // === 初期化 + storage / message 同期 ===
 
-  chrome.storage.local.get([cfg.master, cfg.features], (stored) => {
-    if (chrome.runtime.lastError) return;
-    applyState(stored);
-  });
+  let settingsGeneration = 0;
+  let currentSettings = {};
+
+  function readSettings(patch = {}) {
+    if (checkContextInvalidated()) return;
+    const generation = ++settingsGeneration;
+    chrome.storage.local.get([cfg.master, cfg.features], (stored) => {
+      const error = chrome.runtime.lastError;
+      if (generation !== settingsGeneration || checkContextInvalidated() || error) return;
+      // 部分通知に含まれない初期値も取得し、通知の明示値（削除を含む）を優先する。
+      currentSettings = { ...stored, ...patch };
+      applyState(currentSettings);
+    });
+  }
+
+  readSettings();
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (!(cfg.master in changes) && !(cfg.features in changes)) return;
-    // changes には newValue が含まれているため、storage.local.get の追加 IPC を発行せず
-    // 直接 newValue を使う。片方しか変わっていない場合は他方を get で補完する必要があるが、
-    // 両方変わるケースが多いため fast path として newValue 直読みを優先する。
     const masterChange = changes[cfg.master];
     const featuresChange = changes[cfg.features];
+    const patch = {};
+    if (masterChange) patch[cfg.master] = masterChange.newValue;
+    if (featuresChange) patch[cfg.features] = featuresChange.newValue;
+    currentSettings = { ...currentSettings, ...patch };
+    applyState(currentSettings);
     if (masterChange && featuresChange) {
-      applyState({
-        [cfg.master]: masterChange.newValue,
-        [cfg.features]: featuresChange.newValue,
-      });
+      ++settingsGeneration;
       return;
     }
-    // 片方のみ変化: 変わっていない方を get で補完（IPC 1 回だけ）
-    chrome.storage.local.get([cfg.master, cfg.features], (stored) => {
-      if (chrome.runtime.lastError) return;
-      applyState(stored);
-    });
+    readSettings(patch);
   });
 
   chrome.runtime.onMessage.addListener((msg, sender, _sendResponse) => {
@@ -805,10 +832,7 @@
     // 揃えて msg.action を読む（旧コードの msg.type は dead code バグだった）。
     const action = msg && msg.action;
     if (action !== cfg.applyMsg) return false;
-    chrome.storage.local.get([cfg.master, cfg.features], (stored) => {
-      if (chrome.runtime.lastError) return;
-      applyState(stored);
-    });
+    readSettings();
     return false;
   });
 

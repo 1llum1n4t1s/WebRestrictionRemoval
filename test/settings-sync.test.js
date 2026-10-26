@@ -76,6 +76,7 @@ const host = (local = {}, remote = {}, options = {}) => {
     chrome: { storage }, StorageKeys: K, SettingsSchema: G.SettingsSchema,
     SearchFixer: G.SearchFixer, InstagramCleaner: G.InstagramCleaner,
     TikTokCleaner: G.TikTokCleaner, XCleaner: G.XCleaner, VolumeBooster: G.VolumeBooster,
+    VideoGamma: G.VideoGamma, VideoFill: G.VideoFill, Loupe: G.Loupe, ColorPicker: G.ColorPicker,
     Date: { now: () => now }, crypto: { randomUUID: () => `${options.device || "A"}-${++uuid}` },
     setTimeout: (fn) => { timers.set(++id, fn); return id; },
     clearTimeout: (key) => timers.delete(key),

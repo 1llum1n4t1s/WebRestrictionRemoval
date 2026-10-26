@@ -28,6 +28,19 @@
     K.LOUPE_ZOOM, K.LOUPE_SIZE, K.COLOR_PICKER_DEFAULT_FORMAT, K.COLOR_PICKER_HEX_HASH,
   ])];
   const keys = [K.YOUTUBE_PLAYER_SETTINGS, ...scalarKeys, ...features.keys(), ...eqKeys, K.SEARCH_FIXER_BLOCKED_CHANNELS];
+  // 同期でも popup / バックアップと同じ値域を守る。型だけ正しくても範囲外の値は受け入れない。
+  const scalarNormalizers = new Map([
+    [K.SEARCH_FIXER_GRID_ITEMS, SearchFixer.clampGridItems],
+    [K.VOLUME_BOOSTER_LAST_GAIN, VolumeBooster.clampValue],
+    [K.VIDEO_GAMMA_VALUE, VideoGamma.clampValue],
+    [K.VIDEO_FILL_MODE, VideoFill.normalizeMode], [K.VIDEO_FILL_TARGET, VideoFill.normalizeTarget],
+    [K.LOUPE_ZOOM, Loupe.validateZoom], [K.LOUPE_SIZE, Loupe.clampSize],
+    [K.COLOR_PICKER_DEFAULT_FORMAT, ColorPicker.normalizeFormat],
+  ]);
+  const normalizeScalar = (id, value) => scalarNormalizers.has(id)
+    ? scalarNormalizers.get(id)(value) : id === K.COLOR_PICKER_HEX_HASH ? value !== false : value === true;
+  const validScalar = (id, value) => scalarNormalizers.has(id)
+    ? value === normalizeScalar(id, value) : typeof value === "boolean";
   const fixedBuckets = new Map(scalarKeys.map((key) => [key, key]));
   fixedBuckets.set(EQ, EQ);
   for (const group of playerGroups) fixedBuckets.set(playerPrefix + group, playerPrefix + group);
@@ -91,9 +104,7 @@
       const entry = SearchFixer.normalizeBlockedChannels([record.value])[0];
       return entry?.key === channelKey(id) && equal(entry, record.value);
     }
-    if (id.endsWith("Enabled") || id === K.COLOR_PICKER_HEX_HASH) return typeof record.value === "boolean";
-    if ([K.VIDEO_FILL_MODE, K.VIDEO_FILL_TARGET, K.COLOR_PICKER_DEFAULT_FORMAT].includes(id)) return typeof record.value === "string";
-    return typeof record.value === "number" && Number.isFinite(record.value);
+    return validScalar(id, record.value);
   };
   const snapshot = (view) => {
     const out = Object.fromEntries(scalarKeys.map((key) => [key, pack(view[key])]));
@@ -144,7 +155,8 @@
   };
   const recordChanges = (before, after, at) => {
     const changed = [...new Set([...Object.keys(before), ...Object.keys(after)])]
-      .filter((id) => !equal(before[id], after[id]));
+      .filter((id) => !equal(before[id], after[id]) &&
+        validRecord(id, { ...(after[id] || { deleted: true }), stamp: [0, 0, "validation"] }));
     if (!changed.length) return;
     const stamp = nextStamp(at);
     for (const id of changed) state.records[id] = { ...(after[id] || { deleted: true }), stamp };
@@ -177,7 +189,11 @@
     const view = { ...state.view };
     for (const key of scalarKeys) {
       const record = state.records[key];
-      if (!record) continue;
+      if (!record) {
+        // 旧版で既に保存された不正値はローカルで補正するが、新しい編集や削除として刻印しない。
+        if (Object.hasOwn(view, key) && !validScalar(key, view[key])) view[key] = normalizeScalar(key, view[key]);
+        continue;
+      }
       if (record.deleted) delete view[key];
       else view[key] = record.value;
     }
@@ -267,7 +283,8 @@
         const initial = snapshot(initialView);
         for (const [id, value] of Object.entries(initial)) {
           // 初参加の既存値は時刻不明（0）。既存のクラウド更新を優先する。
-          state.records[id] ||= { ...value, stamp: [0, 0, state.device] };
+          const record = { ...value, stamp: [0, 0, state.device] };
+          if (validRecord(id, record)) state.records[id] ||= record;
         }
         state.joined = true;
       }

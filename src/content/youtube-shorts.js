@@ -65,60 +65,51 @@
     };
   }
 
+  // 初回取得より新しい通知をキー単位で優先し、部分通知でも未変更設定を保つ。
+  const updatedSettings = new Set();
+  let masterEnabled = false;
+  let currentFeatures;
+
+  function applyStoredSettings(stored, initial = false) {
+    for (const key of [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES]) {
+      if (!(key in stored) || (initial && updatedSettings.has(key))) continue;
+      if (!initial) updatedSettings.add(key);
+      if (key === StorageKeys.SEARCH_FIXER_ENABLED) masterEnabled = stored[key];
+      else currentFeatures = stored[key];
+    }
+    apply(computeFlags(masterEnabled, currentFeatures));
+  }
+
   // ---------- 初期化: 現在状態を読んで適用 ----------
   chrome.storage.local
     .get([StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES])
     .then((stored) => {
-      apply(
-        computeFlags(
-          stored[StorageKeys.SEARCH_FIXER_ENABLED],
-          stored[StorageKeys.SEARCH_FIXER_FEATURES]
-        )
-      );
+      applyStoredSettings({
+        [StorageKeys.SEARCH_FIXER_ENABLED]: stored[StorageKeys.SEARCH_FIXER_ENABLED],
+        [StorageKeys.SEARCH_FIXER_FEATURES]: stored[StorageKeys.SEARCH_FIXER_FEATURES],
+      }, true);
     })
     .catch(() => {});
 
   // ---------- 状態追従 ----------
-  // popup → background → content の APPLY_SEARCH_FIXER_CS 経路と、
-  // storage.onChanged の 2 経路で同期する（メイン content.js と同じ二重購読方針）。
   chrome.runtime.onMessage.addListener((request, sender) => {
-    // background SW 由来のみ受け付ける。他 content script の XSS 経由や popup から
-    // 直接呼ばれるとユーザー設定をバイパスして state を書き換えられるため必須。
     if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action === Actions.APPLY_SEARCH_FIXER_CS) {
-      const data = request.data ?? {};
-      apply(computeFlags(data.enabled, data.features));
-    }
+    if (request?.action !== Actions.APPLY_SEARCH_FIXER_CS) return;
+    const data = request.data ?? {};
+    applyStoredSettings({
+      [StorageKeys.SEARCH_FIXER_ENABLED]: data.enabled,
+      [StorageKeys.SEARCH_FIXER_FEATURES]: data.features,
+    });
   });
 
-  chrome.storage.onChanged.addListener(async (changes, areaName) => {
+  // 変更値を直接適用する。キー削除は undefined を渡して既定の OFF に戻す。
+  chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
-    const enabledChange = changes[StorageKeys.SEARCH_FIXER_ENABLED];
-    const featuresChange = changes[StorageKeys.SEARCH_FIXER_FEATURES];
-    if (!enabledChange && !featuresChange) return;
-    // 2-C2 fast path: handleApplySettings は両キーを 1 回の storage.local.set で書くため、
-    // 通常の popup 操作経路では両キーが同時に changes に含まれる。この場合は newValue だけで
-    // computeFlags を呼べるため storage.local.get の往復を完全に省略できる。
-    if (enabledChange && featuresChange) {
-      apply(computeFlags(enabledChange.newValue, featuresChange.newValue));
-      return;
+    const patch = {};
+    for (const key of [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES]) {
+      if (key in changes) patch[key] = changes[key].newValue;
     }
-    // 片方だけ変わった場合のエッジケース（onInstalled の単独キー書き込み等）に備えて両方再取得。
-    // 変更されてないキーは undefined になるため computeFlags() が誤判定する罠を回避する。
-    try {
-      const stored = await chrome.storage.local.get([
-        StorageKeys.SEARCH_FIXER_ENABLED,
-        StorageKeys.SEARCH_FIXER_FEATURES,
-      ]);
-      apply(
-        computeFlags(
-          stored[StorageKeys.SEARCH_FIXER_ENABLED],
-          stored[StorageKeys.SEARCH_FIXER_FEATURES]
-        )
-      );
-    } catch {
-      // storage 一時的にアクセス不可 → 次の通知に任せる
-    }
+    if (Object.keys(patch).length) applyStoredSettings(patch);
   });
 
   /**

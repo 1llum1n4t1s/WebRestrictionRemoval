@@ -62,10 +62,26 @@
       document.documentElement.classList.add(cls);
     }
 
-    const fallback = () => onEvaluate({});
+    const stored = {};
+    const notifiedKeys = new Set();
+    let readGeneration = 0;
+    const readSettings = () => {
+      const generation = ++readGeneration;
+      chrome.storage.local.get(storageKeys).then((result) => {
+        if (generation !== readGeneration) return;
+        // 通知値（削除も含む）は取得結果より優先し、未通知キーを補完する。
+        for (const key of storageKeys) {
+          if (!notifiedKeys.has(key)) stored[key] = result[key];
+        }
+        onEvaluate({ ...stored });
+      }).catch(() => {
+        if (generation !== readGeneration) return;
+        onEvaluate({ ...stored });
+      });
+    };
 
     // (3) 初期評価
-    chrome.storage.local.get(storageKeys).then(onEvaluate).catch(fallback);
+    readSettings();
 
     // (4) storage.onChanged 監視
     chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -73,16 +89,19 @@
       if (!chrome.runtime?.id) return; // zombie guard
       const touched = storageKeys.some((k) => k in changes);
       if (!touched) return;
+      // 進行中の成功・失敗の両方を無効化し、今回の操作を即時評価する。
+      readGeneration++;
+      for (const key of storageKeys) {
+        if (!(key in changes)) continue;
+        notifiedKeys.add(key);
+        stored[key] = changes[key].newValue;
+      }
+      onEvaluate({ ...stored });
       // 全キーが newValue を持っているなら直読みで IPC 1 回節約
       const allChanged = storageKeys.every((k) => changes[k] !== undefined);
-      if (allChanged) {
-        const merged = {};
-        for (const k of storageKeys) merged[k] = changes[k].newValue;
-        onEvaluate(merged);
-        return;
-      }
+      if (allChanged) return;
       // 片方のみ変化なら再 get で補完
-      chrome.storage.local.get(storageKeys).then(onEvaluate).catch(fallback);
+      readSettings();
     });
   }
 

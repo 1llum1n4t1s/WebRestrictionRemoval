@@ -87,9 +87,18 @@
   const EXPLORE_RE = /^\/explore(\/|$)/i;
   const STORIES_RE = /^\/stories(\/|$)/i;
   if (REELS_RE.test(path) || EXPLORE_RE.test(path) || STORIES_RE.test(path)) {
+    const latestSettings = {};
+    const onRedirectSettingsChanged = (changes, areaName) => {
+      if (areaName !== "local") return;
+      for (const key of ["instagramCleanerEnabled", "instagramCleanerFeatures"]) {
+        if (key in changes) latestSettings[key] = changes[key].newValue;
+      }
+    };
+    chrome.storage.onChanged.addListener(onRedirectSettingsChanged);
     chrome.storage.local
       .get(["instagramCleanerEnabled", "instagramCleanerFeatures"])
       .then((stored) => {
+        if (!chrome.runtime?.id) return;
         if (stored.instagramCleanerEnabled !== true) return;
         const feats = stored.instagramCleanerFeatures;
         if (!feats || typeof feats !== "object") return;
@@ -97,12 +106,23 @@
           (REELS_RE.test(path) && feats.reels === true) ||
           (EXPLORE_RE.test(path) && feats.explore === true) ||
           (STORIES_RE.test(path) && feats.storiesAll === true);
-        if (shouldRedirect) {
+        const latest = { ...stored, ...latestSettings };
+        const latestFeats = latest.instagramCleanerFeatures;
+        const stillEnabled = latest.instagramCleanerEnabled === true && latestFeats && (
+          (REELS_RE.test(path) && latestFeats.reels === true) ||
+          (EXPLORE_RE.test(path) && latestFeats.explore === true) ||
+          (STORIES_RE.test(path) && latestFeats.storiesAll === true)
+        );
+        // 初回に有効だった遷移だけを実行し、後から届いた OFF / 削除を優先する。
+        if (shouldRedirect && stillEnabled) {
           try { location.replace("/"); }
           catch { location.href = "/"; }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        chrome.storage.onChanged.removeListener(onRedirectSettingsChanged);
+      });
   }
 
   // サイト固有: MutationObserver で `_a9ym` UL 出現を監視 → その **親 div** に inline 強制 hide。

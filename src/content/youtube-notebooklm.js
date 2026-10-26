@@ -262,7 +262,6 @@
     btnEl = document.createElement("button");
     btnEl.type = "button";
     btnEl.className = BTN_CLASS;
-    btnEl.setAttribute("aria-haspopup", "true");
     btnEl.setAttribute("aria-expanded", "false");
     btnEl.addEventListener("click", onButtonClick);
 
@@ -365,12 +364,16 @@
     if (!rootEl || !btnEl) return;
     panelEl = document.createElement("div");
     panelEl.className = PANEL_CLASS;
-    panelEl.setAttribute("role", "menu");
+    // 通常のフォームを含むポップオーバー。menu の項目・キー操作契約を宣言しない。
+    panelEl.id = PANEL_CLASS;
+    panelEl.setAttribute("role", "group");
+    panelEl.setAttribute("aria-label", i18n("nlmPickNotebook", "送信先のノートブック"));
     // 取得済みならそのまま出す（2 回目以降は待たされない）。裏で最新化して差分だけ反映する。
     if (notebooks) renderPanelList(); else renderPanelLoading();
     document.body.appendChild(panelEl);
     positionPanel();
     btnEl.setAttribute("aria-expanded", "true");
+    btnEl.setAttribute("aria-controls", panelEl.id);
     document.addEventListener("click", onOutsideClick, true);
     document.addEventListener("keydown", onPanelKeydown, true);
     // スクロール / リサイズでアンカーがずれるため、追従させずに閉じる（YouTube のメニューと同じ挙動）
@@ -402,6 +405,7 @@
     try { panelEl?.remove(); } catch {}
     panelEl = null;
     btnEl?.setAttribute("aria-expanded", "false");
+    btnEl?.removeAttribute("aria-controls");
     try {
       document.removeEventListener("click", onOutsideClick, true);
       document.removeEventListener("keydown", onPanelKeydown, true);

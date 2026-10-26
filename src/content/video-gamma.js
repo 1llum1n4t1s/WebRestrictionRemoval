@@ -279,8 +279,22 @@
     }
   }
 
+  // 初回取得より新しい通知をキー単位で優先し、未変更キーは初回値で補完する。
+  const updatedSettings = new Set();
+
+  function applyStoredSettings(s, initial = false) {
+    if (StorageKeys.VIDEO_GAMMA_ENABLED in s && (!initial || !updatedSettings.has(StorageKeys.VIDEO_GAMMA_ENABLED))) {
+      if (!initial) updatedSettings.add(StorageKeys.VIDEO_GAMMA_ENABLED);
+      currentEnabled = s[StorageKeys.VIDEO_GAMMA_ENABLED] === true;
+    }
+    if (StorageKeys.VIDEO_GAMMA_VALUE in s && (!initial || !updatedSettings.has(StorageKeys.VIDEO_GAMMA_VALUE))) {
+      if (!initial) updatedSettings.add(StorageKeys.VIDEO_GAMMA_VALUE);
+      currentValue = VideoGamma.clampValue(s[StorageKeys.VIDEO_GAMMA_VALUE]);
+    }
+    applyState();
+  }
+
   function readSettingsAndApply() {
-    // zombie guard (PATTERN SYNC): orphan 化した content script は chrome.runtime.id が undefined。
     if (!chrome.runtime?.id) {
       teardownOrphan();
       return;
@@ -288,32 +302,34 @@
     chrome.storage.local
       .get([StorageKeys.VIDEO_GAMMA_ENABLED, StorageKeys.VIDEO_GAMMA_VALUE])
       .then((s) => {
-        currentEnabled = s[StorageKeys.VIDEO_GAMMA_ENABLED] === true;
-        currentValue = VideoGamma.clampValue(s[StorageKeys.VIDEO_GAMMA_VALUE]);
-        applyState();
+        // 削除済みキーも既定値へ戻すため、初回結果に全キーを含める。
+        applyStoredSettings({
+          [StorageKeys.VIDEO_GAMMA_ENABLED]: s[StorageKeys.VIDEO_GAMMA_ENABLED],
+          [StorageKeys.VIDEO_GAMMA_VALUE]: s[StorageKeys.VIDEO_GAMMA_VALUE],
+        }, true);
       })
       .catch(() => {});
   }
 
-  // background → content script の即時通知（active tab の全フレームに broadcast される）。
+  // background からの部分通知は、有効なキーだけ更新する。
   chrome.runtime.onMessage.addListener((req, sender) => {
     if (!SenderCheck.isFromBackground(sender)) return;
     if (req?.action !== Actions.APPLY_VIDEO_GAMMA_CS) return;
     const d = req.data ?? {};
-    if (typeof d.enabled === "boolean") currentEnabled = d.enabled;
-    if (Number.isFinite(d.value)) currentValue = VideoGamma.clampValue(d.value);
-    applyState();
+    const patch = {};
+    if (typeof d.enabled === "boolean") patch[StorageKeys.VIDEO_GAMMA_ENABLED] = d.enabled;
+    if (Number.isFinite(d.value)) patch[StorageKeys.VIDEO_GAMMA_VALUE] = d.value;
+    applyStoredSettings(patch);
   });
 
-  // 非 active タブも storage.onChanged で同期する。両キーのどちらか変化したときだけ
-  // 設定を再取得して反映（変更されていないキーが undefined になる罠を回避）。
+  // 通知値を直接反映し、再取得の逆順完了による巻き戻りを防ぐ。
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    const changed =
-      changes[StorageKeys.VIDEO_GAMMA_ENABLED] !== undefined ||
-      changes[StorageKeys.VIDEO_GAMMA_VALUE] !== undefined;
-    if (!changed) return;
-    readSettingsAndApply();
+    const patch = {};
+    for (const key of [StorageKeys.VIDEO_GAMMA_ENABLED, StorageKeys.VIDEO_GAMMA_VALUE]) {
+      if (key in changes) patch[key] = changes[key].newValue;
+    }
+    if (Object.keys(patch).length) applyStoredSettings(patch);
   });
 
   // ページ遷移時のリソース解放 (video-fill と同型)。bfcache 凍結 (persisted=true) は observer も
