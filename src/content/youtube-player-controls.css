@@ -22,8 +22,8 @@
 .__cpa-ypc-overlay[hidden], .__cpa-ypc-overlay [hidden] { display: none !important; }
 .__cpa-ypc-controls { display: flex; flex-direction: column; min-width: 0; }
 .__cpa-ypc-controls:not(:has(.__cpa-ypc-heading, button:not([hidden]))) { display: none; }
-.__cpa-ypc-player:not(:has(.__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
-.__cpa-ypc-overlay:not(:has(> .__cpa-ypc-section:not(.__cpa-ypc-player), .__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
+.__cpa-ypc-player:not(:has(.__cpa-ypc-settings, .__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
+.__cpa-ypc-overlay:not(:has(> .__cpa-ypc-section:not(.__cpa-ypc-player), .__cpa-ypc-settings, .__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
 .__cpa-ypc-section { flex: none; min-width: 0; }
 .__cpa-ypc-section:not(.__cpa-ypc-player) ~ .__cpa-ypc-section,
 .__cpa-ypc-player:has(.__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden]))) ~ .__cpa-ypc-section { border-top: 1px solid rgb(255 255 255 / 25%); }
@@ -46,6 +46,10 @@
 .__cpa-ypc-choices { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-width: 0; }
 .__cpa-ypc-live { flex-wrap: wrap; }
 .__cpa-ypc-live:not(:has(button:not([hidden]))) { display: none; }
+.__cpa-ypc-settings { padding: 6px 0; color: #eee; font: 12px / 1.4 sans-serif; }
+.__cpa-ypc-settings summary { cursor: pointer; font-weight: 600; }
+.__cpa-ypc-settings label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.__cpa-ypc-settings select { max-width: 45%; color: #111; background: #fff; }
 .ytp-button.__cpa-ypc-button {
   width: auto;
   min-width: 34px;
@@ -58,6 +62,9 @@
 }
 .ytp-button.__cpa-ypc-button.__cpa-ypc-active { color: #ff8983; }
 .__cpa-ypc-hide-slider .ytp-volume-panel,
-.__cpa-ypc-hide-slider .ytdVolumeControlsSliderContainer { display: none !important; }
+.__cpa-ypc-hide-slider .ytdVolumeControlsSliderContainer,
+/* 新しい埋め込み UI は標準操作欄が #movie_player の外側にある。 */
+body:has(> #player > #movie_player.__cpa-ypc-hide-slider) > #player-controls :is(.ytp-volume-panel, .ytdVolumeControlsSliderContainer) { display: none !important; }
 .__cpa-ypc-hide-volume .ytp-mute-button,
-.__cpa-ypc-hide-volume .ytdVolumeControlsMuteIconButton { display: none !important; }
+.__cpa-ypc-hide-volume .ytdVolumeControlsMuteIconButton,
+body:has(> #player > #movie_player.__cpa-ypc-hide-volume) > #player-controls :is(.ytp-mute-button, .ytdVolumeControlsMuteIconButton) { display: none !important; }

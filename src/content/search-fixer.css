@@ -34,12 +34,32 @@ html.__cpa-sfx-hide-comments ytd-comments#comments {
   display: none !important;
 }
 
+button.__cpa-sfx-comments-toggle {
+  display: block;
+  margin: 16px 0;
+  padding: 0 16px;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--yt-spec-badge-chip-background, #eee);
+  color: var(--yt-spec-text-primary, #0f0f0f);
+  font: 500 14px Roboto, Arial, sans-serif;
+  cursor: pointer;
+}
+button.__cpa-sfx-comments-toggle:hover {
+  background: var(--yt-spec-10-percent-layer, #ddd);
+}
+button.__cpa-sfx-comments-toggle:focus-visible {
+  outline: 2px solid var(--yt-spec-call-to-action, #065fd4);
+  outline-offset: 2px;
+}
+
 /* hideLiveChat の挙動本体（公式 close button click）は search-fixer.js
  * (collapseLiveChatIfNeeded) で実装。CSS は **click が完了するまでの間だけ**
  * frame を `display: none` で先制非表示にする補助に絞る。
  *
  * `__cpa-sfx-hide-live-chat-pre` は以下の経路で `<html>` に立つ:
- *   - 初回直アクセス: youtube-early.js (document_start) が無条件付与
+ *   - 初回直アクセス: youtube-early.js (document_start) が master と hideLiveChat の明示的な ON 確認後に付与
  *   - SPA 遷移後: search-fixer.js の syncLiveChatCollapse が付与
  *
  * click 成功 / リトライ上限到達 / detach (OFF・別ページ遷移) の 3 経路で必ず剥がす:

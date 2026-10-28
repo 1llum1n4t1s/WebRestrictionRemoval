@@ -69,6 +69,8 @@
   }
 
   function applyToVideo(v) {
+    // metadata 待ちの間に detach された動画には、DOM 外で補正を残さない。
+    if (!v.isConnected) return;
     const t = VideoFill.computeTransform(targetAspect, v.videoWidth, v.videoHeight, mode);
     if (!t) {
       // 補正不要（縦横比一致 or metadata 未確定）。既に当てていたら戻す。

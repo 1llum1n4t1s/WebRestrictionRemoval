@@ -37,7 +37,9 @@
     if (!root || !sections.size) return;
     const targetPage = location.pathname === "/watch" || /^\/(embed|live)\//.test(location.pathname);
     const player = targetPage && (document.getElementById("movie_player") || document.querySelector(".html5-video-player"));
-    const area = player && (player.querySelector(".ytp-chrome-bottom") || player.querySelector("player-fullscreen-action-menu .quick-actions-wrapper") || player.querySelector(".ytp-left-controls") || player.querySelector(".ytwPlayerControlsLeftControls"));
+    const area = player && (player.querySelector(".ytp-chrome-bottom") || player.querySelector("player-fullscreen-action-menu .quick-actions-wrapper") || player.querySelector(".ytp-left-controls") || player.querySelector(".ytwPlayerControlsLeftControls") ||
+      // 埋め込みの新 UI では操作欄が #movie_player の兄弟として生成される。
+      (/^\/embed\//.test(location.pathname) && document.querySelector("#player-controls player-fullscreen-action-menu .quick-actions-wrapper")));
     if (!area) {
       root.remove();
       return;

@@ -175,6 +175,13 @@ html.__cpa-ig-comments .__cpa-ig-comment-view,
 html.__cpa-ig-comments .__cpa-ig-comment-list {
   display: none !important;
 }
+
+/* コメント追加表示はアイコンだけでなくボタンを隠し、空の操作領域を残さない。 */
+html.__cpa-ig-comments button:has(svg[aria-label="他のコメントを見る"]),
+html.__cpa-ig-comments button:has(svg[aria-label="Load more comments" i]),
+html.__cpa-ig-comments button:has(svg[aria-label="View more comments" i]) {
+  display: none !important;
+}
 /* コメントアイコン (SVG) — aria-label による意味論的識別 */
 html.__cpa-ig-comments [aria-label="Comment"],
 html.__cpa-ig-comments [aria-label="コメント"],

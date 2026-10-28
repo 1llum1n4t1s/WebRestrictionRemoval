@@ -12,7 +12,7 @@
  *     2026-07-02 に Firefox 専用パイプラインとして復活。「Firefox catch-up に備えて共有
  *     モジュール構造を維持する」判断がここで活きた)
  * 提供するのは dB→gain 変換 / compressor・filter preset 適用 / bass cut・EQ チェーン構築 / EQ 適用
- * (自動音量正規化の normalizer 関数群は撤去済み)。
+ * / 最終サンプル上限 / 最上位接続 (自動音量正規化の normalizer 関数群は撤去済み)。
  *
  * 値定数は actions.js の `VolumeBooster` を経由 (既存集約場所)。
  *
@@ -155,10 +155,53 @@
     return { preampNode, eqFilters, head: preampNode, tail };
   }
 
+  // 同じノードへ curve を代入し直すと波形が不連続になり得る。状態が同じなら触らない。
+  const outputCeilingEnabled = new WeakMap();
+
+  /**
+   * 自動歪み防止の最終段。DynamicsCompressor はサンプルピークを ±1 に収めない
+   * （Chrome 実測: 音量 3 倍・1 kHz +6 dB の定常正弦で約 1.07）。
+   * 2 点の直線 [-1, 1] は |x|<=1 を恒等変換し、範囲外だけを端点 ±1 へ揃える。
+   * oversample は none。2x / 4x はフィルタ遅延が入り、tabCapture の映像と音声がずれる。
+   * 初期 curve は null（範囲外もそのまま通す）。
+   *
+   * @param {BaseAudioContext} ctx
+   * @returns {WaveShaperNode}
+   */
+  function createOutputCeiling(ctx) {
+    const node = ctx.createWaveShaper();
+    node.oversample = "none";
+    node.curve = null;
+    outputCeilingEnabled.set(node, false);
+    return node;
+  }
+
+  /**
+   * 自動歪み防止の ON/OFF に合わせて最終段を切り替える。ノードは外さない。
+   * OFF は curve=null で |x|>1 も通す（ブーストをユーザーが選んだときの出力を削らない）。
+   * ON でも |x|<=1 のサンプルは変わらないので、範囲内の音への段差は出ない。
+   *
+   * @param {WaveShaperNode} node
+   * @param {boolean} enabled
+   */
+  function applyOutputCeiling(node, enabled) {
+    const on = enabled === true;
+    if (outputCeilingEnabled.get(node) === on) return;
+    outputCeilingEnabled.set(node, on);
+    if (!on) {
+      node.curve = null;
+      return;
+    }
+    const curve = new Float32Array(2);
+    curve[0] = -1;
+    curve[1] = 1;
+    node.curve = curve;
+  }
+
   /**
    * 音量ブースターの最上位 DSP グラフを共通順序で接続する。
    * 各チェーン内部の接続は createEqChain / createBassCutChain が担当し、本関数は
-   * caller 間で drift しやすい6本の境界接続だけを単一情報源にする。
+   * caller 間で drift しやすい境界接続だけを単一情報源にする。
    *
    * @param {{
    *   source: AudioNode,
@@ -167,6 +210,7 @@
    *   gainNode: AudioNode,
    *   bassCutChain: {head: AudioNode, tail: AudioNode},
    *   antiClipNode: AudioNode,
+   *   ceilingNode: AudioNode,
    *   destination: AudioNode,
    * }} graph
    */
@@ -176,7 +220,8 @@
     graph.nightModeNode.connect(graph.gainNode);
     graph.gainNode.connect(graph.bassCutChain.head);
     graph.bassCutChain.tail.connect(graph.antiClipNode);
-    graph.antiClipNode.connect(graph.destination);
+    graph.antiClipNode.connect(graph.ceilingNode);
+    graph.ceilingNode.connect(graph.destination);
   }
 
   globalThis.AudioPipeline = Object.freeze({
@@ -186,6 +231,8 @@
     createBassCutChain,
     applyEqualizer,
     createEqChain,
+    createOutputCeiling,
+    applyOutputCeiling,
     connectAudioGraph,
   });
 })();

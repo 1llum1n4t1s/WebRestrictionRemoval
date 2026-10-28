@@ -340,7 +340,9 @@
     if (!enabled || pageUrl !== location.href) return;
     for (const section of document.querySelectorAll(C.SECTION_SELECTOR)) {
       const target = section.querySelector(C.INSERT_TARGET_SELECTOR);
-      if (target) showTotal(target, { status: "ready", total: computeSectionTotal(section), monthly: true });
+      // 従来画面の価格ノードだけでは全明細の読込完了・単価と数量を確認できない。
+      // 価格が一部だけ描画されていても、部分合計を確定額として表示しない。
+      if (target) showTotal(target, { status: "failed" });
     }
     const overview = [];
     const priorKnownUrls = new Set(manageVersions.keys());
@@ -390,15 +392,6 @@
         return totalItems(own, own.length, location.href);
       });
     }
-  }
-
-  function computeSectionTotal(section) {
-    let total = 0;
-    section.querySelectorAll(C.PRICE_SELECTOR).forEach((node) => {
-      const value = Number((node.innerText ?? node.textContent ?? "").replace(C.PRICE_NORMALIZE_RE, ""));
-      if (Number.isFinite(value)) total += value;
-    });
-    return total;
   }
 
   function showTotal(target, state) {

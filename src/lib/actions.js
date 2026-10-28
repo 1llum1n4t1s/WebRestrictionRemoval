@@ -172,7 +172,7 @@ const StorageKeys = Object.freeze({
   VOLUME_BOOSTER_ENABLED: "volumeBoosterEnabled",
   /** 音量ブースター: 保存されたスライダー位置 (0–300%)。マスター ON 時にタブ切替で自動適用される */
   VOLUME_BOOSTER_LAST_GAIN: "volumeBoosterLastGain",
-  /** 音量ブースター: 自動歪み防止（DynamicsCompressor で hard limit 化） */
+  /** 音量ブースター: 自動歪み防止（DynamicsCompressor でピークを抑制） */
   VOLUME_BOOSTER_ANTI_CLIP_ENABLED: "volumeBoosterAntiClipEnabled",
   /** 音量ブースター: ナイトモード（ゲーム配信用途） */
   VOLUME_BOOSTER_NIGHT_MODE_ENABLED: "volumeBoosterNightModeEnabled",
@@ -1516,9 +1516,11 @@ const VolumeBooster = Object.freeze({
     );
   },
   /**
-   * 自動歪み防止用 DynamicsCompressor プリセット（ブリックウォール風リミッタ）。
-   * threshold:-3dBFS / ratio:12 で実質的な hard limiter として動作し、
-   * attack:1ms / release:50ms で過渡応答を最優先（瞬間ピークを確実に抑える）。
+   * 自動歪み防止用 DynamicsCompressor プリセット。
+   * threshold:-3dBFS / ratio:12、attack:1ms / release:50ms で大半のピークを抑える。
+   * この段だけではサンプルピークが ±1 を超える（音量 3 倍・1 kHz EQ +6 dB の定常正弦で約 1.07）。
+   * attack 0・ratio 20 に強めても 1 を少し超えたままなので、後段の WaveShaper が
+   * 範囲外のサンプルだけを ±1 に揃える。サンプル間の再構成ピークは対象にしない。
    */
   ANTI_CLIP_PRESET: Object.freeze({
     threshold: -3,
@@ -1546,8 +1548,7 @@ const VolumeBooster = Object.freeze({
    *   - knee を 8 → 12 dB に広げて、threshold 越えの折れ目を滑らかにし「圧縮感」を耳に
    *     付かなくする。dialog 中心帯が knee 内で扱われるため、自然なフェード圧縮になる。
    *   - release は引き続き 1.0s（Chrome の nominal max）で句末ポンピング抑制を維持。
-   * threshold/knee/attack/release を強めても 1ms 未満のピークは antiClipNode (limiter)
-   * が後段で受け止めるため、瞬間ピーク抑制の二段構えは崩れない。
+   * antiClipNode の後段が、±1 を超えたサンプルだけを ±1 に揃える。
    */
   NIGHT_MODE_PRESET: Object.freeze({
     threshold: -30,

@@ -24,20 +24,13 @@
  * caption まで巻き込む。代わりに `_a9ym`（per-comment UL）の親 div を `:has(> ul._a9ym)`
  * で識別して隠すことで、caption を残しコメントだけを正確に消す。
  *
- * 仕組み（オプトアウト方式 + 三重ガード）:
- *   1. document_start 同期で `<style>` を `<html>` 直下に prepend
- *      （manifest css の effective 化が SPA 経路で間に合わないケース対策）
- *   2. document_start 同期で `<html>` に `__cpa-ig-comments-pre` を **無条件付与**
- *      （storage.get の async 待ちで comment DOM 出現に間に合わないため）
- *   3. **MutationObserver で `_a9ym` 出現を監視 → その親 `<div>` に即時 inline `style
- *       .setProperty('display', 'none', 'important')` を当てる**（CSS rule との specificity
- *       競合を勝つ最強ガード。Instagram が後から inline style を当てる可能性に備える）
- *      observer は **常時維持** し、pre クラスの有無で動作を guard する。これで storage.onChanged
- *      で hideComments OFF→ON 変更時にも新たな `_a9ym` 出現に追従する。
- *   4. `chrome.storage.local` から `instagramCleanerEnabled` / `instagramCleanerFeatures` を
- *      非同期取得し、master OFF または comments OFF なら pre クラス + 既存 inline force-hide を
- *      剥がす（observer は維持して storage.onChanged 復帰時にも対応）
- *   5. `chrome.storage.onChanged` で master/comments トグル変更時に再評価
+ * 仕組み（オプトイン方式）:
+ *   1. document_start でクラス条件付きの `<style>` だけを同期注入する。
+ *   2. storage から master と comments が明示的に ON と判明したら pre クラスを付与し、
+ *      既存 `_a9ym` の親 div を inline 非表示にして MutationObserver を開始する。
+ *   3. OFF・取得失敗・context 失効時は所有スタイルを復元し observer を止める。
+ *      設定通知は再評価し、ON 復帰時には既存要素と後続 DOM の両方に適用する。
+ *   設定読取前の FOUC は許容し、未選択ユーザーのサイト表示を変えない。
  *
  * 設計判断:
  *   - actions.js は **ロードしない**（最速注入のため依存ゼロ、生 storage key string 使用）
@@ -58,6 +51,7 @@
   const PRE_CLASS = "__cpa-ig-comments-pre";
   const STYLE_ID = "__cpa-ig-early-hide-comments";
   const FORCE_HIDE_ATTR = "data-cpa-ig-force-hide";
+  const forcedWrappers = new Map();
 
   // -----------------------------------------------------------------
   // (0) URL リダイレクトの document_start 先制実行
@@ -129,13 +123,24 @@
   // `_a9z6` (外側 UL) には post caption が含まれるため触らない（caption 巻き込み防止）。
   const forceHideParent = (ymUl) => {
     const wrapper = ymUl?.parentElement;
-    if (!wrapper || wrapper.getAttribute(FORCE_HIDE_ATTR) === "1") return;
+    if (!wrapper || forcedWrappers.has(wrapper)) return;
+    forcedWrappers.set(wrapper, {
+      value: wrapper.style.getPropertyValue("display"),
+      priority: wrapper.style.getPropertyPriority("display"),
+    });
     wrapper.style.setProperty("display", "none", "important");
     wrapper.setAttribute(FORCE_HIDE_ATTR, "1");
   };
 
-  // 既に _a9ym があれば即適用（document_start 時点では普通は無いが念のため）
-  document.querySelectorAll("ul._a9ym").forEach(forceHideParent);
+  const restoreWrapper = (el, original) => {
+    if (el.style.getPropertyValue("display") === "none"
+      && el.style.getPropertyPriority("display") === "important") {
+      if (original.value) el.style.setProperty("display", original.value, original.priority);
+      else el.style.removeProperty("display");
+    }
+    el.removeAttribute(FORCE_HIDE_ATTR);
+    forcedWrappers.delete(el);
+  };
 
   // observer 制御: 旧実装は常時稼働で OFF 時もコールバック先頭で早期 return する設計だったが、
   // Instagram は React で document subtree に対して秒間数十〜数百件の mutation を発火するため、
@@ -160,6 +165,11 @@
       return;
     }
     for (const m of mutations) {
+      if (m.removedNodes.length) {
+        for (const [el, original] of forcedWrappers) {
+          if (!el.isConnected || !el.querySelector(":scope > ul._a9ym")) restoreWrapper(el, original);
+        }
+      }
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
         if (node.tagName === "UL" && node.classList.contains("_a9ym")) {
@@ -170,18 +180,10 @@
       }
     }
   });
-  // framework が pre クラスを同期付与した後の初期状態 (storage 確認前) は observer 稼働。
-  // OFF 確定で offRevert が disconnect する。
-  ensureObserverActive();
-
   const offRevert = () => {
     document.documentElement.classList.remove(PRE_CLASS);
-    document
-      .querySelectorAll("[" + FORCE_HIDE_ATTR + "='1']")
-      .forEach((el) => {
-        el.style.removeProperty("display");
-        el.removeAttribute(FORCE_HIDE_ATTR);
-      });
+    // サイトが後から設定した display は所有しない。
+    for (const [el, original] of forcedWrappers) restoreWrapper(el, original);
     disconnectObserver();
   };
 
@@ -192,7 +194,7 @@
     document.querySelectorAll("ul._a9ym").forEach(forceHideParent);
   };
 
-  // 共通フレームワーク経由で style 注入 + pre クラス同期付与 + storage 取得 + onChanged 購読
+  // 設定で ON と判明してから pre クラス・observer・inline 非表示を適用する。
   __cpaEarlyFramework.setup({
     styleId: STYLE_ID,
     cssText:

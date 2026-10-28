@@ -18,7 +18,7 @@
  * tabId → AudioState の Map。AudioContext は close するまで音声を増幅し続けるため
  * release 時に必ず close する。
  *
- * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → destination）:
+ * AudioState の構造（ノードチェーン: source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → ceilingNode → destination）:
  *   - ctx: AudioContext
  *   - gainNode: GainNode（ユーザースライダーの 0-300% ブースト）
  *   - preampNode: GainNode（イコライザのプリアンプ、dB→倍率。EQ OFF 時は unity 1.0）
@@ -26,13 +26,14 @@
  *   - nightModeNode: DynamicsCompressorNode（ゲーム配信向けナイトモード圧縮、OFF 時はバイパス設定）
  *   - bassCutNodes: BiquadFilterNode[2]（壁ドン対策モード、highpass 2段で24dB/oct。OFF 時はカットオフ 0Hz で素通り）
  *   - antiClipNode: DynamicsCompressorNode（自動歪み防止 / リミッタ、OFF 時はバイパス設定）
+ *   - ceilingNode: WaveShaperNode（自動歪み防止の最終段。ON 時だけ |x|>1 を ±1 に揃える。OFF 時は curve=null）
  *   - stream: MediaStream
  *
  * イコライザ (preamp + 10 バンド) / ナイトモード / 壁ドン対策 / 自動歪み防止は常時チェーン接続し、OFF 時は
- * それぞれ unity gain / 0dB / 0Hz / ratio:1 のバイパス設定にする (ノード抜き差しによる無音・プチノイズを回避)。
+ * それぞれ unity gain / 0dB / 0Hz / ratio:1 / curve=null のバイパス設定にする (ノード抜き差しによる無音・プチノイズを回避)。
  */
 const audioStates = new Map();
-/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, preampNode: GainNode, eqFilters: BiquadFilterNode[], nightModeNode: DynamicsCompressorNode, bassCutNodes: BiquadFilterNode[], antiClipNode: DynamicsCompressorNode, stream: MediaStream, lastSetPercent: number}>>} */
+/** @type {Map<number, Promise<{ctx: AudioContext, gainNode: GainNode, preampNode: GainNode, eqFilters: BiquadFilterNode[], nightModeNode: DynamicsCompressorNode, bassCutNodes: BiquadFilterNode[], antiClipNode: DynamicsCompressorNode, ceilingNode: WaveShaperNode, stream: MediaStream, lastSetPercent: number}>>} */
 const audioInitPromises = new Map();
 // RELEASE_ALL 開始時に世代を進め、開始前の getUserMedia 初期化が後から state を復活させるのを防ぐ。
 let audioReleaseGeneration = 0;
@@ -51,6 +52,8 @@ const {
   createBassCutChain,
   applyEqualizer,
   createEqChain,
+  createOutputCeiling,
+  applyOutputCeiling,
   connectAudioGraph,
 } = AudioPipeline;
 
@@ -149,6 +152,7 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       state.antiClipNode,
       antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
     );
+    applyOutputCeiling(state.ceilingNode, antiClip === true);
     applyFilterPreset(
       state.bassCutNodes,
       bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,
@@ -202,13 +206,14 @@ async function createAudioState(tabId, streamId, initGeneration) {
     // 初期は素通り (preamp 1.0 / 全バンド 0dB)。DSP 構築と更新 (applyEqualizer) を同一モジュールに集約。
     const eqChain = createEqChain(ctx);
     // ノード順序: イコライザ（preamp → 10 バンド peaking）→ ナイトモード（コンプ）→ ブースト（gain）
-    // → 壁ドン対策（highpass）→ 自動歪み防止（リミッタ）の直列接続。EQ で整音 → ナイトモードで
-    // 大小差を狭め → gain でブースト → 壁ドン対策でブースト後の低音を削り → anti-clip でピークを
-    // 抑える、というマスタリング順の配置（ブースト後段に置くことで、boost 率に関わらず最終出力の
-    // 低音が確実にカットされる）。
+    // → 壁ドン対策（highpass）→ 自動歪み防止（リミッタ）→ サンプル上限の直列接続。
+    // EQ で整音 → ナイトモードで大小差を狭め → gain でブースト → 壁ドン対策でブースト後の低音を削り
+    // → anti-clip でピークを抑え → なお ±1 を超えたサンプルだけを ceiling で ±1 に揃える。
+    // bassCut を gain の後段に置くことで、boost 率に関わらず最終出力の低音が確実にカットされる。
     const nightModeNode = ctx.createDynamicsCompressor();
     const bassCutChain = createBassCutChain(ctx);
     const antiClipNode = ctx.createDynamicsCompressor();
+    const ceilingNode = createOutputCeiling(ctx);
     applyCompressorPreset(nightModeNode, VolumeBooster.COMPRESSOR_BYPASS);
     applyCompressorPreset(antiClipNode, VolumeBooster.COMPRESSOR_BYPASS);
     connectAudioGraph({
@@ -218,6 +223,7 @@ async function createAudioState(tabId, streamId, initGeneration) {
       gainNode,
       bassCutChain,
       antiClipNode,
+      ceilingNode,
       destination: ctx.destination,
     });
 
@@ -231,6 +237,7 @@ async function createAudioState(tabId, streamId, initGeneration) {
       nightModeNode,
       bassCutNodes: bassCutChain.bassCutNodes,
       antiClipNode,
+      ceilingNode,
       stream,
       lastSetPercent: VolumeBooster.UNITY,
     };

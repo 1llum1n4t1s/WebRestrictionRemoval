@@ -724,7 +724,6 @@
       }
     }
     // /opop PF-4: 4 連 document.querySelectorAll を `:is()` 統合で 1 回スキャンに圧縮。
-    // 大規模 DOM (IG フィード ~10 万ノード) で OFF 切替時の hitch (10-30ms) を削減。
     // 関心事 (button.remove / host class / scanned dataset) は要素ごとに分岐する。
     const sel =
       `.${ImageDownloader.BUTTON_CLASS},.${ImageDownloader.HOST_CLASS},` +

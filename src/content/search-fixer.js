@@ -28,6 +28,8 @@
 
   /** @type {boolean} master トグル */
   let active = false;
+  /** 破棄・context 失効後は遅延通知から再初期化しない。 */
+  let orphanCleanupRan = false;
   /** @type {Record<string, boolean>} 個別機能フラグ（定数定義からマージ済み） */
   let features = SearchFixer.mergeFeatures({});
   // 高頻度コールバックでも namespace を再解決せず、共有の抽出関数を使う。
@@ -43,8 +45,16 @@
   let resultsObserver = null;
   /** @type {boolean} resultsObserver が現在 attach されているか（多重 disconnect 防止） */
   let observerAttached = false;
+  let commentsObserver = null;
+  let commentsScanRaf = 0;
+  let commentsToggle = null;
+  let commentsRevealed = false;
   /** @type {MutationObserver|null} ライブチャット公式折りたたみ用 observer */
   let liveChatObserver = null;
+  // ページごとの自動折りたたみ後は、ユーザーによる再表示を維持する。
+  let liveChatCollapseHandled = false;
+  let liveChatCollapseInProgress = false;
+  let liveChatClickAttempts = 0;
   /** @type {boolean} liveChatObserver が現在 attach されているか */
   let liveChatObserverAttached = false;
   /** @type {Node|null} liveChatObserver が現在観察しているターゲット（document or frame）。
@@ -87,13 +97,18 @@
   function clearLiveChatPreHide() {
     cancelPreHideRelease();
     document.documentElement.classList.remove(LIVE_CHAT_PRE_HIDE_CLASS);
+    window.__cpaRestoreAllLiveChatFrames?.();
     document
       .querySelectorAll(
         'ytd-live-chat-frame[' + LIVE_CHAT_FORCE_HIDE_ATTR + '="1"]'
       )
       .forEach((el) => {
-        el.style.removeProperty("display");
-        el.removeAttribute(LIVE_CHAT_FORCE_HIDE_ATTR);
+        if (window.__cpaRestoreLiveChatFrame) window.__cpaRestoreLiveChatFrame(el);
+        else {
+          el.style.removeProperty("display");
+          el.style.removeProperty("visibility");
+          el.removeAttribute(LIVE_CHAT_FORCE_HIDE_ATTR);
+        }
       });
   }
 
@@ -128,18 +143,28 @@
       const frame = document.querySelector("ytd-live-chat-frame");
       if (!frame) {
         // frame が消えた → pre クラス意味なしなので剥がし
+        liveChatCollapseInProgress = false;
         clearLiveChatPreHide();
         return;
       }
       // YouTube が collapsed state に切り替えた indicator
       // (frame の `collapsed` 属性が立てば transition 完了。通常 click 後 1〜数フレーム)
       if (frame.hasAttribute("collapsed")) {
+        liveChatCollapseInProgress = false;
+        liveChatCollapseHandled = true;
+        window.__cpaLiveChatCollapseHandled = true;
         clearLiveChatPreHide();
         return;
       }
       if (++attempts >= PRE_HIDE_RELEASE_MAX_FRAMES) {
-        // タイムアウト fallback (collapsed attribute が出ない場合も諦めて剥がす)
+        // クリックが反映されなければ回数を制限して再試行し、最後は手動操作に委ねる。
+        liveChatCollapseInProgress = false;
         clearLiveChatPreHide();
+        if (liveChatClickAttempts < 3) scheduleLiveChatCollapseRetry();
+        else {
+          liveChatCollapseHandled = true;
+          window.__cpaLiveChatCollapseHandled = true;
+        }
         return;
       }
       preHideReleaseRaf = requestAnimationFrame(tick);
@@ -172,7 +197,7 @@
   // 動画フィルタ全体の活性ページ判定。検索結果 OR フィードページ。
   const isVideoFilterPage = () => isResultsPage() || isFeedPage();
   // 機能アクセサ。`active` が false ならすべて false 扱い（マスター OFF）。
-  const f = (key) => active && features[key] === true;
+  const f = (key) => !orphanCleanupRan && active && features[key] === true;
 
   // ---------- 状態購読 ----------
   // 通知で更新したキーだけ初回取得から保護し、残りの初期設定は取り込む。
@@ -256,6 +281,14 @@
 
   /** SPA ナビゲーション開始時の cleanup。CLASS_PROCESSED を剥がし新クエリでの再判定を許可する。 */
   function onNavigationStart() {
+    if (orphanCleanupRan) return;
+    stopSubsSortLabelRepair();
+    commentsRevealed = false;
+    removeCommentsToggle();
+    detachLiveChatObserver();
+    liveChatCollapseHandled = false;
+    window.__cpaLiveChatCollapseHandled = false;
+    liveChatClickAttempts = 0;
     // SPA navigate (yt-navigate-start) の段階で hideLiveChat 用の pre クラスを先制付与する。
     // 理由: yt-navigate-finish 後の syncLiveChatCollapse まで待つと、その間に YouTube が
     //      新ページの ytd-live-chat-frame を expand 状態に戻す瞬間が paint されて
@@ -280,6 +313,8 @@
    * 各機能の必要性に応じて attach / detach / 適用 / 撤去を冪等に行う。
    */
   function onSettingsChanged() {
+    if (orphanCleanupRan) return;
+    if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
     applySubscriptionsRelevant();
     // /shorts/<id> リダイレクトは youtube-shorts.js が担当するためここでは扱わない（責務分離）
 
@@ -370,8 +405,12 @@
   function syncLiveChatCollapse() {
     if (!f("hideLiveChat") || !isWatchPage()) {
       detachLiveChatObserver();
+      liveChatCollapseHandled = false;
+      window.__cpaLiveChatCollapseHandled = false;
+      liveChatClickAttempts = 0;
       return;
     }
+    if (liveChatCollapseHandled) return;
     // SPA 遷移経路でも先制非表示を即時 ON にする（初回直アクセスは youtube-early.js が
     // document_start で同クラスを付与済みなので idempotent）。click 成功時に剥がす。
     document.documentElement.classList.add(LIVE_CHAT_PRE_HIDE_CLASS);
@@ -444,6 +483,7 @@
   }
 
   function detachLiveChatObserver() {
+    liveChatCollapseInProgress = false;
     if (liveChatCollapseRaf !== 0) {
       cancelAnimationFrame(liveChatCollapseRaf);
       liveChatCollapseRaf = 0;
@@ -666,8 +706,17 @@
     // 他には一切触らない（CSS / frame 属性 / 独自クラス / iframe 高さ全部触らない）。
     // 公式 close button の click は user gesture と等価扱いなので YouTube SPA は整合的に
     // 状態更新し、player 副作用ゼロ・layout も自動で整理される。
-    if (!f("hideLiveChat") || !isWatchPage()) {
+    if (liveChatCollapseHandled || !f("hideLiveChat") || !isWatchPage()) {
       cancelLiveChatCollapseRetry();
+      return;
+    }
+    if (liveChatCollapseInProgress) return;
+
+    const frame = document.querySelector("ytd-live-chat-frame");
+    if (frame?.hasAttribute("collapsed")) {
+      liveChatCollapseHandled = true;
+      window.__cpaLiveChatCollapseHandled = true;
+      detachLiveChatObserver();
       return;
     }
 
@@ -684,6 +733,8 @@
     }
     // 成功経路: 進行中のリトライがあれば停止する（無駄な再試行を防ぐ）
     cancelLiveChatCollapseRetry();
+    liveChatCollapseInProgress = true;
+    liveChatClickAttempts++;
 
     // P1-#4: disconnect → click → takeRecords → reattach ガードで MutationObserver の
     // 再発火ループを遮断（panel close → DOM 更新 → observer 発火 → 再度 collapseLiveChatIfNeeded
@@ -945,7 +996,7 @@
   }
 
   /** 登録ボタンをチャンネル名の隣に注入（既存があれば dataset のみ更新 — SPA の renderer 再利用対応）。 */
-  function ensureBlockButton(renderer, info) {
+  function ensureBlockButton(info) {
     // orphan guard: 新規作成分岐の chrome.i18n.getMessage が context invalidation で throw すると
     // 呼び出し元 applyChannelBlocklist の forEach が途中停止するため、入口で安全にスキップする。
     if (!chrome.runtime?.id) return;
@@ -968,7 +1019,7 @@
     btn.dataset.cpaChannelName = info.name;
   }
 
-  /** 登録ボタン click: storage の現在値を再取得してから追記する（popup 側と同じ stale 化 race 防御）。 */
+  /** 登録ボタン click: 追記を background の共通キューへ送り、他の更新と直列化する。 */
   async function onBlockButtonClick(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -978,12 +1029,10 @@
     const name = btn?.dataset?.cpaChannelName || key;
     if (!key) return;
     try {
-      const stored = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS);
-      const list = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
-      if (list.some((c) => c.key === key)) return; // 既登録（別カードの同チャンネル等）
-      if (list.length >= SearchFixer.BLOCKED_CHANNELS_MAX) return; // 上限到達時は静かに no-op
-      list.push({ key, name });
-      await chrome.storage.local.set({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: list });
+      const result = await chrome.runtime.sendMessage({
+        action: "UPDATE_BLOCKED_CHANNELS", operation: "add", key, name,
+      });
+      if (!result?.ok) throw new Error(result?.error || "storage-failed");
       // 除去自体は storage.onChanged → onSettingsChanged → 本 pass 再実行で行われる
     } catch (err) {
       // popup 側 (removeBlockedChannel の logStorageError) と同様、書き込み失敗の手がかりを console に残す
@@ -1013,7 +1062,7 @@
       for (const decision of decisions) {
         if (!decision.renderer.isConnected) continue;
         if (decision.remove) decision.renderer.remove();
-        else ensureBlockButton(decision.renderer, decision.info);
+        else ensureBlockButton(decision.info);
       }
     } catch {}
   }
@@ -1654,10 +1703,60 @@
   }
 
   // ---------- 動画ページ（コメント欄・ライブチャット欄非表示） ----------
+  function removeCommentsToggle() {
+    commentsToggle?.remove();
+    commentsToggle = null;
+  }
+
+  function stopCommentsControl() {
+    commentsObserver?.disconnect();
+    commentsObserver = null;
+    if (commentsScanRaf) cancelAnimationFrame(commentsScanRaf);
+    commentsScanRaf = 0;
+    removeCommentsToggle();
+    document.documentElement.classList.remove("__cpa-sfx-hide-comments");
+  }
+
+  function updateCommentsControl() {
+    const comments = document.querySelector("ytd-comments#comments");
+    if (!comments?.parentElement) {
+      removeCommentsToggle();
+      return;
+    }
+    if (!commentsToggle) {
+      commentsToggle = document.createElement("button");
+      commentsToggle.type = "button";
+      commentsToggle.className = "__cpa-sfx-comments-toggle";
+      commentsToggle.addEventListener("click", () => {
+        commentsRevealed = !commentsRevealed;
+        applyWatchPageClasses();
+      });
+    }
+    const label = chrome.i18n.getMessage(commentsRevealed ? "sfHideCommentsButton" : "sfShowCommentsButton");
+    if (commentsToggle.textContent !== label) commentsToggle.textContent = label;
+    commentsToggle.setAttribute("aria-expanded", String(commentsRevealed));
+    if (commentsToggle.nextElementSibling !== comments) comments.before(commentsToggle);
+  }
+
   function applyWatchPageClasses() {
-    // コメント欄は遅延レンダリング（スクロールで初めて DOM 出現）するため、個別要素 toggle だと
-    // 初期ロード時に空振りする。`<html>` クラスで CSS 駆動にすれば後から DOM が現れても即時適用される。
-    document.documentElement.classList.toggle("__cpa-sfx-hide-comments", f("hideComments"));
+    if (f("hideComments") && isWatchPage()) {
+      document.documentElement.classList.toggle("__cpa-sfx-hide-comments", !commentsRevealed);
+      updateCommentsControl();
+      if (!commentsObserver) {
+        commentsObserver = new MutationObserver(() => {
+          if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+          if (commentsScanRaf) return;
+          commentsScanRaf = requestAnimationFrame(() => {
+            commentsScanRaf = 0;
+            updateCommentsControl();
+          });
+        });
+        commentsObserver.observe(document, { childList: true, subtree: true });
+      }
+    } else {
+      stopCommentsControl();
+      commentsRevealed = false;
+    }
     // ライブチャットは JS 側で公式トグルを押し、CSS は collapsed 状態の高さ補助だけを担う。
     document.documentElement.classList.toggle("__cpa-sfx-hide-live-chat", f("hideLiveChat"));
   }
@@ -1948,14 +2047,10 @@
   let subsGridResizeListener = null;
   /** @type {number} resize debounce timer */
   let subsGridResizeTimer = 0;
-  // sort dropdown 操作の cooldown / click capture / popup-closed listener はすべて 2026-05 に撤去。
-  // 動機: 「初回 sort dropdown 切替で label が rollback する」YouTube 側 bug を補正しようとして
-  //   click capture + cooldown gate + post-cooldown re-scan を入れていたが、実機検証 (extension OFF
-  //   で検証) で **bug は YouTube 側で extension では補正不能** と判明。
-  //   さらに ON 時は cooldown listener が dropdown popup の Polymer state に干渉して
-  //   「2 回目以降 popup が再開しない」という別 bug を生んでしまっていた (extension OFF 時は
-  //    2 回目以降が正常に切り替わることで切り分け確定)。
-  //   よって最善策は「extension は何もせず、YouTube に任せる」=== これら全撤去。
+  // sort は操作を妨げず、応答と DOM の一致が確認できた場合のみラベルを補正する。
+  let subsSortRepair = null;
+  // 要求 ID がなく旧応答を識別できない場合は、ページ再読込まで補正を停止する。
+  let subsSortFrozen = false;
   /** @type {MutationObserver|null} leftnav の subs section #items を監視して再注入する observer */
   let leftnavInjectObserver = null;
   /** @type {Element|null} 観察中の subs section（同一 section への重複 attach 防止） */
@@ -2133,9 +2228,10 @@
     return set;
   }
 
-  /** カードからチャンネル名を取得（main-link の textContent）。 */
-  function getSubsCardName(card) {
-    return (card.querySelector("#main-link")?.textContent || "").trim();
+  /** 表示中のチャンネル名を取得し、説明文を検索対象に含めない。 */
+  function getSubsCardName(card, main = card.querySelector("#main-link")) {
+    const title = main?.querySelector("#channel-title #text") || main?.querySelector("#channel-title");
+    return extractCleanText(title || main);
   }
 
 
@@ -2658,6 +2754,289 @@
 
   // ----- C: /feed/channels グリッド化 + 検索 + ソート + lazy fetch -----
 
+  // ネイティブのイベントは観察だけ行い、操作・描画・scan を止めない。
+  function startSubsSortLabelRepair() {
+    if (subsSortRepair || subsSortFrozen) return;
+    const state = {
+      trigger: null, popup: null, pending: null, timer: 0, followTimer: 0,
+      observer: null, matchObserver: null, ownershipObserver: null, writes: new Map(), group: null,
+      popups: new Set(),
+    };
+    subsSortRepair = state;
+    const forgetChangedWrites = (records) => {
+      for (const record of records) state.writes.delete(record.target);
+    };
+    state.ownershipObserver = new MutationObserver(forgetChangedWrites);
+    const pruneWrites = () => {
+      forgetChangedWrites(state.ownershipObserver.takeRecords());
+      state.ownershipObserver.disconnect();
+      for (const [node, write] of state.writes) {
+        if (node.isConnected) state.ownershipObserver.observe(node, { characterData: true });
+        else {
+          // 切断ノードもサイトが再挿入し得るため、所有する値だけ戻して手放す。
+          if (node.data === write.value) node.data = write.original;
+          state.writes.delete(node);
+        }
+      }
+    };
+    const headerSelector = ":scope > #header-container [role=tablist] button[role=combobox]";
+    const clearFollow = () => {
+      state.observer?.disconnect();
+      state.observer = null;
+      clearTimeout(state.followTimer);
+      state.followTimer = 0;
+      pruneWrites();
+    };
+    const clearPending = () => {
+      state.pending = null;
+      state.matchObserver?.disconnect();
+      state.matchObserver = null;
+    };
+    const detachPopup = (popup) => {
+      popup.removeEventListener("yt-service-request-sent", onSent, true);
+      popup.removeEventListener("yt-service-request-completed", onCompleted, true);
+      state.popups.delete(popup);
+    };
+    const prunePopups = () => {
+      for (const popup of state.popups) {
+        const hasRequest = state.group && Array.from(state.group.requests.values())
+          .some((request) => request.popup === popup);
+        if (popup !== state.popup && !hasRequest) detachPopup(popup);
+      }
+    };
+    const settle = () => {
+      const group = state.group;
+      if (group && !state.pending && !group.requests.size &&
+          group.finishes >= group.successes) {
+        state.group = null;
+        clearTimeout(state.timer);
+        state.timer = 0;
+      }
+      prunePopups();
+    };
+    const blockGroup = () => {
+      subsSortFrozen = true;
+      clearPending();
+      clearTimeout(state.timer);
+      state.timer = 0;
+      state.group = null;
+      state.popup = null;
+      for (const popup of state.popups) detachPopup(popup);
+      state.stop();
+      subsSortRepair = null;
+    };
+    const onTrigger = (event) => {
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      if (!event.isTrusted) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const button = target?.closest("button[role=combobox]");
+      const section = button?.closest("ytd-section-list-renderer");
+      const valid = section && section.querySelector(headerSelector) === button;
+      const key = event.type === "keydown" && (event.key === "Enter" || event.key === " ");
+      if (valid && (event.type === "pointerdown" || key)) {
+        state.trigger = { section, time: performance.now() };
+      } else {
+        state.trigger = null;
+      }
+    };
+    const onPopup = (event) => {
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      const trigger = state.trigger;
+      state.trigger = null;
+      const popup = event.target;
+      if (!trigger || performance.now() - trigger.time > 1000 || !trigger.section.isConnected ||
+          !(popup instanceof Element) || !popup.matches("yt-sheet-view-model") ||
+          !popup.querySelector("[role=menu] [role=menuitem]")) {
+        // 同じ sheet が別メニューに再利用される場合、未完了要求との対応は判別不能。
+        const reused = state.group && Array.from(state.group.requests.values())
+          .some((request) => request.popup === popup);
+        if (reused) blockGroup();
+        else {
+          state.popup = null;
+          prunePopups();
+        }
+        return;
+      }
+      if (subsSortFrozen) return;
+      // 旧 section の未決着要求は新 section のイベントに対応付けられない。
+      if (state.group && state.group.section !== trigger.section) {
+        if (state.pending || state.group.requests.size ||
+            state.group.finishes < state.group.successes) {
+          blockGroup();
+          return;
+        }
+        clearPending();
+        clearTimeout(state.timer);
+        state.timer = 0;
+        state.group = null;
+      }
+      state.popup = popup;
+      state.section = trigger.section;
+      if (!state.popups.has(popup)) {
+        state.popups.add(popup);
+        popup.addEventListener("yt-service-request-sent", onSent, true);
+        popup.addEventListener("yt-service-request-completed", onCompleted, true);
+      }
+      prunePopups();
+    };
+    const onSent = (event) => {
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      const target = event.target;
+      const item = target instanceof Element && target.closest("[role=menuitem]");
+      if (!item || !state.popup?.contains(item)) return;
+      clearFollow();
+      let group = state.group;
+      if (!group) {
+        group = { section: state.section, requests: new Map(), finishes: 0, successes: 0 };
+        state.group = group;
+        state.timer = setTimeout(() => {
+          if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+          if (state.group !== group) return;
+          if (state.pending || group.requests.size || group.finishes < group.successes) {
+            blockGroup();
+          } else {
+            clearPending();
+            settle();
+          }
+        }, 10000);
+      } else {
+        // 対応 ID がない重複は、旧 section を封じて listener ごと手放す。
+        blockGroup();
+        return;
+      }
+      clearPending();
+      const request = group.requests.get(target);
+      if (request) request.count += 1;
+      else group.requests.set(target, { count: 1, popup: state.popup });
+      const label = item.textContent.trim();
+      if (!label) { blockGroup(); return; }
+      state.pending = { target, item, label, section: state.section, finished: false, urls: null };
+    };
+    const onCompleted = (event) => {
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      const target = event.target;
+      const group = state.group;
+      const request = group?.requests.get(target);
+      if (!request) return;
+      if (--request.count === 0) group.requests.delete(target);
+      const pending = state.pending;
+      try {
+        const actions = event.detail.data.onResponseReceivedActions;
+        const commands = actions.map((action) => action.reloadContinuationItemsCommand)
+          .filter((command) => command?.targetId === "browse-feedFEchannels");
+        if (commands.length !== 1) {
+          blockGroup();
+          return;
+        }
+        group.successes += 1;
+        if (!pending || target !== pending.target) { settle(); return; }
+        const contents = commands[0].continuationItems;
+        const shelves = contents.flatMap((entry) => entry.itemSectionRenderer?.contents || [])
+          .map((entry) => entry.shelfRenderer?.content?.expandedShelfContentsRenderer?.items)
+          .filter(Array.isArray);
+        if (shelves.length !== 1 || !shelves[0].length) { blockGroup(); return; }
+        pending.urls = shelves[0].map((entry) => {
+          const url = entry.channelRenderer?.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url;
+          return typeof url === "string" && /^\/@[^/?#]+$/.test(url) ? url : null;
+        });
+        if (pending.urls.some((url) => !url)) { blockGroup(); return; }
+        tryRepair();
+      } catch {
+        // Firefox の isolated world で detail を読めない場合も補正しない。
+        blockGroup();
+      }
+      prunePopups();
+    };
+    const onFinish = (event) => {
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      const group = state.group;
+      if (!group || event.target !== group.section) return;
+      group.finishes += 1;
+      if (state.pending) { state.pending.finished = true; tryRepair(); }
+      settle();
+    };
+    const tryRepair = () => {
+      if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      const pending = state.pending;
+      if (!pending?.finished || !pending.urls) return;
+      const section = pending.section;
+      const cards = Array.from(section.querySelectorAll("ytd-channel-renderer #main-link[href]"));
+      if (!section.isConnected) return;
+      if (cards.length < pending.urls.length ||
+          !pending.urls.every((url, index) => cards[index].getAttribute("href") === url)) {
+        if (!state.matchObserver) {
+          state.matchObserver = new MutationObserver(tryRepair);
+          state.matchObserver.observe(section, { childList: true, subtree: true, attributes: true,
+            attributeFilter: ["href"] });
+        }
+        return;
+      }
+      const update = () => {
+        if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+        pruneWrites();
+        if (!section.isConnected || location.pathname !== "/feed/channels") return;
+        const currentCards = Array.from(section.querySelectorAll("ytd-channel-renderer #main-link[href]"));
+        if (currentCards.length < pending.urls.length ||
+            !pending.urls.every((url, index) => currentCards[index].getAttribute("href") === url)) {
+          clearFollow();
+          return;
+        }
+        const chip = section.querySelector(`${headerSelector} .ytChipShapeText`);
+        if (!chip || chip.childNodes.length !== 1 || chip.firstChild.nodeType !== Node.TEXT_NODE) return;
+        const node = chip.firstChild;
+        if (node.data === pending.label) return;
+        // 自前の書込み以外で Text が変更されたら、以前の復元権を放棄する。
+        forgetChangedWrites(state.ownershipObserver.takeRecords());
+        state.ownershipObserver.disconnect();
+        const previous = state.writes.get(node);
+        const original = previous && node.data === previous.value ? previous.original : node.data;
+        state.writes.set(node, { original, value: pending.label });
+        node.data = pending.label;
+        for (const written of state.writes.keys()) {
+          state.ownershipObserver.observe(written, { characterData: true });
+        }
+      };
+      clearPending();
+      update();
+      state.observer = new MutationObserver(update);
+      state.observer.observe(section, { childList: true, characterData: true, subtree: true });
+      // 実測で約 2.5 秒後にもヘッダーが戻るため、5 秒を上限に追従する。
+      state.followTimer = setTimeout(clearFollow, 5000);
+      settle();
+    };
+    state.stop = () => {
+      const group = state.group;
+      if (group && (state.pending || group.requests.size || group.finishes < group.successes)) {
+        subsSortFrozen = true;
+      }
+      clearPending();
+      clearTimeout(state.timer);
+      state.timer = 0;
+      clearFollow();
+      for (const popup of state.popups) detachPopup(popup);
+      document.removeEventListener("pointerdown", onTrigger, true);
+      document.removeEventListener("keydown", onTrigger, true);
+      document.removeEventListener("yt-popup-opened", onPopup, true);
+      document.removeEventListener("yt-reload-continuation-finish", onFinish, true);
+      forgetChangedWrites(state.ownershipObserver.takeRecords());
+      state.ownershipObserver.disconnect();
+      for (const [node, write] of state.writes) {
+        if (node.data === write.value) node.data = write.original;
+      }
+      state.writes.clear();
+    };
+    document.addEventListener("pointerdown", onTrigger, { capture: true, passive: true });
+    document.addEventListener("keydown", onTrigger, { capture: true, passive: true });
+    document.addEventListener("yt-popup-opened", onPopup, true);
+    document.addEventListener("yt-reload-continuation-finish", onFinish, true);
+  }
+
+  function stopSubsSortLabelRepair() {
+    if (!subsSortRepair) return;
+    subsSortRepair.stop();
+    subsSortRepair = null;
+  }
+
   function applySubsChannelsGrid() {
     // 同上: orphan content script で `chrome.i18n.getMessage` (ensureSubsGridToolbar 内 placeholder)
     // が throw するのを防ぐ。MutationObserver / SPA navigation 起点で頻繁に呼ばれる経路なので
@@ -2669,6 +3048,7 @@
       return;
     }
     document.documentElement.classList.add(SUBS_GRID_CLASS);
+    startSubsSortLabelRepair();
     ensureSubsGridToolbar();
     syncSubsGridItemsPerRow();
     startSubsGridResizeListener();
@@ -2682,19 +3062,53 @@
    * `ytd-channel-renderer` 群が再 hydrate されて新規ノードが追加される。
    * 新カードに対して inject (#avatar move + IntersectionObserver 登録) を再実行しないと
    * サムネ枠が空のまま「巨大アバター + サムネ無し」のレイアウト破壊に見えるため、
-   * MutationObserver で childList 変化を観察し 150ms debounce で scheduleSubsGridScan を再呼び出しする。
+   * MutationObserver でカード内の名前・ハンドル・リンクの変化を即時反映し、
+   * 構造の再構築やサムネの再登録は 150ms ごとにまとめて処理する。
    *
    * scheduleSubsGridScan / applyGridCardInlineStyle は冪等 (SUBS_CARD_MARKER_ATTR / data-cpa-subs-styled
    * で重複防止) なので何度呼んでも処理済みカードはスキップされる。
    */
+  function refreshChangedSubsGridCards(records) {
+    if (!subsGridState) return false;
+    const cards = new Set();
+    for (const record of records) {
+      const target = record.target.nodeType === Node.ELEMENT_NODE
+        ? record.target
+        : record.target.parentElement;
+      if (!target) continue;
+      if (record.type === "attributes" && target.id !== "main-link") continue;
+      if (record.type !== "attributes" &&
+          !target.closest("#channel-title, #subscribers, #main-link, #info-section")) continue;
+      const card = target.closest("ytd-channel-renderer");
+      // 新規カードの構造注入は従来の一括走査に任せ、再利用カードだけを先に更新する。
+      if (card?.isConnected && card.hasAttribute("data-cpa-subs-styled")) cards.add(card);
+    }
+    if (cards.size === 0) return false;
+    const q = (subsGridState.search?.value || "").trim().toLowerCase();
+    const shelves = new Set();
+    for (const card of cards) {
+      // href の変更時は古いサムネも外し、名前・検索結果と別チャンネルを混在させない。
+      applyGridCardInlineStyle(card);
+      applySubsGridCardFilter(card, q);
+      const shelf = card.closest("ytd-shelf-renderer");
+      if (shelf) shelves.add(shelf);
+    }
+    for (const shelf of shelves) applySubsGridShelfFilter(shelf);
+    return true;
+  }
+
   function startSubsGridCardsObserver() {
     if (subsGridCardsObserver) return;
-    subsGridCardsObserver = new MutationObserver(() => {
+    subsGridCardsObserver = new MutationObserver((records) => {
       // /rere B2-012/B2-018: extension reload で orphan 化したら全 observer / timer を停止
       if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+      const changedCards = refreshChangedSubsGridCards(records);
       if (subsGridCardsScanTimer) return;
+      // カード外の href・文字更新は監視対象だが、全カード再走査の理由にはしない。
+      if (!changedCards && !records.some((record) => record.type === "childList")) return;
       subsGridCardsScanTimer = setTimeout(() => {
         subsGridCardsScanTimer = 0;
+        if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
         if (!subsGridState) return;
         // ネイティブ sort dropdown (左上「関連度順 / 新しいアクティビティ / 名前順」) を操作すると
         // YouTube は `yt-reload-continuation-finish` でサーバー再取得 → `ytd-section-list-renderer`
@@ -2732,9 +3146,15 @@
     // observer target は **document.body** に固定する。理由:
     //   - ytd-section-list-renderer / ytd-browse #primary は YouTube SPA で要素ごと置換される
     //     ことがあり、その場合 detach された旧要素を見続けて新 DOM の変化を検知できない。
-    //   - body subtree:true は mutation 量が多いが 150ms debounce で 1 回/cluster に圧縮される。
+    //   - 一括走査は 150ms ごとに集約し、即時更新は変更されたカードだけに絞る。
     //   - 検知漏れによる「toolbar 消失 + cards observer が永遠に発火しない」状態の方が UX 影響が大きい。
-    subsGridCardsObserver.observe(document.body, { childList: true, subtree: true });
+    subsGridCardsObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["href"],
+    });
   }
 
   function stopSubsGridCardsObserver() {
@@ -2748,6 +3168,7 @@
   }
 
   function detachSubsChannelsGrid() {
+    stopSubsSortLabelRepair();
     // light cleanup は idempotent (toolbar / observer は存在チェック付き、class remove も冪等) なので
     // subsGridState の有無に関わらず実行して構わない。
     document.documentElement.classList.remove(SUBS_GRID_CLASS);
@@ -2824,7 +3245,7 @@
 
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = chrome.i18n.getMessage("subsSearchPlaceholder") || "チャンネル名で絞り込み";
+    search.placeholder = chrome.i18n.getMessage("subsSearchPlaceholder") || "チャンネル名またはハンドルで絞り込み";
     search.autocomplete = "off";
     search.spellcheck = false;
     // /rere C1-001 修正: 旧実装は debounce ゼロで毎打鍵に全 N×querySelector を走査していたため、
@@ -2971,7 +3392,9 @@
       // closure capture + 冒頭の subsGridState null guard で安全側に倒す。
       const observer = new IntersectionObserver(
         (entries) => {
-          if (subsGridState === null) return; // detach 後の stale callback ガード
+          if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+          // OFF→ON や toolbar 再生成後に、旧 observer の通知を新しい状態へ混ぜない。
+          if (!subsGridState || subsGridState.observer !== observer) return;
           for (const entry of entries) {
             if (entry.isIntersecting) {
               observer.unobserve(entry.target); // closure capture 経由で stale な subsGridState 不要
@@ -3010,6 +3433,14 @@
    * 重要操作: `#avatar` 要素を `#info-section` の先頭に move する。CSS だけでは
    *   要素の親変更ができないため。OFF 切替時 (clearGridCardInlineStyle) で復元。
    */
+  function onSubsGridCardClick(e) {
+    if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+    if (subsGridState === null) return;
+    if (e.target.closest("a")) return;
+    const main = e.currentTarget.querySelector("#main-link");
+    if (main) main.click();
+  }
+
   function applyGridCardInlineStyle(card) {
     // ===== データ更新フェーズ (毎スキャンで実行) =====
     // YouTube ネイティブ sort dropdown は `yt-reload-continuation-finish` で
@@ -3022,7 +3453,7 @@
     // よってデータ更新（clean-name + href 整合性チェック）は必ず毎回走らせる。
     const main = card.querySelector("#main-link");
     if (main) {
-      const cleanName = extractCleanText(main);
+      const cleanName = getSubsCardName(card, main);
       if (main.getAttribute("data-cpa-clean-name") !== cleanName) {
         main.setAttribute("data-cpa-clean-name", cleanName);
       }
@@ -3057,17 +3488,10 @@
     //   info-section の空白部分・サムネ枠・登録者数テキストは死領域だった。
     //   → カード自身に click を bind して、ターゲットがどの anchor 内でもなければ #main-link.click() で転送する。
     //   重複登録防止に data-cpa-card-click marker を使用。
-    //   listener の冒頭で `subsGridState` を見て、機能 OFF 切替後は no-op に倒す（Codex P2 指摘）。
-    //   listener 自体を removeEventListener で剥がす方針も検討したが、card 単位で handler 参照を
-    //   保持する必要があるのとカード再生成で自然消滅するため、closure 越しの state gate を採用。
+    //   共通 handler は OFF 時に解除し、同じカードを再利用しても重複登録しない。
     if (!card.hasAttribute("data-cpa-card-click")) {
       card.setAttribute("data-cpa-card-click", "");
-      card.addEventListener("click", (e) => {
-        if (subsGridState === null) return; // 機能 OFF 時は stale listener として no-op
-        if (e.target.closest("a")) return; // 元々の anchor クリックは尊重
-        const ml = card.querySelector("#main-link");
-        if (ml) ml.click();
-      });
+      card.addEventListener("click", onSubsGridCardClick);
     }
     // ① #avatar を #info-section の先頭に move (feed カードの「サムネ下にアイコン左」配置)。
     //   元は #avatar-section の中にあるが、それだと 16:9 サムネ枠の中央にアバターが大きく
@@ -3163,8 +3587,8 @@
    */
   function clearGridCardInlineStyle(card) {
     card.removeAttribute("data-cpa-subs-styled");
-    // ON/OFF 繰り返しでの listener 蓄積防止: data-cpa-card-click を剥がして
-    // 次回 ON 時に新規 listener を 1 つだけ追加させる（古い listener は subsGridState===null guard で no-op 化）。
+    // 次回 ON 時に同じカードへ再登録する前に、既存 listener を解除する。
+    card.removeEventListener("click", onSubsGridCardClick);
     // data-cpa-card-href を剥がしておかないと Polymer dom-repeat で card が別チャンネルに再バインドされた際に
     // 古い href のまま残って oldThumb 除去の flicker 経路を踏む（rere レビュー C3-3 指摘）。
     card.removeAttribute("data-cpa-card-click");
@@ -3410,6 +3834,7 @@
     // YouTube の native sort/re-hydration で `ytd-channel-renderer` が物理移動だけで並び替わる
     // ケースがあり、`#main-link` の href が別チャンネルに書き換わった card に古いチャンネルの
     // サムネを append してしまう race condition を防ぐ (Codex P2 指摘 2026-05-08)。
+    if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
     if (subsGridState === null) return;
     if (!card.isConnected) return;
     const currentHandle = extractHandleFromHref(
@@ -3447,6 +3872,8 @@
   }
 
   function drainSubsThumbnailFetchQueue() {
+    if (!chrome.runtime?.id) { cleanupAllSearchFixerStateForOrphan(); return; }
+    if (!subsGridState || subsThumbFetchQueue.length === 0) return;
     if (!subsThumbFetchAbort) subsThumbFetchAbort = new AbortController();
     while (
       subsGridState &&
@@ -3497,6 +3924,36 @@
     }
   }
 
+  function applySubsGridCardFilter(card, q) {
+    const isHidden = card.hasAttribute("hidden");
+    if (!q) {
+      if (isHidden) card.removeAttribute("hidden");
+      return;
+    }
+    const name = getSubsCardName(card).toLowerCase();
+    const handleSlot = (card.querySelector("#subscribers")?.textContent || "").toLowerCase();
+    const shouldShow = name.includes(q) || handleSlot.includes(q);
+    if (shouldShow && isHidden) {
+      card.removeAttribute("hidden");
+    } else if (!shouldShow && !isHidden) {
+      card.setAttribute("hidden", "");
+    }
+  }
+
+  function applySubsGridShelfFilter(shelf) {
+    const cards = shelf.querySelectorAll("ytd-channel-renderer");
+    if (cards.length === 0) return;
+    const visible = Array.from(cards).some((c) => !c.hasAttribute("hidden"));
+    const shelfHidden = shelf.hasAttribute("hidden");
+    if (visible && shelfHidden) {
+      shelf.removeAttribute("hidden");
+      shelf.removeAttribute("data-cpa-shelf-empty");
+    } else if (!visible && !shelfHidden) {
+      shelf.setAttribute("hidden", "");
+      shelf.setAttribute("data-cpa-shelf-empty", "");
+    }
+  }
+
   function applySubsGridFilter() {
     if (!subsGridState) return;
     const q = (subsGridState.search?.value || "").trim().toLowerCase();
@@ -3510,35 +3967,9 @@
     // removeAttribute でも MutationRecord は積まれて Polymer の data-binding listener に
     // 通知が飛ぶため、初回 hydrate 中の race condition を悪化させる原因になる（ゆろさん実機の
     // 「初回 sort 切替失敗」バグ調査で追加したガード）。
-    document.querySelectorAll("ytd-channel-renderer").forEach((card) => {
-      const isHidden = card.hasAttribute("hidden");
-      if (!q) {
-        if (isHidden) card.removeAttribute("hidden");
-        return;
-      }
-      const name = getSubsCardName(card).toLowerCase();
-      const handleSlot = (card.querySelector("#subscribers")?.textContent || "").toLowerCase();
-      const shouldShow = name.includes(q) || handleSlot.includes(q);
-      if (shouldShow && isHidden) {
-        card.removeAttribute("hidden");
-      } else if (!shouldShow && !isHidden) {
-        card.setAttribute("hidden", "");
-      }
-    });
+    document.querySelectorAll("ytd-channel-renderer").forEach((card) => applySubsGridCardFilter(card, q));
     // 全カードが hidden な shelf も hidden にする（空 shelf の見出しが残る UX 問題を回避）。
-    document.querySelectorAll("ytd-shelf-renderer").forEach((shelf) => {
-      const cards = shelf.querySelectorAll("ytd-channel-renderer");
-      if (cards.length === 0) return;
-      const visible = Array.from(cards).some((c) => !c.hasAttribute("hidden"));
-      const shelfHidden = shelf.hasAttribute("hidden");
-      if (visible && shelfHidden) {
-        shelf.removeAttribute("hidden");
-        shelf.removeAttribute("data-cpa-shelf-empty");
-      } else if (!visible && !shelfHidden) {
-        shelf.setAttribute("hidden", "");
-        shelf.setAttribute("data-cpa-shelf-empty", "");
-      }
-    });
+    document.querySelectorAll("ytd-shelf-renderer").forEach(applySubsGridShelfFilter);
   }
 
   // ---------- /rere B2-012 + B2-018 修正: orphan 化への対応 ----------
@@ -3553,13 +3984,21 @@
    *
    * 多経路から呼ばれても `orphanCleanupRan` フラグで 1 回だけ実行される (再 attach 防止)。
    */
-  let orphanCleanupRan = false;
   function cleanupAllSearchFixerStateForOrphan() {
     if (orphanCleanupRan) return;
     orphanCleanupRan = true;
+    const oldGridState = subsGridState;
+    // このインスタンスが付けたグリッドの DOM と listener を元に戻す。
+    if (oldGridState) {
+      try { detachSubsChannelsGrid(); } catch {}
+    }
+    subsGridState = null;
+    // 撤去途中に例外があっても、旧 observer の通知は失効させる。
+    try { oldGridState?.observer?.disconnect(); } catch {}
     try { applySubscriptionsRelevant(false); } catch {}
     try { detachResultsObserver(); } catch {}
     try { detachLiveChatObserver(); } catch {}
+    try { stopCommentsControl(); } catch {}
     try { detachLeftnavObservers(); } catch {}
     try { stopSubsGridCardsObserver(); } catch {}
     try { stopSubsGridResizeListener(); } catch {}
@@ -3571,8 +4010,10 @@
 
   window.addEventListener(
     "pagehide",
-    () => cleanupAllSearchFixerStateForOrphan(),
-    { once: true }
+    (e) => {
+      // bfcache では監視と UI も凍結され、復帰時にそのまま再利用する。
+      if (!e.persisted) cleanupAllSearchFixerStateForOrphan();
+    }
   );
 
 })();

@@ -278,7 +278,7 @@
           <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-shield"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="volumeAntiClipLabel">自動歪み防止</span>
-            <span class="tr-desc" data-i18n="volumeAntiClipDesc">突然の大声や効果音のピークを抑え、音量ブースト時の音割れを防ぎます</span>
+            <span class="tr-desc" data-i18n="volumeAntiClipDesc">突然の大声や効果音のピークを抑え、音量ブースト時の音割れを軽減します</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="volumeAntiClipToggle" />
@@ -738,18 +738,29 @@
       <section class="grp grp--palette" data-i18n-attr="aria-label:paletteTitle" aria-label="色を調整">
         <h2 class="grp-title">
           <span class="grp-title-text" data-i18n="paletteTitle">色を調整</span>
-          <span class="grp-pill" id="palettePill">— — —</span>
+          <span class="grp-pill" id="palettePill" role="status" aria-live="polite" aria-atomic="true">— — —</span>
         </h2>
 
         <div class="palette">
-          <div class="palette-area" id="paletteArea" tabindex="0"
+          <div class="palette-area" id="paletteArea" role="group" tabindex="0"
+               aria-describedby="paletteAxisHint palettePill"
                data-i18n-attr="aria-label:paletteAreaAria"
                aria-label="鮮やかさと明るさを調整（矢印キーで微調整、Shift で大きく動かす）">
             <span class="palette-thumb" id="paletteThumb" aria-hidden="true"></span>
           </div>
-          <p class="palette-axis" data-i18n="paletteAxisHint">
+          <p class="palette-axis" id="paletteAxisHint" data-i18n="paletteAxisHint">
             ドラッグで調整 — 横 = 鮮やかさ / 縦 = 明るさ
           </p>
+          <div class="palette-hue-row">
+            <label class="palette-hue-label" for="paletteSaturation" data-i18n="paletteSaturationLabel">鮮やかさ</label>
+            <input type="range" class="range" id="paletteSaturation"
+                   min="0" max="100" step="1" value="0" />
+          </div>
+          <div class="palette-hue-row">
+            <label class="palette-hue-label" for="paletteBrightness" data-i18n="paletteBrightnessLabel">明るさ</label>
+            <input type="range" class="range" id="paletteBrightness"
+                   min="0" max="100" step="1" value="0" />
+          </div>
           <div class="palette-hue-row">
             <span class="palette-hue-label" data-i18n="paletteHueLabel">色あい</span>
             <input type="range" class="range palette-hue" id="paletteHue"

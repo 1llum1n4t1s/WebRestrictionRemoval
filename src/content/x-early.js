@@ -4,13 +4,13 @@
  * X（旧 Twitter）クリーナーの document_start 注入。flash 体感ラグ消滅用。
  *
  * 役割: `xCleanerEnabled` (master) + `xCleanerFeatures` (オブジェクト) の保存値に応じて、
- * x-cleaner.js (document_idle) が走る前に `<html>` へクラスを **同期で付与**し、
+ * 設定読取後、x-cleaner.js (document_idle) を待たず `<html>` へクラスを付与し、
  * レイアウト系セレクタを `<style>` inline rule で即時非表示化する。
  *
- * 仕組み（オプトアウト方式）— tiktok-early.js と同型:
+ * 仕組み（オプトイン方式）— tiktok-early.js と同型:
  *   1. document_start 同期で `<style>` を `<html>` 直下に prepend
- *   2. document_start 同期でクラスを **無条件付与**（storage.get の async 待ちに間に合わせるため）
- *   3. `chrome.storage.local` から非同期取得し、master OFF / feature OFF なら剥がす
+ *   2. `chrome.storage.local` から非同期取得し、master と feature が明示的に ON の場合だけ付与
+ *   3. 未取得・OFF・取得失敗時は非表示にしない。読取前の FOUC は許容する
  *   4. `chrome.storage.onChanged` で再評価
  *
  * 設計判断:

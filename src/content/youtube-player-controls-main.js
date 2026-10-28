@@ -159,7 +159,9 @@
     }
 
     function mountUI() {
-      const area = player.querySelector(`.__cpa-ypc-player[data-cpa-player-session="${session}"]`);
+      const selector = `.__cpa-ypc-player[data-cpa-player-session="${session}"]`;
+      const area = player.querySelector(selector) || (/^\/embed\//.test(location.pathname) &&
+        document.querySelector(`#player-controls player-fullscreen-action-menu .quick-actions-wrapper > .__cpa-ypc-overlay > ${selector}`));
       if (!area) return;
       const nextSignature = JSON.stringify(config);
       if (controls?.parentElement === area && signature === nextSignature) return;

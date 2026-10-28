@@ -263,8 +263,8 @@
     } finally {
       captureInFlight = false;
       // 進行中に scheduleRecapture が積み上がっていたら 1 回だけ後追い実行
-      // (epoch が進んでいる = deactivate 済みなら isActive が false なのでこの分岐は走らない)
-      if (pendingRecapture && isActive && mySeq === captureSeq) {
+      // deactivate は保留を消す。復帰後に新たに保留された要求は、旧撮影の終了後に実行する。
+      if (pendingRecapture && isActive) {
         pendingRecapture = false;
         scheduleRecapture();
       }
@@ -386,7 +386,6 @@
     window.addEventListener("scroll", onScroll, { passive: true, capture: true });
     window.addEventListener("resize", onResize, { passive: true });
     document.addEventListener("click", onClickOff, { capture: true });
-    document.addEventListener("visibilitychange", onVisibilityChange);
 
     // body 直下の childList 変化のみ監視（subtree:true は SPA で過剰発火するため避ける）。
     // SPA top-level navigation / モーダル追加等の「大きな構造変化」を捉えるのに十分。
@@ -401,7 +400,6 @@
     window.removeEventListener("scroll", onScroll, { capture: true });
     window.removeEventListener("resize", onResize);
     document.removeEventListener("click", onClickOff, { capture: true });
-    document.removeEventListener("visibilitychange", onVisibilityChange);
 
     if (domObserver) {
       domObserver.disconnect();
@@ -501,7 +499,7 @@
         StorageKeys.LOUPE_SIZE,
       ]);
       const enabled = s[StorageKeys.LOUPE_ENABLED] === true;
-      if (enabled) {
+      if (enabled && !document.hidden && chrome.runtime?.id) {
         await activate(s[StorageKeys.LOUPE_ZOOM], s[StorageKeys.LOUPE_SIZE]);
       } else {
         deactivate();
@@ -545,8 +543,12 @@
   // /rere C2-2 PATTERN SYNC（video-fill.js と同型）。deactivate は冪等（!isActive で no-op）。
   window.addEventListener("pagehide", (e) => {
     if (e.persisted) return;
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     deactivate();
   });
+
+  // 非表示時の deactivate 後も、表示復帰を受け取れるようページ単位で購読する。
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   // 初期評価（content script ロード時に storage 状態に従って activate or 待機）
   readSettingsAndApply();

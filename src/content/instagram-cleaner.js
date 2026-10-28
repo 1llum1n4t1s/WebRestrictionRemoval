@@ -42,6 +42,8 @@
   let urlGuardTimer = null;
   /** blockVideos ON 中だけ登録する再生抑止 listener の状態 */
   let blockVideoPlayListenerActive = false;
+  // 入力欄のない公開詳細ページで推定した領域は、DOM 再利用時も毎回再評価する。
+  const publicCommentContainers = new Set();
 
   // i18n / セレクタ崩壊の watch dog (#10): href + aria-label の全バリアントが同時に DOM に
   // 見当たらないとき、Instagram の DOM 構造が根本変化した可能性を開発者コンソールに 1 度だけ警告。
@@ -79,6 +81,7 @@
   // ---------- 設定変更ディスパッチャ ----------
   function onSettingsChanged() {
     applyBodyClasses();
+    if (!f("comments")) clearPublicCommentContainers();
     syncBlockVideoPlaybackGuard();
     if (active) {
       if (hasSweepFeature()) startDomSweep();
@@ -260,6 +263,39 @@
     return element.querySelectorAll('a[href*="/c/"] time').length === allTimes.length;
   }
 
+  function getPublicCommentId(element, shortcode) {
+    if (!isConfirmedCommentItem(element)) return null;
+    const links = element.querySelectorAll('a[href*="/c/"]');
+    let commentId = null;
+    for (const link of links) {
+      const match = (link.getAttribute("href") ?? "").match(/^\/(?:p|reels?|tv)\/([^/?#]+)\/c\/([^/?#]+)\/?(?:[?#].*)?$/i);
+      if (match?.[1] !== shortcode || (commentId !== null && commentId !== match[2])) return null;
+      commentId = match[2];
+    }
+    return commentId;
+  }
+
+  function isEmptyCommentLoader(element) {
+    if (element.textContent.trim() ||
+      element.querySelector("a, time, input, textarea, button, img, picture, video, audio, [contenteditable]")) return false;
+    // 公開ページの spinner は複数の DIV に包まれる。兄弟要素や SVG の混在した wrapper は認めない。
+    let loader = element;
+    while (loader.localName === "div") {
+      if (loader.getAttribute("data-visualcompletion") === "loading-state" &&
+        loader.getAttribute("role") === "progressbar") return true;
+      if (loader.children.length !== 1) return false;
+      loader = loader.children[0];
+    }
+    return false;
+  }
+
+  function clearPublicCommentContainers() {
+    for (const container of publicCommentContainers) {
+      container.classList.remove(InstagramCleaner.COMMENT_LIST_CLASS);
+    }
+    publicCommentContainers.clear();
+  }
+
   /**
    * コメント関連要素を JS で識別し、安全な範囲で隠蔽用マーカークラスを付ける。
    *
@@ -278,13 +314,15 @@
    *      `<ul class="_a9z6">`（直系 `<div>`）または `<div>` 直下に並ぶ。コメント入力 textarea
    *      が存在 + モーダル、または投稿詳細 URL の `main[role="main"]` 配下で、子 2〜50 個 /
    *      全子の全 `<time>` がコメント permalink 内にある / 70%+ が `/<username>/` を持つ /
-   *      異なる username が 2 種類以上 — を全部満たす最内 container をマーク。
+   *      異なる username が 2 種類以上（入力欄のない公開詳細では直系コメントごとに異なる ID）
+   *      — を全部満たす最内 container をマーク。
    *
    * 安全策（前回の「投稿本体を巻き込む」事故を防ぐ）:
    *   - 4 はモーダルを優先し、モーダル外では投稿詳細 URL の main だけを走査する
-   *   - 4 はコメント入力 textarea 不在 root（プロフィール / DM / 検索結果）に到達しないようガード
+   *   - 入力欄のない公開詳細ページは URL の投稿 shortcode と全コメントの一致を追加確認する。
+   *     空の loading 専用子だけを例外にし、プロフィール / DM / 検索結果は走査しない。
    *   - 3 / 4 はコメント permalink を肯定条件にし、投稿本文を含む `_a9z6` は明示除外する
-   *   - 4 は **全時刻がコメント permalink 内 + 異なる username 2 種類以上**を要件にし、
+   *   - 4 は **全時刻がコメント permalink 内 + 2 username または公開詳細の一意なコメント ID**を要件にし、
    *     投稿本文 / タグ付けユーザーパネル / liked_by 行 / 単一ユーザー繰り返し UI を除外する
    *   - 4 は article ガードを敢えて持たない（モーダル投稿は `<dialog>` 内の `<article>` で wrap
    *     されるため）。3. と重複マーク発生時は同 class の冪等 add で CSS 効果は同一。
@@ -292,6 +330,8 @@
    */
   function markCommentElements() {
     try {
+      // 前回の公開領域をいったん戻し、本文への差し替え・URL 変更・切断後は保持しない。
+      clearPublicCommentContainers();
       // 1. コメント入力フォーム
       document.querySelectorAll("textarea[aria-label], textarea[placeholder]").forEach((textarea) => {
         const label =
@@ -361,7 +401,7 @@
       //    `<article>` が無い投稿詳細ページに加え、フィード/プロフィールから投稿クリックで
       //    開く `[role="dialog"]` モーダル表示も対象。コメントは `<ul class="_a9z6">` (子は <div>) や
       //    `<div>` 直下に並ぶ（投稿によって異なるレイアウト）。安全策として下記ガードで誤マッチを防ぐ:
-      //      - 同じ root にコメント入力 textarea が存在する（= コメント可能 UI のみ）
+      //      - 同じ root にコメント入力 textarea が存在、または投稿 URL と全コメントが一致する公開詳細
       //      - スコープをモーダル、または投稿詳細 URL の `main[role="main"]` に限定
       //    （`closest("article")` ガードは入れない — モーダル投稿は `<dialog>` 内の `<article>` で
       //     wrap されており、article ガードを入れると modal も skip されてしまうため。3. の UL
@@ -370,14 +410,21 @@
       //      - 直系子が 2〜50 個
       //      - 全ての子の全 `<time>` がコメント固有 permalink 内にある
       //      - 70% 以上の子が `/<username>/` 形式のリンクを含む
-      //      - **異なる username が 2 種類以上**
-      const dialog = document.querySelector('[role="dialog"]');
-      const isDetailPath = /^\/(?:p|reels?|tv)\/[^/]+(?:\/|$)/i.test(location.pathname);
-      const detectionRoot = dialog || (isDetailPath ? document.querySelector('main[role="main"]') : null);
-      const hasCommentInput = detectionRoot?.querySelector(
-        'textarea[aria-label*="comment" i], textarea[aria-label*="コメント"], textarea[placeholder*="comment" i], textarea[placeholder*="コメント"]'
-      );
-      if (detectionRoot && hasCommentInput) {
+      //      - **異なる username が 2 種類以上**（公開詳細では各項目のコメント ID が全て異なる）
+      const commentInputSelector =
+        'textarea[aria-label*="comment" i], textarea[aria-label*="コメント"], textarea[placeholder*="comment" i], textarea[placeholder*="コメント"]';
+      const firstDialog = document.querySelector('[role="dialog"]');
+      // 先頭が登録案内でも、後続の投稿モーダルにコメント入力があればそちらを優先する。
+      const dialog = firstDialog?.querySelector(commentInputSelector) ? firstDialog :
+        Array.from(document.querySelectorAll('[role="dialog"]')).find((candidate) => candidate.querySelector(commentInputSelector));
+      const dialogCommentInput = dialog?.querySelector(commentInputSelector);
+      const detailPath = location.pathname.match(/^\/(?:[\w.]{1,30}\/)?(?:p|reels?|tv)\/([\w-]+)\/?$/i);
+      const isDetailPath = detailPath || /^\/(?:p|reels?|tv)\/[^/]+(?:\/|$)/i.test(location.pathname);
+      // 登録促進など投稿と無関係の dialog は、背後にある公開詳細の検出を遮らない。
+      const detectionRoot = dialogCommentInput ? dialog : (isDetailPath ? document.querySelector('main[role="main"]') : null);
+      const hasCommentInput = dialogCommentInput || detectionRoot?.querySelector(commentInputSelector);
+      const publicShortcode = !dialogCommentInput && !hasCommentInput ? detailPath?.[1] : null;
+      if (detectionRoot && (hasCommentInput || publicShortcode)) {
         const candidateSelector =
           "ul:not(." + InstagramCleaner.COMMENT_LIST_CLASS + "), div:not(." + InstagramCleaner.COMMENT_LIST_CLASS + ")";
         const matches = [];
@@ -385,16 +432,23 @@
           const children = container.children;
           const len = children.length;
           if (len < 2 || len > 50) return;
-          // `_a9z6` は caption とコメントの混在リスト。article を内包する layout wrapper も対象外。
+          // `_a9z6` は caption とコメントの混在リスト。その祖先と article を内包する wrapper も対象外。
           if (
             container.classList.contains("_a9z6") ||
+            container.querySelector("._a9z6") ||
             container.querySelector("article") ||
             container.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
           ) return;
           let userLinkCount = 0;
           let confirmedCommentCount = 0;
+          let loaderCount = 0;
           const handles = new Set();
+          const publicCommentIds = new Set();
           for (const child of children) {
+            if (publicShortcode && isEmptyCommentLoader(child)) {
+              loaderCount++;
+              continue;
+            }
             const link = child.querySelector("a[href^='/']");
             const href = link?.getAttribute("href") ?? "";
             const m = href.match(/^\/([\w.]{1,30})\/?($|\?)/);
@@ -402,14 +456,25 @@
               userLinkCount++;
               handles.add(m[1]);
             }
-            if (isConfirmedCommentItem(child)) confirmedCommentCount++;
+            if (publicShortcode) {
+              const commentId = getPublicCommentId(child, publicShortcode);
+              if (commentId !== null) {
+                confirmedCommentCount++;
+                publicCommentIds.add(commentId);
+              }
+            } else if (isConfirmedCommentItem(child)) {
+              confirmedCommentCount++;
+            }
           }
-          // 全項目が comment permalink time + 70% 以上 user link + handle 2 種類以上
+          // 公開詳細では空の loading 専用子だけを除外し、コメント自体は最低 2 件必要。
+          // 全コメントが comment permalink time + 70% 以上 user link。
+          // 公開詳細は各直系項目を別コメント ID で裏付け、他の経路は handle 2 種類以上を維持する。
           // （誤マッチ防止: タグ付けユーザーパネル / liked_by 行 / 単一ユーザー繰り返し UI を除外）
           if (
-            confirmedCommentCount === len &&
-            userLinkCount / len >= 0.7 &&
-            handles.size >= 2
+            confirmedCommentCount >= 2 &&
+            confirmedCommentCount + loaderCount === len &&
+            userLinkCount / (len - loaderCount) >= 0.7 &&
+            (publicShortcode ? publicCommentIds.size === confirmedCommentCount : handles.size >= 2)
           ) {
             matches.push(container);
           }
@@ -418,6 +483,7 @@
         for (const container of matches) {
           if (matches.some((other) => other !== container && container.contains(other))) continue;
           container.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
+          if (publicShortcode) publicCommentContainers.add(container);
         }
       }
     } catch {

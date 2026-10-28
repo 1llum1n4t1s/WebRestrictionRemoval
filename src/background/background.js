@@ -19,7 +19,8 @@ const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chr
 //     contextMenuAllowDomains）をクリーンアップ
 //   - v1.0.18: 旧 `ytShortsRemovalEnabled` トグルを `searchFixerFeatures.removeShorts` に統合
 //   - 各機能トグルが未設定なら Default OFF（オプトイン方針）で初期化
-chrome.runtime.onInstalled.addListener(async () => {
+// 同期受信・popup 保存と、旧値の読取りから移行・欠落値の保存までを直列化する。
+chrome.runtime.onInstalled.addListener(() => globalThis.enqueueSettingsWrite(async () => {
   // 過去 2 段階の Shorts 削除設定を新構造の 5 機能 (removeShortsShelf / removeShortsChip /
   // removeShortsSidebar / redirectShortsUrl / shortsBtn) に直接転写する。
   //
@@ -181,7 +182,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   await chrome.storage.local
     .set({ [StorageKeys.INSTALL_SENTINEL]: 1 })
     .catch(() => {});
-});
+}));
 
 // ---------- メッセージハンドラ ----------
 // /rere B1-001 修正: 旧実装は sender 検証 fail 時 `return;` (= undefined) で sendResponse channel を
@@ -192,6 +193,12 @@ chrome.runtime.onInstalled.addListener(async () => {
 // 同期的にクローズされる (return false = 同期応答完了)、の両立を実現する。
 // 未知 action 経路も最末尾で `return false;` を明示し、将来の handler 追加で `return true` 漏れの
 // 罠を物理的に避ける (現状の implicit `undefined` 返しでは同じ silent failure リスクが残る)。
+const loupeActivationGeneration = new Map();
+chrome.tabs.onActivated.addListener(({ windowId }) => {
+  loupeActivationGeneration.set(windowId, (loupeActivationGeneration.get(windowId) ?? 0) + 1);
+});
+chrome.windows?.onRemoved?.addListener((windowId) => loupeActivationGeneration.delete(windowId));
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === Offscreen.ACTION_VOLUME_STREAM_ENDED) {
     if (!SenderCheck.isFromOffscreen(sender)) {
@@ -201,6 +208,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleVolumeStreamEnded(request.tabId)
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
+    return true;
+  } else if (request.action === "SAVE_POPUP_STORAGE") {
+    if (!SenderCheck.isFromPopup(sender)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    const K = StorageKeys;
+    const allowed = new Set([
+      K.LOUPE_ZOOM, K.LOUPE_SIZE, K.VOLUME_BOOSTER_ENABLED, K.VOLUME_BOOSTER_LAST_GAIN,
+      K.VOLUME_BOOSTER_ANTI_CLIP_ENABLED, K.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+      K.VOLUME_BOOSTER_BASS_CUT_ENABLED, K.VOLUME_BOOSTER_MUTED_ENABLED,
+      K.VOLUME_BOOSTER_EQ_ENABLED, K.VOLUME_BOOSTER_EQ_GAINS, K.VOLUME_BOOSTER_EQ_PREAMP,
+      K.VOLUME_BOOSTER_EQ_PRESET, K.COLOR_PICKER_DEFAULT_FORMAT, K.COLOR_PICKER_HEX_HASH, K.POPUP_LAST_TAB,
+    ]);
+    let record;
+    try {
+      const data = request.data;
+      if (!data || typeof data !== "object" || Array.isArray(data)
+        || Object.keys(data).some((key) => !allowed.has(key))) throw new Error("invalid-setting");
+      // バックアップと同じ既存の型・範囲検証を使い、ここでは固定キーだけを許可する。
+      record = globalThis.SettingsBackup.parse(JSON.stringify({ format: "vuora-settings", version: 1, settings: data }));
+      if (Object.keys(record).length !== Object.keys(data).length) throw new Error("invalid-setting");
+    } catch {
+      sendResponse({ ok: false, error: "invalid-setting" }); return false;
+    }
+    globalThis.enqueueSettingsWrite(async () => {
+      const current = await chrome.storage.local.get(K.SETTINGS_SYNC_APPLIED);
+      if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
+      await chrome.storage.local.set(record);
+    }).then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error?.message === "stale-settings" ? "stale-settings" : "storage-failed" }));
+    return true;
+  } else if (request.action === "UPDATE_BLOCKED_CHANNELS") {
+    const allowed = request.operation === "add" ? isFromYouTubeContentScript(sender, true)
+      : request.operation === "remove" && SenderCheck.isFromPopup(sender);
+    if (!allowed) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    if (typeof request.key !== "string" || request.key.length > 128
+      || (request.name !== undefined && typeof request.name !== "string")) {
+      sendResponse({ ok: false, error: "invalid-channel" }); return false;
+    }
+    const [entry] = SearchFixer.normalizeBlockedChannels([{ key: request.key, name: request.name }]);
+    if (!entry) { sendResponse({ ok: false, error: "invalid-channel" }); return false; }
+    globalThis.enqueueSettingsWrite(async () => {
+      const key = StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS;
+      const stored = await chrome.storage.local.get(key);
+      let channels = SearchFixer.normalizeBlockedChannels(stored[key]);
+      if (request.operation === "remove") channels = channels.filter((item) => item.key !== entry.key);
+      else if (!channels.some((item) => item.key === entry.key) && channels.length < SearchFixer.BLOCKED_CHANNELS_MAX) channels.push(entry);
+      await chrome.storage.local.set({ [key]: channels });
+      return channels;
+    }).then((channels) => sendResponse({ ok: true, channels }))
+      .catch(() => sendResponse({ ok: false, error: "storage-failed" }));
+    return true;
+  } else if (request.action === "SAVE_NOTEBOOK_ACCOUNT") {
+    if (!isFromYouTubeContentScript(sender, true)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    if (typeof request.accountIndex !== "number" || !Number.isInteger(request.accountIndex)
+      || NotebookLm.normalizeAccountIndex(request.accountIndex) !== request.accountIndex) {
+      sendResponse({ ok: false, error: "invalid-account" }); return false;
+    }
+    globalThis.enqueueSettingsWrite(() => chrome.storage.local.set({ [StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX]: request.accountIndex }))
+      .then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false, error: "storage-failed" }));
     return true;
   } else if (request.action === Actions.IMPORT_SETTINGS) {
     if (!SenderCheck.isFromPopup(sender)) {
@@ -214,6 +279,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }).then(() => sendResponse({ ok: true }))
       .catch(() => sendResponse({ ok: false, error: "import-failed" }));
     return true;
+  } else if (request.action === "UPDATE_COLOR_HISTORY") {
+    if (!SenderCheck.isFromPopup(sender)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    const hex = ColorPicker.normalizeHex(request.hex);
+    if (request.operation !== "clear" && (request.operation !== "add" || !hex || !Number.isFinite(request.ts))) {
+      sendResponse({ ok: false, error: "invalid-history" }); return false;
+    }
+    globalThis.enqueueSettingsWrite(async () => {
+      const key = StorageKeys.COLOR_PICKER_HISTORY;
+      const stored = await chrome.storage.local.get(key);
+      const seen = new Set();
+      const current = [];
+      for (const entry of Array.isArray(stored[key]) ? stored[key] : []) {
+        const color = ColorPicker.normalizeHex(entry?.hex);
+        if (!color || seen.has(color)) continue;
+        seen.add(color);
+        current.push({ hex: color, ts: Number.isFinite(Number(entry.ts)) ? Number(entry.ts) : Date.now() });
+        if (current.length >= ColorPicker.HISTORY_LIMIT) break;
+      }
+      const next = request.operation === "clear" ? [] : [{ hex, ts: request.ts }, ...current.filter((entry) => entry.hex !== hex)].slice(0, ColorPicker.HISTORY_LIMIT);
+      await chrome.storage.local.set({ [key]: next });
+      return next;
+    }).then((history) => sendResponse({ ok: true, history })).catch(() => sendResponse({ ok: false, error: "storage-failed" }));
+    return true;
+  } else if (request.action === "SAVE_POPUP_SUBTAB") {
+    if (!SenderCheck.isFromPopup(sender)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    const patch = PopupTabs.normalizeSubTabs({ [request.groupKey]: request.subId });
+    if (Object.keys(patch).length !== 1) { sendResponse({ ok: false, error: "invalid-subtab" }); return false; }
+    globalThis.enqueueSettingsWrite(async () => {
+      const key = StorageKeys.POPUP_LAST_SUBTAB;
+      const current = await chrome.storage.local.get(key);
+      await chrome.storage.local.set({ [key]: { ...PopupTabs.normalizeSubTabs(current[key]), ...patch } });
+    }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false, error: "storage-failed" }));
+    return true;
   } else if (request.action === "APPLY_YOUTUBE_PLAYER_SETTINGS") {
     if (!SenderCheck.isFromPopup(sender)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
     globalThis.enqueueSettingsWrite(async () => {
@@ -221,6 +319,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const current = await chrome.storage.local.get([K.YOUTUBE_PLAYER_SETTINGS, K.SETTINGS_SYNC_APPLIED]);
       if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
       const value = SearchFixer.PLAYER_CONTROLS.mergeSettings(current[K.YOUTUBE_PLAYER_SETTINGS], request.data);
+      await chrome.storage.local.set({ [K.YOUTUBE_PLAYER_SETTINGS]: value });
+    }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
+    return true;
+  } else if (request.action === "APPLY_YOUTUBE_LATENCY_SETTING") {
+    if (!isFromYouTubeContentScript(sender, false, true)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    globalThis.enqueueSettingsWrite(async () => {
+      const K = StorageKeys;
+      const current = await chrome.storage.local.get([K.YOUTUBE_PLAYER_SETTINGS, K.SETTINGS_SYNC_APPLIED, K.SEARCH_FIXER_ENABLED, K.SEARCH_FIXER_FEATURES]);
+      if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
+      if (!current[K.SEARCH_FIXER_ENABLED] || !current[K.SEARCH_FIXER_FEATURES]?.liveLatency) throw new Error("feature-disabled");
+      const defaults = SearchFixer.PLAYER_CONTROLS.DEFAULT_SETTINGS.latency;
+      if (!Object.hasOwn(defaults, request.key) || typeof request.value !== typeof defaults[request.key] || (typeof request.value === "number" && !Number.isFinite(request.value))) throw new Error("invalid-setting");
+      const value = SearchFixer.PLAYER_CONTROLS.mergeSettings(current[K.YOUTUBE_PLAYER_SETTINGS], { latency: { [request.key]: request.value } });
       await chrome.storage.local.set({ [K.YOUTUBE_PLAYER_SETTINGS]: value });
     }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
     return true;
@@ -307,6 +418,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       responded = true;
       sendResponse(msg);
     };
+    const captureGeneration = loupeActivationGeneration.get(windowId) ?? 0;
     chrome.tabs
       .query({ active: true, windowId })
       .then((tabs) => {
@@ -323,8 +435,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           quality: Loupe.CAPTURE_QUALITY,
         });
       })
-      .then((dataUrl) => {
+      .then(async (dataUrl) => {
         if (dataUrl != null) {
+          const tabs = await chrome.tabs.query({ active: true, windowId });
+          if (tabs[0]?.id !== tabId || (loupeActivationGeneration.get(windowId) ?? 0) !== captureGeneration) {
+            safeRespond({ ok: false, error: "tab-changed" });
+            return;
+          }
           safeRespond({ ok: true, dataUrl });
         } else {
           // Chrome API 仕様上ここに来るのは前段の `return null` (tab-not-active) のみで、
@@ -337,7 +454,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.action === Actions.NOTEBOOK_LM_LIST) {
     // NotebookLM のノートブック一覧。YouTube タブの content script 由来のみ受け付ける。
-    if (!isFromYouTubeContentScript(sender)) {
+    if (!isFromYouTubeContentScript(sender, true)) {
       sendResponse({ ok: false, error: "sender-rejected" });
       return false;
     }
@@ -347,7 +464,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.action === Actions.NOTEBOOK_LM_SEND) {
     // NotebookLM へのソース追加。YouTube タブの content script 由来のみ受け付ける。
-    if (!isFromYouTubeContentScript(sender)) {
+    if (!isFromYouTubeContentScript(sender, true)) {
       sendResponse({ ok: false, error: "sender-rejected" });
       return false;
     }
@@ -357,7 +474,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.action === Actions.NOTEBOOK_LM_ACCOUNTS) {
     // ログイン中の Google アカウント一覧。YouTube タブの content script 由来のみ受け付ける。
-    if (!isFromYouTubeContentScript(sender)) {
+    if (!isFromYouTubeContentScript(sender, true)) {
       sendResponse({ ok: false, error: "sender-rejected" });
       return false;
     }
@@ -392,11 +509,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  * というコメント上の不変条件を実装できていなかった。Google セッション Cookie を使う RPC の
  * 起点なので、`sender.url` のオリジンまで確認して defense-in-depth を効かせる。
  */
-function isFromYouTubeContentScript(sender) {
+function isFromYouTubeContentScript(sender, topFrameOnly = false, allowNoCookie = false) {
   if (!SenderCheck.isFromContentScript(sender)) return false;
+  // NotebookLM と検索修正は top frame 限定。全 frame 注入のプレイヤー設定は許可を保つ。
+  if (topFrameOnly && sender.frameId !== 0) return false;
   try {
-    const host = new URL(sender.url ?? sender.tab?.url ?? "").hostname.toLowerCase();
-    return host === "youtube.com" || host.endsWith(".youtube.com");
+    const url = new URL(sender.url ?? sender.tab?.url ?? "");
+    const host = url.hostname.toLowerCase();
+    if (host === "youtube.com" || host.endsWith(".youtube.com")) return true;
+    // nocookie 埋め込みはプレイヤー設定の保存だけを許可する。
+    return allowNoCookie && (url.protocol === "https:" || url.protocol === "http:") &&
+      (host === "youtube-nocookie.com" || host.endsWith(".youtube-nocookie.com"));
   } catch {
     return false;
   }
@@ -506,7 +629,7 @@ const notebookLmClient = (() => {
    * 1 回の probe が数百 KB の HTML 取得になるため、結果は SW のメモリにキャッシュする
    * （SW 再起動で消えるだけで、消えても再取得できる）。
    *
-   * @returns {Promise<{ok: true, accounts: Array<{index: number, email: string}>}
+   * @returns {Promise<{ok: true, at: number, accounts: Array<{index: number, email: string}>}
    *                  | {ok: false, error: string}>}
    */
   let cachedNotebookLmAccounts = null;
@@ -562,7 +685,10 @@ const notebookLmClient = (() => {
   }
 
   async function listNotebookLmAccounts() {
-    if (cachedNotebookLmAccounts) return { ok: true, accounts: cachedNotebookLmAccounts };
+    const isFresh = (cache) => cache && Number.isFinite(cache.at)
+      && Date.now() >= cache.at && Date.now() - cache.at < NotebookLm.ACCOUNTS_CACHE_TTL_MS;
+    if (isFresh(cachedNotebookLmAccounts)) return { ok: true, ...cachedNotebookLmAccounts };
+    cachedNotebookLmAccounts = null;
     // 事前取得とパネル表示が重なっても probe は 1 回で済ませる（同時 10 fetch の二重発射を防ぐ）
     if (inFlightNotebookLmAccounts) return await inFlightNotebookLmAccounts;
     inFlightNotebookLmAccounts = (async () => {
@@ -572,10 +698,10 @@ const notebookLmClient = (() => {
       const cache = stored?.[StorageKeys.NOTEBOOK_LM_ACCOUNTS_CACHE];
       if (
         cache && Array.isArray(cache.accounts) && cache.accounts.length > 0 &&
-        Number.isFinite(cache.at) && Date.now() - cache.at < NotebookLm.ACCOUNTS_CACHE_TTL_MS
+        isFresh(cache)
       ) {
-        cachedNotebookLmAccounts = cache.accounts;
-        return { ok: true, accounts: cache.accounts };
+        cachedNotebookLmAccounts = { at: cache.at, accounts: cache.accounts };
+        return { ok: true, ...cachedNotebookLmAccounts };
       }
       // probe は並列。逐次だとアカウント数ぶん RTT が積み上がり、パネルを開いた直後の
       // セレクタが番号表示のまま待たされる。
@@ -594,11 +720,11 @@ const notebookLmClient = (() => {
         accounts.push({ index: i, email: probe.email });
       }
       if (accounts.length === 0) return { ok: false, error: "protocol-changed" };
-      cachedNotebookLmAccounts = accounts;
+      cachedNotebookLmAccounts = { at: Date.now(), accounts };
       chrome.storage.local
-        .set({ [StorageKeys.NOTEBOOK_LM_ACCOUNTS_CACHE]: { at: Date.now(), accounts } })
+        .set({ [StorageKeys.NOTEBOOK_LM_ACCOUNTS_CACHE]: cachedNotebookLmAccounts })
         .catch(() => {});
-      return { ok: true, accounts };
+      return { ok: true, ...cachedNotebookLmAccounts };
     })();
     try {
       return await inFlightNotebookLmAccounts;
@@ -1456,8 +1582,8 @@ async function isVolumeBoosterActive() {
   if (boostedTabIds.size > 0) return true;
 
   // 2-C3 最適化: offscreenState === "OPEN" の場合は getContexts をスキップして
-  // sendMessage 直行で 1 往復削減。実際に offscreen が消えていた場合は sendMessage が
-  // 失敗 → catch で safe-side の active 扱いになり、次サイクルで自然修復される。
+  // sendMessage 直行で 1 往復削減。通信失敗時は安全側の active 扱いで再予約し、
+  // 通信が復旧すれば次回の応答で再判定する。
   // CREATING / CLOSING の中間状態のみ getContexts で実存を確認する。
   // SW 再起動直後で boostedTabIds が空でも、offscreen に audioStates が残っている可能性が
   // あるため、ここから先のフォールバック query で hydrate される。

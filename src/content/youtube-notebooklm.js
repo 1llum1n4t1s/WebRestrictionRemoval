@@ -63,6 +63,9 @@
   let accountIndex = 0;
   /** @type {Array<{index: number, email: string}> | null} ログイン中アカウント（取得できるまで null） */
   let accounts = null;
+  let accountsAt = 0;
+  let accountsExpiryTimer = null;
+  let accountsLoading = null;
   // 応答順序の逆転と OFF→ON をまたぐ旧応答から、現在の送信先候補を守る。
   let notebooksRequestId = 0;
   let accountsRequestId = 0;
@@ -362,6 +365,7 @@
    */
   function openPanel() {
     if (!rootEl || !btnEl) return;
+    expireAccounts();
     panelEl = document.createElement("div");
     panelEl.className = PANEL_CLASS;
     // 通常のフォームを含むポップオーバー。menu の項目・キー操作契約を宣言しない。
@@ -556,7 +560,7 @@
   function persistAccountIndex(value) {
     if (!chrome?.runtime?.id) return;
     try {
-      chrome.storage.local.set({ [StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX]: value }).catch(() => {});
+      chrome.runtime.sendMessage({ action: "SAVE_NOTEBOOK_ACCOUNT", accountIndex: value }).catch(() => {});
     } catch {
       // storage 書き込み失敗は次回既定値に戻るだけなので、動作は継続する
     }
@@ -565,6 +569,7 @@
   /** ノートブック一覧（＋新規作成）を描画する。 */
   function renderPanelList() {
     panelState = "list";
+    const displayedNotebooks = notebooks;
     renderPanelShell(() => {
       // 0 件は正常状態（まだノートブックを作っていない）。何も出さないと「取得に失敗した」と
       // 読めてしまうので、空であることを明示する（故障と正常を UI でも区別する / RC-J と同趣旨）。
@@ -589,7 +594,9 @@
         count.textContent = String(nb.sources);
         item.append(name, count);
         // 既存ソース数を渡して background 側で残容量を差し引かせる（/rere RC-O）
-        item.addEventListener("click", () => void send(nb.id, nb.sources));
+        item.addEventListener("click", () => {
+          if (displayedNotebooks === notebooks) void send(nb.id, nb.sources);
+        });
         list.appendChild(item);
       }
       return [list];
@@ -599,34 +606,74 @@
   /**
    * ログイン中の Google アカウントを取得してセレクタをメールアドレス表示に差し替える。
    *
-   * 一覧取得より遅れて届いても構わない（届くまでは番号表示のまま操作できる）。取得に失敗
-   * したときも黙って番号表示を続け、送信自体はブロックしない。
+   * メールと authuser の対応を先に更新し、その後でノートブック一覧を取得する。
+   * 取得失敗時は古いメールを使わず番号表示で続行する。
    */
+  function expireAccounts() {
+    if (!accounts || (Date.now() >= accountsAt
+      && Date.now() - accountsAt < NotebookLm.ACCOUNTS_CACHE_TTL_MS)) return false;
+    accounts = null;
+    accountsAt = 0;
+    notebooks = null;
+    notebooksRequestId++;
+    prefetchStarted = false;
+    if (panelEl) renderPanelLoading();
+    return true;
+  }
+
   async function loadAccounts() {
-    if (!active || accounts || !chrome?.runtime?.id) return;
+    if (!active || !chrome?.runtime?.id) return;
+    expireAccounts();
+    if (accounts) return;
+    if (accountsLoading) return await accountsLoading;
     const requestId = ++accountsRequestId;
-    try {
-      const res = await chrome.runtime.sendMessage({ action: Actions.NOTEBOOK_LM_ACCOUNTS });
-      if (!active || !chrome?.runtime?.id || requestId !== accountsRequestId) return;
-      if (!res?.ok || !Array.isArray(res.accounts) || res.accounts.length === 0) return;
-      accounts = res.accounts;
-      // エラー表示は上書きしない。読み込み中／一覧のどちらでもセレクタだけ実名に差し替わる。
-      if (!panelEl || panelState === "error") return;
-      if (panelState === "list") renderPanelList();
-      else renderPanelLoading();
-    } catch {
-      // 番号表示のまま続行
+    const loading = (async () => {
+      try {
+        const res = await chrome.runtime.sendMessage({ action: Actions.NOTEBOOK_LM_ACCOUNTS });
+        if (!active || !chrome?.runtime?.id || requestId !== accountsRequestId) return;
+        if (!res?.ok || !Array.isArray(res.accounts) || res.accounts.length === 0
+          || !Number.isFinite(res.at) || Date.now() < res.at
+          || Date.now() - res.at >= NotebookLm.ACCOUNTS_CACHE_TTL_MS) return;
+        accounts = res.accounts;
+        accountsAt = res.at;
+        clearTimeout(accountsExpiryTimer);
+        accountsExpiryTimer = setTimeout(() => {
+          accountsExpiryTimer = null;
+          if (!active) return;
+          expireAccounts();
+          if (rootEl?.isConnected) void loadNotebooks();
+        }, Math.max(1, accountsAt + NotebookLm.ACCOUNTS_CACHE_TTL_MS - Date.now()));
+        // エラー表示は上書きしない。読み込み中／一覧のどちらでもセレクタだけ実名に差し替わる。
+        if (!panelEl || panelState === "error") return;
+        if (panelState === "list") renderPanelList();
+        else renderPanelLoading();
+      } catch {
+        // 番号表示のまま続行
+      }
+    })();
+    accountsLoading = loading;
+    try { await loading; } finally {
+      if (accountsLoading === loading) accountsLoading = null;
     }
   }
 
   async function loadNotebooks() {
     if (!active || !chrome?.runtime?.id) return;
+    expireAccounts();
+    if (!accounts) {
+      notebooks = null;
+      if (panelEl) renderPanelLoading();
+    }
     const requestId = ++notebooksRequestId;
     const requestedAccount = accountIndex;
     const isCurrent = () => active && chrome?.runtime?.id
       && requestId === notebooksRequestId && requestedAccount === accountIndex;
     try {
+      // authuser とメールの対応を更新してから、その世代の候補を取得する。
+      await loadAccounts();
+      if (!isCurrent()) return;
       const res = await chrome.runtime.sendMessage({ action: Actions.NOTEBOOK_LM_LIST, data: { accountIndex: requestedAccount } });
+      if (expireAccounts()) { void loadNotebooks(); return; }
       if (!isCurrent()) return;
       if (!res?.ok) {
         // 表示済みの一覧を一時的な失敗で消さない（キャッシュのまま操作を続けられる）
@@ -676,7 +723,12 @@
    * @param {number} existingSources 既存ソース数（残容量の計算に使う）
    */
   async function send(notebookId, existingSources = 0) {
-    if (sending || !chrome?.runtime?.id) return;
+    if (!active || sending || !chrome?.runtime?.id) return;
+    // スリープやバックグラウンドで期限タイマーが遅れても、古い候補から送信しない。
+    if (expireAccounts() || accountsLoading) {
+      void loadNotebooks();
+      return;
+    }
     const kind = detectPageKind();
     if (!kind) return;
     const urls = collectUrls(kind);
@@ -818,6 +870,11 @@
     active = false;
     notebooksRequestId++;
     accountsRequestId++;
+    clearTimeout(accountsExpiryTimer);
+    accountsExpiryTimer = null;
+    accountsLoading = null;
+    accounts = null;
+    accountsAt = 0;
     prefetchStarted = false;
     try { mutationObserver?.disconnect(); } catch {}
     mutationObserver = null;
@@ -832,6 +889,11 @@
     active = false;
     notebooksRequestId++;
     accountsRequestId++;
+    clearTimeout(accountsExpiryTimer);
+    accountsExpiryTimer = null;
+    accountsLoading = null;
+    accounts = null;
+    accountsAt = 0;
     try { mutationObserver?.disconnect(); } catch {}
     mutationObserver = null;
     try { document.removeEventListener("yt-navigate-finish", onYtNavigateFinish, true); } catch {}
@@ -873,7 +935,7 @@
       StorageKeys.SEARCH_FIXER_FEATURES,
       StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX,
     ],
-    changeKeys: [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES],
+    changeKeys: [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES, StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX],
     applyAction: Actions.APPLY_SEARCH_FIXER_CS,
     onStored(stored) {
       const nextAccountIndex = NotebookLm.normalizeAccountIndex(stored[StorageKeys.NOTEBOOK_LM_ACCOUNT_INDEX]);

@@ -144,6 +144,8 @@
   }
 
   function applyToVideo(v) {
+    // metadata 待ちの間に detach された動画には、DOM 外で補正を残さない。
+    if (!v.isConnected) return;
     if (!original.has(v)) {
       original.set(v, {
         filter: v.style.getPropertyValue("filter"),
@@ -180,13 +182,13 @@
    * 理論的リスクを回避するため、ライフサイクルを video-fill と統一。
    */
   function ensureMetaListener(v) {
-    if (metaAttached.has(v)) return;
-    metaAttached.add(v);
     // 既に metadata 取得済みなら即 apply (listener 待ちで永遠に当たらない罠を回避)。
     if (v.readyState >= 1 /* HAVE_METADATA */) {
       if (isActive()) applyToVideo(v);
       return;
     }
+    if (metaAttached.has(v)) return;
+    metaAttached.add(v);
     v.addEventListener(
       "loadedmetadata",
       () => {

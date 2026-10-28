@@ -4,15 +4,14 @@
  * TikTok クリーナーの document_start 注入。flash 体感ラグ消滅用。
  *
  * 役割: tiktokCleanerEnabled (master) + tiktokCleanerFeatures (オブジェクト) の保存値に応じて、
- * tiktok-cleaner.js (document_idle) が走る前に `<html>` へ pre クラスを **同期で付与**して、
+ * 設定読取後、tiktok-cleaner.js (document_idle) を待たず `<html>` へ pre クラスを付与して、
  * 主要な data-e2e セレクタを `<style>` inline rule で即時非表示化する。
  *
- * 仕組み（オプトアウト方式 + 三重ガード）:
+ * 仕組み（オプトイン方式）:
  *   1. document_start 同期で `<style>` を `<html>` 直下に prepend
  *      （manifest css の effective 化が SPA 経路で間に合わないケース対策）
- *   2. document_start 同期で `<html>` に **両 pre クラスを無条件付与**
- *      （storage.get の async 待ちで DOM 出現に間に合わないため）
- *   3. `chrome.storage.local` から非同期取得し、master OFF または該当 feature OFF なら剥がす
+ *   2. `chrome.storage.local` から非同期取得し、master と該当 feature が明示的に ON の場合だけ付与
+ *   3. 未取得・OFF・取得失敗時は非表示にしない。読取前の FOUC は許容する
  *   4. `chrome.storage.onChanged` で master/features 変更時に再評価
  *
  * 設計判断:
@@ -56,7 +55,7 @@
     'html.' + PRE_HIDE_SUGGESTED + ' [data-e2e="recommend-list"]' +
     '{display:none!important;}';
 
-  // 共通フレームワーク経由で style 注入 + pre クラス同期付与 + storage 取得 + onChanged 購読
+  // 条件付き style を先に注入し、設定で明示的な ON を確認してからクラスを付与する。
   __cpaEarlyFramework.setup({
     styleId: "__cpa-tt-early-style",
     cssText: CSS_TEXT,

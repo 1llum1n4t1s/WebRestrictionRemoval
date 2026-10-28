@@ -337,14 +337,17 @@ test('Instagram early: context失効時はobserver停止だけでなく先制非
   let disconnected = false;
   const classes = new FakeClassList();
   const styles = new Map();
+  const priorities = new Map();
   const attributes = new Map();
   const wrapper = {
     getAttribute: name => attributes.get(name),
     setAttribute: (name, value) => attributes.set(name, value),
     removeAttribute: name => attributes.delete(name),
     style: {
-      setProperty: (name, value) => styles.set(name, value),
-      removeProperty: name => styles.delete(name),
+      getPropertyValue: name => styles.get(name) || '',
+      getPropertyPriority: name => priorities.get(name) || '',
+      setProperty: (name, value, priority) => { styles.set(name, value); priorities.set(name, priority || ''); },
+      removeProperty: name => { styles.delete(name); priorities.delete(name); },
     },
   };
   const document = {

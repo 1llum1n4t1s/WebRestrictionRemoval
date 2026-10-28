@@ -6,9 +6,9 @@
  * Firefox MV3 は `chrome.tabCapture` / `chrome.offscreen` 未対応のため、Chrome の
  * tabCapture → offscreen 経路が使えない。本 content script は **manifest.firefox.json のみ**
  * から全 http(s) ページの全フレームに注入され、ページ内の `<video>` / `<audio>` 要素へ
- * MediaElementSource + 18 処理ノードを attach する。出力は
+ * MediaElementSource + 19 処理ノードを attach する。出力は
  * `source → dryGain → destination` と
- * `source → preamp → eqFilters[0..9] → nightMode → gain → bassCut[0..1] → antiClip → wetGain → destination`
+ * `source → preamp → eqFilters[0..9] → nightMode → gain → bassCut[0..1] → antiClip → ceiling → wetGain → destination`
  * に分岐し、wet 内の DSP 順序は offscreen.js の createAudioState と一致する。
  *
  * tabCapture と違い user gesture 不要で、popup を開かなくても storage 変化だけで
@@ -139,7 +139,7 @@
   const DETACH_GRACE_MS = 30_000;
   // detached だが再生継続中の要素の close 延長回数上限 (30s × 10 = 約 5 分)。
   // 再挿入プレーヤー対策で猶予延長する設計だが、上限が無いと detached+再生継続の異常系サイトで
-  // AudioContext + 18処理ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
+  // AudioContext + 19処理ノード + closure が無限に GC されないため上限を設ける (/rere C2-M3)。
   const DETACH_MAX_RETRIES = 10;
   // background tabのtimer throttlingへ余裕を持たせつつ、sandbox消滅後の旧設定残留を短く抑える。
   // 20秒を超えてtickが遅延した場合はいったんdryへ安全退避し、次の生存確認成功時にwetへ復帰する。
@@ -155,6 +155,8 @@
     createBassCutChain,
     applyEqualizer,
     createEqChain,
+    createOutputCeiling,
+    applyOutputCeiling,
     connectAudioGraph,
   } = AudioPipeline;
 
@@ -210,7 +212,7 @@
   }
 
   // ============================================================
-  // AudioContext + 16 DSPノード + dry/wet出力2ノード構築
+  // AudioContext + 17 DSPノード + dry/wet出力2ノード構築
   // ============================================================
 
   /**
@@ -252,7 +254,7 @@
     if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     // 一時停止中の要素はここでは attach しない。多数のプレビュー動画/音声を抱えるフィード
     // (SNS のタイムライン等) で、まだ再生されてもいない全要素に AudioContext + EQ チェーン
-    // (18処理ノード) を割り当てるのは資源浪費であり、Firefox では captured 状態のまま維持コストだけ
+    // (19処理ノード) を割り当てるのは資源浪費であり、Firefox では captured 状態のまま維持コストだけ
     // かかり続ける。watchMedia が登録する play イベントが実際の再生開始時に evaluateMedia 経由で
     // 再試行するため、ここで skip しても取りこぼしはない。
     if (media.paused) return;
@@ -321,7 +323,7 @@
   }
 
   /**
-   * MediaElementSource + 16 DSPノード + dry/wet出力GainNodeを構築する。
+   * MediaElementSource + 17 DSPノード + dry/wet出力GainNodeを構築する。
    * attach / DSP 例外は期待される EME 回避と分け、固定 reason code で一度だけ記録する。
    */
   function doAttach(media) {
@@ -352,6 +354,7 @@
       const gainNode = ctx.createGain();
       const bassCutChain = createBassCutChain(ctx);
       const antiClipNode = ctx.createDynamicsCompressor();
+      const ceilingNode = createOutputCeiling(ctx);
       const dryGainNode = ctx.createGain();
       const wetGainNode = ctx.createGain();
       // capture直後から安全なbypassが成立するよう、接続前の初期値はdry=1 / wet=0。
@@ -375,6 +378,7 @@
         gainNode,
         bassCutChain,
         antiClipNode,
+        ceilingNode,
         destination: wetGainNode,
       });
       wetGainNode.connect(ctx.destination);
@@ -390,6 +394,7 @@
         nightModeNode,
         bassCutNodes: bassCutChain.bassCutNodes,
         antiClipNode,
+        ceilingNode,
         dryGainNode,
         wetGainNode,
         lastSetPercent: VolumeBooster.UNITY,
@@ -513,6 +518,7 @@
       state.antiClipNode,
       settings.antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
     );
+    applyOutputCeiling(state.ceilingNode, settings.antiClip === true);
     applyFilterPreset(
       state.bassCutNodes,
       settings.bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,

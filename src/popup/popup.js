@@ -269,15 +269,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   /** 動画黒帯除去の表示モード（"zoom" | "stretch"）。モードセグメントのクリックで更新。 */
   let videoFillMode = VideoFill.DEFAULT_MODE;
   /** @type {Array<{key: string, name: string}>} 検索結果チャンネルブロックリスト（channelBlocklist 管理 UI 用）。
-   *  popup → storage 直書きパターン（APPLY_SETTINGS 非経由）。登録は検索結果ページの 🚫 ボタン、
+   *  background の保存キュー経由（APPLY_SETTINGS 非経由）。登録は検索結果ページの 🚫 ボタン、
    *  popup では一覧表示 + 個別解除のみ提供する。 */
   let blockedChannels = [];
+  let blockedChannelsRevision = 0;
+  let blockedChannelsRequestSequence = 0;
+  let blockedChannelsAppliedSequence = 0;
   /** @type {Map<string, (subId: string) => void>} 親タブ id → 保存済みサブタブ id を選び直す関数。
    *  サブタブ DOM の構築は storage 取得より先に走るため、復元は storage 読み込み後に
    *  このレジストリ経由で行う（見つからない id は無視して先頭のままにする）。 */
   const subTabSelectors = new Map();
   /** @type {Record<string, string>} 最後に開いていたサブタブ（親タブ id → サブタブ id）。
-   *  POPUP_LAST_TAB と同じ popup → storage 直書きパターン（APPLY_SETTINGS 非経由）。 */
+   *  POPUP_LAST_TAB と同じ background の保存キュー経由（APPLY_SETTINGS 非経由）。 */
   let lastSubTabs = {};
 
   buildFeatureCategories();
@@ -529,6 +532,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const $paletteArea = document.getElementById("paletteArea");
   const $paletteThumb = document.getElementById("paletteThumb");
   const $paletteHue = document.getElementById("paletteHue");
+  const $paletteSaturation = document.getElementById("paletteSaturation");
+  const $paletteBrightness = document.getElementById("paletteBrightness");
   const $palettePill = document.getElementById("palettePill");
   const $paletteAddBtn = document.getElementById("paletteAddBtn");
   const $paletteResetBtn = document.getElementById("paletteResetBtn");
@@ -547,6 +552,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentHex = null;
   /** @type {Array<{hex:string, ts:number}>} 採取履歴（新しい順） */
   let history = [];
+  let historyWriteChain = Promise.resolve();
+  function updateHistory(action, entry = {}) {
+    const operation = historyWriteChain.then(async () => {
+      const requestHistory = history;
+      const result = await chrome.runtime.sendMessage({ action: "UPDATE_COLOR_HISTORY", operation: action, ...entry });
+      if (!result?.ok) throw new Error(result?.error || "storage-failed");
+      // 別 popup の更新通知後に古い保存結果が届いても一覧を戻さない。
+      if (history === requestHistory) history = sanitizeHistory(result.history);
+    });
+    historyWriteChain = operation.catch(() => {});
+    return operation;
+  }
   /**
    * @type {{h:number,s:number,v:number}} 調色パレットの現在位置（色相 0..360 / 彩度・明度 0..100）。
    * currentHex から毎回逆算すると無彩色や黒で色相・彩度が失われるので、パレット側に状態を持つ。
@@ -630,30 +647,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (focus && activeEntry) activeEntry.tab.focus();
     if (persist) {
-      chrome.storage.local
-        .set({ [StorageKeys.POPUP_LAST_TAB]: target })
+      savePopupStorage({ [StorageKeys.POPUP_LAST_TAB]: target })
         .catch(logStorageError("popup-last-tab"));
     }
+  }
+
+  /** 初期化・インポートと競合する保存を background の共通キューへ送る。 */
+  async function savePopupStorage(data) {
+    const result = await chrome.runtime.sendMessage({
+      action: "SAVE_POPUP_STORAGE", data,
+      syncGeneration: stored[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null,
+    });
+    if (!result?.ok) throw new Error(result?.error || "storage-failed");
   }
 
   /**
    * 親タブ内で最後に開いたサブタブを記憶する（親タブ id → サブタブ id）。
    *
-   * 書き戻す前に storage 現在値を再取得してマージする（POPUP_LAST_TAB と違い 1 キーに
-   * 複数タブ分を相乗りさせるレコードなので、別 popup が書いた他タブ分を wipe しないため。
-   * CLAUDE.md「経路 B: popup 内変数の stale 化 race」の対策と同型）。
+   * 複数 popup 間の更新を失わないよう、background の保存キューで取得・マージする。
    */
   function persistSubTab(groupKey, subId) {
     lastSubTabs = { ...lastSubTabs, [groupKey]: subId };
-    chrome.storage.local
-      .get(StorageKeys.POPUP_LAST_SUBTAB)
-      .then((rec) => {
-        const merged = {
-          ...PopupTabs.normalizeSubTabs(rec[StorageKeys.POPUP_LAST_SUBTAB]),
-          [groupKey]: subId,
-        };
-        return chrome.storage.local.set({ [StorageKeys.POPUP_LAST_SUBTAB]: merged });
-      })
+    chrome.runtime.sendMessage({ action: "SAVE_POPUP_SUBTAB", groupKey, subId })
+      .then((result) => { if (!result?.ok) throw new Error(result?.error || "storage-failed"); })
       .catch(logStorageError("popup-last-subtab"));
   }
 
@@ -675,6 +691,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   $paletteArea.addEventListener("pointercancel", onPalettePointerUp);
   $paletteArea.addEventListener("keydown", onPaletteKeydown);
   $paletteHue.addEventListener("input", onPaletteHueInput);
+  $paletteSaturation.addEventListener("input", () => {
+    applyPaletteHsv({ ...paletteHsv, s: Number($paletteSaturation.value) });
+  });
+  $paletteBrightness.addEventListener("input", () => {
+    applyPaletteHsv({ ...paletteHsv, v: Number($paletteBrightness.value) });
+  });
   $paletteAddBtn.addEventListener("click", onPaletteAdd);
   $paletteResetBtn.addEventListener("click", onPaletteReset);
   $historyGrid.addEventListener("click", onHistoryClick);
@@ -736,6 +758,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // チャンネルブロックリスト: 検索結果ページの 🚫 ボタンから追記されるため、
     // popup を開いたまま登録された場合も一覧を即時反映する。
     if (changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]) {
+      blockedChannelsRevision += 1;
       blockedChannels = SearchFixer.normalizeBlockedChannels(
         changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS].newValue
       );
@@ -823,8 +846,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!btn || !$loupeZoomSegment.contains(btn)) return;
     const zoom = Loupe.validateZoom(btn.dataset.zoom);
     updateLoupeZoomSegment(zoom);
-    chrome.storage.local.set({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(logStorageError("loupe-zoom"));
-    // zoom 変更は storage.onChanged 経由で content script に届くので apply() は不要。
+    savePopupStorage({ [StorageKeys.LOUPE_ZOOM]: zoom }).catch(logStorageError("loupe-zoom"));
+    // 保存された zoom 変更は storage.onChanged 経由で content script に届くので apply() は不要。
   });
 
   // ルーペ: サイズスライダー
@@ -835,13 +858,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const size = Loupe.clampSize(Number($loupeSizeSlider.value));
     $loupeSizeSlider.value = String(size);
     updateLoupeSizeLabel(size);
-    chrome.storage.local.set({ [StorageKeys.LOUPE_SIZE]: size }).catch(logStorageError("loupe-size"));
+    savePopupStorage({ [StorageKeys.LOUPE_SIZE]: size }).catch(logStorageError("loupe-size"));
   });
 
   // 音量ブースター: マスタートグル
   $volumeBoosterToggle.addEventListener("change", () => {
     const on = $volumeBoosterToggle.checked;
-    chrome.storage.local.set({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(logStorageError("volume-master"));
+    savePopupStorage({ [StorageKeys.VOLUME_BOOSTER_ENABLED]: on }).catch(logStorageError("volume-master"));
     updateVolumeBoosterDimState();
     if (on) {
       const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
@@ -879,13 +902,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 自動歪み防止 / ナイトモード: storage に保存 + 現在 gain を再送信して即時反映。
   // ブースト中なら offscreen の compressor パラメータが書き換わり、UNITY (100%) なら次回ブースト時に有効。
   // cancelVolumePush() を先頭で呼ぶのは、debounce タイマー (120ms) が古いトグル状態のまま
-  // 発火するレースを防ぐため。storage.set は fire-and-forget で OK（pushVolumeNow は DOM
+  // 発火するレースを防ぐため。保存は fire-and-forget で OK（pushVolumeNow は DOM
   // のトグル状態を直接読むので storage 書き込み完了を待つ必要がない）。
   // /opop CL-5: 3 つの同型ハンドラを bindSubToggle で集約。
   function bindVolumeSubToggle(toggleEl, storageKey) {
     toggleEl.addEventListener("change", () => {
       cancelVolumePush();
-      chrome.storage.local.set({ [storageKey]: toggleEl.checked }).catch(logStorageError(`volume-sub-${storageKey}`));
+      savePopupStorage({ [storageKey]: toggleEl.checked }).catch(logStorageError(`volume-sub-${storageKey}`));
       applyCompressorTogglePush();
     });
   }
@@ -895,13 +918,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ミュートボタン: クリックで volumeMuted を toggle、storage 保存、現在 gain を再 push して即時反映。
   // ミュート ON でもスライダー値 / サブトグル設定は保持され、UNITY release 条件で AudioContext を解放しない。
-  // 音量ブースター直書きキー群と同様、popup 直書き経路（normalizeSettings を経由しない）。
+  // 音量ブースターの他のキー群と同様、background の保存キュー経由。
   $volumeMuteBtn.addEventListener("click", () => {
     if (!$volumeBoosterToggle.checked) return;
     cancelVolumePush();
     volumeMuted = !volumeMuted;
     updateMuteBtnVisual();
-    chrome.storage.local.set({
+    savePopupStorage({
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
     }).catch(logStorageError("volume-mute"));
     const v = VolumeBooster.sliderPositionToPercent($volumeSlider.value);
@@ -986,7 +1009,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   /** EQ 4 キーを storage に永続化 (master 状態に関係なく保存し、次回 master ON 時に復元できるように)。 */
   function persistEq() {
-    chrome.storage.local.set({
+    savePopupStorage({
       [StorageKeys.VOLUME_BOOSTER_EQ_ENABLED]: $volumeEqToggle.checked,
       [StorageKeys.VOLUME_BOOSTER_EQ_GAINS]: eqGains.slice(),
       [StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]: eqPreamp,
@@ -1192,14 +1215,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  /** 除外解除。storage 現在値を再取得してから書き戻す（経路 B: popup 内変数 stale 化 race 防御）。 */
+  /** 除外解除。background の保存キューで現在値を取得・更新する。 */
   async function removeBlockedChannel(key) {
+    const requestRevision = blockedChannelsRevision;
+    const requestSequence = ++blockedChannelsRequestSequence;
     try {
-      const cur = await chrome.storage.local.get(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS);
-      const list = SearchFixer.normalizeBlockedChannels(cur[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
-      const next = list.filter((c) => c.key !== key);
-      await chrome.storage.local.set({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: next });
-      blockedChannels = next;
+      const result = await chrome.runtime.sendMessage({
+        action: "UPDATE_BLOCKED_CHANNELS", operation: "remove", key,
+      });
+      if (!result?.ok) throw new Error(result?.error || "storage-failed");
+      // 通知は常に優先し、通知がない場合は新しい成功応答の全件スナップショットを使う。
+      if (blockedChannelsRevision === requestRevision && requestSequence > blockedChannelsAppliedSequence) {
+        blockedChannels = SearchFixer.normalizeBlockedChannels(result.channels);
+        blockedChannelsAppliedSequence = requestSequence;
+      }
     } catch (err) {
       // 書き込み失敗時はローカル state を楽観更新しない: storage 上はブロックが残ったまま
       // 一覧から消えると「解除できたのに検索結果でフィルタされ続ける」不整合になる。
@@ -1269,7 +1298,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   function buildPlayerSettings(stored) {
     const spec = SearchFixer.PLAYER_CONTROLS;
     let settings = spec.normalizeSettings(stored[StorageKeys.YOUTUBE_PLAYER_SETTINGS]);
+    let settingsRevision = 0;
     const bindings = [];
+    const failedInputs = new Set();
     const status = document.createElement("p"); status.className = "fr-desc"; status.setAttribute("role", "status");
     const groups = { liveLatency: "latency", playbackQuality: "quality", playbackRate: "rate", playerVolume: "volume" };
     const numericChoices = (group, key) => {
@@ -1311,6 +1342,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         input.required = true;
         for (const value of numericChoices(group, key)) addNumericOption(input, group, key, value);
       } else input.type = "checkbox";
+      let requestSequence = 0;
+      let appliedSequence = 0;
+      let statusSequence = 0;
       input.addEventListener("change", async () => {
         if (!input.checkValidity()) { input.reportValidity(); refresh(); return; }
         const disabled = buttonSlot && input.value === "disabled";
@@ -1319,10 +1353,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         const patch = buttonSlot
           ? { [group]: { enabled: { [index]: !disabled }, ...(!disabled ? { values: { [index]: value } } : {}) } }
           : { [group]: { [key]: index === undefined ? value : { [index]: value } } };
+        const requestRevision = settingsRevision;
+        const sequence = ++requestSequence;
+        let saveFailed = false;
         try { const response = await chrome.runtime.sendMessage({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data: patch, syncGeneration: stored[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null });
           if (!response?.ok) throw new Error("save-failed");
-          settings = spec.mergeSettings(settings, patch); status.textContent = "";
-        } catch { status.textContent = i18n("applyError"); }
+          // 保存通知・同期は優先する。同じ入力の古い成功応答だけを除き、別入力は双方反映する。
+          if (settingsRevision === requestRevision && sequence > appliedSequence) {
+            settings = spec.mergeSettings(settings, patch);
+            appliedSequence = sequence;
+          }
+        } catch { saveFailed = true; }
+        // 入力ごとに最後の応答の成否を保持し、他の入力の成功で失敗を隠さない。
+        if (sequence > statusSequence) {
+          statusSequence = sequence;
+          if (saveFailed) failedInputs.add(input);
+          else failedInputs.delete(input);
+          status.textContent = failedInputs.size ? i18n("applyError") : "";
+        }
         refresh();
       });
       bindings.push({ input, group, key, index }); label.append(text, input); parent.append(label);
@@ -1340,7 +1388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       toggle.closest(".feature-row").after(details);
     }
     featureInputs.get("playerVolume")?.closest(".feature-row").after(status);
-    chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes[StorageKeys.YOUTUBE_PLAYER_SETTINGS]) { settings = spec.normalizeSettings(changes[StorageKeys.YOUTUBE_PLAYER_SETTINGS].newValue); refresh(); } });
+    chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes[StorageKeys.YOUTUBE_PLAYER_SETTINGS]) { settingsRevision += 1; settings = spec.normalizeSettings(changes[StorageKeys.YOUTUBE_PLAYER_SETTINGS].newValue); refresh(); } });
     refresh();
   }
 
@@ -1807,7 +1855,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       [StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED]: volumeMuted,
     };
     if (VOLUME_BOOSTER_VIA_MES) {
-      // Firefox MES 経路はメッセージを送らないため、EQ の live 値 (ドラッグ中含む) も
+      // Firefox MES 経路は音声制御メッセージを送らないため、EQ の live 値 (ドラッグ中含む) も
       // storage 経由で content script に届ける。Chrome 経路では message payload に載せ、
       // storage への EQ 永続化は commitEq の persistEq に任せる。self-write feedback 回避の
       // 非対称設計は維持される (popup 自身は EQ_GAINS / EQ_PREAMP の onChanged 同期をしない)。
@@ -1816,11 +1864,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP] = eqPreamp;
       volumeRecord[StorageKeys.VOLUME_BOOSTER_EQ_PRESET] = eqPreset;
     }
-    chrome.storage.local.set(volumeRecord).catch(logStorageError("volume-pushVolumeNow"));
+    // 保存完了は待たず、tabCapture の user gesture を伴う送信を続ける。
+    savePopupStorage(volumeRecord).catch(logStorageError("volume-pushVolumeNow"));
 
     if (VOLUME_BOOSTER_VIA_MES) {
       // Firefox MES 経路: storage 書き込みが唯一のトリガー。全タブの volume-booster-mes.js が
-      // storage.onChanged で自動適用するため、active tab 取得もメッセージ送信も不要。
+      // storage.onChanged で自動適用するため、active tab 取得も音声制御メッセージも不要。
       setVolumeHint("");
       return;
     }
@@ -1974,12 +2023,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!hex) throw new Error("invalid_color");
 
       const entry = { hex, ts: Date.now() };
-      history = addHistory(history, entry);
       // 先にストレージへ書く（popup が消えても復旧可能）
-      await chrome.storage.local
-        .set({ [StorageKeys.COLOR_PICKER_HISTORY]: history })
-        .catch(() => {});
-
+      try {
+        await updateHistory("add", entry);
+      } catch {
+        setCurrentColor(hex, { time: entry.ts });
+        $pickerNote.classList.add("is-error");
+        $pickerNote.textContent = i18n("pickerHistorySaveFailed");
+        return;
+      }
       setCurrentColor(hex, { time: entry.ts });
       renderHistory();
 
@@ -2008,11 +2060,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function onClearHistory() {
-    if (history.length === 0) return;
-    history = [];
-    await chrome.storage.local
-      .set({ [StorageKeys.COLOR_PICKER_HISTORY]: [] })
-      .catch(() => {});
+    try {
+      await updateHistory("clear");
+    } catch {
+      showStatus(i18n("pickerHistorySaveFailed"), "error");
+      return;
+    }
     setEmptyState();
     renderHistory();
     showStatus(i18n("historyClearedToast"), "ok");
@@ -2023,16 +2076,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!ColorPicker.isValidFormat(next)) return;
     defaultFormat = next;
     applyDefaultFormatHighlight();
-    await chrome.storage.local
-      .set({ [StorageKeys.COLOR_PICKER_DEFAULT_FORMAT]: defaultFormat })
-      .catch(() => {});
+    await savePopupStorage({ [StorageKeys.COLOR_PICKER_DEFAULT_FORMAT]: defaultFormat })
+      .catch(logStorageError("picker-default-format"));
   }
 
   async function onHexHashChange() {
     hexIncludeHash = $hexHashCheck.checked;
-    await chrome.storage.local
-      .set({ [StorageKeys.COLOR_PICKER_HEX_HASH]: hexIncludeHash })
-      .catch(() => {});
+    await savePopupStorage({ [StorageKeys.COLOR_PICKER_HEX_HASH]: hexIncludeHash })
+      .catch(logStorageError("picker-hex-hash"));
   }
 
   async function onCopyClick(ev) {
@@ -2136,6 +2187,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     $paletteThumb.style.left = `${paletteHsv.s}%`;
     $paletteThumb.style.top = `${100 - paletteHsv.v}%`;
     if ($paletteHue.value !== String(paletteHsv.h)) $paletteHue.value = String(paletteHsv.h);
+    // 各軸は標準 range として操作でき、2D 面・色コード入力とも同じ HSV を共有する。
+    for (const [input, value] of [[$paletteSaturation, paletteHsv.s], [$paletteBrightness, paletteHsv.v]]) {
+      input.value = String(value);
+      input.setAttribute("aria-valuetext", i18n("palettePercentValue", String(value)));
+    }
     const paletteText = currentHex
       ? i18n("palettePillValue", String(paletteHsv.h), String(paletteHsv.s), String(paletteHsv.v)) ||
         `${paletteHsv.h}° / ${paletteHsv.s}% / ${paletteHsv.v}%`
@@ -2225,10 +2281,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const norm = normalizeHex(hex);
     if (!norm) return;
     const entry = { hex: norm, ts: Date.now() };
-    history = addHistory(history, entry);
-    await chrome.storage.local
-      .set({ [StorageKeys.COLOR_PICKER_HISTORY]: history })
-      .catch(() => {});
+    try {
+      await updateHistory("add", entry);
+    } catch {
+      showStatus(i18n("pickerHistorySaveFailed"), "error");
+      return;
+    }
     setCurrentColor(norm, { time: entry.ts });
     renderHistory();
     showStatus(i18n("pickerInputAdded", norm.toUpperCase()), "ok");
@@ -2483,19 +2541,6 @@ function sanitizeHistory(raw) {
     if (out.length >= ColorPicker.HISTORY_LIMIT) break;
   }
   return out;
-}
-
-/** 既存配列に新エントリを先頭挿入。同色は重複排除。上限超過は末尾を切り捨て。 */
-function addHistory(list, entry) {
-  const hex = normalizeHex(entry.hex);
-  if (!hex) return list;
-  const ts = Number.isFinite(entry.ts) ? entry.ts : Date.now();
-  const filtered = list.filter((it) => it.hex !== hex);
-  filtered.unshift({ hex, ts });
-  if (filtered.length > ColorPicker.HISTORY_LIMIT) {
-    filtered.length = ColorPicker.HISTORY_LIMIT;
-  }
-  return filtered;
 }
 
 /** 履歴配列の中で指定 HEX が何番目（0 始まり）かを返す。見つからなければ -1。 */
