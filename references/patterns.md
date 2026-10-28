@@ -49,8 +49,8 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
-- **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
-- **early script は共通フレームワーク経由** — `src/content/early-framework.js` が `<style>` 注入・pre クラス同期付与・`chrome.storage.local.get`・`storage.onChanged` 購読のボイラープレートを集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、各 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js`) が config を渡して setup を呼ぶ。新サイトの early script を追加する場合もこのパターンに乗せる。サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す (差異が大きすぎて framework に押し込むと config 肥大化する)。
+- **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js` / `x-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
+- **early script は共通フレームワーク経由** — `src/content/early-framework.js` がクラス条件付き `<style>` 注入・`chrome.storage.local.get`・`storage.onChanged` 購読を集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、4 サイトの early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js` / `x-early.js`) が config を渡して setup を呼ぶ。クラス・inline 非表示は master と該当 feature の明示的な ON を確認してから適用し、未取得・未設定・OFF・初回取得失敗時は表示を変えない。読取前の FOUC は許容する。新サイトの early script もこのパターンに乗せ、サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す。
 - **二重実行防止** — `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__cpaAmazonRankingJumpRunning` / `window.__cpaAmazonMerchantInfoRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaVideoFillRunning` / `window.__cpaLoupeRunning` / `window.__cpaConnectionMonitorRunning` / `window.__cpaBroadcastClockRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
 
 ### MutationObserver 取り扱い
@@ -96,9 +96,10 @@ hideLiveChat は **iframe 内 close button の公式 click 1 つ** に責務を�
 Chrome の音量ブースターは tabCapture → offscreen の AudioContext 一本（自動音量正規化は撤去済み、全サイト一律で EME 動画も含む）。以下の不変条件はこの Chrome 経路に適用される。Firefox は専用 MES パイプライン（次セクション参照）が別実装で担い、本セクションのコードには触れない。
 
 **オーディオ路の不変条件**:
-- **ノード順序は `source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → destination` に固定** — EQ プリアンプ → 10 バンド peaking フィルタ → ナイトモードでダイナミックレンジを狭め、手動 gain でブーストし、壁ドン対策 (highpass 2段) でブースト後の低音を削り、後段に limiter (anti-clip) を置く。gain を先頭に置かず compressor の後段に置くことで「EQ → 圧縮 → 増幅 → 低音カット → リミット」のマスタリング順を保つ。bassCut を gain の後段に置くのは、boost 率に関わらず最終出力の低音を確実にカットするため（先に置くと gain が残留低音を再ブーストしてしまう）。
+- **ノード順序は `source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → ceilingNode → destination` に固定** — EQ プリアンプ → 10 バンド peaking フィルタ → ナイトモードでダイナミックレンジを狭め、手動 gain でブーストし、壁ドン対策 (highpass 2段) でブースト後の低音を削り、後段に limiter (anti-clip) とサンプル上限を置く。gain を先頭に置かず compressor の後段に置くことで「EQ → 圧縮 → 増幅 → 低音カット → リミット → 上限」のマスタリング順を保つ。bassCut を gain の後段に置くのは、boost 率に関わらず最終出力の低音を確実にカットするため（先に置くと gain が残留低音を再ブーストしてしまう）。Firefox の wet 経路も同じ順で、末尾だけ `wetGain` になる。
 - **gain は線形マッピング + `setTargetAtTime` ramp** — UI スライダーは内部値 0..200、実音量は左端 0% / 中央 100% / 右端 300%。実 gain は `VolumeBooster.percentToGain()` で `percent / 100` に線形変換する（**表示 % = 実音量倍率**: 150% = 1.5x / 200% = 2.0x / 300% = 3.0x）。旧実装は 100..MAX を対数で等 dB 配分していたが「150% なのに約 1.2 倍」と表示が実倍率と乖離する問題があり線形化した（ゆろさん指摘 2026-06-27）。スライダー位置 → 表示 % の変換（`sliderPositionToPercent`）は中央 = 等倍を保つため従来どおり。`gainNode.gain` への直接 `.value =` 代入はサンプル境界の不連続でクリック発生 → 必ず `cancelScheduledValues` → `setValueAtTime(現在値, now)` → `setTargetAtTime(target, now, RAMP_TIME_CONSTANT)` の三点セットで ramp 経由（`RAMP_TIME_CONSTANT = 0.015` で 3τ ≈ 45ms 95% 到達、popup の 120ms debounce より十分短い）。
 - **DynamicsCompressor は disconnect ではなく BYPASS preset で OFF** — ナイトモード / 自動歪み防止のサブトグル OFF 時にノードを disconnect/reconnect すると AudioContext のグラフが切れて一瞬無音になりプチノイズが乗る。`COMPRESSOR_BYPASS`（`ratio:1`、threshold/knee 中立）を `applyCompressorPreset` で当てれば素通り化が無音ゼロで実現（切替頻度が低くアタックが速い 1〜50ms ため `setTargetAtTime` 不要、`.value =` 直接代入で十分）。
+- **サンプル上限も disconnect せず、curve の有無で切り替える** — `ceilingNode`（`WaveShaperNode`、`oversample:"none"`）は常時接続する。ON 時の曲線は `[-1, 1]` の 2 点だけで、`|x|<=1` は恒等、範囲外だけ ±1 に揃える。OFF 時は `curve=null` で範囲外も通す。同じ状態への再代入はしない。**復活禁止: `oversample` の `2x` / `4x`**（オーバーサンプリングのフィルタ遅延で tabCapture の映像と音声がずれる）。コンプレッサー段の threshold / ratio を強めても定常正弦のピークは 1 を少し超えたままなので、preset 変更で上限の代わりにしない。
 - **イコライザも disconnect ではなく 0dB / unity gain で OFF** — EQ OFF 時に BiquadFilterNode 群を disconnect/reconnect すると compressor と同様に音切れが起きる。`applyEqualizer(state, false, ...)` で preampNode.gain = unity (1.0)、eqFilters[i].gain = 0dB (素通り) に ramp で戻すことで、チェーン上は常時接続のままバイパス。手動操作中のスライダーでも周波数特性の連続変化が ramp で段差なし。**固定フィルタでフィードバック無し**（撤去した自動音量正規化と違って測定 → 補正ループがない）ため決定論的に安定。
 - **壁ドン対策 (highpass) も disconnect ではなく frequency:0 で OFF** — `bassCutNodes` (BiquadFilterNode type:"highpass" × 2) は compressor / EQ と同じ思想で常時接続を維持し、OFF 時は `applyFilterPreset` で全段へ `BASS_CUT_BYPASS`（frequency:0）を当てて可聴域全体を素通しする。ON 時は全段へ `BASS_CUT_PRESET`（frequency:150Hz, Q:-3.0103 の Butterworth）を適用し、Linkwitz-Riley 4次相当の 24dB/oct を得る。切替頻度が低いため ramp 不要で `.value =` 直接代入で十分。**Web Audio の `lowpass` / `highpass` の Q は「共振量を dB 指定」する例外仕様**（`peaking` の Q とは別物）なので、Butterworth は線形 Q の `0.7071` ではなく `20*log10(0.7071) = -3.0103` を入れる（**復活禁止: `Q: 0.7071`**）。
 - **volumeGetGain は `state.lastSetPercent` を返す** — `gain.value` はランプ中で目標値と一致しないため、ユーザーが最後に指定した整数 percent を保持して round-trip 誤差ゼロを担保。`gainToPercent(gain.value)` 経由だと使えない。
@@ -126,6 +127,7 @@ Chrome の音量ブースターは tabCapture → offscreen の AudioContext 一
 | 2026-07-14 | 壁ドン対策モードの初版（当時は `bassCutNode`、highpass 150Hz / Q:0.7071 × 1段）を gain の後段・anti-clip の前段に追加 | ナイトモード（別トグル）とは別軸の要望: 「低音を物理的にカットして壁・床への振動伝達を抑えたい」。compressor (dynamics) では周波数を削れないため BiquadFilterNode を新設。`applyFilterPreset` を compressor 用 `applyCompressorPreset` と対の汎用関数として追加し、disconnect レスの BYPASS (frequency:0) 方式を踏襲。翌日に2段へ強化 |
 | 2026-08-04 | 壁ドン対策の Q を `0.7071` → `-3.0103` に修正（単位が dB だった） | 「壁ドン対策が全く効かない」報告の実原因。Web Audio の highpass の Q は共振量の **dB 指定**で、線形 Q の 0.7071 は「+0.71dB 共振」の意味になっていた。2 段合成の実測で 150Hz **+1.4dB** / 200Hz **+3.5dB** / 250Hz **+2.9dB** と、壁を伝うドスドス感の主帯域を逆にブーストしていた（50Hz は -37dB で落ちるため「下は効くが体感が相殺される」形の不具合）。修正後は 150Hz -6.0dB / 200Hz -2.4dB。**棄却案**: カットオフを 200Hz 等へ上げる案は、共振ピークが残ったまま声の芯まで削るので不採用（原因は周波数ではなく Q の単位） |
 | 2026-07-15 | 壁ドン対策を highpass 1段 (12dB/oct) → 同一 Butterworth 2段 (24dB/oct) へ強化 | 150Hz 直下の低音が緩やかにしか落ちず体感上残っていた。カットオフを上げて声の芯まで削る案は採らず、150Hz を維持したまま傾斜を倍化。Chrome / Firefox の両経路を共有 `createBassCutChain` で同一構成に固定 |
+| 2026-10-28 | 自動歪み防止の後段にサンプル上限 (`ceilingNode`) を追加 | DynamicsCompressor は音量 3 倍・1 kHz +6 dB の定常正弦でもピーク約 1.07。attack 0・ratio 20 でも 1 を超える。`|x|<=1` を変えない WaveShaper で範囲外だけを ±1 に揃える。遅延のある oversample と、全音を下げる固定パッドは不採用 |
 
 > 自動音量正規化 (EMA / silence gate 二重判定 / dead zone / 非対称 ramp 等の AGC チューニング) は v1.0.38 / v1.0.39 / 2026-06-07 と何度も調整したが、リアルタイム AGC として実用水準に届かず機能ごと撤去した (2026-06-19)。詳細な経緯と棄却した alternative は §撤去済み機能と教訓「自動音量正規化」を参照。
 
@@ -335,13 +337,13 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 - 議題: `safeSendMessage` ヘルパに統一するか、現状の dual style を残すか
 
 #### 3. `isVolumeBoosterActive` 永久 cycle リスク (F-OPS-3 / D-006 / V2 downgrade) `[active]`
-- 場所: `src/background/background.js:940-979, 858-908`
-- 状態: SW 再起動直後の通信失敗で safe-side true → 30 秒 cycle 永続化リスクあるが、自己修復構造 (次回 sendMessage 成功で false に転じる) + 30 秒間隔で CPU 影響観測不能
+- 場所: `src/background/background.js` の `isVolumeBoosterActive` / `scheduleOffscreenClose`
+- 状態: 通信失敗が続き状態が OPEN のままなら 30 秒ごとの再予約が続く。通信復旧時は再判定できるが、実際の継続時間・負荷は未測定。
 - 議題: `chrome.offscreen.hasDocument` (Chrome 116+) や `chrome.runtime.getContexts` で物理確認して同期するべきか
 
 #### 4. F-003 seqId race protection の再帰呼び出し (D-005 / V2 downgrade) `[active]`
-- 場所: `src/background/background.js:385-415`
-- 状態: 再帰経路は構造的に終端 (新規 seqId 発行で旧 seq invalidate、最大 1 階層) + popup ドラッグと onActivated 同時発火確率は実測ゼロに近い
+- 場所: `src/background/background.js` の `autoApplyVolumeBooster`
+- 状態: 取得待ち中の invalidate が繰り返されると再帰も複数回続く。更新が止まり取得に成功すれば収束するが、実際の遅延・蓄積は未測定。
 - 議題: 完全 Promise-based reconciliation に置き換えるか、現状の再帰で十分か
 
 #### 5. リリース失敗時の能動通知経路 (F-OPS-4 / V2 downgrade) `[active]`
@@ -355,14 +357,12 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 - 議題: 複数タブ同時利用時の障害切り分け用途で `requestId: crypto.randomUUID()` を入れるか、必要になってから追加するか
 
 #### 7. `applySubsGridFilter` 2 重走査 (C1-002 / V2 downgrade) `[active]`
-- 場所: `src/content/search-fixer.js:2955-2997`
-- 状態: 5000 ch 登録 + 高速 typing で 100ms hitch のみ (debounce 80ms で吸収)、現実的ユーザー稀
+- 場所: `src/content/search-fixer.js` の `applySubsGridFilter`
+- 状態: カードの更新後に棚ごとに再走査する。登録数・入力速度に対する実際の遅延と debounce の効果は未測定。
 - 議題: 5000ch ユーザーが実機報告されたら shelf → cards グルーピング Map で最適化
 
-#### 8. `:is()` セレクタ最適化コメント (C1-001 / V2 downgrade) `[active]`
-- 場所: `src/content/image-downloader.js:600-617`
-- 状態: 「10-30ms 削減」コメントの実測根拠なし。Chrome バージョン依存
-- 議題: 性能測定で実測してコメント修正、または属性 selector を別 QSA に分離
+#### 8. `:is()` セレクタ最適化コメント (C1-001 / V2 downgrade) `[resolved 2026-10-27: src/content/image-downloader.js]`
+- 実測根拠のない「10-30ms 削減」の記述を削除。セレクタの処理方式は維持。
 
 #### 9. Firefox MV3 catch-up で `__FIREFOX_STRIP_BEGIN__` マーカー方式が負債化 (D-007 / arch-judgment) `[settled 2026-06-06: 現状運用安定、再評価トリガー設定済み]`
 - 場所: `src/background/background.js` の strip マーカー 3 箇所 + `zip.{ps1,sh}` + `.github/workflows/publish.yml` の perl 削除処理
@@ -409,7 +409,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 - **撤去理由**: ゆろさん判断「現実的でない」。EMA 平滑化 / silence gate 二重判定 / dead zone / 非対称 ramp 等を v1.0.38 / v1.0.39 / 2026-06-07 と何度もチューニングしたが、BGM の verse↔chorus・喋りの息継ぎ・シーン切替での「効き」と「ポンピング抑制」の両立が安定せず、リアルタイム AGC として実用水準に達しなかった。
 - **撤去内容**: `volumeBoosterNormalizeEnabled` storage key を `onInstalled` legacy 削除リストに集約。actions.js の `VOLUME_BOOSTER_NORMALIZE_ENABLED` + `NORMALIZE_*` 10 定数、audio-pipeline.js の normalizer 6 関数 + `dbToGain` (normalizer 専用だったため)、offscreen のノードチェーン前段 + normalizer state フィールド、background / popup の normalize 配線、messages.json の volumeNormalize ラベル/説明を完全削除。当時追加した定数不在だけのテストは、実動作の不具合を検出しないため整理時に削除した。音量サブトグルは自動歪み防止 / ナイトモードの 2 つ、storage key は 6 → 5、popup 直書きキーは 5 → 4 に減少。
 - **教訓 1 (リアルタイム AGC は難物)**: 「動画ごとの平均音量を自動で揃える」は ReplayGain のような事前解析方式なら容易だが、リアルタイムでは測定窓・追従速度・無音判定の三つ巴チューニングが必要で、どれかを立てると別が崩れる。同種の「連続測定 → 連続補正」機能を再導入するときは、まず実用水準に届くかを小さく検証してから本実装する。
-- **教訓 2 (audio-pipeline.js の構造は維持)**: normalizer 6 関数の撤去で一時 applyCompressorPreset のみになったが、後に 10 バンド EQ を追加した際に dbToGain (プリアンプの dB→倍率変換) / applyEqualizer (preamp + 10 バンド peaking gain 適用) / createEqChain (EQ チェーン構築) を再導入し、さらに壁ドン対策モードで applyFilterPreset (BiquadFilterNode の frequency/Q 一括設定) と createBassCutChain (highpass 2 段の構築)、Chrome / Firefox の最上位配線を固定する connectAudioGraph を追加、現在は **dbToGain / applyCompressorPreset / applyFilterPreset / createBassCutChain / applyEqualizer / createEqChain / connectAudioGraph の 7 関数構成** (Key Files 表 §audio-pipeline.js と整合)。当初の機能撤去 → 共有モジュール構造維持 → EQ 追加 → 壁ドン対策追加で再活用、という流れで「globalThis.AudioPipeline 公開定数 + Firefox catch-up 時の再利用枠を残す」判断が結果的に活きた事例。
+- **教訓 2 (audio-pipeline.js の構造は維持)**: normalizer 6 関数の撤去で一時 applyCompressorPreset のみになったが、後に 10 バンド EQ を追加した際に dbToGain (プリアンプの dB→倍率変換) / applyEqualizer (preamp + 10 バンド peaking gain 適用) / createEqChain (EQ チェーン構築) を再導入し、さらに壁ドン対策モードで applyFilterPreset (BiquadFilterNode の frequency/Q 一括設定) と createBassCutChain (highpass 2 段の構築)、Chrome / Firefox の最上位配線を固定する connectAudioGraph を追加、現在は **dbToGain / applyCompressorPreset / applyFilterPreset / createBassCutChain / applyEqualizer / createEqChain / createOutputCeiling / applyOutputCeiling / connectAudioGraph の 9 関数構成** (Key Files 表 §audio-pipeline.js と整合)。当初の機能撤去 → 共有モジュール構造維持 → EQ 追加 → 壁ドン対策追加で再活用、という流れで「globalThis.AudioPipeline 公開定数 + Firefox catch-up 時の再利用枠を残す」判断が結果的に活きた事例。
 
 #### 撤去パターン共通の不変条件
 - **`onInstalled` で legacy storage key を必ず削除**: 廃止キーを残すと storage に dead value が永遠に残る + 将来 同名キーを再利用する場合に「OFF 化したつもりが ON で復元される」事故源。撤去時は必ず `onInstalled` の legacy 削除リストに追加。

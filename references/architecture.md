@@ -22,7 +22,7 @@ Popup (src/popup/popup.{html,js,css})
                                     │ chrome.tabCapture.getMediaStreamId (user gesture = popup open)
                                     ──ACTION_VOLUME_SET_GAIN──▶ Offscreen Document
                                                                   │ getUserMedia + AudioContext
-                                                                  │ source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → destination
+                                                                  │ source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → ceilingNode → destination
                                                                   └ EME 動画でも decrypted output を捕獲して増幅
   ※ popup は (gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp, eqPreset) を chrome.storage.local にも書くが、
     これは boost トリガーではなく永続化のみ (popup 復元 + autoApplyVolumeBooster がタブ切替時に参照)。
@@ -31,8 +31,8 @@ Popup (src/popup/popup.{html,js,css})
 [音量ブースター MES 経路 (Firefox 専用パイプライン。manifest.firefox.json のみに登録、Chrome には一切ロードされない)]
   Popup ──音量関連キーを chrome.storage.local 直書き (メッセージ送信なし)──▶ 全タブの volume-booster-mes.js
                                     │ storage.onChanged 購読が唯一のトリガー (user gesture 不要・popup 不要で自動適用)
-                                    │ <video>/<audio> ごとに MediaElementSource + 18 処理ノード
-                                    │ (dryGain + offscreen と同じ 16 DSP ノード + wetGain)
+                                    │ <video>/<audio> ごとに MediaElementSource + 19 処理ノード
+                                    │ (dryGain + offscreen と同じ 17 DSP ノード + wetGain)
                                     └ EME (DRM) サイトは EME_HOSTS で起動 skip + mediaKeys / encrypted 事前検出で attach 回避、
                                       classifyMesSource (safe/probe/pending/unsafe) + same-origin redirect probe で無音化を予防
   ※ タブ共有バナーなし。DRM サイト (Netflix / Prime Video 等) では音量ブースター無効 (音は普通に出る)。
@@ -75,7 +75,7 @@ Service worker。役割:
 `chrome://`, `edge://`, `about:`, `file://` などの非 HTTP(S) ページにはメッセージ送信をスキップ（`content_scripts.matches` が `http(s)://*/*` のみのため）。
 
 ### Offscreen (`src/offscreen/offscreen.html`, `src/offscreen/offscreen.js`)
-音量ブースター専用の extension-context ドキュメント。`chrome-extension://` は常に secure context のため `getUserMedia({ chromeMediaSourceId })` が動く。`audioStates` Map で tabId → `{ ctx, gainNode, preampNode, eqFilters, nightModeNode, bassCutNodes, antiClipNode, stream, lastSetPercent }` を保持。16 ノードチェーン (preamp + EQ 10 バンド + nightMode + gain + bassCut 2段 + antiClip) の構築・preset 切替・gain ramp の詳細は **Important Patterns 「音量ブースター・Offscreen」** を参照。release 時は `stream.getTracks().stop()` → `ctx.close()` の順（逆順だと生きているソースから出力先消失でエラー）。`pagehide` で全 audioStates を cleanup。streamId は `typeof streamId !== "string"` 型チェック + 印字可能 ASCII (`/^[\x21-\x7e]{4,1024}$/`) regex で検証してから `getUserMedia` に流す（過去に厳格すぎる `^[a-zA-Z0-9_:.\-]{8,256}$` で誤拒否が出たため緩めて、「制御文字・空白を含まない」「長さが妥当」程度の保守的検証に再導入。background 経由で不正値が混入した場合の防御一段確保が目的）。`mandatory.chromeMediaSource = "tab"` 形式を先に試し、失敗時のみフラット `chromeMediaSourceId` にフォールバック。
+音量ブースター専用の extension-context ドキュメント。`chrome-extension://` は常に secure context のため `getUserMedia({ chromeMediaSourceId })` が動く。`audioStates` Map で tabId → `{ ctx, gainNode, preampNode, eqFilters, nightModeNode, bassCutNodes, antiClipNode, ceilingNode, stream, lastSetPercent }` を保持。17 ノードチェーン (preamp + EQ 10 バンド + nightMode + gain + bassCut 2段 + antiClip + ceiling) の構築・preset 切替・gain ramp の詳細は **Important Patterns 「音量ブースター・Offscreen」** を参照。release 時は `stream.getTracks().stop()` → `ctx.close()` の順（逆順だと生きているソースから出力先消失でエラー）。`pagehide` で全 audioStates を cleanup。streamId は `typeof streamId !== "string"` 型チェック + 印字可能 ASCII (`/^[\x21-\x7e]{4,1024}$/`) regex で検証してから `getUserMedia` に流す（過去に厳格すぎる `^[a-zA-Z0-9_:.\-]{8,256}$` で誤拒否が出たため緩めて、「制御文字・空白を含まない」「長さが妥当」程度の保守的検証に再導入。background 経由で不正値が混入した場合の防御一段確保が目的）。`mandatory.chromeMediaSource = "tab"` 形式を先に試し、失敗時のみフラット `chromeMediaSourceId` にフォールバック。
 
 ### YouTube Shorts Removal (`src/content/youtube-shorts.js`)
 `*://*.youtube.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に注入。`window === window.top` チェックで埋め込みプレーヤーには注入せず CPU 負荷を抑える。
@@ -110,15 +110,15 @@ Service worker。役割:
 - **停止経路 3 つ**: `AbortSignal`（`FOREIGN_FETCH_TIMEOUT_MS` = 15s）+ `abortForeignCountryFetch()` を master OFF / 対象外ページ遷移 / orphan 化から呼ぶ。旧実装はキューを破棄する経路が無く、機能を切った後も MB 単位の取得が完走していた（/rere RC-A・RC-C）
 - **フィードのタイトル取得はカード全体の `textContent` を使わない**（`isForeignLockup`）。「8 か月前」等の相対日付に仮名が混ざり、全カードが自国判定になる罠がある。`a[href*="/watch"][title]` の title 属性 → `h3` の順で解決する
 
-**`hideComments` 実装上の注意**: `applyWatchPageClasses()` は `<html>` に `__cpa-sfx-hide-comments` クラスを付け外しする実装で、**`isWatchPage()` 判定を経由せず無条件に呼ぶ**こと。watch page 限定にすると SPA で video → home に遷移したとき `<html>` クラスが残置されて他ページに副作用が出る（CodeRabbit レビューで実際に指摘された罠）。CSS 側は `html.__cpa-sfx-hide-comments ytd-comments#comments { display: none !important; }` で watch page 以外には影響しないため、JS は無条件 toggle で良い。
+**`hideComments` 実装上の注意**: 動画ページでは `<html>` の `__cpa-sfx-hide-comments` でコメント欄を初期非表示にし、遅延生成される `ytd-comments#comments` の直前に表示・非表示ボタンを置く。手動表示は同じページ内で維持し、SPA 遷移で初期状態に戻す。機能 OFF・対象外ページ・拡張の無効化時はボタンと監視を撤去し、クラスも解除する。
 
 **`hideLiveChat` 実装上の注意**: hideLiveChat の close 操作の本体はすべて JS 経由で行う。実装は `ytd-live-chat-frame` 配下の iframe (`youtube.com/live_chat_replay`) 内の `yt-live-chat-header-renderer #close-button button[aria-label="閉じる"]` を **`iframe.contentDocument` 経由で取得し**、`fireUserLikeClick` で **full pointer/mouse event sequence** (`pointerdown → mousedown → pointerup → mouseup → click`) を発火する。youtube.com same-origin かつ sandbox 制約なしなので contentDocument にアクセス可能。**frame・iframe・親 `#chat-container`・theater 用 `--ytd-watch-flexy-sidebar-width` には一切触らない**（過去にこれらを CSS や独自属性で操作するたびに player 再初期化 / レイアウト崩れ / 「動画を処理しています」エラー / 再展開不能などの副作用を起こした経緯。なお「動画を処理しています」自体は YouTube 側のタイミング bug だが、保守的に介入は避ける方針）。close button が見つからない場合は何もしない。MutationObserver は cross-document な iframe 内 DOM 変化を観察できないため、`iframe.addEventListener("load", ...)` を `__cpaLiveChatLoadAttached` marker で idempotent に hook し、load 後 50ms で `collapseLiveChatIfNeeded` を再実行することで close button が ready になったタイミングを取りこぼさない。fireUserLikeClick は `btn.ownerDocument.defaultView` 経由で iframe の window から `PointerEvent`/`MouseEvent` constructor を取得する（別 realm の event 扱いを避けるため）。
 
 **hideLiveChat 体感ラグ消滅の先制非表示パターン**: 上記 click ベース実装は「公式 close button の hydration 待ち + click 発火」までの数百 ms、ライブチャット枠が完全展開状態で見えてしまう体感ラグがある。これを消すため、**`document_start` で `<html>` に `__cpa-sfx-hide-live-chat-pre` クラスを付け、CSS で `ytd-live-chat-frame { display: none !important; visibility: hidden !important }` を当てる先制非表示**を入れる (※`display: none` を主とし、SPA 遷移で YouTube が frame に inline `display:flex` を当てた 1 フレームでも class セレクタが負けてコメント本体が見えないよう `visibility: hidden` を併用する。旧「visibility:hidden 単独」は layout 領域 402×964 px が空白枠として 2 秒残る実機問題があったが、display:none が主で効く限り layout は出ないため再発しない。詳細は手順 2 参照):
 
-1. **`src/content/youtube-early.js`**: 新規 content_scripts エントリ（`*://*.youtube.com/*` / `run_at: document_start` / 単独エントリ）。actions.js は読み込まず生 storage key 文字列で書く最小スクリプト。**オプトアウト方式 + `<style>` inline 注入**: (a) `<style id="__cpa-sfx-early-hide-live-chat">` を `<html>` 直下に同期 prepend して CSS rule を即時 effective 化、(b) `<html>` に `__cpa-sfx-hide-live-chat-pre` を **同期で無条件付与**、(c) `chrome.storage.local` から `searchFixerEnabled` / `searchFixerFeatures` を非同期取得、(d) master OFF または hideLiveChat OFF なら剥がす（対象は `/watch` + `/live` URL で、それ以外は早期 return で動作しない。/rere B2-2 で `/live` 直アクセスも対象化）。**`<style>` inline 注入の理由**: search-fixer.css は manifest css 経由で挿入されるが、SPA navigation や frame DOM 追加タイミングによっては CSS rule の effective 化が paint cycle に間に合わないケースが Edge Trace で確認されたため、youtube-early.js 自身で CSS rule を確保する保険。**オプトアウト方式の理由**: オプトイン方式（storage 確認後に付与）だと `chrome.storage.local.get` の async 待ち（数十 ms）の間に frame が DOM 出現してチャット枠が一瞬見えてしまう実機問題があったため。OFF ユーザーには frame hydration 完了前 (数百 ms) に剥がし完了するので実質見えない
+1. **`src/content/youtube-early.js`**: `early-framework.js` に続いて `document_start` で実行する。actions.js は読み込まず生 storage key を使う。条件付き `<style>` は同期注入するが、pre クラス・inline 非表示・MutationObserver は `searchFixerEnabled` と `searchFixerFeatures.hideLiveChat` が明示的に ON と確認できてから適用する。設定未取得・未設定・OFF・初回取得失敗時はサイト要素を隠さない。対象は `/watch` と `/live` URL。ON 確定後は既存 frame を即非表示にし、後続 DOM を監視する。設定読取前の一瞬の表示は許容し、オプトイン契約を優先する。OFF または context 失効を検出したら所有スタイルを復元し、監視を止める。同じ ON の再評価は折りたたみ後の手動再表示を妨げない。
 2. **`search-fixer.css`**: `html.__cpa-sfx-hide-live-chat-pre ytd-live-chat-frame { display: none !important; visibility: hidden !important; }`。**`display: none` を主とし `visibility: hidden` を併用する**（SPA 遷移で YouTube が frame に inline `display:flex` を当てた 1 フレーム、class セレクタの display:none は inline に負けるが、YouTube は expand 時に visibility を触らないため visibility:hidden が子孫=コメント本体(iframe)に継承されて勝ち、一瞬チラ見えを防ぐ。/rere D-1/B1-A1。youtube-early.js の inline force-hide も display+visibility 両方を当てる）。旧「visibility:hidden 単独」は layout 領域 (402×964 px) が約 2 秒間空白枠として残る問題があったが、display:none が主で効く限り layout は出ないため再発しない。pre クラスは click 成功 / リトライ上限到達 / detach の 3 経路で必ず剥がされる設計なので、過去 NG だった `__cpa-sfx-live-chat-force-hide` の「永続 display:none」とは違い、数秒間だけ display:none + visibility:hidden → click 成功で剥がし → YouTube 公式 collapsed bar 表示、というフローになる。「動画を処理しています」エラーは YouTube 側のタイミング bug で CSS 介入とは無関係
-3. **`search-fixer.js` の `syncLiveChatCollapse`**: 入口で `<html>.classList.add(LIVE_CHAT_PRE_HIDE_CLASS)`（初回直アクセスは youtube-early.js が付与済みなので idempotent）
+3. **`search-fixer.js` の `syncLiveChatCollapse`**: 入口で `<html>.classList.add(LIVE_CHAT_PRE_HIDE_CLASS)`（初回直アクセスは youtube-early.js が付与済みなので idempotent）。折りたたみ状態を確認してから自動処理を完了し、その後の手動再表示を維持する。ナビゲーションまたは機能 OFF で状態をリセットする。クリックが反映されない場合は最大3回まで試し、先制非表示を解除する。先制非表示に上書きした inline style は early 側が元値と優先度を保持し、接続中・切断済みの両 frame で復元する。
 3.5. **`search-fixer.js` の `onNavigationStart`**: `yt-navigate-start` で `hideLiveChat` ON のとき pre クラスを **先制付与**。理由: yt-navigate-finish 後の syncLiveChatCollapse まで待つと、その間に YouTube が SPA で再利用される frame を expand 状態に戻す瞬間が paint されて「一瞬見える」現象が Edge の Performance Trace で確認されたため。副作用: hideLiveChat OFF や watch 以外のページでも一瞬 pre クラスが付くが、frame が無いページは CSS rule マッチ無しで副作用ゼロ、frame あり OFF ページは syncLiveChatCollapse で OFF 判定で剥がされる
 4. **`search-fixer.js` の `collapseLiveChatIfNeeded`**: click 成功 *直後* には pre クラスを剥がさず `schedulePreHideRelease()` で **frame に `collapsed` 属性が付くまで rAF polling** してから `clearLiveChatPreHide()`。理由: click 直後に剥がすと YouTube が collapsed transition を DOM 反映する前に display:none が解除され、frame default expand state が paint されてしまう (Edge 動画キャプチャで約 270ms expand 表示を確認)。タイムアウト 30 フレーム (≈500ms) で fallback 剥がし
 5. **`search-fixer.js` の `detachLiveChatObserver`**: hideLiveChat OFF / 別ページ遷移時にも pre クラス削除（class 残置で「機能 OFF 後も枠が見えない」バグ防止）
@@ -132,7 +132,7 @@ Service worker。役割:
 2. **`subsLeftnavInjectAll`**: YouTube が表示上限で隠す登録チャンネルも全件 leftnav に inline 注入。`/feed/channels` から同一オリジン取得、24h cache。`#items` の中（Polymer dom-repeat 配下）に `<a>` を直接 inject する安全パターン。
 3. **`subsAllShortcut`**: `/feed/channels` への 1 クリックエントリを「登録チャンネル」section の `#items` 内、最初のチャンネル entry の直前に entry エントリ風（高さ 40px / icon 24px / text 72px 位置）で挿入し、公式メニューの一部に見せる。
 
-**sort dropdown 関連の補正コードは入れない (再発禁止)**: 1 回目 sort 切替で label rollback / 「新しいアクティビティ」再選択で並び戻らない / 2 回目以降の挙動などは **YouTube 側 bug で extension では補正不能**。実機検証 (extension OFF/ON 比較) で確定済み。cooldown / click capture / popup-closed listener / scan gate / observer scoping は **逆効果**でしかなかったため全撤去 (v1.0.27)。
+**登録チャンネル sort 表示**: 拡張 OFF でも、YouTube が並び替えた後にヘッダーの選択名を初期表示へ戻す現象が確認されている。グリッド ON の `/feed/channels` では、ネイティブ combobox に続く popup の要求イベントを受動的に観察し、同一対象の送信・完了、対象 section の reload 完了、成功応答のチャンネル順と DOM の一致をすべて確認できた場合だけ、既存ラベルの Text を選択名に補正する。DOM が遅れる場合は期限内の変更で再照合し、ヘッダー再生成への追従も短時間に限る。旧 popup の未完了要求は切り離されても完了を観察するが、競合・判定不能な応答・未解決のまま 10 秒が経過した場合は、この document の補正を停止し popup listener をすべて解放する。旧応答を識別できないため OFF・SPA 遷移を挟んでも停止を維持し、ページ再読み込みで再開する。正常に決着した場合の OFF・再 ON は可能。OFF・SPA 遷移・context 失効で監視を止め、拡張の書込み後にサイトが変更していない Text だけ復元する。popup の由来を特定するため document で pointerdown / keydown を受動的に観察するが、イベントの阻止や scan 抑制は行わず、旧 global click capture / cooldown / popup-closed listener / scan gate は再導入しない。YouTube の内部イベント・応答構造に依存し、Firefox で detail を読めない場合や未対応の応答では補正されない。
 
 ### 動画ガンマ補正 (`src/content/video-gamma.js`)
 全 http(s) ページに `all_frames: true` で注入される content script。`videoGammaEnabled` (master) + `videoGammaValue` (数値 0.3〜3.0、初期 1.0) で管理。SVG `<feComponentTransfer type="gamma">` ベースの独自実装で、CSS `filter: url(#__cpa-video-gamma)` を `<video>` 要素に当てて全タブ共通のガンマ補正を適用する。スライダーは中央 (1.0) が補正なし、左に動かすほど暗く（最大 3.0）、右に動かすほど明るく（最小 0.3）。iframe 内の `<video>`（YouTube 埋め込み等）にも `all_frames: true` で同じ補正が当たる。動画データの読み取りや保存は行わない（filter 適用のみ）。
@@ -175,14 +175,14 @@ Service worker。役割:
 - background の `LOUPE_REQUEST_CAPTURE` ハンドラは **`tabId === activeTabId` を assert** してから撮影 (`chrome.tabs.query({ active: true, windowId })` で確認、バックグラウンドタブからの別タブピクセル取得を遮断 / /rere A1-I1)
 
 ### Amazon 定期おトク便 月別合計 (`src/content/amazon-delivery-total.js`)
-`*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。Amazon の DOM 構造（`[data-delivery-type]` セクションと `.subscription-price` 価格表示）に基づく独自実装で、配送月ごとの合計を計算してページに挿入する。
+`*://www.amazon.co.jp/auto-deliveries*` 限定。`amazonDeliveryTotalEnabled` (boolean) で master 制御。現行の配送明細を読み取り、配送月ごとの合計を計算してページに挿入する。従来の表示形式では明細の完全性を確認できないため、合計は表示しない。
 
 **フリーズ対策**: 旧実装は `MutationObserver(subtree: true)` 監視中に自身が `target.append(root)` / `priceEl.textContent = ...` で DOM を書き戻すと再発火 → 再 render → 無限ループでブラウザがフリーズする問題があった。修正版は **rAF coalesce + observer disconnect / takeRecords / reconnect ガード** パターン:
 1. `scheduleRender()` を `requestAnimationFrame` で 1 フレームに 1 回に圧縮
 2. `runRenderInsideObserverGuard()` 内で `observer.disconnect()` → `renderAllTotals()` → `observer.takeRecords()`（蓄積分を破棄）→ `observer.observe()` で再接続
 3. `priceEl.textContent` は変化時のみ更新（同じ文字列の再代入でも `MutationRecord` は積まれるため）
 
-**動作対象**: top frame 限定。従来画面は `[data-delivery-type]` セクションの `.subscription-price` を合計し、`.a-fixed-left-grid-col` に表示する。現行の配送詳細は `[data-testid^="desktop-delivery-card-list-"]` ごとに `desktop-subscription-tile` の `product-price`（単価）× `product-qty-frequency`（数量）を集計し、`desktop-delivery-card` に表示する。過去の節約額や詳細モーダルの価格は合計に含めない。全明細の価格と数量が揃わなければ部分合計や代わりの0円を表示しない。
+**動作対象**: top frame 限定。従来画面の `[data-delivery-type]` セクションでは明細の完全性と数量を確認できないため、合計を取得できない旨を表示する。現行の配送詳細は `[data-testid^="desktop-delivery-card-list-"]` ごとに `desktop-subscription-tile` の `product-price`（単価）× `product-qty-frequency`（数量）を集計し、`desktop-delivery-card` に表示する。過去の節約額や詳細モーダルの価格は合計に含めない。全明細の価格と数量が揃わなければ部分合計や代わりの0円を表示しない。
 
 **価格のない一覧**: マスター ON 時のみ、`#deliveriesDesktopScroller` 内の「管理」URL（`/auto-deliveries/` の `deliveryBundleId`・`shipId`）へ読み取り GET を行い、サーバー側で描画された全明細の単価×数量を取得する。来月以降の便など管理ページにも価格がない明細は、当該明細の `subscriptionId` で `/auto-deliveries/ajax/subscription` を読み取り、得られた `/dp/ASIN` 商品ページの現在の定期便価格と明細の割引率を照合する。配送価格があれば優先する。現在価格も取得できない個別商品だけ、当該 `subscriptionId` の `/auto-deliveries/deliveryHistory` → 履歴の最初の注文詳細リンク `/gp/css/summary/edit.html/ref=rcxsubs_mys2_delivery?orderID=...` を読み取る。注文 HTML の当該 ASIN の商品行 `[data-component=purchasedItemsRightGrid]` 内の `[data-component=unitPrice]` の前回実単価を、将来明細の数量に掛ける。注文全体合計や他商品の価格は使わず、履歴・商品識別不一致や価格不明なら補完しない。現在価格による補完を含む合計は「参考合計（現在価格）」、前回単価を使う場合だけ「参考合計（前回価格を含む）」とし、請求額の変動とクーポン未反映を注記する。全明細が揃った配送だけを表示する。
 
@@ -222,16 +222,18 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 3. **URL リダイレクト (300ms ポーリング)**: `reels` / `explore` / `storiesAll` 機能が ON のとき、対応する URL パスからホーム `/` に `location.replace("/")` で移動する（失敗時は `location.href`）。履歴へ禁止ページを追加せず、「戻る」による再進入を避ける
 4. **master OFF 時の cleanup**: DOM observer、debounce / fallback timer、urlGuardTimer を停止し、付与済みマーカークラスをすべて剥がして元の Instagram UI に戻す
 
-コメントリストは各項目の時刻がコメント固有の `/c/` permalink 内にあることを確認し、本文混在リストを除外する。詳細ページとモーダルの DIV 判定は最内コンテナだけを対象にし、既に隠したコメントの外側を後続走査で隠さない。
+コメントリストは各項目の時刻がコメント固有の `/c/` permalink 内にあることを確認し、本文混在リストを除外する。詳細ページとモーダルの DIV 判定は最内コンテナだけを対象にし、既に隠したコメントの外側を後続走査で隠さない。入力欄のない公開詳細ページでは、URL の投稿 shortcode と全 permalink の一致、各直系コメント内の単一 ID、項目間で全て異なる2件以上のコメント ID を要求し、同一ユーザーのコメントにも対応する。入力欄のある詳細・投稿モーダルの異なる2ユーザー条件は維持する。公開詳細で推定したマーカーは再走査と OFF 時に撤去・再評価する。
 
 **CSS セレクター戦略**: Instagram の難読化 class 名（`.x9f619` 等）は build ごとに変わるため**意図的に避け**、`aria-label` / `href` / `role` / `data-pagelet` / SVG path data などの意味論的属性のみで構成する。例: Reels は `a[href="/reels/"]` + `aria-label="Reels"` + 日本語ロケール用 `aria-label="リール"` + SVG path data の 4 重に重ね、どれか 1 つでもヒットすれば隠れる構造。
+
+**Instagram early (`instagram-early.js`)**: 条件付き style のみを同期注入し、master と comments の明示的な ON を storage で確認してから pre クラス・inline 非表示・MutationObserver を適用する。未取得・未設定・OFF・初回取得失敗時は非表示にしない。読取前の FOUC は許容する。OFF・context 失効時は所有スタイルを復元して監視を止め、ON 復帰時は既存要素も走査する。
 
 ### TikTok クリーナー (`src/content/tiktok-cleaner.js` + `src/content/tiktok-cleaner.css` + `src/content/tiktok-early.js`)
 `*://*.tiktok.com/*` 限定の content_scripts エントリ。Instagram クリーナーと同じ master + FEATURES の 2 段構造 (`tiktokCleanerEnabled` / `tiktokCleanerFeatures`)、ただし機能は **3 つ** (`hideComments` / `hideSuggested` / `imageDownload`)。
 
 **実装パターン**:
 1. **CSS-only body クラス駆動** — `applyBodyClasses()` で `<html>` に `__cpa-tt-comments` / `__cpa-tt-suggested` を toggle するだけ。Instagram のコメント permalink を使った構造判定 や URL リダイレクトなど複雑処理は不要
-2. **early エントリ (document_start) で FOUC 防止** — `tiktok-early.js` が同期で `<style>` を `<html>` 直下に注入 + pre クラス無条件付与（オプトアウト方式）→ `chrome.storage.local.get` で OFF 時のみ剥がす。actions.js 非依存
+2. **early エントリ (document_start) で設定確認後の FOUC を抑止** — `tiktok-early.js` がクラス条件付き `<style>` を同期注入し、storage で master と各 feature の明示的な ON を確認後にだけ pre クラスを付与する。未取得・未設定・OFF・初回取得失敗時は非表示にしない。読取前の FOUC は許容する。actions.js 非依存
 3. **idempotent ガード**: `window.__cpaTikTokCleanerRunning` / `window.__cpaTtEarlyRunning`
 
 **CSS セレクタ戦略 (TikTok の DOM 2 系統)**: 同じ photo / video コンテンツでも 2 つの異なるレイアウトがあり、両系統を CSS rule で網羅する必要がある。
@@ -279,7 +281,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 
 **`followingTabDefault` だけ JS 実装**（唯一 CSS で書けない機能）。ホームのタブは `[role="tablist"] [role="tab"]` の **index 0 = おすすめ / 1 = フォロー中**で、ピン留めリストは 3 番目以降に並ぶため先頭 2 つの順序は不変（＝位置で特定すればロケール非依存）。ユーザー操作と競合させないため、**ホームで、かつ「おすすめ」が選択中のときだけ、1 ページ表示につき 1 回だけ**クリックする（自分で「おすすめ」に戻したあとは介入しない）。走査は MutationObserver + rAF coalesce、SPA 遷移は `popstate` でも拾う。機能 OFF / orphan / `pagehide(persisted=false)` で observer を切る（bfcache 凍結は温存）。
 
-**early script は「レイアウトが動く 3 つ」だけ焼き込む**（`x-early.js`）: 右ペイン / トレンド / おすすめユーザー。広告・カウンタ・Grok はレイアウトを押し広げないので manifest css の到達で間に合い、早期 paint を無駄に遅らせない。
+**early script は「レイアウトが動く 3 つ」だけ焼き込む**（`x-early.js`）。条件付き style を同期注入し、master と各 feature の明示的な ON を取得後にだけクラスを付与する。読取前・OFF・初回取得失敗時は表示を変えない。対象: 右ペイン / トレンド / おすすめユーザー。広告・カウンタ・Grok はレイアウトを押し広げないので manifest css の到達で間に合い、早期 paint を無駄に遅らせない。
 
 ### 音量ブースター (tabCapture 経路一本、`src/background/background.js` + `src/offscreen/offscreen.js`)
 `chrome.tabCapture.getMediaStreamId` + offscreen の `getUserMedia` + AudioContext 方式。**全サイト一律・URL 分岐なし**（Netflix / Prime Video / Amazon 等 EME 動画も含む）。`chrome.tabCapture` は OS / ブラウザレベルで復号された後のタブ音声出力を捕獲するため、EME 動画でもブースト可能。
@@ -292,7 +294,7 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 1. popup の `pushVolumeNow`: 音量関連キー（lastGain + サブトグル 3 + ミュート + EQ enabled/gains/preamp）を storage に永続化（boost トリガーではなく popup 復元 + `autoApplyVolumeBooster` 用）+ active tab へ `VOLUME_BOOSTER_SET_GAIN`（`tabId`, `gain`, `antiClip`, `nightMode`, `bassCut`, `muted`, `eqEnabled`, `eqGains`, `eqPreamp`）を background に送信
 2. background: gain が UNITY かつ全サブトグル OFF かつミュート OFF かつ EQ OFF なら `releaseVolumeBoosterTab` で AudioContext 解放して終了。それ以外は `chrome.tabCapture.getMediaStreamId({ targetTabId })` で MediaStream ID 取得（既存 AudioContext があれば streamId なしで gain / preset / mute / EQ だけ更新）
 3. background → offscreen: `ACTION_VOLUME_SET_GAIN`（`tabId`, `streamId`, `gain`, `antiClip`, `nightMode`, `bassCut`, `muted`, `eqEnabled`, `eqGains`, `eqPreamp`）
-4. offscreen: 未登録タブなら `getUserMedia` → 16 ノード接続 (`source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → destination`)。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp、各 DynamicsCompressor / bassCut フィルタのパラメータ切替、`applyEqualizer` で preamp + 10 バンド gain を ramp 更新
+4. offscreen: 未登録タブなら `getUserMedia` → 17 ノード接続 (`source → preampNode → eqFilters[0..9] → nightModeNode → gainNode → bassCutNodes[0..1] → antiClipNode → ceilingNode → destination`)。登録済みなら GainNode を `setTargetAtTime` で 45ms ramp、各 DynamicsCompressor / bassCut フィルタのパラメータ切替、`applyEqualizer` と `applyOutputCeiling` で preamp + 10 バンド gain とサンプル上限を更新
 5. **タブ切替で自動再適用**: `tabs.onActivated` → `autoApplyVolumeBooster(tabId)` → **`boostedTabIds` に既登録のタブのみ**が対象（既存 AudioContext があるので `getMediaStreamId` 不要で user gesture 制約に引っかからない）。未 boost タブへの初回適用は popup open（= user gesture）が必須
 
 **共通仕様**:
@@ -350,6 +352,8 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 6. それ以外 → `youtube_cdn` (YouTube 個別 CDN 不調が最も疑わしい fallback)
 
 ### Gemini Notebook 送信 (`src/content/youtube-notebooklm.{js,css}` + background の RPC クライアント)
+アカウント一覧は取得日時を添えて端末内に保持し、background のメモリと storage、content の表示すべてに同じ12時間の有効期限を適用する。期限切れではメール表示とノートブック候補を一緒に破棄し、アカウント一覧の読み取り後に現在の選択 index のノートブック一覧を再取得する。取得失敗時は古いメールに戻さず番号で表示し、OFF・再有効化をまたぐ旧応答は破棄する。ページ持続中もボタン表示中は期限タイマーで更新し、送信操作でも期限を再確認する。12時間以内の Google 側のログイン変更を即時検出する契約ではないため、選択 index の自動変更は行わない。
+
 `*://*.youtube.com/*` の top frame に注入（**接続モニター / 配信時刻オーバーレイと同じ content_scripts エントリに相乗り**で actions.js 二重ロードを回避）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.notebookLmSend`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず `APPLY_SEARCH_FIXER_CS` を購読、`computeActive()` で判定）。視聴中の動画 / 検索結果 / プレイリスト / チャンネルの動画を、ユーザー自身の Google アカウントの **Gemini Notebook にソースとして追加**する。カテゴリは新設の `integration`（🔗）。
 
 **外部送信の 3 例外目**: 本機能は接続モニターの RTT 計測・画像ダウンロードの CDN 取得と並ぶ、外部通信を行う例外。**送信されるのはユーザーがボタンを押した瞬間の YouTube 動画 URL と（新規作成時の）ノートブック名だけ**で、視聴履歴収集やバックグラウンド送信は行わない。docs/privacy-policy.{md,en.md} の「例外 3」に明記済み。
@@ -416,6 +420,8 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 ### YouTube プレイヤー操作
 
 `youtube-player-overlay.js` は画質・再生速度・音量・ライブ遅延指標、接続モニター、配信時刻の共通ホストを所有する。両 manifest で利用側より前に読み込み、重複ロードを防止する。`mount(name, node)` / `remove(name)` で各機能の分類を登録し、表示順はプレイヤー操作 → 配信時刻 → 接続モニター。プレイヤーの既存操作領域の上へ単一のスクロール可能な枠を設置し、各分類を見出しとセパレーターで分ける。登録が残る間はプレイヤー・操作領域の生成を待ち、差し替え時は同じ分類ノードを再配置する。全登録の撤去時にホストと監視を解放し、context 失効・通常の pagehide でも撤去する。bfcache の pagehide では登録を保ち、pageshow で再接続する。接続モニターと配信時刻はプレイヤー操作の設定や MAIN セッションから独立して表示できる。
+
+埋め込みの新しい操作 UI が `#movie_player` の外側にある場合は、`#player-controls` 内の操作領域を表示先に使う。MAIN 側も同じ領域内のセッション付き slot を参照し、動画とプレイヤー API の対象は引き続き `#movie_player` とする。
 
 `liveLatency` / `playbackQuality` / `playbackRate` / `playerVolume` は `watch_page` の既定OFFサブ機能です。詳細値は `SearchFixer.PLAYER_CONTROLS` で正規化し `youtubePlayerSettings` に保存します。popup の詳細設定から追従・しきい値・5表示、画質9枠、速度16枠、音量5枠、標準音量UI表示を編集できます。画質・速度・音量はボタン押下時に切り替えます。既定割当なしの30個の commands はアクティブタブへ `YOUTUBE_PLAYER_COMMAND` を配信します。
 

@@ -16,8 +16,9 @@ A productivity helper that bundles 12 categories of features into a single popup
 
 ■ Features available on Firefox
 
-🔹 YouTube Enhancements (35 sub-features)
+🔹 YouTube Enhancements (39 sub-features)
 Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, hiding "Most relevant" in Subscriptions, subscription channel expansion (subs feed → grid + lazy thumbnail), live-stream connection monitor, and more granular controls for YouTube's verbose UI.
+Reduce live latency and switch video quality, playback speed, and player volume. The connection monitor and archive broadcast time also appear as labeled sections in the shared overlay.
 
 🔹 X Cleaner (9 sub-features)
 Hide the right pane (widening the timeline into it) / trends / who to follow / messages dock / promoted posts / Premium upsells / Grok / engagement counts, and open Home on the "Following" tab. Selectors are structural data-testid matches only, so they do not depend on the display language.

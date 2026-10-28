@@ -46,9 +46,8 @@
 
 確認手順:
 1. ユーザーから「該当ページのスクリーンショット」 + 「DevTools Elements パネルの該当 selector のスクリーンショット」を取得
-2. Instagram は `src/content/instagram-cleaner.js` の `runI18nWatchdog()` で selector mismatch の警告が出ているか確認
-3. Amazon / TikTok / search-fixer は現状 selector mismatch detector 未実装（/rere レビュー F-003、将来横展開予定）
-4. selector 修正は [AGENTS.md](../AGENTS.md) の各機能セクション + 過去のコミット履歴を参照
+2. 各 content script のセレクターと実際の DOM を照合する。Instagram / Amazon / TikTok / search-fixer に selector mismatch の自動警告はない
+3. selector 修正は [AGENTS.md](../AGENTS.md) の各機能セクション + 過去のコミット履歴を参照
 
 ### 2-C. リリース失敗（publish.yml）
 
@@ -100,7 +99,7 @@ Firefox の音量ブースターは、旧 content script sandbox が即時 clean
 | YouTube `/feed/channels` | subs グリッドのチャンネルリスト取得失敗 | exponential backoff 2s→60s（`subsListFetchBackoffMs`） |
 | YouTube channel HTML (videoId 抽出) | 該当チャンネルのサムネが mqdefault.jpg にフォールバック → 全失敗で空 | sessionStorage 24h cache でヒット時はネット不要 |
 | Amazon DOM 変更 | 月別合計が表示されない（silent fail） | F-003 余地（DOM mismatch 検知未実装） |
-| Instagram DOM 変更 | 該当機能だけ silent fail | `src/content/instagram-cleaner.js` の `runI18nWatchdog()` で console.warn |
+| Instagram DOM 変更 | 該当機能だけ silent fail | Elements パネルでセレクターと DOM を照合 |
 | TikTok DOM 変更 | 該当機能だけ silent fail | F-003 余地（DOM mismatch 検知未実装） |
 | chrome.tabCapture user gesture 要件 | 新規タブで音量ブースター初回適用失敗 | popup を開く操作が user gesture になる |
 | chrome.tabs.captureVisibleTab 2fps 上限 | Loupe で再キャプチャ間隔 500ms に強制 | 仕様内、ユーザー UX 影響軽微 |
@@ -114,8 +113,11 @@ CI からは新規 add-on 作成不可。次のメンテナがゼロから再現
 
 1. `package.json` 直下に `.amo-metadata.json`（license: MIT, categories）を確認
 2. AMO Developer Hub で API キーを発行（[発行ページ](https://addons.mozilla.org/ja/developers/addon/api/key/)）
-3. ローカルで:
+3. ローカルで、存在しない専用の空ディレクトリを用意し、CI と同じ方法で Firefox 用ソースを構築してから提出する。以下の `firefox-build` は作業用の例であり、既存データがある場合は別の空ディレクトリを指定する:
    ```bash
+   mkdir firefox-build
+   node scripts/copy-package-files.js firefox firefox-build
+   node scripts/strip-firefox-background.js firefox-build/src/background/background.js
    WEB_EXT_API_KEY=<issuer> WEB_EXT_API_SECRET=<secret> \
      pnpm exec web-ext sign \
      --source-dir=firefox-build \
@@ -125,7 +127,7 @@ CI からは新規 add-on 作成不可。次のメンテナがゼロから再現
 4. gecko id（`manifest.firefox.json` 内）で AMO 上に新規 add-on 自動作成
 5. 初回完了後は CI の `publish-firefox` job が新 version 提出を担う
 
-**注意**: `web-ext sign --channel=listed` は `Approval: timeout exceeded` で exit 1 だが submission 受理済みの挙動。CI でも考慮済み（`if: success() || failure()`）。
+**注意**: `Approval: timeout exceeded` は承認待ちのタイムアウトであり、提出状態を確定するものではない。AMO Developer Hub で対象バージョンの状態を確認する。
 
 ---
 

@@ -112,8 +112,8 @@ Popup (src/popup/popup.{html,js,css})
 
 [音量ブースター・MES 経路 (Firefox 専用。manifest.firefox.json のみに登録)]
   Popup ──音量関連キーを storage 直書き──▶ 全タブの volume-booster-mes.js (storage.onChanged 購読)
-    │ <video>/<audio> ごとに MediaElementSource + 18 処理ノード
-    │ (dryGain + 16 DSP ノード + wetGain、メッセージレス・user gesture 不要)
+    │ <video>/<audio> ごとに MediaElementSource + 19 処理ノード
+    │ (dryGain + 17 DSP ノード + wetGain、メッセージレス・user gesture 不要)
     │ 拡張リロード後の旧 graph は 20 秒 lease 失効で dry bypass へ戻る
     │ DRM サイト (EME_HOSTS) では無効。Chrome には一切ロードされない
 
@@ -128,7 +128,7 @@ Popup (src/popup/popup.{html,js,css})
 |------|------|
 | `src/lib/actions.js` | 単一情報源 (Actions / StorageKeys / SettingsSchema 等を `globalThis` に公開) |
 | `src/lib/scan-runner.js` | rAF + MutationObserver + context invalidation guard の共通ランタイム |
-| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 7 関数 (`dbToGain` / `applyCompressorPreset` / `applyFilterPreset` / `createBassCutChain` / `applyEqualizer` / `createEqChain` / `connectAudioGraph`。caller は offscreen.js = Chrome と volume-booster-mes.js = Firefox の 2 つ) |
+| `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 9 関数 (`dbToGain` / `applyCompressorPreset` / `applyFilterPreset` / `createBassCutChain` / `applyEqualizer` / `createEqChain` / `createOutputCeiling` / `applyOutputCeiling` / `connectAudioGraph`。caller は offscreen.js = Chrome と volume-booster-mes.js = Firefox の 2 つ) |
 | `src/background/background.js` | Service Worker (settings 集約 / offscreen 管理 / 音量ブースター制御) |
 | `src/content/*.js` | 各機能の content script |
 | `src/offscreen/` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体・Chrome の唯一の経路) |
