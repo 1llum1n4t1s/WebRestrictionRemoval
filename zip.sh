@@ -7,7 +7,7 @@
 #   ./zip.sh firefox         # Firefox のみ
 #
 # Firefox 版は manifest.firefox.json を manifest.json として同梱し、xpi 拡張子で出力する。
-# 音量ブースター関連 (offscreen / tabCapture) は Firefox MV3 未対応のため除外されている。
+# Firefox 版では Chrome 専用の音量ブースター経路 (offscreen / tabCapture) を除外し、MES 経路を同梱する。
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -38,8 +38,7 @@ fi
 
 build_pkg() {
   local variant="$1"           # chrome | firefox
-  local manifest_src="$2"      # manifest.json | manifest.firefox.json
-  local output="$3"            # web-viewing-assist-chrome.zip | web-viewing-assist-firefox.xpi
+  local output="$2"            # web-viewing-assist-chrome.zip | web-viewing-assist-firefox.xpi
 
   echo ""
   echo "==== $variant 版をビルド中 ===="
@@ -76,10 +75,10 @@ build_pkg() {
 rm -f web-viewing-assist.zip web-restriction-remover.zip
 
 if [ "$TARGET" = "chrome" ] || [ "$TARGET" = "both" ]; then
-  build_pkg "chrome" "manifest.json" "web-viewing-assist-chrome.zip"
+  build_pkg "chrome" "web-viewing-assist-chrome.zip"
 fi
 if [ "$TARGET" = "firefox" ] || [ "$TARGET" = "both" ]; then
-  build_pkg "firefox" "manifest.firefox.json" "web-viewing-assist-firefox.xpi"
+  build_pkg "firefox" "web-viewing-assist-firefox.xpi"
 fi
 
 echo ""

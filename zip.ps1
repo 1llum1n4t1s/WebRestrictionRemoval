@@ -5,7 +5,7 @@
 #   pwsh -NoProfile -File zip.ps1 -Target firefox    # Firefox のみ
 #
 # Firefox 版は manifest.firefox.json を manifest.json として同梱し、xpi 拡張子で出力する。
-# 音量ブースター関連 (offscreen / tabCapture) は Firefox MV3 未対応のため除外されている。
+# Firefox 版では Chrome 専用の音量ブースター経路 (offscreen / tabCapture) を除外し、MES 経路を同梱する。
 
 param(
     [ValidateSet("chrome","firefox","both")]

@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 import posixpath
 import re
 import sys
+import stat
 from urllib.parse import unquote, urlsplit
 import zipfile
 
@@ -25,13 +26,26 @@ root = Path(__file__).resolve().parent.parent
 expected_version = os.environ["EXPECTED_VERSION"]
 
 # ZIP 内の実 bytes を展開して照合する。再コピー・再パッケージはしない。
-if variant == "chrome":
+if target.is_file():
     with zipfile.ZipFile(target) as archive:
-        entries = [entry for entry in archive.infolist() if not entry.is_dir()]
+        all_entries = archive.infolist()
+        require(len({entry.filename for entry in all_entries}) == len(all_entries), "Duplicate ZIP entries")
+        for entry in all_entries:
+            name = entry.filename.rstrip("/")
+            require(name and not name.startswith("/") and "\\" not in name
+                    and all(part not in ("", ".", "..") for part in name.split("/")),
+                    f"Unsafe ZIP entry: {entry.filename}")
+            mode = entry.external_attr >> 16
+            require(not stat.S_ISLNK(mode) and not (entry.flag_bits & 1),
+                    f"Unsupported ZIP entry: {entry.filename}")
+        entries = [entry for entry in all_entries if not entry.is_dir()]
         require(len({entry.filename for entry in entries}) == len(entries), "Duplicate ZIP entries")
         files = {entry.filename: archive.read(entry) for entry in entries}
-    identity = hashlib.sha256(target.read_bytes()).hexdigest()
+    zip_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+    identity = zip_hash if variant == "chrome" else None
 else:
+    require(variant == "firefox" and target.is_dir(), "Expected Firefox source directory or ZIP")
+    zip_hash = None
     paths = sorted(target.rglob("*"))
     require(not any(item.is_symlink() for item in paths), "Source contains symlinks")
     files = {item.relative_to(target).as_posix(): item.read_bytes() for item in paths if item.is_file()}
@@ -97,8 +111,18 @@ else:
     require(not {"offscreen", "tabCapture"}.intersection(manifest["permissions"]), "Chrome permissions in Firefox")
     require(not any(name.startswith("src/offscreen/") for name in files), "Chrome-only files in Firefox source")
     require(b"__FIREFOX_STRIP_BEGIN__" not in files["src/background/background.js"], "Firefox source was not stripped")
-    metadata = json.loads((root / ".amo-metadata.json").read_text(encoding="utf-8"))
-    require(metadata["version"]["license"] and metadata["categories"]["firefox"], "Missing AMO submission metadata")
+    metadata_bytes = (root / ".amo-metadata.json").read_bytes()
+    metadata_hash = hashlib.sha256(metadata_bytes).hexdigest()
+    require(not os.environ.get("EXPECTED_AMO_METADATA_SHA256")
+            or metadata_hash == os.environ["EXPECTED_AMO_METADATA_SHA256"], "AMO metadata changed during verification")
+    metadata = json.loads(metadata_bytes)
+    require(isinstance(metadata, dict) and set(metadata) == {"categories", "version"}, "Unexpected AMO metadata fields")
+    categories, version = metadata["categories"], metadata["version"]
+    require(isinstance(categories, dict) and set(categories) == {"firefox"}
+            and isinstance(categories["firefox"], list) and categories["firefox"]
+            and all(isinstance(item, str) and item for item in categories["firefox"]), "Invalid AMO categories")
+    require(isinstance(version, dict) and set(version) == {"license"}
+            and isinstance(version["license"], str) and version["license"], "Invalid AMO version metadata")
 for content in manifest.get("content_scripts", []):
     references += content.get("js", []) + content.get("css", [])
 for group in manifest.get("web_accessible_resources", []):
@@ -166,6 +190,8 @@ require(not os.environ.get("EXPECTED_SHA256") or identity == os.environ["EXPECTE
         "Downloaded artifact differs from verified package")
 print(f"source={os.environ.get('GITHUB_SHA', 'local')} version={expected_version} platform={variant}")
 print(f"artifact={target} sha256={identity} inventory_sha256={inventory_hash}")
+if zip_hash:
+    print(f"zip_sha256={zip_hash}")
 print("signature=unsigned submission input; store signing/repackaging has a separate identity")
 print(inventory, end="")
 if os.environ.get("GITHUB_OUTPUT"):
