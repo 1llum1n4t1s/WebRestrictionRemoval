@@ -1,6 +1,6 @@
 # Privacy Policy — Vuora
 
-Last updated: October 27, 2026
+Last updated: October 29, 2026
 
 ## Introduction
 
@@ -8,16 +8,16 @@ Last updated: October 27, 2026
 
 ## Data we collect
 
-Except for a contact form you submit yourself, the Extension does not collect any personal information. Only when you submit the form are the email address and message you typed sent to the developer's (Kagayoi) support desk (see "Exception 4: Contact form" below).
+Except for a contact form you submit yourself, the Extension does not collect any personal information. Only when you submit the form are the email address and message you typed sent to the developer's (Kagayoi) support desk (see "Exception 3: Contact form" below).
 
 ## Data stored locally
 
-The Extension stores the following settings on the user's device (`chrome.storage.local`). See Exception 5 for optional settings sync:
+The Extension stores the following settings on the user's device (`chrome.storage.local`). See Exception 4 for optional settings sync:
 
-- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 39 sub-features including Shorts removal, comment hiding, live-chat hiding, subscriptions enhancements, and the connection monitor).
-- **`searchFixerFeatures`** (object): on/off state of each of the 39 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements / connection monitor).
+- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 38 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
+- **`searchFixerFeatures`** (object): on/off state of each of the 38 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
-- **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored on-device by default; included in optional settings sync (Exception 5).
+- **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored on-device by default; included in optional settings sync (Exception 4).
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
 - **`amazonRankingJumpEnabled`** (boolean): whether the "Go to this product's ranking" button on Amazon product pages is enabled. Default OFF.
 - **`instagramCleanerEnabled`** (boolean): whether the Instagram cleaner is enabled.
@@ -49,13 +49,13 @@ The Extension stores the following settings on the user's device (`chrome.storag
 - **`colorPickerHexHash`** (boolean, default true): whether to include the leading `#` when copying in HEX format.
 - **`popupLastTab`** (string, one of `"tune"` / `"youtube"` / `"x"` / `"instagram"` / `"tiktok"` / `"picker"` / `"settings"`): the last tab the popup had open. Used to restore the popup state on next launch. Legacy value `"assist"` is auto-migrated to `"tune"`.
 
-These values are normally stored on the device. When settings sync is enabled, the settings described in Exception 5 are also saved to browser sync storage.
+These values are normally stored on the device. When settings sync is enabled, the settings described in Exception 4 are also saved to browser sync storage.
 
 **On Chrome**, the Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled. **On Firefox**, the current gain value is held only in the in-page audio pipeline's memory (see "Tab audio access" below) and is likewise never persisted.
 
 ## Settings file export and import
 
-Only when you operate the controls in **07 Settings**, the Extension saves feature settings, EQ, blocked channels, color history and selected tabs as a JSON file on your device, or imports a file you choose. Authentication, destination accounts, caches, sync on/off and on-site overlay positions are excluded. The file is not sent to the developer or an external server. When settings sync is on, imported entries covered by Exception 5 are saved to the browser sync service.
+Only when you operate the controls in **07 Settings**, the Extension saves feature settings, EQ, blocked channels, color history and selected tabs as a JSON file on your device, or imports a file you choose. Authentication, destination accounts, caches, sync on/off and on-site overlay positions are excluded. The file is not sent to the developer or an external server. When settings sync is on, imported entries covered by Exception 4 are saved to the browser sync service.
 
 ## Tab audio access
 
@@ -69,37 +69,17 @@ While the Loupe master toggle is ON, the Extension uses the `chrome.tabs.capture
 
 ## Data sharing
 
-When settings sync is enabled, the settings described in Exception 5 are shared with the browser provider’s sync service. Data is not shared for advertising or analytics. What you submit through the contact form is handled solely by the developer's (Kagayoi) support desk in order to reply to you.
+When settings sync is enabled, the settings described in Exception 4 are shared with the browser provider’s sync service. Data is not shared for advertising or analytics. What you submit through the contact form is handled solely by the developer's (Kagayoi) support desk in order to reply to you.
 
 ## Network communication
 
-The Extension does not communicate with any external servers, with the seven explicit exceptions listed below.
+The Extension does not communicate with any external servers, with the six explicit exceptions listed below.
 
 ### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
 
 When the Instagram / TikTok cleaner's "Show download button on images" sub-feature (opt-in, default OFF) is enabled, an image GET is issued only at the moment the user clicks the download button, and only against each site's official CDN (Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`; TikTok: `p<digits>.tiktokcdn.com` / `p<digits>.tiktokcdn-us.com`). These are the same domains the browser already loads via `<img>` tags. The fetch uses `credentials: "omit"` (no cookies), `redirect: "manual"` (blocks redirect-based third-party transmission), and `referrerPolicy: "no-referrer"` (no referrer). Proxy fetches to other origins are blocked by a hostname allowlist (YouTube does not provide this feature). Downloaded images are saved locally via Blob URL + `<a download>` only; nothing is transmitted externally.
 
-### Exception 2: Connection monitor (YouTube Enhancements sub-feature)
-
-When the YouTube Enhancements's "Connection monitor" sub-feature (`searchFixerFeatures.connectionMonitor`, opt-in, default OFF) is enabled **and** the user is actively viewing a YouTube live stream, the Extension issues round-trip-time (RTT) measurement fetches to the two public health-check endpoints below every 5 seconds. These measurements feed the in-player HUD that helps the user diagnose buffering causes (their own network / device performance / YouTube CDN / international routing / etc.).
-
-- `https://www.gstatic.com/generate_204` — RTT to a Google edge endpoint
-- `https://speed.cloudflare.com/__down?bytes=10` — RTT to a Cloudflare endpoint (international-route baseline)
-
-These fetches run with the following privacy controls:
-
-- `mode: "no-cors"`: the response body is discarded without being read or parsed. The Extension only measures the round-trip time via `performance.now()` deltas
-- `credentials: "omit"`: no cookies are sent
-- `referrerPolicy: "no-referrer"`: no referrer is sent
-- `AbortSignal.timeout(4500)`: every request is forcibly aborted after 4.5 seconds
-
-Requests run in the extension background, and only the measured RTT numbers are returned to the page-side component. The sender, enabled settings, and current video are checked. Turning the feature off, navigating away, or closing the tab cancels pending authorization and requests. Redirect destinations are not followed.
-
-**The only information conveyed to the endpoints is "the fact that Vuora is ON" and "the approximate time the user is viewing a live stream."** No user identifier, cookies, YouTube watch history, channel names, video IDs, or other personal data are transmitted (the user's IP address inevitably reaches the destination server as part of the HTTP request protocol, but this is the same property as any ordinary web browsing). The destination URLs are hard-coded constants in `actions.js` and cannot be changed by any user action or setting (a unit test asserts the URLs are fixed). Both endpoints are public measurement endpoints operated by Google and Cloudflare; the Extension does **not** operate any server of its own.
-
-When the connection-monitor sub-feature is OFF, when the YouTube Enhancements master toggle is OFF, or when the user is **not** on a YouTube live stream (e.g. watching a VOD or browsing any other page), **none of these fetches are issued**. Measured RTT values are held only in a content-script-scope memory ring buffer (at most 6 samples / 30 seconds of data) and are not persisted. They are discarded immediately when the master toggle / sub-feature is turned OFF or the overlay is removed.
-
-### Exception 3: Send to Gemini Notebook (YouTube Enhancements sub-feature)
+### Exception 2: Send to Gemini Notebook (YouTube Enhancements sub-feature)
 
 When the YouTube Enhancements' "Send to Gemini Notebook" sub-feature (`searchFixerFeatures.notebookLmSend`, opt-in, default OFF) is enabled, the Extension communicates with Google Gemini Notebook (`https://notebooklm.google.com`) as follows.
 
@@ -123,7 +103,7 @@ Because Gemini Notebook has no public API, the Extension uses the internal endpo
 
 When the sub-feature is OFF or the YouTube Enhancements master toggle is OFF, the send button is not rendered and **none of these requests are issued**.
 
-### Exception 4: Contact form
+### Exception 3: Contact form
 
 Only when you press "Contact support" at the bottom of the settings popup and submit the form does the Extension send the following to Kagayoi Support (`https://support.kagayoi.com`). No such request happens unless you press the button.
 
@@ -132,11 +112,11 @@ Only when you press "Contact support" at the bottom of the settings popup and su
 
 On first use, the six-digit code delivered by email is sent to Kagayoi Support to verify you. After verification, Kagayoi Support stores the inquiry and replies so that you and support staff can access them. The contact authentication session (access token, email address, expiry) is kept in the extension's `localStorage`; the verification code itself is never stored. The URL or content of pages you browse, captured images, and your extension settings are never sent.
 
-### Exception 5: Settings sync across PCs
+### Exception 4: Settings sync across PCs
 
 “Sync settings across PCs” is OFF by default. When enabled on each PC, feature toggles, sub-features, audio/equalizer, video/loupe settings, blocked channels, and color copy format are stored in the browser’s storage.sync. If browser sync is enabled, the browser provider (Google for Chrome, Mozilla for Firefox) shares them with PCs using the same browser and account. Nothing is sent to the developer’s server. Authentication, destination accounts, account caches, color history, selected popup tabs, HUD positions, browsing URLs, page content, audio, and images are excluded. Update timestamps, logical counters, a randomly generated extension device ID, and deletion records are also synced to resolve conflicts. The ID is not derived from hardware names or account information and is not used for advertising or analytics. The opt-in switch and applied-state bookkeeping remain local. Turning sync off stops this PC from sending or applying settings, but does not delete data already in browser sync storage.
 
-### Exception 6: Additional YouTube page and image retrieval (YouTube Enhancements sub-features)
+### Exception 5: Additional YouTube page and image retrieval (YouTube Enhancements sub-features)
 
 The following read-only retrieval occurs only while the YouTube Enhancements master toggle and the relevant sub-feature are ON (each sub-feature is opt-in and defaults to OFF).
 
@@ -149,7 +129,7 @@ These page requests are GETs to the current YouTube page's origin. They use `cre
 For grid thumbnail selection, the Extension sends HEAD requests to `https://i.ytimg.com/vi/<video-ID>/maxresdefault.jpg` or `hqdefault.jpg`, using `credentials: "omit"`, `redirect: "manual"`, and `referrerPolicy: "no-referrer"`. Selected images are displayed through ordinary image requests to the same CDN, falling back to `mqdefault.jpg` if loading fails. Displayed images also use `no-referrer`. The CDN receives the video ID and IP address; cookies for displayed images follow normal browser controls.
 
 Country classifications are cached in page memory and `sessionStorage` (stored entries are accepted for seven days when read); subscription lists and thumbnail information are cached in `sessionStorage` (valid for 24 hours). Cached information includes classifications, channel names, links, avatar URLs, channel IDs, thumbnail URLs, and retrieval timestamps. It stays on the device and is not sent through settings sync or to the developer's server. Turning a feature OFF does not delete saved caches. Turning the master OFF cancels its page requests. Turning the left-navigation or grid sub-feature OFF also cancels its corresponding requests. After the foreign-channel sub-feature is turned OFF, no new lookups start; remaining requests are canceled at the next queue-processing step, so an already started lookup may finish. Country lookups are also canceled on navigation to an unsupported page, and grid retrieval on leaving the channel list. Page exit or extension context invalidation cancels ongoing page requests and grid HEAD requests.
-### Exception 7: Amazon Subscribe & Save price retrieval
+### Exception 6: Amazon Subscribe & Save price retrieval
 
 While "Amazon Subscribe & Save totals" is ON (opt-in, default OFF), if the list at `https://www.amazon.co.jp/auto-deliveries` has no prices, the Extension automatically reads the linked delivery management pages to total unit price × quantity. If a management page also omits an item's price, as can happen for next month's and later deliveries, it reads the subscription information to find the product link, then checks the product page's current Subscribe & Save price against the item's discount rate. Only for individual products whose current price is also unavailable, it reads that subscription's delivery history and previous order details, then multiplies the same product's previous unit price by the upcoming delivery quantity. Order totals and other products' prices are not used. Delivery prices take priority. Current-price estimates are labeled "Estimated total (current prices)"; estimates using a previous price are labeled "Estimated total (includes previous prices)". The billed amount may change and coupons are not included. If the history or product cannot be verified, or prices and quantities are not available for every item, no partial total or substitute zero is shown.
 

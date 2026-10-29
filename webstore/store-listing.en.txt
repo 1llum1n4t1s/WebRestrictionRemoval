@@ -18,8 +18,8 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
 
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
-  YouTube Enhancements offers 39 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, hiding "Most relevant" in Subscriptions, live-stream connection monitor, live-latency reduction, and quality / playback-speed / player-volume buttons).
-  Detailed player settings let you choose visible buttons, their values, and live catch-up behavior. Choose quality and numeric values from dropdowns; quality, speed, and volume buttons apply when clicked. Assign shortcuts in your browser's extension settings.
+  YouTube Enhancements offers 38 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, hiding "Most relevant" in Subscriptions, live-latency reduction, and quality / playback-speed / player-volume buttons).
+  All fixed quality, speed, and volume choices appear when their feature is enabled and apply when clicked. Detailed settings control live catch-up behavior and the visibility of standard volume controls. Assign shortcuts in your browser's extension settings.
 
 · 🐦 X cleaner (opt-in, default OFF)
   Nine sub-features that hide distracting UI on X (formerly Twitter).
@@ -92,7 +92,7 @@ The "07 Settings" tab brings together browser settings sync and JSON export/impo
 · Settings are stored on your device (chrome.storage.local). Optional settings sync shares eligible settings through the browser's sync service.
 · Page content and tab audio are not collected or transmitted for advertising, analytics, or telemetry.
 · Only when you submit the optional contact form are your email address, optional name, inquiry content, verification code, and related support details sent to Kagayoi Support.
-· Other external communication is limited to user-initiated or opt-in Instagram / TikTok image retrieval, the YouTube live connection monitor, sending video URLs to Gemini Notebook, browser settings sync, subscription channel thumbnails, and Amazon Subscribe & Save price retrieval.
+· Other external communication is limited to user-initiated or opt-in Instagram / TikTok image retrieval, sending video URLs to Gemini Notebook, browser settings sync, subscription channel thumbnails, and Amazon Subscribe & Save price retrieval.
 · Amazon price retrieval runs only while the feature is ON, using read-only requests with Amazon authentication cookies to the same https://www.amazon.co.jp origin. Amazon receives delivery, subscription, history, and order identifiers, product URLs, and your IP address. Orders and deliveries are not changed, and nothing is sent to the developer's server. Results stay only in page memory; turning the feature OFF or navigating away cancels requests and discards results.
   (When the Instagram / TikTok image download button is ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
 · While Volume Booster is in use, tab audio data is only amplified and re-output through an AudioContext; no recording, storage, or external transmission is performed.
@@ -170,10 +170,10 @@ To tune the readability, audio, and continuity of the page you are viewing, usin
   None of these read, modify, or transmit the page DOM (Video Gamma / Remove video black bars only attach a filter / transform to <video>; they do not read or save video data).
 
   *://*.youtube.com/*:
-  Required for YouTube Enhancements (39 sub-features including Shorts removal, subscriptions enhancements, the connection monitor, live-latency reduction, and quality / speed / volume buttons). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view use DOM/CSS operations. Player controls also use YouTube's in-page player API. Nothing read is transmitted off-device.
+  Required for YouTube Enhancements (38 sub-features including Shorts removal, subscriptions enhancements, live-latency reduction, and quality / speed / volume buttons). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view use DOM/CSS operations. Player controls also use YouTube's in-page player API. Nothing read is transmitted off-device.
 
   *://www.amazon.co.jp/auto-deliveries*:
-  Required to show Amazon recurring-delivery totals. The script reads unit prices and quantities in Manage pages, or `subscription-price` on legacy monthly pages, and inserts the total into the same page. Nothing read is transmitted off-device.
+  Required to show Amazon recurring-delivery totals. The script reads delivery items and quantities in Manage pages, fills missing unit prices through read-only requests to the same Amazon origin, and inserts a total when all items are accounted for. It hides totals when completeness cannot be confirmed, including on legacy monthly pages. Nothing is sent to the developer server.
 
   *://www.amazon.co.jp/*:
   Required for the Amazon jump-to-ranking button + Amazon seller / shipper badge.

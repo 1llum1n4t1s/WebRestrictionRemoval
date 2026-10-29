@@ -42,7 +42,7 @@
 - YouTube: `ytd-channel-renderer` / `ytd-live-chat-frame` / `ytd-shelf-renderer` 等
 - Instagram: aria-label / role / data-pagelet ベース（難読化 class 非依存）
 - TikTok: `[class*="RightPanelContainer"]` / `[class*="DivCommentListContainer"]`
-- Amazon: `[data-delivery-type]` / `.subscription-price`
+- Amazon: 配送管理画面は `DELIVERY_SECTION_SELECTOR`（`[data-testid^="desktop-delivery-card-list-"]`）と `DELIVERY_PRICE_SELECTOR`（`[data-testid="product-price"]`）、明細・数量の検出を確認。従来画面は `SECTION_SELECTOR`（`[data-delivery-type]`）で検出するが、全明細の完全性・単価・数量を確認できないため合計を表示しない。
 
 確認手順:
 1. ユーザーから「該当ページのスクリーンショット」 + 「DevTools Elements パネルの該当 selector のスクリーンショット」を取得

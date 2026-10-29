@@ -11,7 +11,7 @@ All features start OFF — opt in only to what you need. Normal browsing assista
 
 | Feature | Description |
 |---------|-------------|
-| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / connection monitor / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / reduce live latency / quality, speed, and volume buttons / send to Gemini Notebook and more — **39 sub-features** |
+| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / reduce live latency / quality, speed, and volume buttons / send to Gemini Notebook and more — **38 sub-features** |
 | 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" (**9 sub-features**) |
 | 📦 **Amazon Subscribe & Save monthly total** | Shows unit price × quantity totals, including future deliveries whose prices are not listed. Retrieves current subscription prices and labels reference totals; previous-order prices are identified when used as a fallback. Legacy monthly pages remain supported |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
@@ -46,16 +46,16 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 1. Click the toolbar icon to open the popup.
 2. **Turn ON only the master toggles you need** (everything is OFF by default).
-3. Tune each feature in the popup (the 39 YouTube Enhancements sub-features, Volume Booster slider, etc.).
+3. Tune each feature in the popup (the 38 YouTube Enhancements sub-features, Volume Booster slider, etc.).
 4. Settings are persisted across sessions.
 
-The YouTube watch-page category includes live-latency reduction and buttons for quality, playback speed, and player volume. Open each feature's detailed settings to choose which buttons appear, their values, and live catch-up behavior. Numeric values and quality levels use dropdowns. Quality, speed, and volume buttons apply their values when clicked. Assign shortcuts in your browser's extension settings.
+The YouTube watch-page category includes live-latency reduction and buttons for quality, playback speed, and player volume. All fixed quality, speed, and volume choices appear when their feature is enabled and apply when clicked. Detailed settings control live catch-up behavior and the visibility of standard volume controls. Assign shortcuts in your browser's extension settings.
 
-The connection monitor and archive broadcast time appear as labeled sections in the same overlay as quality, playback speed, and volume. Each feature can be enabled independently, including the monitor or broadcast time on its own. Separate drag and collapse controls are removed; scroll within the shared overlay when needed.
+Archive broadcast time appears as a labeled section in the same overlay as quality, playback speed, and volume. Each feature can be enabled independently, including broadcast time on its own. Separate drag and collapse controls are removed; scroll within the shared overlay when needed.
 
 ### Popup tabs
 - **Tune**: Audio / Video / Amazon features and their settings
-- **YouTube**: 39 YouTube Enhancements sub-features
+- **YouTube**: 38 YouTube Enhancements sub-features
 - **X**: 9 X cleaner sub-features
 - **Instagram**: 12 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
@@ -68,7 +68,7 @@ The YouTube / X / Instagram / TikTok master toggles are in their respective tabs
 
 ## 🔒 Privacy
 
-- **Normal processing stays on-device** — external communication is limited to seven exceptions: Instagram / TikTok image retrieval, the YouTube connection monitor, Send to Gemini Notebook, the contact form, optional settings sync, subscription channel thumbnails, and same-origin Amazon price retrieval for deliveries whose prices are not listed.
+- **Normal processing stays on-device** — external communication is limited to six exceptions: Instagram / TikTok image retrieval, Send to Gemini Notebook, the contact form, optional settings sync, subscription channel thumbnails, and same-origin Amazon price retrieval for deliveries whose prices are not listed.
 - **Personal information only for support** — the email address and message entered in the contact form are sent to Kagayoi Support only when you submit it.
 - **Opt-in by design** — everything is OFF on install; only what you enable runs.
 - **Open source** — code is published in this repository for anyone to inspect.
@@ -103,7 +103,7 @@ See the [Privacy Policy](docs/privacy-policy.en.md) for details.
 ## 🛠️ For developers
 
 Build / test / CI / architecture details are in [CONTRIBUTING.md](CONTRIBUTING.md).
-LLM-oriented implementation conventions and patterns are in [CLAUDE.md](CLAUDE.md).
+LLM-oriented working conventions are in [AGENTS.md](AGENTS.md), and the design source of truth is [DESIGN.md](DESIGN.md).
 
 ---
 

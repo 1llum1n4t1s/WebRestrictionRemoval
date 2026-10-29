@@ -16,9 +16,9 @@ A productivity helper that bundles 12 categories of features into a single popup
 
 ■ Features available on Firefox
 
-🔹 YouTube Enhancements (39 sub-features)
-Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, hiding "Most relevant" in Subscriptions, subscription channel expansion (subs feed → grid + lazy thumbnail), live-stream connection monitor, and more granular controls for YouTube's verbose UI.
-Reduce live latency and switch video quality, playback speed, and player volume. The connection monitor and archive broadcast time also appear as labeled sections in the shared overlay.
+🔹 YouTube Enhancements (38 sub-features)
+Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, hiding "Most relevant" in Subscriptions, subscription channel expansion (subs feed → grid + lazy thumbnail), and more granular controls for YouTube's verbose UI.
+Reduce live latency and switch video quality, playback speed, and player volume. Archive broadcast time also appears as a labeled section in the shared overlay.
 
 🔹 X Cleaner (9 sub-features)
 Hide the right pane (widening the timeline into it) / trends / who to follow / messages dock / promoted posts / Premium upsells / Grok / engagement counts, and open Home on the "Following" tab. Selectors are structural data-testid matches only, so they do not depend on the display language.
@@ -58,7 +58,7 @@ EyeDropper API based. HEX / RGB / HSL formats with up to 20 history entries stor
 The "07 Settings" tab brings together browser settings sync and JSON export/import. Save all feature settings, EQ, blocked channels, color history and selected tabs, and transfer them to another PC or between Chrome and Firefox. Sync on/off, destination accounts, authentication, caches and on-site overlay positions remain device-specific. Imported feature settings also sync when sync is on. The popup has a refreshed, calmer design in Japanese and English, with light and dark themes.
 
 ■ Privacy
-Settings are stored in `browser.storage.local`; optional settings sync shares eligible settings through the browser's sync service. Browsing-assistance data is not sent for advertising, analytics, or telemetry. Contact details are sent to Kagayoi Support only when you submit the optional form; image retrieval, subscription channel thumbnails, the connection monitor, Gemini Notebook, and Amazon Subscribe & Save price retrieval use only the network requests required by the features you explicitly operate or enable. Amazon retrieval runs only while ON, using read-only requests with Amazon authentication cookies to the same https://www.amazon.co.jp origin. Amazon receives delivery, subscription, history, and order identifiers, product URLs, and your IP address. Orders and deliveries are not changed, and nothing is sent to the developer's server. Results stay only in page memory; turning the feature OFF or navigating away cancels requests and discards results. See docs/privacy-policy.en.md for details.
+Settings are stored in `browser.storage.local`; optional settings sync shares eligible settings through the browser's sync service. Browsing-assistance data is not sent for advertising, analytics, or telemetry. Contact details are sent to Kagayoi Support only when you submit the optional form; image retrieval, subscription channel thumbnails, Gemini Notebook, and Amazon Subscribe & Save price retrieval use only the network requests required by the features you explicitly operate or enable. Amazon retrieval runs only while ON, using read-only requests with Amazon authentication cookies to the same https://www.amazon.co.jp origin. Amazon receives delivery, subscription, history, and order identifiers, product URLs, and your IP address. Orders and deliveries are not changed, and nothing is sent to the developer's server. Results stay only in page memory; turning the feature OFF or navigating away cancels requests and discards results. See docs/privacy-policy.en.md for details.
 
 ■ Requirements
 Firefox 142 or later.
