@@ -1302,57 +1302,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     const bindings = [];
     const failedInputs = new Set();
     const status = document.createElement("p"); status.className = "fr-desc"; status.setAttribute("role", "status");
-    const groups = { liveLatency: "latency", playbackQuality: "quality", playbackRate: "rate", playerVolume: "volume" };
-    const numericChoices = (group, key) => {
-      if (group === "volume") return Array.from({ length: 101 }, (_, i) => i);
-      if (group === "rate") return [.1, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 16];
-      if (key === "playbackRate") return [1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2, 3, 4, 5, 6, 8, 10, 12, 16];
-      if (key === "smoothThreshold") return [0, .5, 1, 2, 3, 5, 10, 15, 20, 30, 60, 120];
-      return [1, 3, 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 999999];
-    };
-    const addNumericOption = (input, group, key, value) => {
+    const groups = { liveLatency: "latency", playerVolume: "volume" };
+    const addNumericOption = (input, key, value) => {
       if (Array.from(input.options).some((option) => option.value === String(value))) return;
       const option = document.createElement("option");
       option.value = String(value);
-      option.textContent = `${value}${group === "rate" || key === "playbackRate" ? "x" : group === "volume" ? "%" : ""}`;
+      option.textContent = `${value}${key === "playbackRate" ? "x" : ""}`;
       input.append(option);
     };
-    const refresh = () => { for (const { input, group, key, index } of bindings) {
-      const value = index === undefined ? settings[group][key] : settings[group][key][index];
+    const refresh = () => { for (const { input, group, key } of bindings) {
+      const value = settings[group][key];
       // 同期・バックアップで復元された既存の値も、選択肢へ残して表示する。
-      if (typeof value === "number") addNumericOption(input, group, key, value);
+      if (typeof value === "number") addNumericOption(input, key, value);
       if (input.type === "checkbox") input.checked = value;
-      else input.value = key === "values" && !settings[group].enabled[index] ? "disabled" : value;
+      else input.value = value;
     } };
-    const add = (parent, group, key, index) => {
-      const fallback = index === undefined ? settings[group][key] : settings[group][key][index];
-      const buttonSlot = key === "values" && index !== undefined;
+    const add = (parent, group, key) => {
+      const fallback = settings[group][key];
       const label = document.createElement("label"); label.className = "player-settings-row";
       const text = document.createElement("span");
-      text.textContent = index === undefined ? i18n("yp_" + key) : i18n("yp_buttonValue", String(index + 1));
+      text.textContent = i18n("yp_" + key);
       const input = document.createElement(typeof fallback === "boolean" ? "input" : "select");
-      if (buttonSlot) {
-        const disabled = document.createElement("option");
-        disabled.value = "disabled";
-        disabled.textContent = i18n("yp_disabled");
-        input.append(disabled);
-      }
-      if (typeof fallback === "string") for (const value of spec.QUALITY_VALUES) { const option = document.createElement("option"); option.value = value; option.textContent = ({ tiny: "144p", small: "240p", medium: "360p", large: "480p", hd720: "720p", hd1080: "1080p", hd1440: "1440p", hd2160: "2160p", auto: i18n("yp_auto") })[value]; input.append(option); }
-      else if (typeof fallback === "number") {
+      if (typeof fallback === "number") {
         input.required = true;
-        for (const value of numericChoices(group, key)) addNumericOption(input, group, key, value);
+        for (const value of spec.NUMERIC_CHOICES[key]) addNumericOption(input, key, value);
       } else input.type = "checkbox";
       let requestSequence = 0;
       let appliedSequence = 0;
       let statusSequence = 0;
       input.addEventListener("change", async () => {
         if (!input.checkValidity()) { input.reportValidity(); refresh(); return; }
-        const disabled = buttonSlot && input.value === "disabled";
         const value = input.type === "checkbox" ? input.checked : typeof fallback === "number" ? Number(input.value) : input.value;
-        // 値と有効状態は同じパッチで保存し、無効化では以前の値を保持する。
-        const patch = buttonSlot
-          ? { [group]: { enabled: { [index]: !disabled }, ...(!disabled ? { values: { [index]: value } } : {}) } }
-          : { [group]: { [key]: index === undefined ? value : { [index]: value } } };
+        const patch = { [group]: { [key]: value } };
         const requestRevision = settingsRevision;
         const sequence = ++requestSequence;
         let saveFailed = false;
@@ -1373,7 +1354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         refresh();
       });
-      bindings.push({ input, group, key, index }); label.append(text, input); parent.append(label);
+      bindings.push({ input, group, key }); label.append(text, input); parent.append(label);
     };
     for (const [feature, group] of Object.entries(groups)) {
       const toggle = featureInputs.get(feature); if (!toggle) continue;
@@ -1381,9 +1362,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const summary = document.createElement("summary"); summary.textContent = i18n("yp_details"); details.append(summary);
       const note = document.createElement("p"); note.className = "fr-desc"; note.textContent = i18n(group === "latency" ? "yp_latencyNote" : "yp_buttonNote"); details.append(note);
       for (const [key, value] of Object.entries(settings[group])) {
-        if (key === "enabled" && Array.isArray(value)) continue;
-        if (Array.isArray(value)) value.forEach((_, index) => add(details, group, key, index));
-        else add(details, group, key);
+        if (!Array.isArray(value)) add(details, group, key);
       }
       toggle.closest(".feature-row").after(details);
     }

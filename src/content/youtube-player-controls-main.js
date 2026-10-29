@@ -18,7 +18,6 @@
     let automatic = null;
     let manualRate = false;
     let controls = null;
-    let signature = "";
     let ends = [];
     let lastSkip = 0;
     let copiedUntil = 0;
@@ -51,7 +50,6 @@
     function clearUI() {
       controls?.remove();
       controls = null;
-      signature = "";
       buttons.clear();
       currentValues.clear();
       player?.classList.remove("__cpa-ypc-hide-slider", "__cpa-ypc-hide-volume");
@@ -163,10 +161,8 @@
       const area = player.querySelector(selector) || (/^\/embed\//.test(location.pathname) &&
         document.querySelector(`#player-controls player-fullscreen-action-menu .quick-actions-wrapper > .__cpa-ypc-overlay > ${selector}`));
       if (!area) return;
-      const nextSignature = JSON.stringify(config);
-      if (controls?.parentElement === area && signature === nextSignature) return;
+      if (controls?.parentElement === area) return;
       clearUI();
-      signature = nextSignature;
       controls = document.createElement("div");
       controls.className = "__cpa-ypc-controls";
       for (const [kind, feature] of [["quality", "playbackQuality"], ["rate", "playbackRate"], ["volume", "playerVolume"]]) {
@@ -190,7 +186,6 @@
         container.append(heading, choices);
         const order = kind === "quality" ? [0, 1, 2, 3, 4, 5, 6, 8, 7] : kind === "rate" ? [0, 1, 2, 3, 4, 5, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15] : group.values.map((_value, index) => index);
         for (const index of order) {
-          if (!group.enabled[index]) continue;
           const value = group.values[index];
           const label = kind === "quality" ? (value === "auto" ? config.labels.auto : qualityLabels[value]) : kind === "rate" ? `${value}x` : `${value}%`;
           const button = createButton(label, `${config.labels[kind]}: ${label}`, () => command(kind, index));
@@ -211,11 +206,12 @@
         }
         controls.append(group);
       }
-      area.append(controls);
+      area.prepend(controls);
     }
 
     function updateSelection() {
       const quality = call("getPlaybackQuality");
+      const preferredQuality = call("getPreferredQuality") || quality;
       const volume = call("isMuted") === true ? 0 : call("getVolume");
       const values = {
         quality: quality === "auto" ? config.labels.auto : (qualityLabels[quality] || "—"),
@@ -229,7 +225,7 @@
         const [kind, index] = key.split(":");
         if (index === undefined) continue;
         const value = config.settings[kind].values[Number(index)];
-        const active = kind === "quality" && value === "auto" ? call("getPreferredQuality") === "auto" : value === (kind === "quality" ? quality : kind === "rate" ? video.playbackRate : volume);
+        const active = value === (kind === "quality" ? preferredQuality : kind === "rate" ? video.playbackRate : volume);
         button.classList.toggle("__cpa-ypc-active", active);
         button.setAttribute("aria-pressed", String(active));
       }

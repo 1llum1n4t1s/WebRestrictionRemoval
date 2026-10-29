@@ -10,6 +10,8 @@ const read = (name) => fs.readFileSync(path.join(__dirname, "../src", name), "ut
 const copy = (value) => JSON.parse(JSON.stringify(value));
 const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(setImmediate); };
 
+const youtubeSender = { id: "test-extension", url: "https://www.youtube.com/watch?v=test", tab: { id: 1 }, frameId: 0 };
+
 const host = async (initial = {}, firefox = false) => {
   const data = copy(initial);
   const listeners = [];
@@ -134,6 +136,43 @@ test("自動反映中に stream が消失してもキャプチャを新規要求
   assert.equal(res.error, "volume-stream-ended");
 });
 
+test("動画ページの設定は両ブラウザで部分更新し、同時操作と無効なボタンの値を保持する", async () => {
+  for (const firefox of [false, true]) {
+    const h = await host({ searchFixerEnabled: true, searchFixerFeatures: { hideComments: true, homeGrid: true } }, firefox);
+    const feature = (key, value) => h.message({ action: "APPLY_YOUTUBE_WATCH_FEATURE", key, value, syncGeneration: null }, youtubeSender);
+    const results = await Promise.all([feature("playbackRate", true), feature("playerVolume", true), feature("hideComments", false)]);
+    assert.ok(results.every((result) => result.ok));
+    assert.equal(h.data.searchFixerFeatures.playbackRate, true);
+    assert.equal(h.data.searchFixerFeatures.playerVolume, true);
+    assert.equal(h.data.searchFixerFeatures.hideComments, false);
+    assert.equal(h.data.searchFixerFeatures.homeGrid, true);
+    const save = (data) => h.message({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data, syncGeneration: null }, youtubeSender);
+    assert.equal((await save({ rate: { values: { 0: 1.35 }, enabled: { 0: true } } })).ok, true);
+    assert.equal((await save({ rate: { enabled: { 0: false } }, volume: { hideSlider: true } })).ok, true);
+    assert.equal(h.data.youtubePlayerSettings.rate.values[0], 1.35);
+    assert.equal(h.data.youtubePlayerSettings.rate.enabled[0], false);
+    assert.equal(h.data.youtubePlayerSettings.volume.hideSlider, true);
+  }
+});
+
+test("動画ページの設定は送信元・カテゴリ・型・マスター・同期世代を検証する", async () => {
+  const h = await host({ searchFixerEnabled: true, [K.SETTINGS_SYNC_APPLIED]: "current" });
+  const feature = { action: "APPLY_YOUTUBE_WATCH_FEATURE", key: "hideComments", value: true, syncGeneration: "current" };
+  for (const sender of [{}, { ...youtubeSender, id: "other" }, { ...youtubeSender, url: "https://example.com/watch" }]) {
+    assert.equal((await h.message(feature, sender)).error, "sender-rejected");
+    assert.equal((await h.message({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data: {}, syncGeneration: "current" }, sender)).error, "sender-rejected");
+  }
+  for (const patch of [{ key: "homeGrid" }, { key: "unknown" }, { value: "true" }]) {
+    assert.equal((await h.message({ ...feature, ...patch }, youtubeSender)).error, "invalid-feature");
+  }
+  assert.equal((await h.message({ ...feature, syncGeneration: null }, youtubeSender)).error, "stale-settings");
+  assert.equal(h.writes.length, 0);
+  h.data.searchFixerEnabled = false;
+  assert.equal((await h.message(feature, youtubeSender)).error, "feature-disabled");
+  assert.equal((await h.message({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data: { volume: { hideSlider: true } }, syncGeneration: "current" }, youtubeSender)).error, "feature-disabled");
+  assert.equal(h.writes.length, 0);
+});
+
 test("popup の各操作は該当項目だけを読み込み時の世代とともに送信する", async () => {
   const source = read("popup/popup.js");
   const controls = new Map();
@@ -157,7 +196,14 @@ test("popup の各操作は該当項目だけを読み込み時の世代とと�
   const featureBindings = source.slice(featureStart, source.indexOf("  // ----- DOM 構築", featureStart));
   for (const name of new Set((bindings + featureBindings).match(/\$\w+/g))) context[name] = control(name);
   for (const name of new Set((bindings + featureBindings).match(/update\w+/g))) context[name] = () => {};
-  for (const name of ["featureInputs", "igFeatureInputs", "ttFeatureInputs", "xFeatureInputs"]) {
+  // 定義された map を全て実行対象にし、追加時の保存先・change 登録漏れも検知する。
+  const featureMaps = [...source.matchAll(/const\s+(\w*[Ff]eatureInputs)\s*=\s*new Map\(\)/g)].map((match) => match[1]);
+  const featureFields = {
+    featureInputs: "searchFixerFeatures", igFeatureInputs: "instagramCleanerFeatures",
+    ttFeatureInputs: "tiktokCleanerFeatures", xFeatureInputs: "xCleanerFeatures",
+  };
+  assert.deepEqual([...featureMaps].sort(), Object.keys(featureFields).sort());
+  for (const name of featureMaps) {
     context[name] = new Map([["one", control(name + "1")], ["two", control(name + "2")]]);
   }
   const applyStart = source.indexOf("  async function apply(patch)");
@@ -171,14 +217,23 @@ test("popup の各操作は該当項目だけを読み込み時の世代とと�
     ["$videoFillToggle", "videoFillEnabled"], ["$loupeToggle", "loupeEnabled"],
     ["$videoGammaSlider", "videoGammaValue"], ["$videoFillTargetSelect", "videoFillTarget"],
     ["$gridItemsSelect", "searchFixerGridItems"],
-    ["featureInputs1", "searchFixerFeatures"], ["igFeatureInputs1", "instagramCleanerFeatures"],
-    ["ttFeatureInputs1", "tiktokCleanerFeatures"], ["xFeatureInputs1", "xCleanerFeatures"],
   ]) {
     await control(name).handlers.change();
     const message = sent.at(-1);
     assert.deepEqual(Object.keys(message.data), [field], name);
-    if (field.endsWith("Features")) assert.deepEqual(message.data[field], { one: true });
     assert.equal(message.syncGeneration, "opened-at");
+  }
+  for (const name of featureMaps) {
+    for (const [key, input] of context[name]) {
+      assert.equal(typeof input.handlers.change, "function", `${name}.${key} の change 登録`);
+      input.checked = key === "one";
+      const before = sent.length;
+      await input.handlers.change();
+      assert.equal(sent.length, before + 1, `${name}.${key} は1回だけ保存する`);
+      const message = sent.at(-1);
+      assert.deepEqual(message.data, { [featureFields[name]]: { [key]: input.checked } });
+      assert.equal(message.syncGeneration, "opened-at");
+    }
   }
 });
 

@@ -1,66 +1,117 @@
+/* プレイヤー内の共通パネル。操作・現在値・設定の階層を揃える。 */
 .__cpa-ypc-overlay {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  min-width: 0;
-  max-width: 100%;
+  --ypc-accent: #ffffff;
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: 100%;
-  max-height: min(360px, 50vh);
-  box-sizing: border-box;
-  padding: 4px 10px;
-  overflow-y: auto;
-  background: rgb(0 0 0 / 80%);
-  border-radius: 4px;
-  scrollbar-width: none;
-  vertical-align: top;
-  color: #eee;
-  font: 12px / 1.4 sans-serif;
-}
-.__cpa-ypc-overlay[hidden], .__cpa-ypc-overlay [hidden] { display: none !important; }
-.__cpa-ypc-controls { display: flex; flex-direction: column; min-width: 0; }
-.__cpa-ypc-controls:not(:has(.__cpa-ypc-heading, button:not([hidden]))) { display: none; }
-.__cpa-ypc-player:not(:has(.__cpa-ypc-settings, .__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
-.__cpa-ypc-overlay:not(:has(> .__cpa-ypc-section:not(.__cpa-ypc-player), .__cpa-ypc-settings, .__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden])))) { display: none; }
-.__cpa-ypc-section { flex: none; min-width: 0; }
-.__cpa-ypc-section:not(.__cpa-ypc-player) ~ .__cpa-ypc-section,
-.__cpa-ypc-player:has(.__cpa-ypc-controls:not([hidden]) :is(.__cpa-ypc-heading, button:not([hidden]))) ~ .__cpa-ypc-section { border-top: 1px solid rgb(255 255 255 / 25%); }
-.__cpa-ypc-group { display: flex; align-items: stretch; min-width: 0; max-width: 100%; padding: 6px 0; }
-.__cpa-ypc-group + .__cpa-ypc-group { border-top: 1px solid rgb(255 255 255 / 25%); }
-.__cpa-ypc-heading {
+  bottom: calc(100% + 8px);
+  width: 100%;
+  max-height: var(--ypc-available-height, calc(100vh - 80px));
   display: flex;
-  flex: 0 0 104px;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  margin-right: 10px;
-  padding-right: 10px;
-  border-right: 1px solid rgb(255 255 255 / 25%);
-  font: 12px / 1.4 sans-serif;
-  color: #fff;
+  gap: 8px;
+  padding: 12px;
+  overflow: auto;
+  container-type: inline-size;
+  box-sizing: border-box;
+  border: 1px solid #ffffff24;
+  border-radius: 12px;
+  background: #00000099;
+  box-shadow: 0 8px 28px #0006;
+  color: #f5f5f5;
+  font: 12px / 1.5 system-ui, sans-serif;
+  text-align: left;
+  text-shadow: none;
+  white-space: normal;
+  scrollbar-width: thin;
+  scrollbar-color: #777777 transparent;
+  color-scheme: dark;
 }
-.__cpa-ypc-label { font-weight: 600; }
-.__cpa-ypc-current { color: #ffaaa5; font-variant-numeric: tabular-nums; }
-.__cpa-ypc-choices { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-width: 0; }
-.__cpa-ypc-live { flex-wrap: wrap; }
+.__cpa-ypc-overlay *, .__cpa-ypc-overlay *::before, .__cpa-ypc-overlay *::after { box-sizing: border-box; }
+.__cpa-ypc-overlay[hidden], .__cpa-ypc-overlay [hidden] { display: none !important; }
+/* YouTube の自動非表示より、設定中・キーボード操作中の表示を優先する。 */
+.ytp-chrome-bottom:has(> .__cpa-ypc-overlay:hover, > .__cpa-ypc-overlay:focus-within, > .__cpa-ypc-overlay .__cpa-ypc-settings[open]) { opacity: 1 !important; }
+.__cpa-ypc-controls { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.__cpa-ypc-player:has(> .__cpa-ypc-settings[open]) > .__cpa-ypc-controls { display: none; }
+.__cpa-ypc-controls:not(:has(.__cpa-ypc-heading, button:not([hidden]))) { display: none; }
+.__cpa-ypc-section { flex: none; min-width: 0; }
+.__cpa-ypc-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #ffffff12;
+  border-radius: 8px;
+  background: #ffffff06;
+}
+.__cpa-ypc-heading { display: flex; flex: 0 0 86px; flex-direction: column; gap: 3px; font: inherit; }
+.__cpa-ypc-label { color: #bdbdbd; font-size: 11px; font-weight: 500; }
+.__cpa-ypc-current { color: var(--ypc-accent); font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.__cpa-ypc-choices { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
+.__cpa-ypc-live { flex-wrap: wrap; gap: 6px; }
 .__cpa-ypc-live:not(:has(button:not([hidden]))) { display: none; }
-.__cpa-ypc-settings { padding: 6px 0; color: #eee; font: 12px / 1.4 sans-serif; }
-.__cpa-ypc-settings summary { cursor: pointer; font-weight: 600; }
-.__cpa-ypc-settings label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0; }
-.__cpa-ypc-settings select { max-width: 45%; color: #111; background: #fff; }
 .ytp-button.__cpa-ypc-button {
   width: auto;
-  min-width: 34px;
-  height: 32px;
-  padding: 0 6px;
-  font: inherit;
-  font-size: 12px;
-  color: #eee;
+  min-width: 42px;
+  height: 30px;
+  margin: 0;
+  padding: 0 9px;
+  border: 1px solid #ffffff24;
+  border-radius: 6px;
+  background: #ffffff08;
+  color: #eeeeee;
+  font: 12px / 28px system-ui, sans-serif;
+  text-shadow: none;
   white-space: nowrap;
+  cursor: pointer;
 }
-.ytp-button.__cpa-ypc-button.__cpa-ypc-active { color: #ff8983; }
+.ytp-button.__cpa-ypc-button:hover { border-color: #ffffff99; background: #ffffff14; }
+.ytp-button.__cpa-ypc-button.__cpa-ypc-active { border-color: var(--ypc-accent); background: #ffffff26; color: #ffffff; }
+.__cpa-ypc-settings { margin-bottom: 8px; border: 1px solid #ffffff24; border-radius: 8px; background: #00000014; color: #eeeeee; font: inherit; }
+.__cpa-ypc-settings summary { padding: 10px 12px; cursor: pointer; font-weight: 600; }
+.__cpa-ypc-settings > summary { position: sticky; top: -12px; z-index: 1; border-radius: 8px 8px 0 0; background: #000a; color: var(--ypc-accent); }
+.__cpa-ypc-settings[open] > summary { border-bottom: 1px solid #ffffff1a; }
+.__cpa-ypc-setting-list { display: grid; gap: 8px; padding: 10px; }
+.__cpa-ypc-quick-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px; margin: 8px 0; }
+.__cpa-ypc-quick-settings .__cpa-ypc-setting-row { min-height: 44px; height: 100%; }
+.__cpa-ypc-quick-settings .__cpa-ypc-setting-row small { display: none; }
+.__cpa-ypc-setting-item { min-width: 0; border: 1px solid #ffffff12; border-radius: 6px; background: #ffffff04; }
+.__cpa-ypc-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px; font: inherit; cursor: pointer; }
+.__cpa-ypc-setting-row > span { min-width: 0; overflow-wrap: anywhere; }
+.__cpa-ypc-setting-row small { display: block; margin-top: 4px; color: #bdbdbd; font-size: 11px; line-height: 1.5; }
+.__cpa-ypc-setting-row input[type="checkbox"] {
+  appearance: none;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid #888888;
+  border-radius: 20px;
+  background: #444444;
+  cursor: pointer;
+}
+.__cpa-ypc-setting-row input[type="checkbox"]::before { content: ""; display: block; width: 12px; height: 12px; margin: 2px; border-radius: 50%; background: #dddddd; }
+.__cpa-ypc-setting-row input:checked { background: var(--ypc-accent); border-color: var(--ypc-accent); }
+.__cpa-ypc-setting-row input:checked::before { transform: translateX(12px); background: #222222; }
+.__cpa-ypc-settings select { flex: 0 0 auto; max-width: 45%; min-height: 30px; padding: 3px 6px; border: 1px solid #888888; border-radius: 5px; background: #222222; color: #f5f5f5; font: inherit; }
+.__cpa-ypc-overlay :disabled { opacity: .55; cursor: wait; }
+.__cpa-ypc-advanced { border-top: 1px solid #ffffff12; }
+.__cpa-ypc-advanced summary { color: #bbbbbb; font-size: 11px; font-weight: 500; }
+.__cpa-ypc-advanced .__cpa-ypc-setting-row { padding-block: 6px; }
+.__cpa-ypc-save-status:not(:empty) { padding: 10px 0; color: #ffb8b5; }
+.__cpa-ypc-overlay :is(button, input, select, summary):focus-visible { outline: 2px solid var(--ypc-accent); outline-offset: 2px; }
+@container (min-width: 520px) { .__cpa-ypc-setting-list { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; } }
+@container (max-width: 360px) {
+  .__cpa-ypc-quick-settings { grid-template-columns: 1fr; }
+  .__cpa-ypc-group { flex-wrap: wrap; gap: 8px; }
+  .__cpa-ypc-heading { flex-basis: 100%; flex-direction: row; align-items: baseline; justify-content: space-between; }
+  .__cpa-ypc-choices { flex-basis: 100%; }
+}
+@media (forced-colors: active) {
+  .__cpa-ypc-setting-row input[type="checkbox"] { appearance: auto; }
+  .__cpa-ypc-setting-row input[type="checkbox"]::before { display: none; }
+  .ytp-button.__cpa-ypc-button.__cpa-ypc-active { outline: 2px solid Highlight; }
+}
 .__cpa-ypc-hide-slider .ytp-volume-panel,
 .__cpa-ypc-hide-slider .ytdVolumeControlsSliderContainer,
 /* 新しい埋め込み UI は標準操作欄が #movie_player の外側にある。 */

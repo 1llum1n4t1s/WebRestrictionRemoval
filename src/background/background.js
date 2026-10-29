@@ -3,7 +3,7 @@
 // manifest.firefox.json の background.scripts に actions.js を併記してあり、
 // background.js 実行時には既に評価済みなのでここでは skip する。
 if (typeof importScripts === "function") {
-  importScripts("/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js", "/src/background/connection-monitor.js");
+  importScripts("/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js");
 }
 
 // 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する
@@ -312,12 +312,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       await chrome.storage.local.set({ [key]: { ...PopupTabs.normalizeSubTabs(current[key]), ...patch } });
     }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false, error: "storage-failed" }));
     return true;
-  } else if (request.action === "APPLY_YOUTUBE_PLAYER_SETTINGS") {
-    if (!SenderCheck.isFromPopup(sender)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+  } else if (request.action === "APPLY_YOUTUBE_WATCH_FEATURE") {
+    if (!isFromYouTubeContentScript(sender, false, true)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    if (!SearchFixer.FEATURES.some((feature) => feature.category === "watch_page" && feature.key === request.key) || typeof request.value !== "boolean") {
+      sendResponse({ ok: false, error: "invalid-feature" }); return false;
+    }
     globalThis.enqueueSettingsWrite(async () => {
       const K = StorageKeys;
-      const current = await chrome.storage.local.get([K.YOUTUBE_PLAYER_SETTINGS, K.SETTINGS_SYNC_APPLIED]);
+      const current = await chrome.storage.local.get([K.SEARCH_FIXER_ENABLED, K.SEARCH_FIXER_FEATURES, K.SETTINGS_SYNC_APPLIED]);
       if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
+      if (current[K.SEARCH_FIXER_ENABLED] !== true) throw new Error("feature-disabled");
+      await chrome.storage.local.set({ [K.SEARCH_FIXER_FEATURES]: SearchFixer.mergeFeatures({ ...current[K.SEARCH_FIXER_FEATURES], [request.key]: request.value }) });
+    }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
+    return true;
+  } else if (request.action === "APPLY_YOUTUBE_PLAYER_SETTINGS") {
+    const fromPopup = SenderCheck.isFromPopup(sender);
+    if (!fromPopup && !isFromYouTubeContentScript(sender, false, true)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
+    globalThis.enqueueSettingsWrite(async () => {
+      const K = StorageKeys;
+      const current = await chrome.storage.local.get([K.YOUTUBE_PLAYER_SETTINGS, K.SETTINGS_SYNC_APPLIED, K.SEARCH_FIXER_ENABLED]);
+      if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
+      if (!fromPopup && current[K.SEARCH_FIXER_ENABLED] !== true) throw new Error("feature-disabled");
       const value = SearchFixer.PLAYER_CONTROLS.mergeSettings(current[K.YOUTUBE_PLAYER_SETTINGS], request.data);
       await chrome.storage.local.set({ [K.YOUTUBE_PLAYER_SETTINGS]: value });
     }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
@@ -908,6 +923,18 @@ let inFlightVolumeSettings = null;
 //          ③ ①の await 完了 → 古い storage 値を `cachedVolumeSettings` に代入 (上書き)
 //          ④ 古い値が以降のタブ切替で適用され、UI と挙動の乖離が発生
 let cacheSeqId = 0;
+// EQ_PRESET は popup の表示状態のみで、boost には EQ_GAINS が効くため含めない。
+const VOLUME_SETTINGS_KEYS = Object.freeze([
+  StorageKeys.VOLUME_BOOSTER_ENABLED,
+  StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
+  StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
+  StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+  StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
+  StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
+  StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
+  StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
+  StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
+]);
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効
@@ -924,17 +951,7 @@ async function autoApplyVolumeBooster(tabId) {
     if (inFlightVolumeSettings?.seqId !== seqAtFetch) {
       inFlightVolumeSettings = {
         seqId: seqAtFetch,
-        promise: chrome.storage.local.get([
-          StorageKeys.VOLUME_BOOSTER_ENABLED,
-          StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
-          StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-          StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
-          StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
-          StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
-          StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
-          StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
-          StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
-        ]),
+        promise: chrome.storage.local.get(VOLUME_SETTINGS_KEYS),
       };
     }
     const fetchState = inFlightVolumeSettings;
@@ -970,18 +987,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効、設定変化も無視
   // 音量関連キーいずれかが変化したら autoApplyVolumeBooster のキャッシュを invalidate
-  // (EQ_PRESET は popup の表示状態のみで boost には EQ_GAINS が効くため監視不要)
-  if (
-    StorageKeys.VOLUME_BOOSTER_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_LAST_GAIN in changes ||
-    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED in changes ||
-    StorageKeys.VOLUME_BOOSTER_EQ_GAINS in changes ||
-    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP in changes
-  ) {
+  if (VOLUME_SETTINGS_KEYS.some((key) => key in changes)) {
     cachedVolumeSettings = null;
     // /rere F-003: 進行中の autoApplyVolumeBooster の await が stale な fetch 結果で
     // cache を上書きする race を防ぐため seqId を進める (await 復帰時 seqId 不一致で破棄判定)
@@ -1141,7 +1147,6 @@ function normalizeSettings(settings) {
     videoFillMode: VideoFill.normalizeMode(settings?.videoFillMode),
     videoFillTarget: VideoFill.normalizeTarget(settings?.videoFillTarget),
     loupeEnabled: settings?.loupeEnabled === true,
-    // 接続モニターは searchFixerFeatures.connectionMonitor に統合済み（searchFixerFeatures 経由で正規化される）。
   };
 }
 
@@ -1195,10 +1200,7 @@ async function notifyContentScripts(s) {
     [{ action: Actions.APPLY_LOUPE_CS, data: { enabled: s.loupeEnabled } }, TOP_FRAME],
   ];
   if (isYouTubeUrl(url)) {
-    // Shorts 削除 (features.removeShorts*) と接続モニター (features.connectionMonitor) はいずれも
-    // YouTube 機能拡張のサブ機能として統合されているため、メッセージは APPLY_SEARCH_FIXER_CS のみ。
-    // search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js の 3 つが同一 isolated world で
-    // この 1 メッセージを購読し、各々の責務に応じて反応する。
+    // YouTube の各 content script へ共通設定を配信する。
     messages.push([{ action: Actions.APPLY_SEARCH_FIXER_CS, data: {
       enabled: s.searchFixerEnabled,
       features: s.searchFixerFeatures,
@@ -1334,14 +1336,6 @@ let activeVolumeSetGainCount = 0;
 let volumeReleaseGeneration = 0;
 // global RELEASE_ALLを直列化し、新世代SETも解放完了後まで待機させるbarrier。
 let volumeReleaseBarrier = Promise.resolve();
-// scheduleOffscreenClose の連続再スケジュール回数（soft tracking 用）。
-// `isVolumeBoosterActive()` が true である限り再スケジュールを継続する設計のため、
-// このカウンタは無限増加防止のリセット境界として機能する（実際の close 停止はしない）。
-// 10 回 = 5 分。リセットしても close 試行ループ自体は継続し、
-// `isVolumeBoosterActive()` が false に戻ったタイミングで初めて close へ進む。
-const OFFSCREEN_CLOSE_RESCHEDULE_LIMIT = 10;
-let offscreenCloseRescheduleCount = 0;
-
 // P2-#19: ブースト中タブの background 側ローカルキャッシュ。
 // `setVolumeBoosterGain` が成功するたびに add、`releaseVolumeBoosterTab` 完了 / `chrome.tabs.onRemoved`
 // で delete する。`isVolumeBoosterActive` はこの Set のサイズを優先確認することで、30 秒間隔の
@@ -1502,14 +1496,6 @@ function scheduleOffscreenClose() {
     if (active) {
       // PERF-11 対策: 通信失敗で `isVolumeBoosterActive` が常に true を返す状況でも、
       // 強制 close はブースト中の音を断つリスクがあるため避けて再スケジュールを継続する。
-      // カウンタは「連続再スケジュール回数」を soft tracking する目的で保持し、
-      // 上限到達時はリセットだけして次サイクルへ繰り越す（無限カウントアップ防止）。
-      // close 試行を停止すると offscreen document が永久に残ってしまうため、
-      // 上限到達後も `scheduleOffscreenClose()` を必ず呼んで cycle を維持する。
-      offscreenCloseRescheduleCount += 1;
-      if (offscreenCloseRescheduleCount >= OFFSCREEN_CLOSE_RESCHEDULE_LIMIT) {
-        offscreenCloseRescheduleCount = 0;
-      }
       scheduleOffscreenClose();
       return;
     }
@@ -1524,8 +1510,7 @@ function scheduleOffscreenClose() {
       return;
     }
     if (closeGeneration !== offscreenCloseGeneration) return;
-    // ここまで到達 = boost なし → カウンタリセットして close へ
-    offscreenCloseRescheduleCount = 0;
+    // ここまで到達 = boost なし → close へ
     offscreenState = "CLOSING";
     offscreenClosingPromise = chrome.offscreen
       .closeDocument()
@@ -1541,8 +1526,8 @@ function scheduleOffscreenClose() {
   }, Offscreen.IDLE_MS);
 }
 
-// B1-B5 対策: SW がスリープ → 再起動すると offscreenIdleTimer / offscreenCloseRescheduleCount
-// などのモジュール変数がリセットされるため、offscreen document が残ったまま誰も close を
+// B1-B5 対策: SW がスリープ → 再起動すると offscreenIdleTimer などのモジュール変数が
+// リセットされるため、offscreen document が残ったまま誰も close を
 // スケジュールしない状態が起きうる（onRemoved や setVolumeBoosterGain が呼ばれるまで close
 // しない）。SW 起動直後に「offscreen が残っていれば scheduleOffscreenClose を再発動」する。
 //

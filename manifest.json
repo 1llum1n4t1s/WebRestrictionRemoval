@@ -58,8 +58,8 @@
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/youtube-player-overlay.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-connection-monitor.js", "src/content/youtube-broadcast-clock.js", "src/content/youtube-notebooklm.js"],
-      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css", "src/content/youtube-connection-monitor.css", "src/content/youtube-broadcast-clock.css", "src/content/youtube-notebooklm.css"],
+      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/youtube-player-overlay.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-broadcast-clock.js", "src/content/youtube-notebooklm.js"],
+      "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css", "src/content/youtube-broadcast-clock.css", "src/content/youtube-notebooklm.css"],
       "run_at": "document_idle",
       "all_frames": false
     },

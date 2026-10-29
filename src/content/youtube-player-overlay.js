@@ -1,12 +1,15 @@
-// プレイヤー操作・接続モニター・配信時刻が共有する表示先。データと設定は各機能が所有する。
+// プレイヤー操作・配信時刻が共有する表示先。データと設定は各機能が所有する。
 (() => {
   "use strict";
   if (window.__cpaYouTubeOverlay) return;
 
-  const order = ["player", "broadcast", "connection"];
+  const order = ["player", "broadcast"];
   const sections = new Map();
   let root = null;
   let observer = null;
+  let resizeObserver = null;
+  let observedPlayer = null;
+  let observedArea = null;
   let frame = null;
   let heartbeat = null;
   let stopped = false;
@@ -14,6 +17,10 @@
   function releaseHost() {
     observer?.disconnect();
     observer = null;
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+    observedPlayer = null;
+    observedArea = null;
     if (frame !== null) cancelAnimationFrame(frame);
     frame = null;
     clearInterval(heartbeat);
@@ -45,6 +52,17 @@
       return;
     }
     if (root.parentElement !== area) area.append(root);
+    // 操作欄の直上から動画の上端まで使い、全画面・シアター・埋め込みの寸法に追従する。
+    const availableHeight = Math.max(0, area.getBoundingClientRect().top - player.getBoundingClientRect().top - 8);
+    root.style.setProperty("--ypc-available-height", `${availableHeight}px`);
+    if (observedPlayer !== player || observedArea !== area) {
+      resizeObserver ??= new ResizeObserver(scheduleSync);
+      resizeObserver.disconnect();
+      resizeObserver.observe(player);
+      resizeObserver.observe(area);
+      observedPlayer = player;
+      observedArea = area;
+    }
   }
 
   function scheduleSync() {

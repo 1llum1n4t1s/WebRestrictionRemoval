@@ -40,3 +40,14 @@ test("破損・他製品・未知版・容量超過・不正値を保存前に�
 test("部分ファイルは指定項目だけ返し、欠落項目を初期化しない", () => {
   assert.deepEqual(B.parse(file({ searchFixerEnabled: false })), { searchFixerEnabled: false });
 });
+
+test("廃止された接続モニターだけを旧バックアップから除き、残る設定を復元する", () => {
+  const stored = { searchFixerFeatures: { connectionMonitor: true, hideComments: true, broadcastClock: true } };
+  for (const result of [B.parse(file(stored)), B.parse(B.stringify(stored, "test"))]) {
+    assert.equal(Object.hasOwn(result.searchFixerFeatures, "connectionMonitor"), false);
+    assert.equal(result.searchFixerFeatures.hideComments, true);
+    assert.equal(result.searchFixerFeatures.broadcastClock, true);
+  }
+  assert.throws(() => B.parse(file({ searchFixerFeatures: { connectionMonitor: "true" } })));
+  assert.throws(() => B.parse(file({ searchFixerFeatures: { unknown: true } })));
+});

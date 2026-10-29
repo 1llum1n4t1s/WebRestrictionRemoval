@@ -21,6 +21,30 @@ const fs = require("node:fs");
 const path = require("node:path");
 const G = require("./_load-actions");
 
+test("YouTube の再生候補は旧表示設定に関係なく全件を表示し、詳細値と保存済みデータを保持する", () => {
+  const spec = G.SearchFixer.PLAYER_CONTROLS;
+  const stored = { rate: { values: [1.35], enabled: [false] }, volume: { values: [42], hideSlider: true }, latency: { playbackRate: 1.3 } };
+  const snapshot = JSON.stringify(stored);
+  const result = spec.getPlaybackSettings(stored);
+  for (const group of ["quality", "rate", "volume"]) {
+    assert.deepEqual([...result[group].values], [...spec.DEFAULT_SETTINGS[group].values]);
+    assert.ok(result[group].enabled.every(Boolean));
+  }
+  assert.equal(result.volume.hideSlider, true);
+  assert.equal(result.latency.playbackRate, 1.3);
+  assert.equal(JSON.stringify(stored), snapshot);
+  const choices = spec.NUMERIC_CHOICES;
+  assert.ok(Object.isFrozen(choices));
+  assert.deepEqual([...choices.playbackRate], [1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2, 3, 4, 5, 6, 8, 10, 12, 16]);
+  assert.deepEqual([...choices.smoothThreshold], [0, .5, 1, 2, 3, 5, 10, 15, 20, 30, 60, 120]);
+  assert.deepEqual([...choices.skipThreshold], [1, 3, 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 999999]);
+  for (const values of Object.values(choices)) assert.ok(Object.isFrozen(values));
+  const restored = spec.normalizeSettings({ latency: { playbackRate: 1.35, smoothThreshold: .75, skipThreshold: 42 } });
+  assert.equal(restored.latency.playbackRate, 1.35);
+  assert.equal(restored.latency.smoothThreshold, .75);
+  assert.equal(restored.latency.skipThreshold, 42);
+});
+
 // ---------- ロケール整合 ----------
 
 /**
@@ -1049,7 +1073,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 24 個の定数を公開する", () => {
+test("actions.js は globalThis に 23 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -1070,7 +1094,6 @@ test("actions.js は globalThis に 24 個の定数を公開する", () => {
     "VideoGamma",
     "VideoFill",
     "Loupe",
-    "ConnectionMonitor",
     "BroadcastClock",
     "NotebookLm",
     "ColorPicker",
@@ -1079,7 +1102,7 @@ test("actions.js は globalThis に 24 個の定数を公開する", () => {
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);
   }
-  assert.equal(required.length, 24, "公開定数の件数（ドキュメント整合性の単一情報源）");
+  assert.equal(required.length, 23, "公開定数の件数（ドキュメント整合性の単一情報源）");
 });
 
 test("SenderCheck.isFromOffscreen: extension id・tab不在・URL完全一致で検証", () => {
@@ -1186,7 +1209,6 @@ test("ImageDownloader: 必要な定数キーが揃っている", () => {
   assert.equal(typeof G.ImageDownloader.BUSY_CLASS, "string");
   assert.equal(typeof G.ImageDownloader.SCANNED_SRC_DATASET_KEY, "string");
   assert.equal(typeof G.ImageDownloader.SCANNED_SRC_ATTR_SELECTOR, "string");
-  assert.equal(typeof G.ImageDownloader.SKIP_MARKER, "string");
   // dataset key と attribute selector の整合性: cpaImgDlSrc → data-cpa-img-dl-src
   assert.match(
     G.ImageDownloader.SCANNED_SRC_ATTR_SELECTOR,
@@ -1278,7 +1300,7 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 39, "SearchFixer.FEATURES は 39 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 38, "SearchFixer.FEATURES は 38 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 12, "InstagramCleaner.FEATURES は 12 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
 });
@@ -1663,31 +1685,6 @@ test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema
   );
 });
 
-// クリーナーのサブ機能トグルは popup.js が `for (const [key, input] of <xx>FeatureInputs)` で
-// change リスナーを張ることで初めて保存される。X クリーナー追加時にこのループを書き忘れ、
-// 「トグルを ON にしても閉じると OFF に戻る」実害が出た（2026-07-28、実機で発覚）。
-// map を定義しただけでリスナー登録を忘れる drift を機械的に検知する。
-test("popup.js: すべての <xx>FeatureInputs に change リスナー登録ループがある（保存されないトグルの再発防止）", () => {
-  const fs = require("node:fs");
-  const path = require("node:path");
-  const popupSrc = fs.readFileSync(path.resolve(__dirname, "..", "src", "popup", "popup.js"), "utf8");
-
-  // `const <name>FeatureInputs = new Map();` で定義されている map をすべて拾う
-  // YouTube だけ prefix なしの `featureInputs` なので [Ff] を許容する
-  const defined = [...popupSrc.matchAll(/const\s+(\w*[Ff]eatureInputs)\s*=\s*new Map\(\)/g)].map((m) => m[1]);
-  assert.ok(defined.length >= 4, `FeatureInputs map が想定より少ない: ${defined.join(",")}`);
-
-  const missing = defined.filter((name) => {
-    const loop = new RegExp(`for\\s*\\(\\s*const\\s+\\[key,\\s*input\\]\\s+of\\s+${name}\\s*\\)\\s*\\{\\s*input\\.addEventListener\\("change"`);
-    return !loop.test(popupSrc);
-  });
-  assert.deepEqual(
-    missing,
-    [],
-    `change リスナー登録ループが無い FeatureInputs（トグルを操作しても apply() が呼ばれず保存されない）: ${missing.join(", ")}`
-  );
-});
-
 // /rere F-OPS-2 修正: popup.js の `stored = await chrome.storage.local.get([...])` リストに
 // SettingsSchema の全 storageKey が含まれることを CI 検知する。経路 D (popup stored リスト欠落)
 // は v1.0.29 で RTX_ENHANCER_ENABLED の追加忘れにより永久 OFF 化バグを引き起こした実例があり、
@@ -1750,23 +1747,6 @@ test("ImageDownloader.isAllowedFetchUrl: cdninstagram.com は scontent- prefix �
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://tracker.cdninstagram.com/log"), false);
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://auth.cdninstagram.com/oauth"), false);
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://attacker.cdninstagram.com/exfil"), false);
-});
-
-// 接続モニターは YouTube 機能拡張のサブ機能 (searchFixerFeatures.connectionMonitor) に統合済み。
-// 独立 storage key / action は持たず、SearchFixer.FEATURES の watch_page カテゴリに存在することと、
-// 旧独立キーが完全に撤去されていることを drift 検知する（再導入の事故を CI で防ぐ）。
-test("接続モニターは SearchFixer.FEATURES の connectionMonitor サブ機能に統合されている", () => {
-  const cm = G.SearchFixer.FEATURES.find((f) => f.key === "connectionMonitor");
-  assert.ok(cm, "SearchFixer.FEATURES に connectionMonitor が存在する必要がある");
-  assert.equal(cm.category, "watch_page", "connectionMonitor は watch_page カテゴリ");
-  // mergeFeatures が未設定時に false を埋めることを確認（オプトイン保証）
-  assert.equal(G.SearchFixer.mergeFeatures({}).connectionMonitor, false);
-  assert.equal(G.SearchFixer.mergeFeatures({ connectionMonitor: true }).connectionMonitor, true);
-  // 旧独立 master トグルの痕跡が actions.js から完全撤去されていること
-  assert.equal(G.StorageKeys.CONNECTION_MONITOR_ENABLED, undefined, "旧 storage key は撤去済みのはず");
-  assert.equal(G.Actions.APPLY_CONNECTION_MONITOR_CS, undefined, "旧 action は撤去済みのはず");
-  // ConnectionMonitor namespace（純粋ロジック）は引き続き公開されている
-  assert.equal(typeof G.ConnectionMonitor.classify, "function");
 });
 
 // 配信時刻オーバーレイ（broadcastClock）は YouTube 機能拡張の watch_page サブ機能。
@@ -1846,175 +1826,6 @@ test("BroadcastClock.formatTimestamp: yyyy/MM/dd　hh:mm:ss（全桁ゼロ埋め
   assert.equal(F(NaN), "");
   assert.equal(F(Infinity), "");
   assert.equal(F("x"), "");
-});
-
-// ConnectionMonitor.median: 集計の中央値計算が正しく動くこと（baseline 計算で使う純粋関数）。
-test("ConnectionMonitor.median: 奇数 / 偶数 / 不正値混入 / 空配列の境界値", () => {
-  const M = G.ConnectionMonitor.median;
-  // 奇数個 → 中央値そのもの
-  assert.equal(M([1, 2, 3]), 2);
-  assert.equal(M([5]), 5);
-  // 偶数個 → 中央 2 値の平均
-  assert.equal(M([1, 2, 3, 4]), 2.5);
-  // 順不同でもソートして計算
-  assert.equal(M([10, 2, 7, 1]), 4.5);
-  // 不正値（NaN / Infinity / null / string）は除外して計算
-  assert.equal(M([1, NaN, 2, Infinity, "x", 3]), 2);
-  // 全部不正値 → null
-  assert.equal(M([NaN, undefined, null]), null);
-  // 空配列 → null
-  assert.equal(M([]), null);
-  // 非配列 → null
-  assert.equal(M(null), null);
-  assert.equal(M(undefined), null);
-  assert.equal(M("not array"), null);
-});
-
-// ConnectionMonitor.classify: ヒューリスティクス分岐の境界値テスト。
-// ライブ視聴中のクルクル要因を切り分けるロジックそのものなので、回帰防止が最重要。
-test("ConnectionMonitor.classify: バッファ 0 回 → STABLE", () => {
-  const C = G.ConnectionMonitor;
-  assert.equal(C.classify({ bufferingCountRecent: 0 }), C.VERDICT.STABLE);
-  // 他フィールドが充実していても 0 回なら STABLE
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 0,
-      downlinkBaseline: 25,
-      downlinkDuringBuffering: 1,
-      droppedFramesRatio: 0.9,
-      googleRttMedian: 500,
-      cloudflareRttMedian: 500,
-    }),
-    C.VERDICT.STABLE
-  );
-});
-
-test("ConnectionMonitor.classify: buffering 中の downlink が 50% 以下 → NETWORK", () => {
-  const C = G.ConnectionMonitor;
-  // baseline 25Mbps の 50% (12.5) 以下なら NETWORK
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 3,
-      downlinkBaseline: 25,
-      downlinkDuringBuffering: 8,
-    }),
-    C.VERDICT.NETWORK
-  );
-  // ぴったり 50% 境界も NETWORK 判定
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 1,
-      downlinkBaseline: 20,
-      downlinkDuringBuffering: 10,
-    }),
-    C.VERDICT.NETWORK
-  );
-  // 50% より少し上 → 経路診断 fallback で YOUTUBE_CDN (両 RTT 不明時)
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 1,
-      downlinkBaseline: 20,
-      downlinkDuringBuffering: 11,
-    }),
-    C.VERDICT.YOUTUBE_CDN
-  );
-});
-
-test("ConnectionMonitor.classify: dropped frames 比率 30% 以上 → DEVICE", () => {
-  const C = G.ConnectionMonitor;
-  // baseline 帯域が落ちていない + dropped 比率高 → DEVICE
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 2,
-      downlinkBaseline: 25,
-      downlinkDuringBuffering: 24,
-      droppedFramesRatio: 0.4,
-    }),
-    C.VERDICT.DEVICE
-  );
-  // ぴったり 30% 境界も DEVICE
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 1,
-      downlinkBaseline: 25,
-      downlinkDuringBuffering: 25,
-      droppedFramesRatio: 0.3,
-    }),
-    C.VERDICT.DEVICE
-  );
-});
-
-test("ConnectionMonitor.classify: 経路診断による細分化（YOUTUBE_CDN / ROUTING / INTERNATIONAL）", () => {
-  const C = G.ConnectionMonitor;
-  // Google と CF どちらも快適 (< 100ms) → YouTube CDN 個別不調
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 2,
-      googleRttMedian: 80,
-      cloudflareRttMedian: 60,
-    }),
-    C.VERDICT.YOUTUBE_CDN
-  );
-  // Google だけ異常 (> 200ms) かつ CF 快適 → Google エッジ / ルーティング
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 2,
-      googleRttMedian: 350,
-      cloudflareRttMedian: 50,
-    }),
-    C.VERDICT.ROUTING
-  );
-  // 両方異常 → 国際線 / 中継 ISP 経路遅延
-  assert.equal(
-    C.classify({
-      bufferingCountRecent: 2,
-      googleRttMedian: 350,
-      cloudflareRttMedian: 280,
-    }),
-    C.VERDICT.INTERNATIONAL
-  );
-  // RTT 情報がない場合 → YOUTUBE_CDN (fallback)
-  assert.equal(
-    C.classify({ bufferingCountRecent: 2 }),
-    C.VERDICT.YOUTUBE_CDN
-  );
-});
-
-test("ConnectionMonitor.classify: 不正入力は UNKNOWN", () => {
-  const C = G.ConnectionMonitor;
-  assert.equal(C.classify(null), C.VERDICT.UNKNOWN);
-  assert.equal(C.classify(undefined), C.VERDICT.UNKNOWN);
-  assert.equal(C.classify("garbage"), C.VERDICT.UNKNOWN);
-});
-
-test("ConnectionMonitor.VERDICT: 7 種類の識別子が全て string + 固定値", () => {
-  const V = G.ConnectionMonitor.VERDICT;
-  // メッセージキー対応 + i18n 側で固定文字列依存しているので値も固定する
-  assert.equal(V.STABLE, "stable");
-  assert.equal(V.NETWORK, "network");
-  assert.equal(V.DEVICE, "device");
-  assert.equal(V.YOUTUBE_CDN, "youtube_cdn");
-  assert.equal(V.ROUTING, "routing");
-  assert.equal(V.INTERNATIONAL, "international");
-  assert.equal(V.UNKNOWN, "unknown");
-});
-
-test("ConnectionMonitor: 経路診断 endpoint は generate_204 / speed.cloudflare.com の HTTPS 固定", () => {
-  // セキュリティ + プライバシー上のクリティカル設定。
-  // ローカル endpoint や任意ドメインへの fetch に書き換わったら CI で気付ける。
-  // Cloudflare は 1.1.1.1 直 IP がブロックされる環境があるため speed.cloudflare.com の公式 speedtest endpoint を使用
-  assert.equal(G.ConnectionMonitor.ENDPOINT_GOOGLE, "https://www.gstatic.com/generate_204");
-  assert.equal(G.ConnectionMonitor.ENDPOINT_CLOUDFLARE, "https://speed.cloudflare.com/__down?bytes=10");
-});
-
-test("ConnectionMonitor: 動画 chunk 実 throughput 計測の閾値定数が定義されている", () => {
-  // navigator.connection.downlink (bucket 化された粗い見積もり) ではなく PerformanceObserver で
-  // googlevideo.com の transferSize / download 時間から実測 throughput を取る仕様。
-  // 小さい chunk は warmup overhead 支配で無意味なため VIDEO_CHUNK_MIN_BYTES で除外する。
-  assert.equal(typeof G.ConnectionMonitor.VIDEO_CHUNK_MIN_BYTES, "number");
-  assert.ok(G.ConnectionMonitor.VIDEO_CHUNK_MIN_BYTES > 0, "VIDEO_CHUNK_MIN_BYTES は正の数");
-  assert.equal(typeof G.ConnectionMonitor.VIDEO_THROUGHPUT_WINDOW_MS, "number");
-  assert.ok(G.ConnectionMonitor.VIDEO_THROUGHPUT_WINDOW_MS > 0, "VIDEO_THROUGHPUT_WINDOW_MS は正の数");
 });
 
 // Amazon ランキング移動ボタンの storage key / action の drift 検知（機能死活の単一情報源）。

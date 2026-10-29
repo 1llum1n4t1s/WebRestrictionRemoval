@@ -15,7 +15,9 @@
     [K.INSTAGRAM_CLEANER_FEATURES, InstagramCleaner], [K.TIKTOK_CLEANER_FEATURES, TikTokCleaner],
     [K.X_CLEANER_FEATURES, XCleaner]]) {
     add(key, spec.DEFAULT_FEATURES, (v) => object(v) && Object.entries(v).every(([k, x]) =>
-      Object.hasOwn(spec.DEFAULT_FEATURES, k) && typeof x === "boolean"), (v) => spec.mergeFeatures(v));
+      // 廃止済みの接続モニターを含む旧バックアップも読み込み、正規化時にその項目だけ落とす。
+      (Object.hasOwn(spec.DEFAULT_FEATURES, k) || (key === K.SEARCH_FIXER_FEATURES && k === "connectionMonitor")) &&
+      typeof x === "boolean"), (v) => spec.mergeFeatures(v));
   }
   const number = (key, fallback, normalize) => add(key, fallback,
     (v) => typeof v === "number" && Number.isFinite(v) && normalize(v) === v);

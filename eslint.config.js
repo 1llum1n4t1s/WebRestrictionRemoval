@@ -34,7 +34,6 @@ const ACTIONS_GLOBALS = {
   VideoGamma: "readonly",
   VideoFill: "readonly",
   Loupe: "readonly",
-  ConnectionMonitor: "readonly",
   BroadcastClock: "readonly",
   NotebookLm: "readonly",
   XCleaner: "readonly",

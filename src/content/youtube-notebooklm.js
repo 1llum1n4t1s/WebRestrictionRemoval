@@ -5,7 +5,7 @@
 //
 // 有効化は YouTube 機能拡張のサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.notebookLmSend` の両方 true で activate（独立 storage key は持たず、
-// APPLY_SEARCH_FIXER_CS を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js /
+// APPLY_SEARCH_FIXER_CS を search-fixer.js / youtube-shorts.js /
 // youtube-broadcast-clock.js と共に購読する）。
 //
 // UI: **YouTube のページ内**にボタンを挿し込む（参考にした拡張機能と同じ配置に合わせてある）。

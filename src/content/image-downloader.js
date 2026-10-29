@@ -600,11 +600,16 @@
       return;
     }
 
+    // 同じ src・host でも、サイト側の DOM 再利用で非対象になる場合は装飾を外す。
+    if (!adapter.isContentImage(img)) {
+      detachOverlayForImage(img);
+      return;
+    }
+
     const lastSrc = img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
 
-    // src が変わっていなければ（前回の判定結果がそのまま有効）button 位置だけ再 sync する。
+    // 対象画像の src が変わっていなければ button 位置だけ再 sync する。
     // host や img のサイズが SPA navigation / lazy load / window resize で変わっているケースに対応。
-    // SKIP マーカーが付いてる場合は decorate 対象外なので何もしない。
     if (lastSrc === currentSrc) {
       const hostElCached = resolveHostEl(img);
       const overlay = overlayByImage.get(img);
@@ -621,15 +626,11 @@
       if (overlay) detachOverlayForImage(img);
     }
 
-    // src が変わった、または skip マーカーが残っているケース → 古い装飾を撤去して再評価
+    // src が変わったケース → 古い装飾を撤去して再評価
     if (lastSrc) {
       detachOverlayForImage(img);
     }
 
-    if (!adapter.isContentImage(img)) {
-      img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] = ImageDownloader.SKIP_MARKER + ":" + currentSrc;
-      return;
-    }
     const hostEl = resolveHostEl(img);
     if (!hostEl) return;
 

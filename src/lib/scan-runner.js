@@ -103,15 +103,7 @@
         contextInvalidated = true;
       }
       if (contextInvalidated) {
-        if (observer) {
-          try { observer.disconnect(); } catch {}
-          observer = null;
-        }
-        if (rafHandle) {
-          try { cancelAnimationFrame(rafHandle); } catch {}
-          rafHandle = 0;
-        }
-        scanScheduled = false;
+        stopObserver();
         active = false;
         if (cleanup) {
           try { cleanup(); } catch {}

@@ -8,7 +8,7 @@
 //
 // 有効化は YouTube 機能拡張のサブ機能として制御する: master `searchFixerEnabled` AND
 // `searchFixerFeatures.broadcastClock` の両方 true で activate（独立 storage key は持たず、
-// APPLY_SEARCH_FIXER_CS を search-fixer.js / youtube-shorts.js / youtube-connection-monitor.js と
+// APPLY_SEARCH_FIXER_CS を search-fixer.js / youtube-shorts.js と
 // 共に購読する）。純粋ロジック（videoId 抽出 / HTML パース / 時刻算出 / 整形）は actions.js の
 // BroadcastClock namespace に集約し、本ファイルは DOM / fetch / lifecycle のみ担当する。
 //
@@ -17,7 +17,6 @@
 // HTML 内の liveBroadcastDetails を抽出する。結果は sessionStorage に videoId 単位で cache し、
 // 動画ごと 1 回の fetch に抑える（負例＝通常動画も cache して再 fetch を防ぐ）。
 //
-// 設計上の不変条件（youtube-connection-monitor.js PATTERN SYNC）:
 //   - master OFF / サブ機能 OFF / 拡張機能 disable / 非アーカイブ / SPA 離脱時は HUD・listener を撤去
 //   - top frame 限定（埋め込みプレイヤーには介入しない）
 //   - context invalidation 後は MutationObserver / listener を必ず解除
@@ -429,7 +428,7 @@
   // ---------- 設定購読 ----------
   // 配信時刻オーバーレイは YouTube 機能拡張のサブ機能。master `searchFixerEnabled` AND
   // `searchFixerFeatures.broadcastClock` の両方 true のときだけ activate する
-  // （youtube-connection-monitor.js / youtube-shorts.js と同じ統合方式）。両キーを毎回再取得する
+  // （youtube-shorts.js と同じ統合方式）。両キーを毎回再取得する
   // ので「片方だけ変わってもう片方が undefined になる」罠を構造的に回避する。
 
   /** master(searchFixerEnabled) AND サブ機能(broadcastClock) で有効判定 */
@@ -454,7 +453,7 @@
   });
 
   // pagehide: bfcache 凍結（persisted=true）は observer/listener を温存して復帰後そのまま継続させる
-  // （youtube-connection-monitor.js / video-fill.js / loupe.js PATTERN SYNC）。
+  // （video-fill.js / loupe.js PATTERN SYNC）。
   // 実ドキュメント破棄（persisted=false）のときだけ deactivate() でフル解放する。
   window.addEventListener(
     "pagehide",

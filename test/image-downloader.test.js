@@ -197,6 +197,10 @@ const FakeElement = class {
   }
 
   closest(selector) {
+    for (let element = this; element; element = element.parentElement) {
+      if (selector.includes("DivAvatar") && element.className.includes("DivAvatar")) return element;
+      if (selector.includes("feed-item") && (element.attributes.get("data-e2e") || "").includes("feed-item")) return element;
+    }
     if (selector.includes("feed-item") || selector.includes("user-post-item")) {
       return this._isContentImage ? this : null;
     }
@@ -279,7 +283,6 @@ const createBehaviorHarness = () => {
     HOST_POSITIONED_CLASS: "__cpa-img-dl-host-positioned",
     SCANNED_SRC_DATASET_KEY: "cpaImgDlSrc",
     SCANNED_SRC_ATTR_SELECTOR: "img[data-cpa-img-dl-src]",
-    SKIP_MARKER: "__cpa-skip__",
     detectHost: () => "tiktok",
     isAllowedFetchUrl: () => true,
     buildFilename: () => "tiktok.jpg",
@@ -368,7 +371,7 @@ test("共有hostの各画像が固有button・URL・位置を保持し、detach/
   const host = new FakeElement("div", document, { left: 0, top: 0, width: 500, height: 300 });
   const first = new FakeElement("img", document, { left: 10, top: 20, width: 200, height: 240 });
   const second = new FakeElement("img", document, { left: 260, top: 20, width: 200, height: 240 });
-  first._isContentImage = true;
+  first._isContentImage = false;
   second._isContentImage = true;
   first.currentSrc = "https://p16-sign.tiktokcdn.com/first.jpg";
   second.currentSrc = "https://p16-sign.tiktokcdn.com/second.jpg";
@@ -382,6 +385,11 @@ test("共有hostの各画像が固有button・URL・位置を保持し、detach/
   host.appendChild(second);
 
   const api = context.__testImageDownloader;
+  api.decorateImage(first);
+  api.decorateImage(first);
+  assert.equal(first.dataset.cpaImgDlSrc, undefined, "非対象画像には走査印を残さない");
+  assert.equal(host.children.some((el) => el.classList.contains(ImageDownloader.BUTTON_CLASS)), false);
+  first._isContentImage = true;
   api.decorateImage(first);
   api.decorateImage(second);
   api.decorateImage(first);
@@ -399,9 +407,20 @@ test("共有hostの各画像が固有button・URL・位置を保持し、detach/
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(fetchCalls, [first.currentSrc, second.currentSrc]);
 
+  second._isContentImage = false;
+  second.currentSrc = "https://p16-sign.tiktokcdn.com/non-content.jpg";
+  api.decorateImage(second);
+  assert.equal(second.dataset.cpaImgDlSrc, undefined, "URL変更後の非対象画像には走査印を残さない");
+  assert.equal(buttons[1].isConnected, false);
+  assert.equal(buttons[0].parentElement, host);
+  second._isContentImage = true;
+  second.currentSrc = "https://p16-sign.tiktokcdn.com/second.jpg";
+  api.decorateImage(second);
+  const restoredButton = host.children.find((el) => el.classList.contains(ImageDownloader.BUTTON_CLASS) && el !== buttons[0]);
+
   second._display = "none";
   api.decorateImage(second);
-  assert.equal(buttons[1].isConnected, false, "非表示slideの古いbuttonを撤去する");
+  assert.equal(restoredButton.isConnected, false, "非表示slideの古いbuttonを撤去する");
   assert.equal(buttons[0].parentElement, host, "片方の非表示化で別画像のbuttonを消さない");
   assert.equal(host.classList.contains(ImageDownloader.HOST_CLASS), true);
 
@@ -428,4 +447,32 @@ test("共有hostの各画像が固有button・URL・位置を保持し、detach/
   assert.equal(host.classList.contains(ImageDownloader.HOST_CLASS), false);
   assert.equal(first.dataset.cpaImgDlSrc, undefined);
   assert.equal(second.dataset.cpaImgDlSrc, undefined);
+});
+
+test("同じURL・hostでも投稿画像がavatar領域へ再利用されたらbuttonを撤去する", () => {
+  const { context, document, ImageDownloader } = createBehaviorHarness();
+  const host = new FakeElement("div", document);
+  host.setAttribute("data-e2e", "feed-item");
+  const image = new FakeElement("img", document);
+  image.currentSrc = "https://p16-sign.tiktokcdn.com/reused.jpg";
+  image.naturalWidth = image.naturalHeight = 400;
+  host.appendChild(image);
+  const api = context.__testImageDownloader;
+  assert.equal(api.tiktokIsContentImage(image), true);
+  api.decorateImage(image);
+  const button = host.children.find((el) => el.classList.contains(ImageDownloader.BUTTON_CLASS));
+  assert.ok(button);
+
+  // src と挿入先を保った DOM 再利用後、childList 変更による次回走査を通す。
+  host.classList.add("DivAvatar");
+  host.appendChild(new FakeElement("span", document));
+  assert.equal(api.tiktokIsContentImage(image), false);
+  api.scanAllImages();
+  assert.equal(button.isConnected, false);
+  assert.equal(image.dataset.cpaImgDlSrc, undefined);
+  assert.equal(host.classList.contains(ImageDownloader.HOST_CLASS), false);
+
+  host.classList.remove("DivAvatar");
+  api.scanAllImages();
+  assert.equal(host.children.filter((el) => el.classList.contains(ImageDownloader.BUTTON_CLASS)).length, 1);
 });

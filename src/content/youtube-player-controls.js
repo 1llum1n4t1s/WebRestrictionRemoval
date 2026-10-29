@@ -3,11 +3,14 @@
   "use strict";
   const CHANNEL = "__cpa_youtube_player_controls_v1";
   const featureKeys = ["liveLatency", "playbackQuality", "playbackRate", "playerVolume"];
+  const watchFeatures = SearchFixer.FEATURES.filter((feature) => feature.category === "watch_page");
+  const quickFeatureKeys = new Set(["hideComments", "hideLiveChat", "broadcastClock"]);
   let state = null;
   let session = null;
   let stopped = false;
   let heartbeat = null;
   let settingsPanel = null;
+  let bindings = [];
   let playerSlot = null;
   let syncGeneration = null;
 
@@ -24,34 +27,49 @@
     post("stop");
     session = null;
     settingsPanel = null;
+    bindings = [];
     playerSlot = null;
     window.__cpaYouTubeOverlay.remove("player");
   }
 
   function sendSettings() {
-    if (state && session) post("settings", state);
+    if (state && session) post("settings", { features: state.features, labels: state.labels, settings: state.settings });
   }
 
   function updateSettingsPanel(slot) {
-    if (!state.features.liveLatency) { settingsPanel?.remove(); settingsPanel = null; return; }
     if (!settingsPanel) {
       const panel = document.createElement("details");
       panel.className = "__cpa-ypc-settings";
       const summary = document.createElement("summary");
-      summary.textContent = `${chrome.i18n.getMessage("feat_sf_liveLatency_label")} · ${chrome.i18n.getMessage("yp_details")}`;
+      summary.textContent = chrome.i18n.getMessage("ypcWatchSettings");
       panel.append(summary);
       const status = document.createElement("div");
+      status.className = "__cpa-ypc-save-status";
       status.setAttribute("role", "status");
-      for (const [key, fallback] of Object.entries(SearchFixer.PLAYER_CONTROLS.DEFAULT_SETTINGS.latency)) {
+      const failedInputs = new Set();
+      const spec = SearchFixer.PLAYER_CONTROLS;
+      const groups = { liveLatency: "latency", playerVolume: "volume" };
+      const message = (key) => chrome.i18n.getMessage(key);
+
+      function addInput(parent, text, description, fallback, readValue, makeRequest, choices = []) {
         const label = document.createElement("label");
+        label.className = "__cpa-ypc-setting-row";
         const name = document.createElement("span");
-        name.textContent = chrome.i18n.getMessage(`yp_${key}`);
+        name.textContent = text;
+        let descriptionId = null;
+        if (description) {
+          const desc = document.createElement("small");
+          desc.id = `__cpa-ypc-desc-${session}-${bindings.length}`;
+          descriptionId = desc.id;
+          desc.textContent = description;
+          name.append(desc);
+        }
         const input = document.createElement(typeof fallback === "boolean" ? "input" : "select");
-        input.dataset.latencyKey = key;
-        if (typeof fallback === "boolean") input.type = "checkbox";
+        input.setAttribute("aria-label", text);
+        if (descriptionId) input.setAttribute("aria-describedby", descriptionId);
+        if (typeof fallback === "boolean") { input.type = "checkbox"; input.setAttribute("role", "switch"); }
         else {
-          const values = key === "playbackRate" ? [1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2, 3, 4, 5, 6, 8, 10, 12, 16] : key === "smoothThreshold" ? [0, .5, 1, 2, 3, 5, 10, 15, 20, 30, 60, 120] : [1, 3, 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 999999];
-          for (const value of values) input.add(new Option(`${value}${key === "playbackRate" ? "x" : ""}`, String(value)));
+          for (const [value, title] of choices) input.add(new Option(title, String(value)));
         }
         input.addEventListener("change", async (event) => {
           if (!event.isTrusted) return;
@@ -60,25 +78,65 @@
           input.disabled = true;
           try {
             const value = input.type === "checkbox" ? input.checked : Number(input.value);
-            const response = await chrome.runtime.sendMessage({ action: "APPLY_YOUTUBE_LATENCY_SETTING", key, value, syncGeneration });
+            const request = makeRequest(value);
+            const response = await chrome.runtime.sendMessage({ ...request, syncGeneration });
             if (!response?.ok) throw new Error("save-failed");
             // onStored の再取得で state が更新済みなら、その確定値を旧応答で上書きしない。
-            if (session === activeSession && state === requestState) state.settings = SearchFixer.PLAYER_CONTROLS.mergeSettings(state.settings, { latency: { [key]: value } });
-            status.textContent = "";
-          } catch { status.textContent = chrome.i18n.getMessage("ypcSaveError"); }
+            if (session === activeSession && state === requestState) {
+              if (request.data) state.settings = spec.mergeSettings(state.settings, request.data);
+              else state.watchFeatures[request.key] = value;
+            }
+            failedInputs.delete(input);
+          } catch { failedInputs.add(input); }
           finally { input.disabled = false; if (session === activeSession) updateSettingsPanel(slot); }
+          status.textContent = failedInputs.size ? message("ypcSaveError") : "";
         });
         label.append(name, input);
-        panel.append(label);
+        parent.append(label);
+        bindings.push({ input, readValue });
       }
-      panel.append(status);
-      for (const type of ["click", "keydown", "keyup"]) panel.addEventListener(type, (event) => event.stopPropagation());
+
+      const list = document.createElement("div");
+      list.className = "__cpa-ypc-setting-list";
+      const quick = document.createElement("div");
+      quick.className = "__cpa-ypc-quick-settings";
+      for (const feature of watchFeatures) {
+        const item = document.createElement("div");
+        item.className = "__cpa-ypc-setting-item";
+        addInput(item, message(`feat_sf_${feature.key}_label`), message(`feat_sf_${feature.key}_desc`), false,
+          () => state.watchFeatures[feature.key], (value) => ({ action: "APPLY_YOUTUBE_WATCH_FEATURE", key: feature.key, value }));
+        const group = groups[feature.key];
+        if (group) {
+          const details = document.createElement("details");
+          details.className = "__cpa-ypc-advanced";
+          const title = document.createElement("summary");
+          title.textContent = message("yp_details");
+          details.append(title);
+          const defaults = spec.DEFAULT_SETTINGS[group];
+          for (const [key, fallback] of Object.entries(defaults)) {
+            if (Array.isArray(fallback)) continue;
+            const choices = typeof fallback === "number" ? spec.NUMERIC_CHOICES[key] : [];
+            addInput(details, message(`yp_${key}`), "", fallback, () => state.settings[group][key],
+              (value) => ({ action: "APPLY_YOUTUBE_PLAYER_SETTINGS", data: { [group]: { [key]: value } } }),
+              choices.map((value) => [value, `${value}${key === "playbackRate" ? "×" : ""}`]));
+          }
+          item.append(details);
+        }
+        if (quickFeatureKeys.has(feature.key)) {
+          item.title = message(`feat_sf_${feature.key}_desc`);
+          quick.append(item);
+        } else list.append(item);
+      }
+      panel.append(list);
+      for (const target of [panel, quick]) {
+        for (const type of ["click", "dblclick", "keydown", "keyup", "pointerdown"]) target.addEventListener(type, (event) => event.stopPropagation());
+      }
       settingsPanel = panel;
-      slot.append(panel);
+      slot.append(status, quick, panel);
     }
-    for (const input of settingsPanel.querySelectorAll("[data-latency-key]")) {
+    for (const { input, readValue } of bindings) {
       if (input.disabled) continue;
-      const value = state.settings.latency[input.dataset.latencyKey];
+      const value = readValue();
       if (input.type === "checkbox") input.checked = value;
       else {
         if (![...input.options].some((option) => option.value === String(value))) input.add(new Option(String(value), String(value)));
@@ -91,7 +149,7 @@
     if (stopped) return;
     try {
       if (!chrome.runtime.id) return teardown();
-      const active = targetPage() && state && featureKeys.some((key) => state.features[key]);
+      const active = targetPage() && state?.enabled;
       if (!active) {
         if (session) stopSession();
         return;
@@ -161,7 +219,7 @@
       const labels = {};
       const labelKeys = { quality: "ypcQuality", rate: "ypcRate", volume: "ypcVolume", auto: "yp_auto", showPlaybackRate: "yp_showPlaybackRate", showLatency: "yp_showLatency", showHealth: "yp_showHealth", showEstimation: "yp_showEstimation", showCurrent: "yp_showCurrent", copied: "ypcCopied" };
       for (const [key, message] of Object.entries(labelKeys)) labels[key] = chrome.i18n.getMessage(message);
-      state = { features, labels, settings: SearchFixer.PLAYER_CONTROLS.normalizeSettings(stored[StorageKeys.YOUTUBE_PLAYER_SETTINGS]) };
+      state = { enabled: stored[StorageKeys.SEARCH_FIXER_ENABLED] === true, watchFeatures: SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]), features, labels, settings: SearchFixer.PLAYER_CONTROLS.getPlaybackSettings(stored[StorageKeys.YOUTUBE_PLAYER_SETTINGS]) };
       refresh();
     },
   });

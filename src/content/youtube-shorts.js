@@ -65,51 +65,19 @@
     };
   }
 
-  // 初回取得より新しい通知をキー単位で優先し、部分通知でも未変更設定を保つ。
-  const updatedSettings = new Set();
   let masterEnabled = false;
-  let currentFeatures;
+  let currentFeatures = SearchFixer.mergeFeatures();
 
-  function applyStoredSettings(stored, initial = false) {
-    for (const key of [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES]) {
-      if (!(key in stored) || (initial && updatedSettings.has(key))) continue;
-      if (!initial) updatedSettings.add(key);
-      if (key === StorageKeys.SEARCH_FIXER_ENABLED) masterEnabled = stored[key];
-      else currentFeatures = stored[key];
-    }
-    apply(computeFlags(masterEnabled, currentFeatures));
-  }
-
-  // ---------- 初期化: 現在状態を読んで適用 ----------
-  chrome.storage.local
-    .get([StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES])
-    .then((stored) => {
-      applyStoredSettings({
-        [StorageKeys.SEARCH_FIXER_ENABLED]: stored[StorageKeys.SEARCH_FIXER_ENABLED],
-        [StorageKeys.SEARCH_FIXER_FEATURES]: stored[StorageKeys.SEARCH_FIXER_FEATURES],
-      }, true);
-    })
-    .catch(() => {});
-
-  // ---------- 状態追従 ----------
-  chrome.runtime.onMessage.addListener((request, sender) => {
-    if (!SenderCheck.isFromBackground(sender)) return;
-    if (request?.action !== Actions.APPLY_SEARCH_FIXER_CS) return;
-    const data = request.data ?? {};
-    applyStoredSettings({
-      [StorageKeys.SEARCH_FIXER_ENABLED]: data.enabled,
-      [StorageKeys.SEARCH_FIXER_FEATURES]: data.features,
-    });
-  });
-
-  // 変更値を直接適用する。キー削除は undefined を渡して既定の OFF に戻す。
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local") return;
-    const patch = {};
-    for (const key of [StorageKeys.SEARCH_FIXER_ENABLED, StorageKeys.SEARCH_FIXER_FEATURES]) {
-      if (key in changes) patch[key] = changes[key].newValue;
-    }
-    if (Object.keys(patch).length) applyStoredSettings(patch);
+  CleanerCore.subscribe({
+    masterKey: StorageKeys.SEARCH_FIXER_ENABLED,
+    featuresKey: StorageKeys.SEARCH_FIXER_FEATURES,
+    applyAction: Actions.APPLY_SEARCH_FIXER_CS,
+    mergeFeatures: (raw) => SearchFixer.mergeFeatures(raw),
+    onUpdate(patch) {
+      if ("active" in patch) masterEnabled = patch.active;
+      if ("features" in patch) currentFeatures = patch.features;
+      apply(computeFlags(masterEnabled, currentFeatures));
+    },
   });
 
   /**

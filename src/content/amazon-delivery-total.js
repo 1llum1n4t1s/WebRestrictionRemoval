@@ -380,13 +380,14 @@
     }
     const items = detailItems(document);
     const expected = expectedCount(document);
+    const pageSignature = JSON.stringify([location.href, expected, items]);
     for (const section of document.querySelectorAll(C.DELIVERY_SECTION_SELECTOR)) {
       const target = section.querySelector(C.DELIVERY_TARGET_SELECTOR);
       if (!target) continue;
       const own = [...section.querySelectorAll(C.DELIVERY_ITEM_SELECTOR)].map(itemData);
       // 画面全体の件数で読込完了を確認し、配送ごとの単価×数量を計算する。
       const complete = expected !== null && expected === items.length;
-      const signature = JSON.stringify([location.href, expected, items, own]);
+      const signature = `${pageSignature}|${JSON.stringify(own)}`;
       renderAsync(section, target, signature, () => {
         if (!complete) throw new Error("Incomplete delivery");
         return totalItems(own, own.length, location.href);
