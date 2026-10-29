@@ -245,7 +245,7 @@
       if (!/^[\w-]{11}$/.test(videoId || "")) return;
       const progress = call("getProgressState");
       if (!Number.isFinite(progress?.current) || progress.current < 0) return;
-      const url = `https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(progress.current)}s#\n${formatTime(progress.current)}`;
+      const url = `https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(progress.current)}s`;
       // ユーザーが押したときだけブラウザの clipboard API を使う。権限要求や外部送信はしない。
       try { navigator.clipboard?.writeText(url)?.then(() => { copiedUntil = Date.now() + 4000; }).catch(() => {}); } catch { /* 拒否時も再生操作は維持する。 */ }
     }
