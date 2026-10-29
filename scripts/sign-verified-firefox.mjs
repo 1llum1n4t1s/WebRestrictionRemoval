@@ -94,14 +94,24 @@ export function createGuardedSign(webExt, submitAddon, {SubmitClient, onVerified
   };
 }
 
-async function main() {
-  if (process.argv[2] !== 'sign') throw new Error('Only sign is supported');
-  const require = createRequire(import.meta.url);
-  const packageDir = path.dirname(await fs.realpath(require.resolve('web-ext')));
+async function verifyWebExtContract(packageDir) {
   const pkg = JSON.parse(await fs.readFile(path.join(packageDir, 'package.json'), 'utf8'));
   if (pkg.version !== '10.8.0') throw new Error(`Unsupported web-ext version: ${pkg.version}`);
   for (const [name, expected] of Object.entries(hashes)) {
     if (await sha(path.join(packageDir, name)) !== expected) throw new Error(`Unsupported web-ext injection contract: ${name}`);
+  }
+}
+
+async function main() {
+  const mode = process.argv[2];
+  if (mode !== 'sign' && mode !== 'check') throw new Error('Only sign or check is supported');
+  const require = createRequire(import.meta.url);
+  const packageDir = path.dirname(await fs.realpath(require.resolve('web-ext')));
+  // check と sign は同じ固定版・ファイルハッシュを照合する。check は提出を行わない。
+  await verifyWebExtContract(packageDir);
+  if (mode === 'check') {
+    console.log('web-ext signing contract verified');
+    return;
   }
   const webExt = (await import(pathToFileURL(path.join(packageDir, 'index.js')))).default;
   const {default: SubmitClient, signAddon} = await import('web-ext/util/submit-addon');
