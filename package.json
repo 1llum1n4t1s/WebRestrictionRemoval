@@ -14,7 +14,7 @@
     "lint": "eslint src/ test/ scripts/ webstore/generate-screenshots.js"
   },
   "devDependencies": {
-    "@kagayoi/support-extension": "1.0.8",
+    "@kagayoi/support-extension": "1.0.9",
     "eslint": "^10.13.0",
     "globals": "^17.13.0",
     "puppeteer": "^25.16.0",
