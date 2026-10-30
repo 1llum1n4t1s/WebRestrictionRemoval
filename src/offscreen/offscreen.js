@@ -48,12 +48,9 @@ let activeReleaseAllCount = 0;
  */
 const {
   applyCompressorPreset,
-  applyFilterPreset,
   createBassCutChain,
-  applyEqualizer,
   createEqChain,
   createOutputCeiling,
-  applyOutputCeiling,
   connectAudioGraph,
 } = AudioPipeline;
 
@@ -128,36 +125,9 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
       }
     }
 
-    // 線形マッピング (VolumeBooster.percentToGain = percent / 100) で実 gain を算出
-    // → setTargetAtTime で 45ms ramp。
-    // 直接 `.value =` 代入だとプチノイズが乗るため必ず ramp 経由にする。
-    // cancelScheduledValues で古いランプ予約を破棄してから現在値を anchor し新しいランプを開始。
-    // ミュート ON のときは percentToGain を無視して 0 へランプする。`lastSetPercent` には
-    // ユーザーが意図したスライダー値を残し、ミュート解除時に同じランプ経路で復帰できるようにする。
-    const clamped = VolumeBooster.clampValue(gainPercent);
-    const mutedFlag = muted === true;
-    const targetGain = mutedFlag ? 0 : VolumeBooster.percentToGain(clamped);
-    const now = state.ctx.currentTime;
-    state.gainNode.gain.cancelScheduledValues(now);
-    state.gainNode.gain.setValueAtTime(state.gainNode.gain.value, now);
-    state.gainNode.gain.setTargetAtTime(targetGain, now, VolumeBooster.RAMP_TIME_CONSTANT);
-    // ユーザーが意図したスライダー位置を保持（gain.value はランプ中で別値、ミュート中も保持）。
-    state.lastSetPercent = clamped;
-    // 既存ノードのプロパティを書き換えるだけなので AudioContext 再構築は不要。トグル切替時も音切れなし。
-    applyCompressorPreset(
-      state.nightModeNode,
-      nightMode === true ? VolumeBooster.NIGHT_MODE_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
-    );
-    applyCompressorPreset(
-      state.antiClipNode,
-      antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
-    );
-    applyOutputCeiling(state.ceilingNode, antiClip === true);
-    applyFilterPreset(
-      state.bassCutNodes,
-      bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,
-    );
-    applyEqualizer(state, eqEnabled, eqGains, eqPreamp);
+    const clamped = AudioPipeline.applySettings(state, {
+      gain: gainPercent, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp,
+    });
     return { ok: true, gain: clamped };
   } catch (err) {
     return { ok: false, error: String(err?.message ?? err) };

@@ -45,7 +45,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 
 `src/background/settings-sync.js` が明示した設定キーだけを `storage.local` と `storage.sync` の間で照合します。同期キーは `vuora.settings.v2.` 接頭辞を持ち、既存のサイト適用リスナーへ直接漏れません。同期スイッチはPC単位で既定 OFF、初参加は同期先優先です。
 
-- YouTubeプレイヤー詳細は `youtubePlayerSettings` に保存し、ライブ遅延・画質・再生速度・音量の4機能を各1レコードとして同期します。popup はライブ追従・標準音量 UI の変更フィールドだけを `APPLY_YOUTUBE_PLAYER_SETTINGS` へ送り、background が sender と同期世代を確認して共通書込キュー内で再取得・マージ・正規化します。手動バックアップにも含めます。画質・速度・音量ボタンは固定候補をすべて表示し、旧 `values` / `enabled` は保存互換のために保持しますが再生には使いません。
+- YouTubeプレイヤー詳細は `youtubePlayerSettings` に保存し、ライブ遅延・画質・再生速度・音量の4機能を各1レコードとして同期します。popup はライブ追従・標準音量 UI の変更フィールドだけを `APPLY_YOUTUBE_PLAYER_SETTINGS` へ送り、background が sender と同期世代を確認して共通書込キュー内で再取得・マージ・正規化します。手動バックアップにも含めます。画質・音量・再生速度はオーバーレイの1行の選択欄で切り替え、速度候補は0.25〜2倍に絞ります。ほかの設定とライブ接続情報は1つのアコーディオンへ収め、配信時刻は外側に表示します。旧 `values` / `enabled` は保存互換のために保持しますが再生には使いません。
 - 通常設定は項目単位、4クリーナーはサブ機能単位、除外リストはチャンネル単位の LWW register とします。EQ の有効状態・全バンド・プリアンプ・プリセットは1レコードです。
 - 更新情報は `[時刻, 論理カウンター, ランダム端末ID]` の辞書順で比較します。端末の時計が戻った場合はカウンターを進め、受信済みの時刻も引き継ぎます。設定の local 変更通知時に時刻を取得し、5秒の送信待ちより先に更新情報を保存します。受信・再送では刻印し直しません。
 - `_settingsSyncState` に勝者・画面へ適用済みの値・時計を保持し、ネットワーク待ちと独立したキューで編集を記録します。ブラウザ側が古い値へ戻した場合も最大の更新情報を再送します。受信反映の自己通知はマーカーで除外し、設定と適用済み状態を同じ local 書込で更新します。
@@ -71,6 +71,8 @@ Chrome では popup の user gesture を起点に background が `chrome.tabCapt
 Chrome の音量設定変更はブースト中の全タブへ即時反映します。自動反映中に stream が終了しても新規キャプチャへ進みません。
 
 Firefox では `manifest.firefox.json` だけが `volume-booster-mes.js` を読み込み、各 `<video>` / `<audio>` を `MediaElementSource` と共有 DSP pipeline へ接続します。Firefox では graph を閉じても直接出力へ戻せないため、OFF 時は dry bypass を維持します。EME / DRM サイトでは attach せず、通常再生を優先します。
+
+両経路は保存済み音量設定の正規化と既存 DSP ノードへの設定適用を共有します。取得・解放や Firefox の dry / wet 切替は各経路で管理します。
 
 Firefox では attach を開始する前に、メタデータ取得済み・ページ内のユーザー操作済み・再生中という条件を確認します。これにより、自動再生中の音声が suspended な AudioContext に接続されて無音になることや、未再生のプレビューへの不要な graph 作成を避けます。ソースの安全性は `VolumeBooster.classifyMesSource` で判定します。CORS 検証付きのソースや blob / data URL は接続可能とし、それ以外の同一オリジン HTTP(S) ソースは最小 Range GET と `redirect: "manual"` でリダイレクトも確認します。安全性を確認できない場合は接続せず、元の音声出力を保ちます。
 

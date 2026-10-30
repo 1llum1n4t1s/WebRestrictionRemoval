@@ -438,7 +438,7 @@ const YouTubePlayerControls = (() => {
   const QUALITY_VALUES = DEFAULT_SETTINGS.quality.values;
   const RATE_VALUES = DEFAULT_SETTINGS.rate.values;
   const NUMERIC_CHOICES = Object.freeze({
-    playbackRate: Object.freeze([1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2, 3, 4, 5, 6, 8, 10, 12, 16]),
+    playbackRate: Object.freeze([1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2]),
     smoothThreshold: Object.freeze([0, .5, 1, 2, 3, 5, 10, 15, 20, 30, 60, 120]),
     skipThreshold: Object.freeze([1, 3, 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 999999]),
   });
@@ -467,9 +467,9 @@ const YouTubePlayerControls = (() => {
   }
   function getPlaybackSettings(raw) {
     const settings = normalizeSettings(raw);
-    // 旧ボタン割り当てはバックアップ互換用に保持し、再生 UI とショートカットは全候補で統一する。
+    // 保存形式は旧ボタン割り当てと互換を保ち、再生 UI とショートカットは固定候補で統一する。
     for (const group of ["quality", "rate", "volume"]) {
-      settings[group].values = [...DEFAULT_SETTINGS[group].values];
+      settings[group].values = [...DEFAULT_SETTINGS[group].values].filter((value) => group !== "rate" || value <= 2);
       settings[group].enabled = settings[group].values.map(() => true);
     }
     return settings;
@@ -1397,6 +1397,31 @@ const ImageDownloader = Object.freeze({
  * それ以外の値が設定された時点でブーストを起動する。
  */
 const VolumeBooster = Object.freeze({
+  // EQ preset は表示用で、実行時は gains を使用する。
+  SETTINGS_KEYS: Object.freeze([
+    StorageKeys.VOLUME_BOOSTER_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
+    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
+    StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
+    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
+  ]),
+  normalizeSettings(stored) {
+    return {
+      enabled: stored[StorageKeys.VOLUME_BOOSTER_ENABLED] === true,
+      gain: VolumeBooster.clampValue(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT),
+      antiClip: stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true,
+      nightMode: stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true,
+      bassCut: stored[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true,
+      muted: stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true,
+      eqEnabled: stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true,
+      eqGains: VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]),
+      eqPreamp: VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]),
+    };
+  },
   MIN: 0,
   /** デフォルト音量 (%)。100 で原音そのまま（gain 1.0、リソース解放状態）。 */
   DEFAULT: 100,

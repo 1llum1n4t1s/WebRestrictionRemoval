@@ -14,6 +14,45 @@ const code = fs.readFileSync(
 );
 vm.runInThisContext(code);
 
+test("applySettings: ミュートでも設定音量を保持し、同じノードへ DSP を更新", () => {
+  const V = G.VolumeBooster;
+  const param = () => ({
+    value: 0.5,
+    cancelScheduledValues() {},
+    setValueAtTime(value) { this.anchor = value; },
+    setTargetAtTime(value) { this.target = value; },
+  });
+  const compressor = () => Object.fromEntries(["threshold", "knee", "ratio", "attack", "release"].map((key) => [key, { value: 0 }]));
+  const state = {
+    ctx: { currentTime: 3 }, gainNode: { gain: param() }, preampNode: { gain: param() },
+    nightModeNode: compressor(), antiClipNode: compressor(), ceilingNode: { curve: null },
+    bassCutNodes: [createFilterNode(), createFilterNode()],
+    eqFilters: Array.from({ length: 10 }, () => ({ gain: param() })),
+  };
+  const nodes = { ...state };
+  const settings = { gain: 450, muted: true, nightMode: true, antiClip: true, bassCut: true,
+    eqEnabled: true, eqGains: [20, -20], eqPreamp: 6 };
+  assert.equal(AudioPipeline.applySettings(state, settings), 300);
+  assert.equal(state.lastSetPercent, 300);
+  assert.equal(state.gainNode.gain.anchor, 0.5);
+  assert.equal(state.gainNode.gain.target, 0);
+  assert.equal(state.nightModeNode.ratio.value, V.NIGHT_MODE_PRESET.ratio);
+  assert.equal(state.antiClipNode.ratio.value, V.ANTI_CLIP_PRESET.ratio);
+  assert.deepEqual(Array.from(state.ceilingNode.curve), [-1, 1]);
+  assert.equal(state.bassCutNodes[0].frequency.value, V.BASS_CUT_PRESET.frequency);
+  assert.equal(state.preampNode.gain.target, AudioPipeline.dbToGain(6));
+  assert.deepEqual(state.eqFilters.slice(0, 2).map((node) => node.gain.target), [12, -12]);
+  AudioPipeline.applySettings(state, { ...settings, muted: false, antiClip: false, nightMode: false, bassCut: false, eqEnabled: false });
+  assert.equal(state.gainNode.gain.target, 3);
+  assert.equal(state.ceilingNode.curve, null);
+  assert.equal(state.nightModeNode.ratio.value, V.COMPRESSOR_BYPASS.ratio);
+  assert.equal(state.antiClipNode.ratio.value, V.COMPRESSOR_BYPASS.ratio);
+  assert.equal(state.bassCutNodes[0].frequency.value, V.BASS_CUT_BYPASS.frequency);
+  assert.equal(state.preampNode.gain.target, 1);
+  assert.ok(state.eqFilters.every((node) => node.gain.target === 0));
+  for (const key of Object.keys(nodes)) assert.equal(state[key], nodes[key]);
+});
+
 /** @typedef {{type: string, frequency: {value: number}, Q: {value: number}, connectedTo: MockFilterNode | null, connect: (target: MockFilterNode) => void}} MockFilterNode */
 
 /** @returns {MockFilterNode} */

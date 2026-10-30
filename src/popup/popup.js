@@ -2300,8 +2300,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentHex = null;
     $specimenCard.classList.add("is-empty");
     document.documentElement.style.removeProperty("--pigment");
-    document.documentElement.style.removeProperty("--pigment-contrast");
-    document.documentElement.style.removeProperty("--pigment-tint");
     syncValueInputs(null);
     paletteHsv = { h: 0, s: 0, v: 0 };
     paletteBaseHex = null;
@@ -2356,13 +2354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentHex = norm;
     $specimenCard.classList.remove("is-empty");
 
-    const rgb = hexToRgb(norm);
-    const tint = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.10)`;
-    const contrast = pickContrast(rgb);
-
     document.documentElement.style.setProperty("--pigment", norm);
-    document.documentElement.style.setProperty("--pigment-contrast", contrast);
-    document.documentElement.style.setProperty("--pigment-tint", tint);
 
     syncValueInputs(norm, { source });
     if (!fromPalette) {
@@ -2475,19 +2467,6 @@ function rgbToHsl({ r, g, b }) {
     s: Math.round(s * 100),
     l: Math.round(l * 100),
   };
-}
-
-/**
- * WCAG 2.1 の相対輝度に基づいて、対象色の上に置くべき高コントラストの文字色を返す。
- * 0.5 を境界に白/黒（実際は和紙系の暖色寄り）を切り替える。
- */
-function pickContrast({ r, g, b }) {
-  const lin = (c) => {
-    const v = c / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  return L > 0.5 ? "#1a1614" : "#fefcf9";
 }
 
 /** HEX を指定形式の文字列にフォーマット（"#RRGGBB" / "rgb(...)" / "hsl(...)"）。 */

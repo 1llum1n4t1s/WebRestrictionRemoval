@@ -923,18 +923,7 @@ let inFlightVolumeSettings = null;
 //          ③ ①の await 完了 → 古い storage 値を `cachedVolumeSettings` に代入 (上書き)
 //          ④ 古い値が以降のタブ切替で適用され、UI と挙動の乖離が発生
 let cacheSeqId = 0;
-// EQ_PRESET は popup の表示状態のみで、boost には EQ_GAINS が効くため含めない。
-const VOLUME_SETTINGS_KEYS = Object.freeze([
-  StorageKeys.VOLUME_BOOSTER_ENABLED,
-  StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
-  StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-  StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
-  StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
-  StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
-  StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
-  StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
-  StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
-]);
+const VOLUME_SETTINGS_KEYS = VolumeBooster.SETTINGS_KEYS;
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   if (!HAS_VOLUME_BOOSTER) return;  // Firefox 版では音量ブースター無効
@@ -970,15 +959,8 @@ async function autoApplyVolumeBooster(tabId) {
   }
   const stored = cachedVolumeSettings;
   if (stored[StorageKeys.VOLUME_BOOSTER_ENABLED] !== true) return;
-  const gain = VolumeBooster.clampValue(stored[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT);
-  const antiClip = stored[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true;
-  const nightMode = stored[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true;
-  const bassCut = stored[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true;
-  const muted = stored[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true;
-  const eqEnabled = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
-  // gain と一貫させて offscreen への送信前にクランプ (audio-pipeline で再クランプされる二重防御)。
-  const eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
-  const eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
+  const { gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp } =
+    VolumeBooster.normalizeSettings(stored);
   await setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp, true);
 }
 
@@ -1865,7 +1847,7 @@ chrome.commands?.onCommand?.addListener(async (command) => {
   const match = /^youtube-(quality|rate|volume)-(\d+)$/.exec(command);
   if (!match) return;
   const kind = match[1]; const index = Number(match[2]) - 1;
-  if (index < 0 || index >= ({ quality: 9, rate: 16, volume: 5 })[kind]) return;
+  if (index < 0 || index >= ({ quality: 9, rate: 8, volume: 5 })[kind]) return;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab?.id) await chrome.tabs.sendMessage(tab.id, { action: "YOUTUBE_PLAYER_COMMAND", kind, index });

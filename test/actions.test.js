@@ -21,21 +21,24 @@ const fs = require("node:fs");
 const path = require("node:path");
 const G = require("./_load-actions");
 
-test("YouTube の再生候補は旧表示設定に関係なく全件を表示し、詳細値と保存済みデータを保持する", () => {
+test("YouTube の再生候補は速度を2倍までに絞り、旧表示設定・詳細値・保存済みデータを保持する", () => {
   const spec = G.SearchFixer.PLAYER_CONTROLS;
   const stored = { rate: { values: [1.35], enabled: [false] }, volume: { values: [42], hideSlider: true }, latency: { playbackRate: 1.3 } };
   const snapshot = JSON.stringify(stored);
   const result = spec.getPlaybackSettings(stored);
   for (const group of ["quality", "rate", "volume"]) {
-    assert.deepEqual([...result[group].values], [...spec.DEFAULT_SETTINGS[group].values]);
+    assert.deepEqual([...result[group].values], [...spec.DEFAULT_SETTINGS[group].values].filter((value) => group !== "rate" || value <= 2));
     assert.ok(result[group].enabled.every(Boolean));
+    assert.equal(result[group].enabled.length, result[group].values.length);
   }
+  assert.deepEqual([...result.rate.values].sort((a, b) => a - b), [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]);
+  assert.equal(spec.normalizeSettings({ rate: { values: [16] } }).rate.values[0], 16);
   assert.equal(result.volume.hideSlider, true);
   assert.equal(result.latency.playbackRate, 1.3);
   assert.equal(JSON.stringify(stored), snapshot);
   const choices = spec.NUMERIC_CHOICES;
   assert.ok(Object.isFrozen(choices));
-  assert.deepEqual([...choices.playbackRate], [1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2, 3, 4, 5, 6, 8, 10, 12, 16]);
+  assert.deepEqual([...choices.playbackRate], [1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.5, 1.75, 2]);
   assert.deepEqual([...choices.smoothThreshold], [0, .5, 1, 2, 3, 5, 10, 15, 20, 30, 60, 120]);
   assert.deepEqual([...choices.skipThreshold], [1, 3, 5, 10, 15, 30, 60, 120, 180, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 999999]);
   for (const values of Object.values(choices)) assert.ok(Object.isFrozen(values));
@@ -102,6 +105,37 @@ test("_locales: 全 CATEGORIES にカテゴリ名が ja / en 両方そろって�
 });
 
 // ---------- VolumeBooster ----------
+
+test("VolumeBooster.normalizeSettings: 保存値を安全に正規化し配列を共有しない", () => {
+  const V = G.VolumeBooster;
+  const K = G.StorageKeys;
+  assert.ok(Object.isFrozen(V.SETTINGS_KEYS));
+  assert.equal(V.SETTINGS_KEYS.length, 9);
+  assert.ok(!V.SETTINGS_KEYS.includes(K.VOLUME_BOOSTER_EQ_PRESET));
+  const empty = V.normalizeSettings({});
+  assert.equal(empty.gain, 100);
+  assert.deepEqual(empty.eqGains, Array(10).fill(0));
+  assert.deepEqual(V.normalizeSettings({ [K.VOLUME_BOOSTER_LAST_GAIN]: null }).gain, 100);
+  const bands = [99, -99, "bad", 2.6];
+  const settings = V.normalizeSettings({
+    [K.VOLUME_BOOSTER_ENABLED]: true,
+    [K.VOLUME_BOOSTER_LAST_GAIN]: "bad",
+    [K.VOLUME_BOOSTER_ANTI_CLIP_ENABLED]: 1,
+    [K.VOLUME_BOOSTER_NIGHT_MODE_ENABLED]: true,
+    [K.VOLUME_BOOSTER_BASS_CUT_ENABLED]: "true",
+    [K.VOLUME_BOOSTER_MUTED_ENABLED]: true,
+    [K.VOLUME_BOOSTER_EQ_ENABLED]: 1,
+    [K.VOLUME_BOOSTER_EQ_GAINS]: bands,
+    [K.VOLUME_BOOSTER_EQ_PREAMP]: 99,
+  });
+  assert.equal(settings.gain, 100);
+  assert.deepEqual([settings.enabled, settings.antiClip, settings.nightMode, settings.bassCut, settings.muted, settings.eqEnabled],
+    [true, false, true, false, true, false]);
+  assert.deepEqual(settings.eqGains, [12, -12, 0, 3, 0, 0, 0, 0, 0, 0]);
+  assert.notEqual(settings.eqGains, bands);
+  assert.notEqual(V.normalizeSettings({}).eqGains, empty.eqGains);
+  assert.equal(settings.eqPreamp, 12);
+});
 
 test("VolumeBooster.nudgePercent: ±ボタンの増減と端の clamp", () => {
   const n = G.VolumeBooster.nudgePercent;

@@ -224,6 +224,26 @@
     graph.ceilingNode.connect(graph.destination);
   }
 
+  /** 既存ノードを保ち、音量・各 preset・EQ を同じ順序で更新する。 */
+  function applySettings(state, settings) {
+    const clamped = VolumeBooster.clampValue(settings.gain);
+    const targetGain = settings.muted === true ? 0 : VolumeBooster.percentToGain(clamped);
+    const now = state.ctx.currentTime;
+    state.gainNode.gain.cancelScheduledValues(now);
+    state.gainNode.gain.setValueAtTime(state.gainNode.gain.value, now);
+    state.gainNode.gain.setTargetAtTime(targetGain, now, VolumeBooster.RAMP_TIME_CONSTANT);
+    state.lastSetPercent = clamped;
+    applyCompressorPreset(state.nightModeNode,
+      settings.nightMode === true ? VolumeBooster.NIGHT_MODE_PRESET : VolumeBooster.COMPRESSOR_BYPASS);
+    applyCompressorPreset(state.antiClipNode,
+      settings.antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS);
+    applyOutputCeiling(state.ceilingNode, settings.antiClip === true);
+    applyFilterPreset(state.bassCutNodes,
+      settings.bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS);
+    applyEqualizer(state, settings.eqEnabled === true, settings.eqGains, settings.eqPreamp);
+    return clamped;
+  }
+
   globalThis.AudioPipeline = Object.freeze({
     dbToGain,
     applyCompressorPreset,
@@ -234,5 +254,6 @@
     createOutputCeiling,
     applyOutputCeiling,
     connectAudioGraph,
+    applySettings,
   });
 })();

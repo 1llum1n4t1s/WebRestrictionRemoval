@@ -18,11 +18,12 @@
     let automatic = null;
     let manualRate = false;
     let controls = null;
+    let liveControls = null;
     let ends = [];
     let lastSkip = 0;
     let copiedUntil = 0;
     const buttons = new Map();
-    const currentValues = new Map();
+    const selections = new Map();
 
     function call(name, ...args) {
       try { return typeof player?.[name] === "function" ? player[name](...args) : undefined; } catch { return undefined; }
@@ -50,8 +51,10 @@
     function clearUI() {
       controls?.remove();
       controls = null;
+      liveControls?.remove();
+      liveControls = null;
       buttons.clear();
-      currentValues.clear();
+      selections.clear();
       player?.classList.remove("__cpa-ypc-hide-slider", "__cpa-ypc-hide-volume");
     }
 
@@ -91,7 +94,7 @@
         result.labels[key] = data.labels[key];
       }
       for (const key of ["liveLatency", "playbackQuality", "playbackRate", "playerVolume"]) result.features[key] = data.features[key] === true;
-      for (const [key, length, low, high] of [["quality", 9, 0, 0], ["rate", 16, 0.1, 16], ["volume", 5, 0, 100]]) {
+      for (const [key, length, low, high] of [["quality", 9, 0, 0], ["rate", 8, 0.1, 2], ["volume", 5, 0, 100]]) {
         const group = input[key];
         if (!group || !Array.isArray(group.values) || group.values.length !== length || !Array.isArray(group.enabled) || group.enabled.length !== length) return null;
         if (group.values.some((value) => key === "quality" ? !qualityValues.includes(value) : !finite(value, low, high))) return null;
@@ -165,37 +168,34 @@
       clearUI();
       controls = document.createElement("div");
       controls.className = "__cpa-ypc-controls";
-      for (const [kind, feature] of [["quality", "playbackQuality"], ["rate", "playbackRate"], ["volume", "playerVolume"]]) {
+      for (const [kind, feature] of [["quality", "playbackQuality"], ["volume", "playerVolume"], ["rate", "playbackRate"]]) {
         if (!config.features[feature]) continue;
         const group = config.settings[kind];
-        const container = document.createElement("span");
+        const container = document.createElement("label");
         container.className = "__cpa-ypc-group";
-        container.setAttribute("role", "group");
-        container.setAttribute("aria-label", config.labels[kind]);
-        const heading = document.createElement("span");
-        heading.className = "__cpa-ypc-heading";
         const name = document.createElement("span");
         name.className = "__cpa-ypc-label";
         name.textContent = config.labels[kind];
-        const current = document.createElement("span");
-        current.className = "__cpa-ypc-current";
-        currentValues.set(kind, current);
-        heading.append(name, current);
-        const choices = document.createElement("span");
-        choices.className = "__cpa-ypc-choices";
-        container.append(heading, choices);
-        const order = kind === "quality" ? [0, 1, 2, 3, 4, 5, 6, 8, 7] : kind === "rate" ? [0, 1, 2, 3, 4, 5, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15] : group.values.map((_value, index) => index);
+        const select = document.createElement("select");
+        select.className = "__cpa-ypc-select";
+        select.setAttribute("aria-label", config.labels[kind]);
+        selections.set(kind, select);
+        container.append(name, select);
+        const order = kind === "quality" ? [0, 1, 2, 3, 4, 5, 6, 8, 7] : kind === "rate" ? [0, 1, 2, 3, 4, 5, 7, 6] : group.values.map((_value, index) => index);
         for (const index of order) {
           const value = group.values[index];
           const label = kind === "quality" ? (value === "auto" ? config.labels.auto : qualityLabels[value]) : kind === "rate" ? `${value}x` : `${value}%`;
-          const button = createButton(label, `${config.labels[kind]}: ${label}`, () => command(kind, index));
-          buttons.set(`${kind}:${index}`, button);
-          choices.append(button);
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = label;
+          select.append(option);
         }
+        select.addEventListener("change", () => { command(kind, Number(select.value)); });
         controls.append(container);
       }
+      for (const type of ["click", "dblclick", "keydown", "keyup", "pointerdown"]) controls.addEventListener(type, (event) => event.stopPropagation());
       if (config.features.liveLatency) {
-        const group = document.createElement("span");
+        const group = document.createElement("div");
         group.className = "__cpa-ypc-group __cpa-ypc-live";
         for (const key of ["showPlaybackRate", "showLatency", "showHealth", "showEstimation", "showCurrent"]) {
           if (!config.settings.latency[key]) continue;
@@ -204,7 +204,8 @@
           buttons.set(key, button);
           group.append(button);
         }
-        controls.append(group);
+        liveControls = group;
+        area.querySelector(".__cpa-ypc-settings")?.append(group);
       }
       area.prepend(controls);
     }
@@ -213,21 +214,40 @@
       const quality = call("getPlaybackQuality");
       const preferredQuality = call("getPreferredQuality") || quality;
       const volume = call("isMuted") === true ? 0 : call("getVolume");
-      const values = {
+      const labels = {
         quality: quality === "auto" ? config.labels.auto : (qualityLabels[quality] || "—"),
         rate: Number.isFinite(video.playbackRate) ? `${video.playbackRate}x` : "—",
         volume: Number.isFinite(volume) ? `${Math.round(volume)}%` : "—",
       };
-      for (const [kind, current] of currentValues) {
-        if (current.textContent !== values[kind]) current.textContent = values[kind];
-      }
-      for (const [key, button] of buttons) {
-        const [kind, index] = key.split(":");
-        if (index === undefined) continue;
-        const value = config.settings[kind].values[Number(index)];
-        const active = value === (kind === "quality" ? preferredQuality : kind === "rate" ? video.playbackRate : volume);
-        button.classList.toggle("__cpa-ypc-active", active);
-        button.setAttribute("aria-pressed", String(active));
+      const available = call("getAvailableQualityLevels");
+      for (const [kind, select] of selections) {
+        const values = config.settings[kind].values;
+        const value = kind === "quality" ? preferredQuality : kind === "rate" ? video.playbackRate : volume;
+        const index = values.indexOf(value);
+        // 標準 UI で選んだ候補外の値も表示する。候補を勝手に近い値へ置き換えない。
+        let current = select.querySelector('option[value="current"]');
+        if (index < 0) {
+          if (!current) {
+            current = document.createElement("option");
+            current.value = "current";
+            current.disabled = true;
+            select.append(current);
+          }
+          if (current.textContent !== labels[kind]) current.textContent = labels[kind];
+        } else current?.remove();
+        for (const option of select.options) {
+          if (kind !== "quality" || option.value === "current") continue;
+          const qualityValue = values[Number(option.value)];
+          option.disabled = qualityValue !== "auto" && (!Array.isArray(available) || !available.includes(qualityValue));
+          if (qualityValue === "auto") {
+            const label = preferredQuality === "auto" && quality !== "auto" ? `${config.labels.auto} (${labels.quality})` : config.labels.auto;
+            if (option.textContent !== label) option.textContent = label;
+          }
+        }
+        // 現在値が変わったときだけ選択状態を更新する。
+        const selected = index < 0 ? "current" : String(index);
+        if (select.value !== selected) select.value = selected;
+        select.title = `${config.labels[kind]}: ${labels[kind]}`;
       }
     }
 
@@ -322,6 +342,7 @@
       mountUI();
       const visible = !isAd();
       if (controls) controls.hidden = !visible;
+      if (liveControls) liveControls.hidden = !visible;
       player.classList.toggle("__cpa-ypc-hide-slider", visible && config.features.playerVolume && config.settings.volume.hideSlider);
       player.classList.toggle("__cpa-ypc-hide-volume", visible && config.features.playerVolume && config.settings.volume.hideVolumeIcon);
       liveTick();

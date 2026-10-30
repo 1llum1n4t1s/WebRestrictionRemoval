@@ -4,7 +4,6 @@
   const CHANNEL = "__cpa_youtube_player_controls_v1";
   const featureKeys = ["liveLatency", "playbackQuality", "playbackRate", "playerVolume"];
   const watchFeatures = SearchFixer.FEATURES.filter((feature) => feature.category === "watch_page");
-  const quickFeatureKeys = new Set(["hideComments", "hideLiveChat", "broadcastClock"]);
   let state = null;
   let session = null;
   let stopped = false;
@@ -83,7 +82,7 @@
             if (!response?.ok) throw new Error("save-failed");
             // onStored の再取得で state が更新済みなら、その確定値を旧応答で上書きしない。
             if (session === activeSession && state === requestState) {
-              if (request.data) state.settings = spec.mergeSettings(state.settings, request.data);
+              if (request.data) state.settings = spec.getPlaybackSettings(spec.mergeSettings(state.settings, request.data));
               else state.watchFeatures[request.key] = value;
             }
             failedInputs.delete(input);
@@ -98,8 +97,7 @@
 
       const list = document.createElement("div");
       list.className = "__cpa-ypc-setting-list";
-      const quick = document.createElement("div");
-      quick.className = "__cpa-ypc-quick-settings";
+      let latencyItem = null;
       for (const feature of watchFeatures) {
         const item = document.createElement("div");
         item.className = "__cpa-ypc-setting-item";
@@ -107,11 +105,12 @@
           () => state.watchFeatures[feature.key], (value) => ({ action: "APPLY_YOUTUBE_WATCH_FEATURE", key: feature.key, value }));
         const group = groups[feature.key];
         if (group) {
-          const details = document.createElement("details");
+          if (group === "latency") {
+            item.classList.add("__cpa-ypc-setting-item--wide");
+            latencyItem = item;
+          }
+          const details = document.createElement("div");
           details.className = "__cpa-ypc-advanced";
-          const title = document.createElement("summary");
-          title.textContent = message("yp_details");
-          details.append(title);
           const defaults = spec.DEFAULT_SETTINGS[group];
           for (const [key, fallback] of Object.entries(defaults)) {
             if (Array.isArray(fallback)) continue;
@@ -122,17 +121,14 @@
           }
           item.append(details);
         }
-        if (quickFeatureKeys.has(feature.key)) {
-          item.title = message(`feat_sf_${feature.key}_desc`);
-          quick.append(item);
-        } else list.append(item);
+        list.append(item);
       }
-      panel.append(list);
-      for (const target of [panel, quick]) {
-        for (const type of ["click", "dblclick", "keydown", "keyup", "pointerdown"]) target.addEventListener(type, (event) => event.stopPropagation());
-      }
+      // 詳細の多い遅延設定を末尾へまとめ、操作順も表示順に揃える。
+      if (latencyItem) list.append(latencyItem);
+      panel.append(status, list);
+      for (const type of ["click", "dblclick", "keydown", "keyup", "pointerdown"]) panel.addEventListener(type, (event) => event.stopPropagation());
       settingsPanel = panel;
-      slot.append(status, quick, panel);
+      slot.append(panel);
     }
     for (const { input, readValue } of bindings) {
       if (input.disabled) continue;
@@ -226,7 +222,7 @@
 
   chrome.runtime.onMessage.addListener((request, sender) => {
     if (stopped || !SenderCheck.isFromBackground(sender) || request?.action !== "YOUTUBE_PLAYER_COMMAND") return;
-    const limits = { quality: 9, rate: 16, volume: 5 };
+    const limits = { quality: 9, rate: 8, volume: 5 };
     if (!Object.hasOwn(limits, request.kind) || !Number.isInteger(request.index) || request.index < 0 || request.index >= limits[request.kind]) return;
     if (session && targetPage()) post("command", { kind: request.kind, index: request.index });
   });

@@ -151,12 +151,9 @@
 
   const {
     applyCompressorPreset,
-    applyFilterPreset,
     createBassCutChain,
-    applyEqualizer,
     createEqChain,
     createOutputCeiling,
-    applyOutputCeiling,
     connectAudioGraph,
   } = AudioPipeline;
 
@@ -503,27 +500,7 @@
   function applyStateSettings(state, settings, withLease = false) {
     // neutral化はDSP parameter更新より先に出力crossfadeを予約する。後続更新が例外でも旧wet設定は残らない。
     if (!withLease) scheduleOutputMix(state, false, false);
-    const clamped = VolumeBooster.clampValue(settings.gain);
-    const targetGain = settings.muted === true ? 0 : VolumeBooster.percentToGain(clamped);
-    const now = state.ctx.currentTime;
-    state.gainNode.gain.cancelScheduledValues(now);
-    state.gainNode.gain.setValueAtTime(state.gainNode.gain.value, now);
-    state.gainNode.gain.setTargetAtTime(targetGain, now, VolumeBooster.RAMP_TIME_CONSTANT);
-    state.lastSetPercent = clamped;
-    applyCompressorPreset(
-      state.nightModeNode,
-      settings.nightMode === true ? VolumeBooster.NIGHT_MODE_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
-    );
-    applyCompressorPreset(
-      state.antiClipNode,
-      settings.antiClip === true ? VolumeBooster.ANTI_CLIP_PRESET : VolumeBooster.COMPRESSOR_BYPASS,
-    );
-    applyOutputCeiling(state.ceilingNode, settings.antiClip === true);
-    applyFilterPreset(
-      state.bassCutNodes,
-      settings.bassCut === true ? VolumeBooster.BASS_CUT_PRESET : VolumeBooster.BASS_CUT_BYPASS,
-    );
-    applyEqualizer(state, settings.eqEnabled === true, settings.eqGains, settings.eqPreamp);
+    AudioPipeline.applySettings(state, settings);
     // active化はDSP設定完了後にwetへcrossfadeし、未設定graphが一瞬聞こえるのを防ぐ。
     if (withLease) scheduleOutputMix(state, true, true);
   }
@@ -746,17 +723,7 @@
   // storage 監視 (popup → storage 直書きが唯一のトリガー)
   // ============================================================
 
-  const WATCHED_KEYS = [
-    StorageKeys.VOLUME_BOOSTER_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_LAST_GAIN,
-    StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_EQ_ENABLED,
-    StorageKeys.VOLUME_BOOSTER_EQ_GAINS,
-    StorageKeys.VOLUME_BOOSTER_EQ_PREAMP,
-  ];
+  const WATCHED_KEYS = VolumeBooster.SETTINGS_KEYS;
   const WATCHED_KEY_SET = new Set(WATCHED_KEYS);
   let settingsLoadGeneration = 0;
 
@@ -782,17 +749,7 @@
         }
         if (orphaned) return;
         if (generation !== settingsLoadGeneration) return;
-        currentSettings = {
-          enabled: s[StorageKeys.VOLUME_BOOSTER_ENABLED] === true,
-          gain: VolumeBooster.clampValue(s[StorageKeys.VOLUME_BOOSTER_LAST_GAIN] ?? VolumeBooster.DEFAULT),
-          antiClip: s[StorageKeys.VOLUME_BOOSTER_ANTI_CLIP_ENABLED] === true,
-          nightMode: s[StorageKeys.VOLUME_BOOSTER_NIGHT_MODE_ENABLED] === true,
-          bassCut: s[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true,
-          muted: s[StorageKeys.VOLUME_BOOSTER_MUTED_ENABLED] === true,
-          eqEnabled: s[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true,
-          eqGains: VolumeBooster.clampEqGains(s[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]),
-          eqPreamp: VolumeBooster.clampEqPreamp(s[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]),
-        };
+        currentSettings = VolumeBooster.normalizeSettings(s);
         scanAndApply();
       });
     } catch (error) {

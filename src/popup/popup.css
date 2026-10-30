@@ -54,8 +54,6 @@
   --ink-soft: #68605e;
   --ink-faint: #70655f;
   --pigment: #805160;
-  --pigment-tint: rgba(128, 81, 96, 0.10);
-  --pigment-contrast: #fffaf7;
   --neutral-plate: #efefef;
   --neutral-plate-rule: #cccccc;
   --switch-off: #b6aaa4;
@@ -82,8 +80,6 @@
     --ink-soft: #c2b5b9;
     --ink-faint: #b4a5ac;
     --pigment: #c8ae7b;
-    --pigment-tint: rgba(200, 174, 123, 0.10);
-    --pigment-contrast: #292118;
     --neutral-plate: #292929;
     --neutral-plate-rule: #555555;
     --switch-off: #796771;
