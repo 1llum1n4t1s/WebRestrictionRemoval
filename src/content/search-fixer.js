@@ -53,6 +53,8 @@
   let liveChatObserver = null;
   // ページごとの自動折りたたみ後は、ユーザーによる再表示を維持する。
   let liveChatCollapseHandled = false;
+  // SPA の finish 時点では前動画の collapsed 状態が残る。ページデータ反映まで完了判定しない。
+  let liveChatNavigationPending = false;
   let liveChatCollapseInProgress = false;
   let liveChatClickAttempts = 0;
   /** @type {boolean} liveChatObserver が現在 attach されているか */
@@ -278,6 +280,7 @@
   // start ハンドラは「ナビゲーション開始時の cleanup」に専念。SPA で再利用される
   // ytd-video-renderer の processed マーカーを剥がし、新クエリでの demote 判定を有効化する (#5)。
   document.addEventListener("yt-navigate-start", onNavigationStart);
+  document.addEventListener("yt-page-data-updated", onLiveChatPageDataUpdated);
 
   /** SPA ナビゲーション開始時の cleanup。CLASS_PROCESSED を剥がし新クエリでの再判定を許可する。 */
   function onNavigationStart() {
@@ -286,6 +289,7 @@
     commentsRevealed = false;
     removeCommentsToggle();
     detachLiveChatObserver();
+    liveChatNavigationPending = true;
     liveChatCollapseHandled = false;
     window.__cpaLiveChatCollapseHandled = false;
     liveChatClickAttempts = 0;
@@ -306,6 +310,12 @@
     document
       .querySelectorAll(`.${CLASS_PROCESSED}`)
       .forEach((el) => el.classList.remove(CLASS_PROCESSED));
+  }
+
+  function onLiveChatPageDataUpdated() {
+    if (orphanCleanupRan || !liveChatNavigationPending) return;
+    liveChatNavigationPending = false;
+    syncLiveChatCollapse();
   }
 
   /**
@@ -410,7 +420,7 @@
       liveChatClickAttempts = 0;
       return;
     }
-    if (liveChatCollapseHandled) return;
+    if (liveChatCollapseHandled || liveChatNavigationPending) return;
     // SPA 遷移経路でも先制非表示を即時 ON にする（初回直アクセスは youtube-early.js が
     // document_start で同クラスを付与済みなので idempotent）。click 成功時に剥がす。
     document.documentElement.classList.add(LIVE_CHAT_PRE_HIDE_CLASS);
@@ -706,7 +716,7 @@
     // 他には一切触らない（CSS / frame 属性 / 独自クラス / iframe 高さ全部触らない）。
     // 公式 close button の click は user gesture と等価扱いなので YouTube SPA は整合的に
     // 状態更新し、player 副作用ゼロ・layout も自動で整理される。
-    if (liveChatCollapseHandled || !f("hideLiveChat") || !isWatchPage()) {
+    if (liveChatCollapseHandled || liveChatNavigationPending || !f("hideLiveChat") || !isWatchPage()) {
       cancelLiveChatCollapseRetry();
       return;
     }

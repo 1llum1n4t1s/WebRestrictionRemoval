@@ -125,6 +125,8 @@ Service worker。役割:
 6. **`search-fixer.js` の `scheduleLiveChatCollapseRetry` 上限到達分岐**: fail-safe で pre クラス削除（live chat なし動画 / hydration 異常で永遠に click 成功しない場合に備え、frame を永久に隠したままにせず元 UI を見せる）
 7. **delay 短縮**: iframe load 後 delay は **300ms → 50ms**、リトライバックオフは **[200, 600, 1500] → [50, 200, 800]** に短縮（pre クラスで見た目はすでに隠れているため、hydration 完了次第すぐ click → 公式 collapsed bar 表示、を最速化）
 
+再生リストなどの SPA 遷移では、`yt-navigate-finish` 後も前動画の `collapsed` 属性が残り、ページデータ反映時にチャットが再展開される。`yt-navigate-start` から `yt-page-data-updated` までは先制非表示を保ち、遅延した iframe load 通知を含め折りたたみの試行・完了判定を待機する。反映後に自動処理を再開し、同じ動画での追加のデータ通知では手動再表示をリセットしない。
+
 **復活禁止の失敗パターン**: 詳細列挙は本ドキュメント末尾の Important Patterns「hideLiveChat（YouTube ライブチャット非表示）」を参照。要約すると `display:none` / `height:0` / `setAttribute("collapsed")` / `#chat-container:has(...){display:none}` / 独自クラスでの frame 全体非表示はすべて NG（SPA panel state を破壊して player 副作用 / 「パネルを開く」消失 / 再展開不能になる）。`visibility:hidden` は layout のみへの影響で Polymer state に介入しないため安全。
 
 **登録チャンネル拡張（v1.0.27 で完成）**: 3 機能セットで構成される。
