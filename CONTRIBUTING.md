@@ -10,8 +10,8 @@ LLM (Claude / Codex 等) 向けの詳細な実装規約は [AGENTS.md](AGENTS.md
 
 ## 開発環境
 
-- **Node.js**: 22+ (Volta 管理を推奨)
-- **pnpm**: 11+
+- **Node.js**: 26.13.0 (CI 検証版、Volta 管理を推奨)
+- **pnpm**: 12.16.1 (CI 検証版)
 - **対象ブラウザ**: Chrome 140+ / Firefox 142+
 
 ## セットアップ
