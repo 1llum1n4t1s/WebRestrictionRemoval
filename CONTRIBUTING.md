@@ -136,7 +136,7 @@ Popup (src/popup/popup.{html,js,css})
 | `_locales/{en,ja}/` | i18n (Chrome i18n API) |
 | `test/actions.test.js` | 純粋関数テスト（FEATURES / 公開定数の drift 検知を含む。件数は実行結果を参照） |
 | `webstore/` | ストア申請用 HTML テンプレート / 画像生成 / store-listing テキスト |
-| `vava.config.json` | `/vava` スキル (ストア listing 同期スクリプト) 用のプロジェクト固有設定 |
+| `AGENTS.md` | ストア掲載情報の同期・確認コマンド |
 
 ## コーディング規約
 
