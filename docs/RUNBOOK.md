@@ -51,11 +51,11 @@
 
 ### 2-C. リリース失敗（publish.yml）
 
-- Chrome publish が fail だが Firefox publish が success → Chrome 側のみ問題（`if: success() || failure()` で独立実行）
-- Chrome で upload 成功後に Publish API が fail → 同じ release workflow を再実行。pre-flight が同 version の再 upload だけを skip し、Submit for review を再試行する
-- Chrome 側エラー `ITEM_NOT_UPDATABLE` → pre-flight の Items.get が失敗または同 version を識別できず、重複 upload に進んだ可能性。pre-flight ログの `crxVersion` / `uploadState` を確認する
-- Firefox 側エラー `Version * already exists` → 同様
-- Chrome の pre-flight は同 version を検知すると upload のみ skip し、review 申請済みか Items.get では確定できないため Publish API は保守的に毎回実行する
+- Chrome publish が fail だが Firefox publish が success → Chrome 側のみ問題（両 publish job は `package` だけに依存し、互いの結果に依存しない）
+- Chrome で upload 成功後に Publish API が fail → CWS Dashboard でアップロード済み版と審査状態、失敗ログを確認する。同 version の自動再 upload・再申請は行わない
+- Chrome の pre-flight は同 version、version 不明、upload 状態不明を検出すると停止する。`ITEM_NOT_UPDATABLE` 等のエラーは Dashboard とログの `crxVersion` / `uploadState` を照合する
+- Firefox は認証付きで listed version の全ページを確認し、既存 version があれば提出せず非ゼロ終了する。`Version * already exists` の場合も AMO の登録版と審査状態、失敗ログを確認する
+- workflow の再実行（`github.run_attempt > 1`）では package job が実行されない。未確認の提出状態を再実行やガードの無効化で迂回しない。自動の同 version 再提出・復旧経路は用意されていない
 
 #### ロールバック手順
 

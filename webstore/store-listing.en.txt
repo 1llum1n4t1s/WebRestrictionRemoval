@@ -12,7 +12,10 @@ Vuora
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 12 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok) — into a single popup, all designed for comfortable everyday browsing.
+An extension that consolidates 13 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok / X) — into a single popup, all designed for comfortable everyday browsing.
+
+📖 Wikipedia reading settings (opt-in, default OFF)
+Adjust article width, typeface, text size, and colors on Wikipedia. Includes sticky contents, enlargement of loaded images, and in-page reference previews. Styles Wikipedia’s standard article previews when enabled on Wikipedia. Article text, editing links, and attribution remain available. No external viewer, redirects, or new article fetches.
 
 ■ Main features
 
@@ -22,12 +25,12 @@ An extension that consolidates 12 categories of viewing aids — plus a shared s
   Quality, volume, and playback speed appear in one row of selectors when enabled. Playback speeds range from 0.25x to 2x. Other settings share one accordion: general settings use two columns and live-latency settings use a full-width section. Narrow players use one column. Archive broadcast time remains outside the accordion. Assign shortcuts in your browser's extension settings.
 
 · 🐦 X cleaner (opt-in, default OFF)
-  Nine sub-features that hide distracting UI on X (formerly Twitter).
+  Ten sub-features to hide distracting UI and save post images on X (formerly Twitter). Enable image download under Extras to save post images in original quality using the button shown on hover.
   Layout: hide the right pane (widening the timeline into it) / trends / who to follow / messages dock
   Noise: hide promoted posts / Premium upsells / Grok / engagement counts (reply, repost, like, views)
   Timeline: open Home on the "Following" tab
   * Selectors are structural data-testid matches only, so they do not depend on the display language.
-  * Client-side DOM/CSS only; nothing is ever transmitted.
+  * Image downloads request HTTPS pbs.twimg.com/media/ only on click, with name=orig, image format, image path and IP address. No cookies or referrer are sent; redirects are rejected.
 
 · 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
   On https://www.amazon.co.jp/auto-deliveries, retrieves missing prices from Amazon and shows unit price × quantity totals in the list. When delivery prices are missing, current prices or previous delivery unit prices are used to show a reference total. The billed amount may change and coupons are not included. No partial total is shown unless all items are available. Legacy monthly pages remain supported.
@@ -92,9 +95,9 @@ The "07 Settings" tab brings together browser settings sync and JSON export/impo
 · Settings are stored on your device (chrome.storage.local). Optional settings sync shares eligible settings through the browser's sync service.
 · Page content and tab audio are not collected or transmitted for advertising, analytics, or telemetry.
 · Only when you submit the optional contact form are your email address, optional name, inquiry content, verification code, and related support details sent to Kagayoi Support.
-· Other external communication is limited to user-initiated or opt-in Instagram / TikTok image retrieval, sending video URLs to Gemini Notebook, browser settings sync, subscription channel thumbnails, and Amazon Subscribe & Save price retrieval.
+· Other external communication is limited to user-initiated or opt-in Instagram / TikTok / X image retrieval, sending video URLs to Gemini Notebook, browser settings sync, subscription channel thumbnails, and Amazon Subscribe & Save price retrieval.
 · Amazon price retrieval runs only while the feature is ON, using read-only requests with Amazon authentication cookies to the same https://www.amazon.co.jp origin. Amazon receives delivery, subscription, history, and order identifiers, product URLs, and your IP address. Orders and deliveries are not changed, and nothing is sent to the developer's server. Results stay only in page memory; turning the feature OFF or navigating away cancels requests and discards results.
-  (When the Instagram / TikTok image download button is ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
+  (When both the cleaner master toggle and the Instagram / TikTok / X image download option are ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com / HTTPS pbs.twimg.com/media/) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
 · While Volume Booster is in use, tab audio data is only amplified and re-output through an AudioContext; no recording, storage, or external transmission is performed.
 
 ■ Category

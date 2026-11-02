@@ -2,17 +2,20 @@
 Firefox AMO Listing (English)
 ※ For Chrome Web Store, see webstore/store-listing.en.txt
 ※ For Japanese, see webstore/store-listing.firefox.ja.txt
-※ All 12 categories work on Firefox. The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource), except on DRM-protected video sites.
+※ All 13 categories work on Firefox. The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource), except on DRM-protected video sites.
 ============================================================
 
 ■ Name
 Vuora (Firefox)
 
 ■ Summary (250 chars max)
-Locally tunes the pages you view. 12 categories: YouTube Enhancements, X Cleaner, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (non-DRM sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
+Locally tunes the pages you view. 13 categories: YouTube Enhancements, X Cleaner, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (non-DRM sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
 
 ■ Description (16,000 chars max)
-A productivity helper that bundles 12 categories of features into a single popup.
+A productivity helper that bundles 13 categories of features into a single popup.
+
+📖 Wikipedia reading settings (opt-in, default OFF)
+Adjust article width, typeface, text size, and colors on Wikipedia. Includes sticky contents, enlargement of loaded images, and in-page reference previews. Styles Wikipedia’s standard article previews when enabled on Wikipedia. Article text, editing links, and attribution remain available. No external viewer, redirects, or new article fetches.
 
 ■ Features available on Firefox
 
@@ -20,8 +23,8 @@ A productivity helper that bundles 12 categories of features into a single popup
 Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, hiding "Most relevant" in Subscriptions, subscription channel expansion (subs feed → grid + lazy thumbnail), and more granular controls for YouTube's verbose UI.
 Reduce live latency and switch video quality, playback speed, and player volume. Archive broadcast time also appears as a labeled section in the shared overlay.
 
-🔹 X Cleaner (9 sub-features)
-Hide the right pane (widening the timeline into it) / trends / who to follow / messages dock / promoted posts / Premium upsells / Grok / engagement counts, and open Home on the "Following" tab. Selectors are structural data-testid matches only, so they do not depend on the display language.
+🔹 X Cleaner (10 sub-features)
+Hide the right pane (widening the timeline into it) / trends / who to follow / messages dock / promoted posts / Premium upsells / Grok / engagement counts, and open Home on the "Following" tab. Selectors are structural data-testid matches only, so they do not depend on the display language. Enable image download under Extras to save post images in original quality using the button shown on hover. On click only, image downloads send the image path, format, name=orig and IP address to HTTPS pbs.twimg.com/media/. No cookies or referrer are sent, and redirects are rejected.
 
 🔹 Amazon Subscribe & Save totals
 On amazon.co.jp/auto-deliveries, retrieves missing prices from Amazon and shows unit price × quantity totals in the list. When delivery prices are missing, current prices or previous delivery unit prices are used to show a reference total. The billed amount may change and coupons are not included. No partial total is shown unless all items are available. Legacy monthly pages remain supported.

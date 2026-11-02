@@ -8,7 +8,7 @@
 
 ### Firefox AMO 対応 (2026-05-16 確立、ReplaceFontSelect の知見ベース)
 
-WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースターは per-browser 2 実装** — Chrome は tabCapture → offscreen 経路 (Firefox MV3 は `chrome.tabCapture` / `chrome.offscreen` 未対応)、Firefox は専用 MES パイプライン (`volume-booster-mes.js`、manifest.firefox.json のみに登録、2026-07-02 追加) で、Firefox でも全 12 機能が動作する (DRM サイトでは音量ブースターのみ無効)。background の音量関連処理は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip。Firefox 版ビルドの不変条件:
+WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースターは per-browser 2 実装** — Chrome は tabCapture → offscreen 経路 (Firefox MV3 は `chrome.tabCapture` / `chrome.offscreen` 未対応)、Firefox は専用 MES パイプライン (`volume-booster-mes.js`、manifest.firefox.json のみに登録、2026-07-02 追加) で、Firefox でも全 13 機能が動作する (DRM サイトでは音量ブースターのみ無効)。background の音量関連処理は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip。Firefox 版ビルドの不変条件:
 
 1. **専用 manifest 分割** — `manifest.firefox.json` を別ファイルで持ち、zip スクリプトが Firefox xpi 生成時に `manifest.json` として同梱する。Chrome 版とは以下が違う:
    - `offscreen` / `tabCapture` permission を **除外** (Firefox MV3 未対応)
@@ -21,13 +21,13 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 
 3. **`HAS_VOLUME_BOOSTER` ランタイム検知** — `const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";` を background.js で定義し、`VOLUME_BOOSTER_SET_GAIN` / `VOLUME_BOOSTER_RELEASE_TAB` メッセージ handler、`chrome.tabs.onActivated` / `chrome.tabs.onRemoved` / `chrome.storage.onChanged` の音量関連経路で早期 return する。
 
-4. **popup の MES 分岐** — `popup.js` の `VOLUME_BOOSTER_VIA_MES = !HAS_VOLUME_BOOSTER` で Firefox を検知し、(a) audio section は Firefox でも**表示したまま** `#volumeMesNote`（DRM サイト非対応の注記、i18n キー `volumeMesFirefoxNote`）の hidden を外す、(b) `pushVolumeNow` は storage 書き込み（MES では EQ 3 キーも同梱して live 反映）だけで early return し `VOLUME_BOOSTER_SET_GAIN` メッセージを送らない。旧「audio section 全体を display:none」方式は 2026-07-02 の MES 経路追加で廃止。
+4. **popup の MES 分岐** — `popup.js` の `VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER` で Firefox を検知し、(a) audio section は Firefox でも**表示したまま** `#volumeMesNote`（DRM サイト非対応の注記、i18n キー `volumeMesFirefoxNote`）の hidden を外す、(b) `pushVolumeNow` は storage 書き込み（MES では EQ 3 キーも同梱して live 反映）だけで early return し `VOLUME_BOOSTER_SET_GAIN` メッセージを送らない。旧「audio section 全体を display:none」方式は 2026-07-02 の MES 経路追加で廃止。
 
 5. **AMO 初回登録** — CI からは新規 add-on 作成不可。ローカルで `WEB_EXT_API_KEY=$AMO_JWT_ISSUER WEB_EXT_API_SECRET=$AMO_JWT_SECRET pnpm exec web-ext sign --source-dir=firefox-build --channel=listed --amo-metadata=.amo-metadata.json` を実行 → gecko id (manifest 内) で AMO 上に新規 add-on 自動作成。**初回完了後は CI の `publish-firefox` job が新バージョン提出を担う**。
 
 6. **web-ext lint で受理性確認** — `pnpm exec web-ext lint --source-dir=firefox-build` で AMO validator 相当チェック。**v1.0.33 から errors / warnings / notices すべて 0 件達成済み**。過去に「許容済み warning」だった 4 カテゴリ (`BACKGROUND_SERVICE_WORKER_IGNORED` / `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` / `UNSUPPORTED_API` / `UNSAFE_VAR_ASSIGNMENT`) は #10 のパターンで全部 0 件化済み。新規 warning が出たら同じ手法で潰すこと。
 
-7. **`if: success() || failure()` で Chrome / Firefox 独立実行** — publish.yml の `publish-firefox` job に必須。Chrome publish が同 version 重複 upload 等で失敗しても Firefox AMO step は連鎖 skip されず独立 submit される (ReplaceFontSelect が release/3.0.3 で踏んで確立した不変条件)。
+7. **別 job で Chrome / Firefox 独立実行** — publish.yml の `publish` / `publish-firefox` はどちらも `needs: package` で、互いの publish 結果に依存しない。package 成功後は Chrome publish が失敗しても Firefox AMO submit を実行する。
 
 8. **AMO listing は plain text 化される** — API 経由で送る `<ul>` 等は `&lt;ul&gt;` としてエスケープ保存される。リッチ HTML 表示は AMO Dashboard のリッチテキストエディタ経由のみ可能。`webstore/store-listing.firefox.{ja,en}.txt` は絵文字 + `・` 等で plain text 構造化済み。
 
@@ -138,7 +138,7 @@ Firefox MV3 は tabCapture / offscreen 未対応のため、Firefox 版の音量
 **⚠️ 最重要の前提 (敵対的レビュー 3/3 で確定)**: **Firefox では一度 MES で capture した要素は `ctx.close()` しても直接出力に復帰しない**（要素は captured のまま = 無音）。「detach して音を元に戻す」という回復手段は存在しないため、設計は **誤 attach の予防** と **graph を生かしたままの bypass** に全振りする。`ctx.close()` は音がもう不要な場面の資源解放専用。
 
 **Chrome 影響ゼロの担保 (3 層)**:
-1. content_scripts エントリは **manifest.firefox.json のみ** に置く (Chrome 用 manifest.json には追加しない。Chrome zip にファイル自体は同梱されるが参照されないため不活性)
+1. content_scripts エントリは **manifest.firefox.json のみ** に置く (Chrome 用 manifest.json には追加しない。`scripts/copy-package-files.js` が Chrome ZIP から MES ファイル自体を除外する)
 2. スクリプト冒頭の `chrome.runtime.getURL("")` スキーム検査（`moz-extension://` = Gecko）で、万一 Chrome 系にロードされても即 return する（`typeof browser` 判定は Chrome 137+ が extension context に browser namespace を露出するため判別子にならない。`chrome.tabCapture` の typeof 検査も「content script には Chrome でも露出しない」「AMO linter の UNSUPPORTED_API 警告対象」の 2 理由で使えない）
 3. Chrome の tabCapture 経路コード (background / offscreen / popup の送信部) には手を入れない。popup の分岐は `VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER` の early return のみ（IS_GECKO_EXTENSION も同じスキーム検査。generate-screenshots の popup-shim 環境で Firefox 注記が Chrome ストア素材に写り込まない防御を兼ねる）
 

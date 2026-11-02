@@ -25,7 +25,7 @@ The Extension stores the following settings on the user's device (`chrome.storag
 - **`tiktokCleanerEnabled`** (boolean): whether the TikTok cleaner is enabled.
 - **`tiktokCleanerFeatures`** (object): on/off state of each of the 3 TikTok cleaner sub-features (Hide comments / Hide suggested accounts / Image download button).
 - **`xCleanerEnabled`** (boolean): whether the X (formerly Twitter) cleaner is enabled. Default OFF.
-- **`xCleanerFeatures`** (object): on/off state of each of the 9 X cleaner sub-features (Hide right pane / Hide trends / Hide who to follow / Hide messages dock / Hide promoted posts / Hide Premium upsells / Hide Grok / Hide engagement counts / Open Home on "Following"). All of them are local CSS visibility rules plus one tab selection; nothing is transmitted.
+- **`xCleanerFeatures`** (object): on/off state of each of the 10 X cleaner sub-features (Hide right pane / Hide trends / Hide who to follow / Hide messages dock / Hide promoted posts / Hide Premium upsells / Hide Grok / Hide engagement counts / Open Home on "Following" / Image download button). Image download requests are described in Exception 1; the other sub-features only apply local CSS visibility rules and select a tab.
 - **`volumeBoosterEnabled`** (boolean): Volume Booster master toggle. Default OFF.
 - **`volumeBoosterLastGain`** (number, 0–600): Volume Booster slider position (%). Default 100.
 - **`volumeBoosterAntiClipEnabled`** (boolean): whether the Volume Booster's "Auto Distortion Guard" sub-toggle (a `DynamicsCompressor` followed by a `WaveShaper` that clamps only samples outside ±1) is enabled. Default OFF.
@@ -75,9 +75,9 @@ When settings sync is enabled, the settings described in Exception 4 are shared 
 
 The Extension does not communicate with any external servers, with the six explicit exceptions listed below.
 
-### Exception 1: Image download (Instagram / TikTok cleaner sub-feature)
+### Exception 1: Image download (Instagram / TikTok / X cleaner sub-feature)
 
-When the Instagram / TikTok cleaner's "Show download button on images" sub-feature (opt-in, default OFF) is enabled, an image GET is issued only at the moment the user clicks the download button, and only against each site's official CDN (Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`; TikTok: `p<digits>.tiktokcdn.com` / `p<digits>.tiktokcdn-us.com`). These are the same domains the browser already loads via `<img>` tags. The fetch uses `credentials: "omit"` (no cookies), `redirect: "manual"` (blocks redirect-based third-party transmission), and `referrerPolicy: "no-referrer"` (no referrer). Proxy fetches to other origins are blocked by a hostname allowlist (YouTube does not provide this feature). Downloaded images are saved locally via Blob URL + `<a download>` only; nothing is transmitted externally.
+When both the Instagram / TikTok / X cleaner master toggle and its "Show download button on images" sub-feature (opt-in, default OFF) are enabled, an image GET is issued only when the user clicks the download button, and only against the site's official CDN (Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`; TikTok: `p<digits>.tiktokcdn.com` / `p<digits>.tiktokcdn-us.com`; X: HTTPS `pbs.twimg.com/media/`). For X, the image file path derived from the displayed post image URL, request information needed to obtain the original image (including `name=orig` and the image format), and the IP address are sent to X's image CDN. Requests use `credentials: "omit"` (no cookies), `redirect: "manual"` (redirects are rejected), and `referrerPolicy: "no-referrer"` (no referrer). Hosts outside the allowlist and X paths outside `/media/` are rejected (YouTube does not provide this feature). Downloaded images are saved locally via Blob URL + `<a download>`. Nothing is sent to the developer's servers, and the Extension does not fetch images before the download button is clicked.
 
 ### Exception 2: Send to Gemini Notebook (YouTube Enhancements sub-feature)
 

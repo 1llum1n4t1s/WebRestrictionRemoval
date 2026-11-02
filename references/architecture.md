@@ -47,7 +47,9 @@ Popup (src/popup/popup.{html,js,css})
 ```
 
 ### Popup (`src/popup/popup.html`, `src/popup/popup.js`, `src/popup/popup.css`)
-7 タブ構成（調整 / YouTube / X / Instagram / TikTok / カラーピッカー / 設定）。**マスタートグル（件数は [AGENTS.md の早見表](../AGENTS.md) を参照）**（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / X クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ トグル + プリセット dropdown + プリアンプ縦スライダー + 10 バンド縦スライダー）** + 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル（YouTube / X / Instagram / TikTok。サブ機能数は同早見表を参照）。Shorts 削除・コメント欄非表示・配信時刻オーバーレイは YouTube 機能拡張のサブ機能（`removeShortsShelf` 等 / `hideComments` / `broadcastClock`）として統合され、専用パネル（配信時刻オーバーレイは `watch_page` カテゴリ）に FEATURES 駆動で自動描画される。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+8 カテゴリ（調整 / YouTube / X / Instagram / TikTok / Wikipedia / カラーピッカー / 設定）をカスタムドロップダウンで切り替えます。**マスタートグル（件数は [AGENTS.md の早見表](../AGENTS.md) を参照）**（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / X クリーナー / Wikipedia 閲覧調整 / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）+ 音量ブースタースライダー（左端にミュート 🔊/🔇 ボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ トグル + プリセット dropdown + プリアンプ縦スライダー + 10 バンド縦スライダー）** + 動画ガンマスライダー（中央 1.0 = 補正なし、左 3.0 で暗く、右 0.3 で明るく）+ ルーペ倍率セグメント（1.5× / 2.5× / 4×）+ ルーペサイズスライダー（150〜1000px）+ 各クリーナー専用パネル（YouTube / X / Instagram / TikTok。サブ機能数は同早見表を参照）。Shorts 削除・コメント欄非表示・配信時刻オーバーレイは YouTube 機能拡張のサブ機能（`removeShortsShelf` 等 / `hideComments` / `broadcastClock`）として統合され、専用パネル（配信時刻オーバーレイは `watch_page` カテゴリ）に FEATURES 駆動で自動描画される。幅 460px。トグル変更で即 `APPLY_SETTINGS` を background へ送信、設定は `chrome.storage.local` から復元（未設定時 false）。音量ブースターのマスタートグル OFF 時はスライダー・サブトグル・ミュートボタンを `.volume-disabled` で dim 化。ルーペ ON 時のみ倍率セグメント + サイズスライダーが表示される（`.sub-block.hidden` トグル）。
+
+**カテゴリ選択**: `categoryTrigger` に現在の名前とアイコンを表示し、`categoryMenu` を標準 Popover API の top layer へ開きます。リストボックスの上下矢印・Home/End は候補のフォーカスだけを移動し、Enter/Space・クリックで確定、Escape・外側クリックで取消します。Tab は一覧を閉じて次の操作へ進みます。選択と表示領域を同期し、保存は既存の `POPUP_LAST_TAB` と背景の書込キューを使います。メニューは表示領域内に配置し、ライト／ダークは既存の色トークンを共有します。
 
 **クリーナーの機能一覧**: サブ機能行は **1 行 1 トグル + 説明文** の縦積みレイアウト。各機能の `desc` は `actions.js` の `SearchFixer.FEATURES` / `InstagramCleaner.FEATURES` を単一情報源として popup.js が動的にレンダリングする（FEATURES に追加するだけで UI 自動生成）。
 
@@ -261,7 +263,9 @@ Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / �
 - modal viewer で `DivCommentContainer` 全体非表示 → プロフィール + キャプション巻き込み
 
 ### X クリーナー (`src/content/x-cleaner.{js,css}` + `src/content/x-early.js`)
-`*://x.com/*` / `*://*.x.com/*` / `*://twitter.com/*` / `*://*.twitter.com/*` の top frame 限定。TikTok クリーナーと同じ master + FEATURES の 2 段構造（`xCleanerEnabled` / `xCleanerFeatures`）+ CleanerCore 購読 + `<html>` クラス駆動 CSS で、**9 サブ機能**（レイアウト 4 / ノイズ除去 4 / タイムライン 1）を提供する。`window.__cpaXCleanerRunning` で二重実行防止。旧ドメイン `twitter.com` は x.com へ転送されるだけで残っているため、manifest matches と background の `isXUrl` の両方で併記する。
+`*://x.com/*` / `*://*.x.com/*` / `*://twitter.com/*` / `*://*.twitter.com/*` の top frame 限定。TikTok クリーナーと同じ master + FEATURES の 2 段構造（`xCleanerEnabled` / `xCleanerFeatures`）+ CleanerCore 購読 + `<html>` クラス駆動 CSS で、**10 サブ機能**（レイアウト 4 / ノイズ除去 4 / タイムライン 1 / 追加機能 1）を提供する。`window.__cpaXCleanerRunning` で二重実行防止。旧ドメイン `twitter.com` は x.com へ転送されるだけで残っているため、manifest matches と background の `isXUrl` の両方で併記する。
+
+**画像ダウンロード**: 「追加機能」の `imageDownload` は既定 OFF。マスターとサブ機能の両方が ON の場合だけ共有 `image-downloader.js` が投稿画像へ保存ボタンを表示する。クリック時のみ HTTPS の `pbs.twimg.com/media/` に `name=orig` を指定して取得し、Cookie・リファラを送らず、リダイレクトを拒否する。表示形式の原寸が取得できない場合は JPG / PNG の原寸を順に試し、縮小画像では代用しない。写真へのリンクや画像ビューアーを対象にし、ボタンはリンク・inert 領域の外側に配置する。動画サムネイル・アバターは対象外。OFF・遷移・context 失効時にボタンと処理を片付ける。
 
 **セレクタ戦略（最重要）: `data-testid` + `:has()` の構造マッチのみ。`aria-label` の文言に依存しない。**
 X の aria-label は UI 言語でローカライズされる（実機で「トレンド」「プレミアムプラスにアップグレード」を確認）ため、文言マッチだと日本語環境でしか動かない。難読化 class（`css-146c3p1` 等）はビルドごとに変わるので当然使わない。`:has()` は minimum_chrome_version 140 / Firefox 142 のどちらでも使える。
@@ -384,3 +388,37 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 画質9候補（自動を含む）・音量5候補・速度8候補（0.25 / 0.5 / 0.75 / 1 / 1.25 / 1.5 / 1.75 / 2倍）は、各機能 ON 時にオーバーレイの選択欄へ表示します。利用できない画質は選択不可とし、標準 UI で選ばれた候補外の現在値も表示します。ライブ遅延の新規速度候補も2倍までに絞り、保存済みの値は保持します。ボタン単位の表示ON/OFF・値の割り当て UI は持ちません。`getPlaybackSettings` が再生 UI とショートカット用に固定候補を返し、旧保存値の `values` / `enabled` に影響されません。旧形式は同期・手動バックアップとの互換のため保存・正規化を維持しますが、再生には使いません。
 
 `youtube-player-controls.js` は YouTube / youtube-nocookie の通常ページと埋込フレームへ注入し、live_chat は対象外です。`youtube-player-controls-main.js` は同じ範囲へ manifest の `world: "MAIN"` で直接注入します。ページへ `<script src="chrome-extension://…">` を追加する経路と、そのための web_accessible_resources は持ちません。MAIN は開始メッセージの受付だけを常駐させ、機能 ON 時に isolated 側のセッション付き slot を確認して操作エンジンを開始します。`available` / `start` / `ready` / `settings` の通知と heartbeat により読込順・プレイヤー生成待ちに対応し、OFF・SPA・期限切れでエンジンを撤去して再開可能にします。MAIN は権限 API・fetch・保存を持ちません。
+
+### Wikipedia 閲覧調整
+
+基本情報の通常の項目／値の表は、実ノードと読み順を保持したまま2段の段組みで配置します。長い値の隣にも後続項目を詰め、ラベル列の余白と段落間隔を抑えます。幅が足りなければ1段になります。複雑なセル結合を持つ表はこの変形を行わず、元の表構造を保ちます。
+
+新レイアウトのヘッダーは既存のロゴ・検索・アカウント操作を使い、記事幅に連動する配置と余白、テーマの淡い背景を使う角丸の検索欄、控えめなログインボタンで整えます。Codex 検索の初期フォームと Vue 初期化後の両方を対象にし、モバイルで検索を展開しても入力・送信・候補が重ならないようにします。検索候補・標準メニュー・各リンクの挙動は Wikipedia の実装を維持します。
+
+関連記事・典拠管理の `navbox` は、枠と展開後の本文面をテーマの本文色へ、見出し・グループ・交互背景をテーマの案内色へ合わせます。見出し内の固定背景と文字色も解除し、リンクは既存のリンク表示設定を継承します。`catlinks` も同じ案内色を使い、マスター OFF・元の配色ではいずれもサイトの表示へ戻します。
+
+独自目次はスクロール位置に合わせて現在の h2／h3 のリンクへ `aria-current="location"` を付け、テーマ色の背景・左線・太字で示します。位置の計測は requestAnimationFrame でまとめ、記事自体を動かさず目次内のスクロールだけで選択項目を表示します。リサイズ・目次再開・見出し更新にも追従し、目次 OFF／機能解除時に保留フレームと参照を破棄します。
+
+角の形は角丸に統一し、切替 UI は提供しません。旧 `borderRadius` は設定・同期・バックアップの互換性のため受け付けますが、表示には使いません。
+
+記事のシリーズ案内 (`pathnavbox`) と注意ボックス (`ambox`) は、独自テーマ使用時に背景・文字・枠線をテーマへ合わせます。注意の種類を示す `ambox` 左線は元の色を保持します。「Wikipedia の配色」への切替とマスター OFF では元のテンプレート配色へ戻ります。
+
+Wikipedia が `mw-interlanguage-selector-disabled` を付けた場合、サイトの CSS は標準言語一覧も隠します。マスター ON の記事ではこの状態と既存チェックボックスの `:checked` が揃ったときだけ標準一覧を表示し、画面内の幅と高さでスクロールできるようにします。ULS が有効なら変更しません。Escape は既存チェックボックスを閉じてフォーカスを戻し、ULS 無効時の固定ヘッダーの言語ボタンは同じ標準一覧へ案内します。状態や一覧のコピー・独自取得は追加しません。
+
+E2E はタブを作り直さず、実記事の同じ文書でテーマ・幅・行間・レイアウト等を8回切り替え、各回で言語一覧を開閉します。サイト配信の違いに左右されないよう、後半は観測済みの ULS 無効状態を実記事上で再現し、標準一覧の Enter／Space・Tab・フォーカス離脱・Escape・モバイルの画面内表示も確認します。固定ヘッダーの入口は fixture で検証し、ログイン済みの実画面は別の確認範囲です。
+
+表示パネルを非表示にし、右列にページツールがピン留めされていない場合は、右列と間隔の分を本文に使います。`narrowContent` を ON にすると空いた領域へ広げず、設定済みの記事幅に収めます。ほかのページツールが右列にある場合はその列を保ちます。行間は文字サイズに対する倍率 `lineHeight`（1.30〜2.40、0.05刻み）で保存し、本文へ適用します。旧設定に行間がなければ従来の1.85倍で補完します。
+
+`*://*.wikipedia.org/*` の top frame に `actions.js` → `cleaner-core.js` → `scan-runner.js` → `wikipedia-reader.js` と専用 CSS を読み込みます。`wikipediaEnabled` は既定 OFF。`wikipediaFeatures` の `readableLayout` / `stickyContents` / `imageViewer` / `linkPreview` はマスター ON のときだけ既定 ON、`hideAppearance` / `narrowContent` は既定 OFF です。後者は Vector の表示パネルと表示ボタンをピン留め状態にかかわらず隠します。外観はテーマ・本文書体・見出し書体・文字サイズ・行間・記事幅・リンク表示・記事表示を調整できます。テーマ一覧 `WikipediaReader.AVAILABLE_THEMES` は Wikipedia 自体の配色と自動切替に加え One Dark / Light、Dracula、Nord、Monokai、Solarized Dark / Light、GitHub Dark / Light。旧テーマの保存値も `WikipediaReader.THEMES` で受け入れ、使用中の場合だけ旧値を選択欄に残します。自動切替は One Light / Dark をシステム設定に合わせます。書体はシステムのゴシック／明朝と同梱7書体（見出しは「本文と同じ」も選択可）。文字サイズは S/M/L が 14/16/18px、細かい指定は14–24px。記事幅は640–1200pxで、S/M/L（680/860/1200px）と細かい指定を併用できます。`WikipediaReader` の正規化関数を popup・background・同期・バックアップと content script で共有します。
+
+記事閲覧 (`ns-0` / `action-view`) 時だけ適用します。`readableLayout` は Vector 2022 と必要な標準ヘッダー・タイトルバー・ツールバーがある文書で、検索を含む上部バー、目次の左列、記事ヘッダー、本文、基本情報、記事操作、帰属フッターへ構造を組み直します。Wikipedia の実ノードを移すため、検索・言語切替・編集・履歴・本文の ID やイベントを保持します。移動前の位置へコメントを挿入し、解除時に逆順で戻します。独自ラッパー内のサイト所有ノードは ID に依存せず復元し、サイトが差し替えたノードも保持します。元のページ全体が交換された場合は古い文書を復活させません。旧 Vector 等では元の構造を保ち、外観調整だけを適用します。
+
+記事操作と基本情報は `details` で折りたたみます。基本情報は冒頭の説明の後に本文全幅のブロックで置き、画面幅にかかわらず最初は閉じます。本文へ回り込ませず、開閉状態はリサイズで変更しません。初期 URL と文書内リンクが閉じた領域を指す場合は開き、印刷時も内容を展開して帰属とともに印刷します。独自目次を OFF にした場合は標準目次を表示し、固定した標準メニューも保持します。編集の URL・要素・`html` の VisualEditor クラスは文書全体の監視で検出し、編集開始時に元へ戻し、閲覧復帰時に再構成します。リンクのクリックだけで編集待機状態は作りません。固定目次・脚注本文カード・読込済み画像の拡大は追加 UI とし、記事プレビューは Wikipedia の標準カードを調整します。独自 fetch・外部ビューアー・別サイト転送はありません。OFF・対象外遷移・context 失効時には追加 UI とスタイルを撤去します。
+
+画像は読込済みの要素から表示用 canvas へ描画し、再取得・画素の読出し・保存を行いません。`scripts/verify-wikipedia.js` は実際の拡張ポップアップから設定配信と復元を確認する E2E です。未使用の専用絶対パスを `VUORA_BROWSER_TEST_DIR` に指定し、`node --test scripts/verify-wikipedia.js` で実行します。`VUORA_LIVE_WIKIPEDIA=1` を指定すると日本語・英語 Wikipedia の実記事の確認も追加します。画像と専用プロファイルは指定先へ保存するため、終了後は必要な画像だけ保持してプロファイルを清掃します。
+
+本文用 Web フォントは `src/fonts/wikipedia` に通常・太字の12ファイルと OFL ライセンスを同梱します。`Noto Sans JP` / `IBM Plex Sans JP` / `M PLUS 2` / `M PLUS Rounded 1c` / `Murecho` / `Zen Kaku Gothic New` / `LINE Seed JP` を選べます。マスター ON の記事で、選択した書体だけの `@font-face` を生成し、拡張内 URL から必要なウェイトを遅延読込します。Web Accessible Resources の公開先は Wikipedia だけです。OFF・システム書体への変更時には宣言も撤去します。既存の `sans/serif` と旧4項目の保存値は受け入れ、追加項目を補完します。同期・バックアップも同じ検証器を使い、未知の項目・値を拒否します。設定画面用 IBM Plex Sans JP のサブセットは従来どおり別に保持します。
+
+他のフォント置換拡張と併用するときは、Wikipedia の本文ブロックへ専用クラスと記事 ID で直接 `font-family` を指定し、Vuora の選択を優先します。コード・数式・操作アイコン・編集領域は対象外です。マスター OFF では専用クラスとフォント定義を撤去するため、他の拡張の指定へ自然に戻ります。相手の設定・スタイルは変更しません。`scripts/verify-wikipedia-font-coexistence.js` は実物の2拡張で併用を確認する E2E です。未使用の `VUORA_BROWSER_TEST_DIR` と、参照先 checkout の絶対パス `VUORA_REPLACE_FONT_DIR` を指定して実行します。`VUORA_LIVE_WIKIPEDIA=1` で実記事の描画フォントと OFF 復元も確認します。
+
+**Wikiwand のカスタマイズ種類との対応**: ユーザー提供の画像と保存資料を静的に調べ、見出しと本文の書体・本文幅・リンク・記事表示を Wikipedia 上で独自に実装しています。配色はエディターテーマを基準にし、リンクは背景に対する可読性も考慮します。下線方式は通常の本文色、色方式はリンク色を使い、どちらもホバー時はリンク色と下線を使います。`articleStyle` は `full/pictures/text` を受け付け、本文と目次を残したまま画像付き表示では情報ボックス以外の表などを、本文表示ではさらに画像と情報ボックスを非表示にします。折りたたみ表と段落内の小さな画像は保ちます。カバー画像は Wikipedia に専用画像がなく、ユーザーの選択により UI・描画処理を撤去しました。旧設定・バックアップとの互換性のため `coverImage` キーは引き続き受け付けますが、表示には使いません。Wikiwand の In-article AI は外部AI機能の表示切替のため、外部AIを追加しない Vuora では提供しません。

@@ -88,7 +88,7 @@ bash ./zip.sh firefox
 - Chrome: `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN` / `CWS_EXTENSION_ID`
 - Firefox: `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` ([発行ページ](https://addons.mozilla.org/ja/developers/addon/api/key/))
 
-Chrome publish が失敗しても Firefox AMO step は `if: success() || failure()` で独立実行されます。Chrome は **同 version pre-flight check** で upload 済みなら再 upload だけを skip し、Publish API は毎回実行します（upload 成功後に Submit for review が失敗した run を同 version で再試行可能）。Firefox は既存 version の submission を pre-flight で skip します。
+Chrome / Firefox の publish は `package` だけに依存する別 job で、Chrome publish が失敗しても Firefox AMO submit は独立して実行されます。Chrome は pre-flight で同 version や状態不明を検出すると停止し、Firefox も認証付きの全ページ照会で既存 version を検出すると非ゼロ終了します。自動の同 version 再提出は行わず、workflow の再実行では package job も実行されません。提出失敗時は各ストアの登録版・審査状態とログを確認してください（[RUNBOOK](docs/RUNBOOK.md#2-c-リリース失敗publishyml)）。
 
 ### バージョンアップ手順
 

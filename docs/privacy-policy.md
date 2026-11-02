@@ -27,7 +27,7 @@
 - **`tiktokCleanerEnabled`**（真偽値）: TikTok クリーナー機能の有効/無効。
 - **`tiktokCleanerFeatures`**（オブジェクト）: TikTok クリーナーの 3 個のサブ機能（コメント欄非表示 / おすすめのアカウント非表示 / 画像ダウンロードボタン）の個別 ON/OFF 状態。
 - **`xCleanerEnabled`**（真偽値）: X（旧 Twitter）クリーナー機能の有効/無効。デフォルト OFF。
-- **`xCleanerFeatures`**（オブジェクト）: X クリーナーの 9 個のサブ機能（右ペイン非表示 / トレンド非表示 / おすすめユーザー非表示 / メッセージドック非表示 / プロモーション投稿非表示 / プレミアム勧誘非表示 / Grok 非表示 / 反応数非表示 / ホームを「フォロー中」で開く）の個別 ON/OFF 状態。すべて端末内の CSS 表示制御とタブ選択のみで、外部送信は行いません。
+- **`xCleanerFeatures`**（オブジェクト）: X クリーナーの 10 個のサブ機能（右ペイン非表示 / トレンド非表示 / おすすめユーザー非表示 / メッセージドック非表示 / プロモーション投稿非表示 / プレミアム勧誘非表示 / Grok 非表示 / 反応数非表示 / ホームを「フォロー中」で開く / 画像ダウンロードボタン）の個別 ON/OFF 状態。画像ダウンロードの通信は例外 1 に記載し、ほかは端末内の CSS 表示制御とタブ選択のみです。
 - **`volumeBoosterEnabled`**（真偽値）: 音量ブースターのマスタートグル。デフォルト OFF。
 - **`volumeBoosterLastGain`**（数値・0〜600）: 音量ブースターのスライダー位置（%）。デフォルト 100。
 - **`volumeBoosterAntiClipEnabled`**（真偽値）: 音量ブースターのサブトグル「自動歪み防止」（`DynamicsCompressor` の後段で、±1 を超えるサンプルだけを ±1 に揃える `WaveShaper`）の有効/無効。デフォルト OFF。
@@ -77,9 +77,9 @@
 
 本拡張機能は、以下に明示する 6 つの例外を除き、外部サーバーへの通信を一切行いません。
 
-### 例外 1: 画像ダウンロード（Instagram / TikTok クリーナーのサブ機能）
+### 例外 1: 画像ダウンロード（Instagram / TikTok / X クリーナーのサブ機能）
 
-Instagram / TikTok クリーナーのサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `p<数字>.tiktokcdn.com` / `p<数字>.tiktokcdn-us.com`）に対して画像 GET を発行します。これは現にブラウザが `<img>` タグでロードしているドメインと同一であり、`credentials: "omit"` でクッキーは送信せず、`redirect: "manual"` で 302 経由の第三者ドメイン送信を遮断し、`referrerPolicy: "no-referrer"` でリファラ送信もゼロにします。それ以外のオリジンへの代理 fetch はホスト名ホワイトリストで遮断します（YouTube では本機能は提供されません）。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されるのみで、外部送信は一切行いません。
+Instagram / TikTok / X クリーナーのマスターとサブ機能「画像にダウンロードボタンを表示」（オプトイン・デフォルト OFF）を両方有効化した場合、ユーザーがダウンロードボタンをクリックした瞬間にのみ、各サイトの正規 CDN（Instagram: `scontent-*.cdninstagram.com` / `scontent-*.fna.fbcdn.net`、TikTok: `p<数字>.tiktokcdn.com` / `p<数字>.tiktokcdn-us.com`、X: HTTPS の `pbs.twimg.com/media/`）に対して画像 GET を発行します。X では投稿画像 URL に由来する画像ファイルパスと、オリジナル画質を要求する `name=orig`・画像形式等の取得に必要な情報、および IP アドレスが X の画像 CDN に伝わります。`credentials: "omit"` で Cookie を送信せず、`redirect: "manual"` でリダイレクトを拒否し、`referrerPolicy: "no-referrer"` でリファラも送信しません。許可外のホストや X の `/media/` 以外への代理 fetch は拒否します（YouTube では本機能は提供されません）。ダウンロードした画像は Blob URL + `<a download>` 経由でローカルに保存されます。開発者のサーバーへの送信や、ダウンロードボタンを押す前の画像取得は行いません。
 
 ### 例外 2: Gemini Notebook 送信（YouTube 機能拡張のサブ機能）
 
