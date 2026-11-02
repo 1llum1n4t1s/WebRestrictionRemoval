@@ -3,7 +3,7 @@
   "name": "__MSG_appName__",
   "description": "__MSG_appDescription__",
   "default_locale": "en",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "browser_specific_settings": {
     "gecko": {
       "id": "{8b2f6c4e-9a1d-4e8f-b3a7-1c5d9e7f2a4b}",
@@ -133,8 +133,8 @@
     },
     {
       "matches": ["*://x.com/*", "*://*.x.com/*", "*://twitter.com/*", "*://*.twitter.com/*"],
-      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/x-cleaner.js"],
-      "css": ["src/content/x-cleaner.css"],
+      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/x-cleaner.js", "src/content/image-downloader.js"],
+      "css": ["src/content/x-cleaner.css", "src/content/image-downloader.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
@@ -156,6 +156,22 @@
       "js": ["src/lib/actions.js", "src/lib/audio-pipeline.js", "src/content/volume-booster-mes.js"],
       "run_at": "document_idle",
       "all_frames": true
+    },
+    {
+      "matches": [
+        "*://*.wikipedia.org/*"
+      ],
+      "js": [
+        "src/lib/actions.js",
+        "src/lib/cleaner-core.js",
+        "src/lib/scan-runner.js",
+        "src/content/wikipedia-reader.js"
+      ],
+      "css": [
+        "src/content/wikipedia-reader.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "permissions": [
@@ -164,6 +180,12 @@
   ],
   "host_permissions": [
     "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/fonts/wikipedia/*.woff2"],
+      "matches": ["*://*.wikipedia.org/*"]
+    }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'; frame-ancestors 'none'"

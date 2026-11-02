@@ -2,7 +2,7 @@
 
 > [日本語版](README.md) もあります。
 
-A Chrome / Firefox extension that consolidates **12 features for comfortable browsing** into a single popup.
+A Chrome / Firefox extension that consolidates **13 features for comfortable browsing** into a single popup.
 All features start OFF — opt in only to what you need. Normal browsing assistance stays on-device; network requests run only for the features you explicitly enable or operate.
 
 ---
@@ -12,7 +12,7 @@ All features start OFF — opt in only to what you need. Normal browsing assista
 | Feature | Description |
 |---------|-------------|
 | 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / reduce live latency / quality, speed, and volume selection / send to Gemini Notebook and more — **38 sub-features** |
-| 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" (**9 sub-features**) |
+| 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" + save post images in original quality (**10 sub-features**) |
 | 📦 **Amazon Subscribe & Save monthly total** | Shows unit price × quantity totals, including future deliveries whose prices are not listed. Retrieves current subscription prices and labels reference totals; previous-order prices are identified when used as a fallback. Legacy monthly pages remain supported |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
 | 📦 **Amazon seller / shipper badge** | Shows "Sold: XXX / Ships: YYY" at the top of the product page. Amazon-fulfilled = 🟢 green, marketplace = 🟠 orange warning |
@@ -22,9 +22,10 @@ All features start OFF — opt in only to what you need. Normal browsing assista
 | 🎞️ **Video Gamma** | Adjust `<video>` brightness via slider (center 1.0 = no correction, left for darker, right for brighter) |
 | 🖥️ **Remove video black bars** | Removes letterbox/pillarbox bars on ultrawide screens (zoom or stretch mode) |
 | 🔍 **Loupe** | Cursor-following circular magnifier — perfect for pausing a video and inspecting fine details |
+| 📖 **Wikipedia reading settings** | Rebuild Wikipedia articles around search, contents and reading. Adjust width, body and heading typefaces (including seven bundled fonts), size, line spacing and editor-inspired themes; use sticky contents, collapse article information, hide Appearance and reclaim its space, enlarge loaded images, and preview links and references. Switching off restores the original structure. No external viewer or new article fetches |
 | 🎨 **Color Picker** | Pick a color from the screen and copy as HEX / RGB / HSL, with up to 20 history entries |
 
-> 📥 **Image download** is provided as a sub-feature of the Instagram / TikTok cleaners (overlays a download button on hover for post photos and video thumbnails). Not available on YouTube.
+> 📥 **Image download** is provided as a sub-feature of the Instagram / TikTok / X cleaners (overlays a download button on hover for post photos and video thumbnails). For X, enable the master toggle and the image download option under "Extras" in the X tab to save post images in original quality. Not available on YouTube.
 
 ---
 
@@ -38,7 +39,7 @@ Search for **"Vuora"** on the [Chrome Web Store](https://chrome.google.com/webst
 
 Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
-> **All 12 features work on Firefox.** The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. The only limitation: it has no effect on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally.
+> **All 13 features work on Firefox.** The Volume Booster runs on a Firefox-only in-page audio pipeline (MediaElementSource): settings apply to all tabs automatically without opening the popup, and no tab-sharing banner appears. The only limitation: it has no effect on DRM-protected video sites (Netflix, Prime Video, DAZN, Disney+, etc.) — those videos still play normally.
 
 ---
 
@@ -54,21 +55,25 @@ The YouTube watch-page category includes live-latency reduction and controls for
 Archive broadcast time appears outside the settings section in the same overlay. Each feature can be enabled independently, including broadcast time on its own. Scroll within the shared overlay when needed.
 
 ### Popup tabs
+
+Use the category dropdown at the top to switch between eight tabs. Your last tab and subcategory are remembered.
+
 - **Tune**: Audio / Video / Amazon features and their settings
 - **YouTube**: 38 YouTube Enhancements sub-features
-- **X**: 9 X cleaner sub-features
+- **X**: 10 X cleaner sub-features
 - **Instagram**: 12 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features
+- **Wikipedia**: Reading settings toggle, themes, typefaces, article display, and reading aids
 - **Color Picker**: Pick, enter, adjust, and copy colors + history
 - **Settings**: Settings sync across PCs + settings export / import
 
-The YouTube / X / Instagram / TikTok master toggles are in their respective tabs.
+The YouTube / X / Instagram / TikTok / Wikipedia master toggles are in their respective tabs.
 
 ---
 
 ## 🔒 Privacy
 
-- **Normal processing stays on-device** — external communication is limited to six exceptions: Instagram / TikTok image retrieval, Send to Gemini Notebook, the contact form, optional settings sync, subscription channel thumbnails, and same-origin Amazon price retrieval for deliveries whose prices are not listed.
+- **Normal processing stays on-device** — external communication is limited to six exceptions: Instagram / TikTok / X image retrieval, Send to Gemini Notebook, the contact form, optional settings sync, subscription channel thumbnails, and same-origin Amazon price retrieval for deliveries whose prices are not listed.
 - **Personal information only for support** — the email address and message entered in the contact form are sent to Kagayoi Support only when you submit it.
 - **Opt-in by design** — everything is OFF on install; only what you enable runs.
 - **Open source** — code is published in this repository for anyone to inspect.
