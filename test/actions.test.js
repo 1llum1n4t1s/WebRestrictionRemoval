@@ -1054,7 +1054,7 @@ test("ColorPicker.parseColorInput: HEX / RGB / HSL の貼り付け解釈", () =>
 // ---------- PopupTabs ----------
 
 test("PopupTabs.isValid / normalize: タブ識別子のみ受理、不正値は TUNE", () => {
-  assert.equal(G.PopupTabs.ALL.length, 7, "popup タブ数（ドキュメント整合性の単一情報源）");
+  assert.equal(G.PopupTabs.ALL.length, 8, "popup タブ数（ドキュメント整合性の単一情報源）");
   for (const id of G.PopupTabs.ALL) {
     assert.equal(G.PopupTabs.isValid(id), true, `${id} should be valid`);
   }
@@ -1107,7 +1107,7 @@ test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", 
   assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
 });
 
-test("actions.js は globalThis に 23 個の定数を公開する", () => {
+test("actions.js は globalThis に 24 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -1123,6 +1123,7 @@ test("actions.js は globalThis に 23 個の定数を公開する", () => {
     "InstagramCleaner",
     "TikTokCleaner",
     "XCleaner",
+    "WikipediaReader",
     "ImageDownloader",
     "VolumeBooster",
     "VideoGamma",
@@ -1136,7 +1137,7 @@ test("actions.js は globalThis に 23 個の定数を公開する", () => {
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);
   }
-  assert.equal(required.length, 23, "公開定数の件数（ドキュメント整合性の単一情報源）");
+  assert.equal(required.length, 24, "公開定数の件数（ドキュメント整合性の単一情報源）");
 });
 
 test("SenderCheck.isFromOffscreen: extension id・tab不在・URL完全一致で検証", () => {
@@ -1181,6 +1182,32 @@ test("TikTokCleaner.mergeFeatures: partial は欠損 default 補完", () => {
 });
 
 // ---------- ImageDownloader ----------
+
+test("X の画像保存は追加機能として既定OFF、Xと旧Twitterを認識する", () => {
+  assert.equal(G.XCleaner.DEFAULT_FEATURES.imageDownload, false);
+  assert.equal(G.XCleaner.mergeFeatures({ hideTrends: true }).imageDownload, false);
+  assert.equal(G.XCleaner.mergeFeatures({ imageDownload: true }).imageDownload, true);
+  for (const hostname of ["x.com", "www.x.com", "twitter.com", "mobile.twitter.com"]) assert.equal(G.ImageDownloader.detectHost({ hostname }), "x");
+  for (const hostname of ["fake-x.com", "x.com.evil.com", "twitter.com.evil.com"]) assert.equal(G.ImageDownloader.detectHost({ hostname }), null);
+});
+
+test("X 投稿画像の形式と識別子を保ち、origだけを保存候補にする", () => {
+  for (const input of ["https://pbs.twimg.com/media/AbC_123-xy?format=png&name=small", "https://pbs.twimg.com/media/AbC_123-xy.png:large", "https://pbs.twimg.com/media/AbC_123-xy.png"]) {
+    assert.equal(G.ImageDownloader.xOriginalUrl(input), "https://pbs.twimg.com/media/AbC_123-xy?format=png&name=orig");
+  }
+  assert.equal(G.ImageDownloader.xOriginalUrl("https://pbs.twimg.com/media/AbC?name=4096x4096&format=webp&tracking=removed#fragment"), "https://pbs.twimg.com/media/AbC?format=webp&name=orig");
+  assert.match(G.ImageDownloader.buildFilename("x", "image/png"), /^x_\d{8}_\d{6}\.png$/);
+});
+
+test("X 保存経路はHTTPSの画像パス・orig URLだけを許可する", () => {
+  for (const input of [null, {}, "https://pbs.twimg.com/profile_images/abc/a.jpg", "https://pbs.twimg.com/ext_tw_video_thumb/abc/a.jpg", "https://pbs.twimg.com/media/abc?format=svg", "https://pbs.twimg.com/media/abc?format=gif", "http://pbs.twimg.com/media/abc.jpg", "https://pbs.twimg.com:444/media/abc.jpg", "https://user:pass@pbs.twimg.com/media/abc.jpg", "https://pbs.twimg.com.evil.com/media/abc.jpg", "https://evil.pbs.twimg.com/media/abc.jpg", "https://pbs.twimg.com/media/abc%2Fother.jpg"]) {
+    assert.equal(G.ImageDownloader.xOriginalUrl(input), null, String(input));
+    assert.equal(G.ImageDownloader.isAllowedFetchUrl("x", input), false, String(input));
+  }
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("x", "https://pbs.twimg.com/media/abc?format=jpg&name=orig"), true);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("x", "https://pbs.twimg.com/media/abc?format=jpg&name=large"), false);
+  assert.equal(G.ImageDownloader.isAllowedFetchUrl("x", "https://pbs.twimg.com/media/abc?format=jpg&name=orig&url=https://evil.com"), false);
+});
 
 test("ImageDownloader.detectHost: instagram / tiktok のサブドメインも認識", () => {
   assert.equal(G.ImageDownloader.detectHost({ hostname: "instagram.com" }), "instagram");
@@ -1977,4 +2004,69 @@ test("ImageDownloader.isAllowedFetchUrl: fbcdn.net は scontent- prefix 限定",
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://tracking.fbcdn.net/pixel.png"), false);
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://video.fbcdn.net/clip.mp4"), false);
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("instagram", "https://analytics.fbcdn.net/x.png"), false);
+});
+
+
+test("WikipediaReader は明示的な機能選択を保持し、配色・書体・寸法を正規化する", () => {
+  const spec = G.WikipediaReader;
+  assert.equal(spec.FEATURES.length, 6);
+  assert.deepEqual(spec.mergeFeatures({ imageViewer: false, unknown: true }), { ...spec.DEFAULT_FEATURES, imageViewer: false });
+  assert.equal(spec.mergeFeatures({}).hideAppearance, false, "既存設定に項目がなければ表示パネルを残す");
+  assert.equal(spec.mergeFeatures({}).narrowContent, false);
+  assert.equal(spec.normalizeAppearance({ lineHeight: 1.32 }).lineHeight, 1.3);
+  assert.equal(spec.normalizeAppearance({ lineHeight: 9 }).lineHeight, 2.4);
+  assert.deepEqual(spec.normalizeAppearance(null), spec.DEFAULT_APPEARANCE);
+  assert.deepEqual(spec.normalizeAppearance({ theme: "dark", font: "serif", fontSize: 99, contentWidth: 1 }),
+    { ...spec.DEFAULT_APPEARANCE, theme: "dark", font: "serif", fontSize: 24, contentWidth: 640 });
+  assert.deepEqual(spec.normalizeAppearance({ theme: "bad", font: "bad", fontSize: "20", contentWidth: Infinity }), spec.DEFAULT_APPEARANCE);
+  assert.equal(spec.FONTS.length, 7);
+  for (const { key } of spec.FONTS) assert.equal(spec.normalizeAppearance({ font: key }).font, key);
+  for (const font of ["sans", "serif"]) assert.equal(spec.normalizeAppearance({ font }).font, font, "既存の書体設定は維持する");
+});
+
+
+test("Wikipedia 外観は旧設定を保持し、追加項目を既定補完して厳密に検証する", () => {
+  const spec = G.WikipediaReader;
+  const legacy = { theme: "dark", font: "serif", fontSize: 19, contentWidth: 973 };
+  assert.equal(spec.isValidAppearance(legacy), true);
+  assert.deepEqual(spec.normalizeAppearance(legacy), { ...spec.DEFAULT_APPEARANCE, ...legacy });
+  assert.equal(Object.keys(spec.normalizeAppearance(legacy)).length, 10);
+  assert.equal(spec.normalizeAppearance(legacy).lineHeight, 1.85);
+  for (const lineHeight of [1.3, 1.55, 1.85, 2.4]) assert.equal(spec.isValidAppearance({ ...legacy, lineHeight }), true);
+  for (const lineHeight of [1.2, 2.5, 1.32, "1.85", Infinity]) assert.equal(spec.isValidAppearance({ ...legacy, lineHeight }), false);
+  for (const headingFont of ["inherit", "sans", "serif", ...spec.FONTS.map(({ key }) => key)])
+    assert.equal(spec.isValidAppearance({ ...legacy, headingFont }), true);
+  const choices = { linkStyle: ["underline", "color"], coverImage: ["show", "hide"],
+    borderRadius: ["rounded", "square"], articleStyle: ["full", "pictures", "text"] };
+  for (const [key, values] of Object.entries(choices)) {
+    for (const value of values) {
+      assert.equal(spec.isValidAppearance({ ...legacy, [key]: value }), true);
+      assert.equal(spec.normalizeAppearance({ ...legacy, [key]: value })[key], value);
+    }
+  }
+  for (const key of Object.keys(spec.DEFAULT_APPEARANCE)) {
+    assert.equal(spec.isValidAppearance({ ...legacy, [key]: "unknown" }), false, key);
+    if (Object.hasOwn(legacy, key)) {
+      const missing = { ...legacy }; delete missing[key]; assert.equal(spec.isValidAppearance(missing), false, key);
+    }
+  }
+  for (const value of [null, [], {}, { ...legacy, unknown: true }, { ...legacy, fontSize: 19.5 },
+    { ...legacy, contentWidth: 1201 }, { ...legacy, coverImage: true }]) assert.equal(spec.isValidAppearance(value), false);
+});
+
+
+test("Wikipedia はエディターテーマと旧テーマを受け入れ、未知のテーマを拒否する", () => {
+  const spec = G.WikipediaReader;
+  assert.equal(Object.isFrozen(spec.THEMES), true);
+  assert.equal(Object.isFrozen(spec.AVAILABLE_THEMES), true);
+  assert.deepEqual([...spec.AVAILABLE_THEMES], ["original", "auto", "one-dark", "one-light", "dracula", "nord", "monokai", "solarized-dark", "solarized-light", "github-dark", "github-light"]);
+  for (const theme of [...spec.AVAILABLE_THEMES, "sepia", "algae", "calmness", "dark", "deep-ocean", "desert", "fairy-dust", "grey", "light", "nature"])
+    assert.ok(spec.THEMES.includes(theme), theme);
+  for (const theme of spec.THEMES) {
+    const appearance = { ...spec.DEFAULT_APPEARANCE, theme };
+    assert.equal(spec.isValidAppearance(appearance), true, theme);
+    assert.equal(spec.normalizeAppearance(appearance).theme, theme);
+  }
+  assert.equal(spec.isValidAppearance({ ...spec.DEFAULT_APPEARANCE, theme: "unknown" }), false);
+  assert.equal(spec.normalizeAppearance({ theme: "unknown" }).theme, "original");
 });

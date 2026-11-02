@@ -75,7 +75,7 @@ const host = (local = {}, remote = {}, options = {}) => {
   vm.runInNewContext(source, {
     chrome: { storage }, StorageKeys: K, SettingsSchema: G.SettingsSchema,
     SearchFixer: G.SearchFixer, InstagramCleaner: G.InstagramCleaner,
-    TikTokCleaner: G.TikTokCleaner, XCleaner: G.XCleaner, VolumeBooster: G.VolumeBooster,
+    TikTokCleaner: G.TikTokCleaner, XCleaner: G.XCleaner, WikipediaReader: G.WikipediaReader, VolumeBooster: G.VolumeBooster,
     VideoGamma: G.VideoGamma, VideoFill: G.VideoFill, Loupe: G.Loupe, ColorPicker: G.ColorPicker,
     Date: { now: () => now }, crypto: { randomUUID: () => `${options.device || "A"}-${++uuid}` },
     setTimeout: (fn) => { timers.set(++id, fn); return id; },
@@ -164,7 +164,7 @@ test("時計が戻っても連続編集は単調増加し、受信時刻を引�
 });
 
 for (const [key, spec] of [[K.SEARCH_FIXER_FEATURES, G.SearchFixer], [K.INSTAGRAM_CLEANER_FEATURES, G.InstagramCleaner],
-  [K.TIKTOK_CLEANER_FEATURES, G.TikTokCleaner], [K.X_CLEANER_FEATURES, G.XCleaner]]) {
+  [K.TIKTOK_CLEANER_FEATURES, G.TikTokCleaner], [K.X_CLEANER_FEATURES, G.XCleaner], [K.WIKIPEDIA_FEATURES, G.WikipediaReader]]) {
   test(`${key}: 別 PC の別サブ機能変更を消さない`, async () => {
     const [one, two] = Object.keys(spec.DEFAULT_FEATURES);
     const initial = { ...spec.DEFAULT_FEATURES, [one]: false, [two]: false };
@@ -177,6 +177,18 @@ for (const [key, spec] of [[K.SEARCH_FIXER_FEATURES, G.SearchFixer], [K.INSTAGRA
     }
   });
 }
+
+test("X画像保存の同期は他のサブ機能の変更と独立して保持する", async () => {
+  const initial = G.XCleaner.mergeFeatures({});
+  const [a, b] = await peers({ xCleanerFeatures: initial });
+  await a.edit({ xCleanerFeatures: { ...initial, imageDownload: true } });
+  await b.edit({ xCleanerFeatures: { ...initial, hideTrends: true } });
+  await a.tick(); await b.tick(); await exchange(a, b);
+  for (const h of [a, b]) {
+    assert.equal(h.state.local.xCleanerFeatures.imageDownload, true);
+    assert.equal(h.state.local.xCleanerFeatures.hideTrends, true);
+  }
+});
 
 test("除外リストの別々の追加・削除を保持し、古い追加で削除が復活しない", async () => {
   const old = { key: "@old", name: "Old" };
@@ -225,6 +237,27 @@ test("通信待ち中の編集を保存し、古いアップロード完了で�
   });
   await h.tick(); assert.equal(h.state.local.loupeSize, 600);
   await h.tick(); assert.equal(h.state.sync[PREFIX + "loupeSize"].items.loupeSize.value, 600);
+});
+
+test("同期切替と同一通知の設定変更は、ONなら編集を記録しOFFなら送信しない", async () => {
+  const h = host({ settingsSyncEnabled: false, loupeSize: 220 }, entry("loupeSize", 300, [1500, 0, "B"]));
+  await h.tick();
+  h.now(2000);
+  await h.edit({ settingsSyncEnabled: true, loupeSize: 450 });
+  assert.equal(records(h).loupeSize.value, 450);
+  assert.equal(records(h).loupeSize.stamp[0], 2000);
+  await h.tick();
+  assert.equal(h.state.local.loupeSize, 450);
+  const reads = h.reads(), writes = h.writes();
+  await h.edit({ settingsSyncEnabled: false, loupeSize: 600 });
+  await h.tick();
+  assert.equal(h.state.local.loupeSize, 600);
+  assert.deepEqual(records(h), {});
+  assert.equal(h.reads(), reads);
+  assert.equal(h.writes(), writes);
+  await h.edit({ settingsSyncEnabled: true });
+  await h.tick();
+  assert.equal(h.state.local.loupeSize, 450, "OFF中の変更を再ON時に新規編集として送らない");
 });
 
 test("OFF はデータを消さず、OFF中の受信・送信を止め、再ONはクラウド優先", async () => {
@@ -377,4 +410,45 @@ test("インポート世代付き一括編集は同期先へ伝播し、OFFな�
   await off.tick();
   assert.equal(off.state.local.searchFixerEnabled, true);
   assert.equal(off.writes(), 0);
+});
+
+
+test("Wikipedia の外観を同期し、不正な外観の受信を拒否する", async () => {
+  const appearance = { theme: "sepia", font: "m-plus-2", fontSize: 22, contentWidth: 800 };
+  const [a, b] = await peers({ wikipediaEnabled: false, wikipediaAppearance: G.WikipediaReader.DEFAULT_APPEARANCE });
+  await a.edit({ wikipediaEnabled: true, wikipediaAppearance: appearance });
+  await a.tick(); await exchange(a, b);
+  assert.equal(b.state.local.wikipediaEnabled, true);
+  assert.deepEqual(b.state.local.wikipediaAppearance, { ...G.WikipediaReader.DEFAULT_APPEARANCE, ...appearance });
+  await b.receive(entry(K.WIKIPEDIA_APPEARANCE, { ...appearance, theme: "unknown" }, [9000, 0, "X"]));
+  await b.tick();
+  assert.deepEqual(b.state.local.wikipediaAppearance, { ...G.WikipediaReader.DEFAULT_APPEARANCE, ...appearance });
+});
+
+test("Wikipedia の表示パネルと本文幅を独立した機能として同期する", async () => {
+  const [a, b] = await peers({ wikipediaFeatures: { imageViewer: false } });
+  assert.equal(b.state.local.wikipediaFeatures.hideAppearance, false);
+  assert.equal(b.state.local.wikipediaFeatures.narrowContent, false);
+  await a.edit({ wikipediaFeatures: { ...a.state.local.wikipediaFeatures, hideAppearance: true, narrowContent: true } });
+  await a.tick(); await exchange(a, b);
+  assert.equal(b.state.local.wikipediaFeatures.hideAppearance, true);
+  assert.equal(b.state.local.wikipediaFeatures.narrowContent, true);
+  assert.equal(b.state.local.wikipediaFeatures.imageViewer, false);
+});
+
+
+test("Wikipedia の旧外観の受信を補完し、追加した外観と行間も同期する", async () => {
+  const legacy = { theme: "sepia", font: "serif", fontSize: 19, contentWidth: 973 };
+  const h = host({ settingsSyncEnabled: true }, entry(K.WIKIPEDIA_APPEARANCE, legacy, [2000, 0, "B"]));
+  await h.tick();
+  assert.deepEqual(h.state.local.wikipediaAppearance, { ...G.WikipediaReader.DEFAULT_APPEARANCE, ...legacy });
+  const appearance = { ...G.WikipediaReader.DEFAULT_APPEARANCE, ...legacy, headingFont: "line-seed-jp",
+    linkStyle: "underline", coverImage: "show", borderRadius: "square", articleStyle: "text", lineHeight: 1.55 };
+  const [a, b] = await peers({ wikipediaAppearance: legacy });
+  await a.edit({ wikipediaAppearance: appearance }); await a.tick(); await exchange(a, b);
+  assert.deepEqual(b.state.local.wikipediaAppearance, appearance);
+  for (const key of ["headingFont", "linkStyle", "coverImage", "borderRadius", "articleStyle", "lineHeight"]) {
+    await b.receive(entry(K.WIKIPEDIA_APPEARANCE, { ...appearance, [key]: "unknown" }, [9000, 0, "X"]));
+    await b.tick(); assert.deepEqual(b.state.local.wikipediaAppearance, appearance);
+  }
 });

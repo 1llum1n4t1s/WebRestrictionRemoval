@@ -6,11 +6,12 @@
  * 過去は CLAUDE.md に `node --check src/lib/actions.js && node --check ...` の
  * 23 ファイル列挙コマンドをハードコードしていたが、content_scripts 追加・削除のたびに
  * 手動更新で drift する問題があった。本テストは `src/**\/*.js` を glob で動的列挙し、
- * Node.js `vm.compileFunction` で構文 check (実行はしない) を 1 ファイルずつ走らせる。
+ * classic script は `vm.Script`、HTML で module と宣言されたファイルは
+ * `node --input-type=module --check` で構文 check (実行はしない) する。
  *
  * 使い方: `pnpm test`（actions.test.js 等と一括実行）。
  *
- * `node --check <file>` の代替として `vm.compileFunction` を使う理由:
+ * classic script に `vm.Script` を使う理由:
  *   - Node 標準 test runner と統合して 1 コマンドで回せる
  *   - 各ファイルに対する subtest として失敗ファイル名が即特定できる
  *   - 子プロセス起動オーバーヘッドが無い (23 ファイル × spawn = 数秒 → 数 ms)
@@ -20,11 +21,44 @@
  */
 
 const test = require("node:test");
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { spawnSync } = require("node:child_process");
 
 const SRC_ROOT = path.join(__dirname, "..", "src");
+
+// ブラウザが読む HTML の宣言から種別を決め、ファイル名で module を固定しない。
+const moduleFiles = new Set();
+for (const entry of fs.readdirSync(SRC_ROOT, { recursive: true, withFileTypes: true })) {
+  if (!entry.isFile() || !entry.name.endsWith(".html")) continue;
+  const htmlPath = path.join(entry.parentPath || entry.path, entry.name);
+  for (const [tag] of fs.readFileSync(htmlPath, "utf8").matchAll(/<script\b[^>]*>/gi)) {
+    if (!/\btype\s*=\s*["']module["']/i.test(tag)) continue;
+    const src = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (src) moduleFiles.add(path.resolve(path.dirname(htmlPath), src));
+  }
+}
+
+const checkSyntax = (code, filename, isModule = false) => {
+  if (!isModule) return new vm.Script(code, { filename });
+  const result = spawnSync(process.execPath, ["--input-type=module", "--check"], {
+    input: code,
+    encoding: "utf8",
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, `${filename}: ${result.stderr}`);
+};
+
+test("構文検査は script のトップレベル制約と module 構文を非実行で検証する", () => {
+  for (const code of ["return;", "new.target;"]) {
+    assert.throws(() => checkSyntax(code, "classic.js"), SyntaxError);
+  }
+  checkSyntax('throw new Error("実行禁止");', "classic.js");
+  checkSyntax('import "./missing.js"; export const value = await Promise.resolve(1); throw new Error("実行禁止");', "module.js", true);
+  assert.throws(() => checkSyntax("export const = ;", "module.js", true));
+});
 
 /**
  * `src/` 配下から `.js` ファイルを再帰列挙する (`fs.readdirSync` recursive)。
@@ -55,9 +89,8 @@ test("src/**/*.js の全ファイルが構文エラーなくパースできる",
     const relative = path.relative(SRC_ROOT, file);
     await t.test(relative, () => {
       const code = fs.readFileSync(file, "utf8");
-      // `vm.compileFunction` は構文 check だけ走り、実行はしない。
       // `chrome` 等のグローバル未定義はここでは検知しない設計。
-      vm.compileFunction(code, [], { filename: file });
+      checkSyntax(code, file, moduleFiles.has(file));
     });
   }
 });

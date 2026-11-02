@@ -19,6 +19,7 @@
   const features = new Map([
     [K.SEARCH_FIXER_FEATURES, SearchFixer], [K.INSTAGRAM_CLEANER_FEATURES, InstagramCleaner],
     [K.TIKTOK_CLEANER_FEATURES, TikTokCleaner], [K.X_CLEANER_FEATURES, XCleaner],
+    [K.WIKIPEDIA_FEATURES, WikipediaReader],
   ]);
   const scalarKeys = [...new Set([
     ...SettingsSchema.map(({ storageKey }) => storageKey).filter((key) => !features.has(key)),
@@ -30,6 +31,7 @@
   const keys = [K.YOUTUBE_PLAYER_SETTINGS, ...scalarKeys, ...features.keys(), ...eqKeys, K.SEARCH_FIXER_BLOCKED_CHANNELS];
   // 同期でも popup / バックアップと同じ値域を守る。型だけ正しくても範囲外の値は受け入れない。
   const scalarNormalizers = new Map([
+    [K.WIKIPEDIA_APPEARANCE, WikipediaReader.normalizeAppearance],
     [K.SEARCH_FIXER_GRID_ITEMS, SearchFixer.clampGridItems],
     [K.VOLUME_BOOSTER_LAST_GAIN, VolumeBooster.clampValue],
     [K.VIDEO_GAMMA_VALUE, VideoGamma.clampValue],
@@ -39,7 +41,9 @@
   ]);
   const normalizeScalar = (id, value) => scalarNormalizers.has(id)
     ? scalarNormalizers.get(id)(value) : id === K.COLOR_PICKER_HEX_HASH ? value !== false : value === true;
-  const validScalar = (id, value) => scalarNormalizers.has(id)
+  const validScalar = (id, value) => id === K.WIKIPEDIA_APPEARANCE
+    ? WikipediaReader.isValidAppearance(value)
+    : scalarNormalizers.has(id)
     ? value === normalizeScalar(id, value) : typeof value === "boolean";
   const fixedBuckets = new Map(scalarKeys.map((key) => [key, key]));
   fixedBuckets.set(EQ, EQ);
@@ -191,11 +195,11 @@
       const record = state.records[key];
       if (!record) {
         // 旧版で既に保存された不正値はローカルで補正するが、新しい編集や削除として刻印しない。
-        if (Object.hasOwn(view, key) && !validScalar(key, view[key])) view[key] = normalizeScalar(key, view[key]);
+        if (Object.hasOwn(view, key) && (key === K.WIKIPEDIA_APPEARANCE || !validScalar(key, view[key]))) view[key] = normalizeScalar(key, view[key]);
         continue;
       }
       if (record.deleted) delete view[key];
-      else view[key] = record.value;
+      else view[key] = key === K.WIKIPEDIA_APPEARANCE ? WikipediaReader.normalizeAppearance(record.value) : record.value;
     }
     for (const [key, spec] of features) {
       view[key] = spec.mergeFeatures(view[key]);
@@ -342,13 +346,13 @@
     if (toggled) generation++;
     if (Object.keys(patch).length || toggled) revision++;
     enqueue(async () => {
-      const before = snapshot(state.view);
+      if (toggled) active = changes[K.SETTINGS_SYNC_ENABLED].newValue === true;
+      const before = active ? snapshot(state.view) : null;
       for (const [key, value] of Object.entries(patch)) {
         if (value === undefined) delete state.view[key];
         else state.view[key] = value;
       }
       if (toggled) {
-        active = changes[K.SETTINGS_SYNC_ENABLED].newValue === true;
         state.joined = false;
         state.records = {};
         attempts = 0;

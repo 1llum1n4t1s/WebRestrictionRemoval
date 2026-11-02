@@ -25,7 +25,7 @@
     "description": "拡張機能名 (chrome://extensions およびストア表示)"
   },
   "appDescription": {
-    "message": "閲覧中ページの見やすさ・聞きやすさ・作業継続性をローカル設定で整えるブラウザ拡張機能。",
+    "message": "YouTube・Wikipedia・SNS・買い物ページの見やすさと聞きやすさをローカル設定で整えるブラウザ拡張機能。",
     "description": "拡張機能の短い説明 (manifest.description)"
   },
   "defaultTitle": {
@@ -42,7 +42,8 @@
     "description": "popup ヘッダーのタグライン"
   },
 
-  "tabbarAriaLabel": { "message": "ポップアップタブ" },
+  "categorySelectorLabel": { "message": "カテゴリ" },
+  "tabbarAriaLabel": { "message": "表示するカテゴリ" },
   "tabTune": { "message": "調整" },
   "tabYoutube": { "message": "YouTube" },
   "tabInstagram": { "message": "Instagram" },
@@ -336,7 +337,7 @@
   "applyOkAllStopped": { "message": "⏹  すべて停止" },
   "applyOkPrefix": { "message": "✓  " },
   "applyOkSeparator": { "message": "  /  " },
-  "applyError": { "message": "⚠️ このページには適用できません" },
+  "applyError": { "message": "⚠️ 設定を保存・適用できませんでした" },
 
   "volumeErrorInvalidTab": { "message": "⚠ タブを取得できません" },
   "volumeErrorOffscreenUnavailable": { "message": "⚠ 内部処理を起動できません" },
@@ -468,6 +469,9 @@
   "feat_tt_imageDownload_label": { "message": "画像にダウンロードボタンを表示" },
   "feat_tt_imageDownload_desc": { "message": "フォト投稿 / 動画サムネにマウスを乗せたとき、左上にダウンロードボタンを overlay 表示" },
 
+  "categoryXExtra": { "message": "追加機能" },
+  "feat_x_imageDownload_label": { "message": "画像にダウンロードボタンを表示" },
+  "feat_x_imageDownload_desc": { "message": "投稿画像にマウスを乗せると左上にボタンを表示し、クリックするとオリジナル画質で保存します" },
   "feat_x_hideRightPane_label": { "message": "右ペインを非表示" },
   "feat_x_hideRightPane_desc": { "message": "3 ペインのうち一番右の列（検索 / トレンド / おすすめユーザー / 勧誘）を丸ごと非表示にし、空いたぶんタイムラインを右端まで広げる" },
   "feat_x_hideTrends_label": { "message": "トレンドを非表示" },
@@ -548,5 +552,217 @@
   "ypcCommand_volume_2": {"message":"YouTube 音量ボタン 2"},
   "ypcCommand_volume_3": {"message":"YouTube 音量ボタン 3"},
   "ypcCommand_volume_4": {"message":"YouTube 音量ボタン 4"},
-  "ypcCommand_volume_5": {"message":"YouTube 音量ボタン 5"}
+  "ypcCommand_volume_5": {"message":"YouTube 音量ボタン 5"},
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Wikipedia 閲覧調整"
+  },
+  "wikipediaMasterDesc": {
+    "message": "Wikipedia の記事のレイアウト・文字・配色を調整します。"
+  },
+  "wikipediaOptions": {
+    "message": "Wikipedia の閲覧設定"
+  },
+  "wikipedia_theme": {
+    "message": "配色"
+  },
+  "wikipedia_noto_sans_jp": { "message": "Noto Sans JP" },
+  "wikipedia_ibm_plex_sans_jp": { "message": "IBM Plex Sans JP" },
+  "wikipedia_m_plus_2": { "message": "M PLUS 2" },
+  "wikipedia_m_plus_rounded_1c": { "message": "M PLUS Rounded 1c" },
+  "wikipedia_murecho": { "message": "Murecho" },
+  "wikipedia_zen_kaku_gothic_new": { "message": "Zen Kaku Gothic New" },
+  "wikipedia_line_seed_jp": { "message": "LINE Seed JP" },
+  "wikipedia_font": {
+    "message": "本文の書体"
+  },
+  "wikipedia_fontSize": {
+    "message": "文字サイズ"
+  },
+  "wikipedia_contentWidth": {
+    "message": "記事の幅"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "本文の基準となる幅です。「表示」パネルを隠すと空いた分も広がります。「本文を指定幅に収める」を ON にすると、この幅に収まります。"
+  },
+  "wikipedia_lineHeight": {
+    "message": "行間"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1倍"
+  },
+  "wikipedia_original": {
+    "message": "サイトの配色"
+  },
+  "wikipedia_light": {
+    "message": "ライト"
+  },
+  "wikipedia_sepia": {
+    "message": "セピア"
+  },
+  "wikipedia_dark": {
+    "message": "ダーク"
+  },
+  "wikipedia_sans": {
+    "message": "システムのゴシック体"
+  },
+  "wikipedia_serif": {
+    "message": "システムの明朝体"
+  },
+  "wikipediaContents": {
+    "message": "目次"
+  },
+  "wikipediaClose": {
+    "message": "閉じる"
+  },
+  "wikipediaImage": {
+    "message": "画像を拡大"
+  },
+  "wikipediaReference": {
+    "message": "脚注プレビュー"
+  },
+  "wikipediaSiteMenu": { "message": "Wikipedia のメニュー" },
+  "wikipediaArticleActions": { "message": "記事の操作" },
+  "wikipediaArticleInfo": { "message": "基本情報" },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "新しい記事レイアウト"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "「表示」パネルを非表示"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "記事右側の Wikipedia 標準の「表示」パネルを隠し、空いた分を本文に使います。"
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "本文を指定幅に収める"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "「表示」パネルを隠しても本文を余分に広げず、下の「記事の幅」に収めます。幅の値は「記事の幅」で調整します。"
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "記事を検索ヘッダー・目次・本文・基本情報へ組み直します。OFF にすると元の配置へ戻ります。"
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "固定目次"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "見出しへの移動に使う目次を固定表示します。"
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "画像拡大"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "記事内の画像を拡大表示します。"
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "リンク・脚注プレビュー"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "Wikipedia 標準の記事プレビューを整え、脚注の内容をその場で表示します。記事プレビューは Wikipedia 側で有効な場合に表示されます。"
+  },
+  "wikipedia_headingFont": {
+    "message": "見出しの書体"
+  },
+  "wikipedia_inherit": {
+    "message": "本文と同じ"
+  },
+  "wikipedia_linkStyle": {
+    "message": "リンクの表示"
+  },
+  "wikipedia_underline": {
+    "message": "下線"
+  },
+  "wikipedia_color": {
+    "message": "色"
+  },
+  "wikipedia_coverImage": {
+    "message": "カバー画像"
+  },
+  "wikipedia_show": {
+    "message": "表示"
+  },
+  "wikipedia_hide": {
+    "message": "非表示"
+  },
+  "wikipedia_articleStyle": {
+    "message": "記事の表示"
+  },
+  "wikipedia_full": {
+    "message": "すべて"
+  },
+  "wikipedia_pictures": {
+    "message": "本文と画像"
+  },
+  "wikipedia_text": {
+    "message": "本文のみ"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "「すべて」は表なども表示。「本文と画像」は表などを省き、「本文のみ」は画像も省きます。"
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "「下線」は本文と同じ文字色で、カーソルを重ねるとリンク色になります。「色」は常にリンク色で表示します。"
+  },
+  "wikipedia_group_typography": {
+    "message": "文字・配色"
+  },
+  "wikipedia_group_layout": {
+    "message": "レイアウト"
+  },
+  "wikipedia_group_display": {
+    "message": "表示"
+  },
+  "wikipedia_small": {
+    "message": "S"
+  },
+  "wikipedia_medium": {
+    "message": "M"
+  },
+  "wikipedia_large": {
+    "message": "L"
+  },
+  "wikipedia_auto": {
+    "message": "OSに合わせる"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$（以前のテーマ）",
+    "placeholders": { "theme": { "content": "$1" } }
+  },
+  "wikipedia_one_dark": { "message": "One Dark" },
+  "wikipedia_one_light": { "message": "One Light" },
+  "wikipedia_dracula": { "message": "Dracula" },
+  "wikipedia_nord": { "message": "Nord" },
+  "wikipedia_monokai": { "message": "Monokai" },
+  "wikipedia_solarized_dark": { "message": "Solarized Dark" },
+  "wikipedia_solarized_light": { "message": "Solarized Light" },
+  "wikipedia_github_dark": { "message": "GitHub Dark" },
+  "wikipedia_github_light": { "message": "GitHub Light" },
+  "wikipedia_deep_ocean": {
+    "message": "深海"
+  },
+  "wikipedia_algae": {
+    "message": "苔"
+  },
+  "wikipedia_calmness": {
+    "message": "静穏"
+  },
+  "wikipedia_desert": {
+    "message": "砂漠"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "淡い紫"
+  },
+  "wikipedia_grey": {
+    "message": "グレー"
+  },
+  "wikipedia_nature": {
+    "message": "自然"
+  },
+  "wikipediaGallery": {
+    "message": "記事内の画像"
+  },
+  "wikipediaNoImages": {
+    "message": "表示できる読み込み済みの画像がありません。"
+  }
 }

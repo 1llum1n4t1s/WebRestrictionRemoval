@@ -32,6 +32,7 @@ const host = async (initial = {}, firefox = false) => {
       storage: {
         local: {
           async get(keys) {
+            if (typeof keys === "string") keys = [keys];
             const snapshot = Object.fromEntries(keys.filter((key) => key in data).map((key) => [key, copy(data[key])]));
             await beforeRead(keys);
             return snapshot;
@@ -185,7 +186,8 @@ test("popup の各操作は該当項目だけを読み込み時の世代とと�
   const context = vm.createContext({
     StorageKeys: K, Actions: G.Actions, SearchFixer: G.SearchFixer,
     VideoGamma: G.VideoGamma, VideoFill: G.VideoFill,
-    stored: { [K.SETTINGS_SYNC_APPLIED]: "opened-at" }, applySeq: 0,
+    stored: { [K.SETTINGS_SYNC_APPLIED]: "opened-at" }, applySeq: 0, applyErrorSeq: 0,
+    settingOperations: new Map(), settingNotifications: new Map(), pendingSettingsOperations: new Set(),
     chrome: { runtime: { async sendMessage(message) { sent.push(copy(message)); return { ok: true }; } } },
     currentVideoGammaValue: () => 1.2, videoFillMode: "stretch",
     setTimeout() {}, buildOkMessage() {}, showStatus() {},
@@ -238,6 +240,47 @@ test("popup の各操作は該当項目だけを読み込み時の世代とと�
 });
 
 
+test("popupの保存失敗は項目ごとに復元し、新しい操作と再取得中の通知を保持する", async () => {
+  const source = read("popup/popup.js");
+  const requests = [], reads = [], restored = [], statuses = [];
+  const context = vm.createContext({
+    StorageKeys: K, Actions: G.Actions, stored: {}, applySeq: 0, applyErrorSeq: 0,
+    settingOperations: new Map(), settingNotifications: new Map(), pendingSettingsOperations: new Set(),
+    chrome: { runtime: { sendMessage: () => new Promise((resolve, reject) => requests.push({ resolve, reject })) },
+      storage: { local: { get: () => new Promise((resolve) => reads.push(resolve)) } } },
+    restoreSettingUi: (...args) => restored.push(args), buildOkMessage: () => "ok",
+    i18n: (key) => key, showStatus: (...args) => statuses.push(args),
+  });
+  const start = source.indexOf("  async function apply(patch)");
+  vm.runInContext(source.slice(start, source.indexOf("  function restoreSettingUi", start)), context);
+  const first = context.apply({ searchFixerFeatures: { hideComments: true } });
+  const second = context.apply({ searchFixerFeatures: { hideLiveChat: true } });
+  requests[1].resolve({ ok: true }); await second;
+  requests[0].resolve({ ok: false }); await new Promise(setImmediate);
+  // 保存取得開始後に新しい値が通知された場合、古い取得値では戻さない。
+  context.settingNotifications.set("searchFixerFeatures", { newValue: { hideComments: true, hideLiveChat: true } });
+  reads[0]({ searchFixerFeatures: { hideComments: false } }); await first;
+  assert.deepEqual(restored, [["searchFixerFeatures", { hideComments: true, hideLiveChat: true }, "hideComments"]]);
+  assert.equal(statuses.at(-1)[1], "error");
+  const old = context.apply({ videoGammaEnabled: true });
+  const newer = context.apply({ videoGammaEnabled: false });
+  requests[3].resolve({ ok: true }); await newer;
+  requests[2].reject(new Error("old transport failure")); await old;
+  assert.equal(restored.length, 1);
+  assert.equal(statuses.at(-1)[1], "ok");
+  const failed = context.apply({ wikipediaEnabled: true });
+  requests[4].reject(new Error("transport failure")); await new Promise(setImmediate);
+  reads[1]({ wikipediaEnabled: false }); await failed;
+  assert.deepEqual(restored.at(-1), ["wikipediaEnabled", false, null]);
+});
+
+test("旧履歴の範囲外日時は新規色追加後もバックアップで往復できる", async () => {
+  const h = await host({ colorPickerHistory: [{ hex: "#123456", ts: 8640000000000001 }] });
+  assert.equal((await h.message({ action: "UPDATE_COLOR_HISTORY", operation: "add", hex: "#abcdef", ts: 1234 })).ok, true);
+  const roundTrip = copy(h.run('SettingsBackup.parse(SettingsBackup.stringify(' + JSON.stringify(h.data) + ', "test"))'));
+  assert.deepEqual(roundTrip.colorPickerHistory, [{ hex: "#abcdef", ts: 1234 }, { hex: "#123456", ts: 8640000000000001 }]);
+});
+
 test("インポートはbackgroundで再検証し、一括保存・世代失効・認証情報保持を両ブラウザで行う", async () => {
   for (const firefox of [false, true]) {
     const h = await host({ settingsSyncEnabled: true, notebookLmAccountIndex: 2, searchFixerEnabled: false }, firefox);
@@ -247,6 +290,11 @@ test("インポートはbackgroundで再検証し、一括保存・世代失効�
     assert.equal(h.writes.length, 0);
     assert.equal((await h.message({ action: G.Actions.IMPORT_SETTINGS, data: data.replace('150', '999') })).ok, false);
     assert.equal(h.writes.length, 0);
+    const invalidHistory = JSON.stringify({ format: "vuora-settings", version: 1,
+      settings: { searchFixerEnabled: true, colorPickerHistory: [{ hex: "#123456", ts: -1 }] } });
+    assert.equal((await h.message({ action: G.Actions.IMPORT_SETTINGS, data: invalidHistory })).ok, false);
+    assert.equal(h.writes.length, 0);
+    assert.equal(h.data.searchFixerEnabled, false);
     assert.equal((await h.message({ action: G.Actions.IMPORT_SETTINGS, data })).ok, true);
     assert.equal(h.writes.length, 1);
     assert.equal(h.data.searchFixerEnabled, true);
@@ -255,4 +303,27 @@ test("インポートはbackgroundで再検証し、一括保存・世代失効�
     assert.equal(h.data.notebookLmAccountIndex, 2);
     await assert.rejects(h.run('handleApplySettings({searchFixerEnabled:false}, null)'), /stale-settings/);
   }
+});
+
+
+test("Wikipedia の部分保存は他の外観と機能・マスター設定を保持する", async () => {
+  const h = await host({ wikipediaEnabled: false, wikipediaFeatures: { imageViewer: false, linkPreview: true },
+    wikipediaAppearance: { theme: "dark", font: "serif", fontSize: 20, contentWidth: 1000 } });
+  await h.run('handleApplySettings({wikipediaAppearance:{fontSize:22,lineHeight:1.55}}, null)');
+  assert.deepEqual(h.data.wikipediaAppearance, { ...G.WikipediaReader.DEFAULT_APPEARANCE, theme: "dark", font: "serif", fontSize: 22, contentWidth: 1000, lineHeight: 1.55 });
+  assert.deepEqual(h.writes, [{ wikipediaAppearance: h.data.wikipediaAppearance }]);
+  assert.equal(h.data.wikipediaEnabled, false);
+  await h.run('handleApplySettings({wikipediaFeatures:{linkPreview:false}}, null)');
+  assert.equal(h.data.wikipediaFeatures.imageViewer, false);
+  assert.equal(h.data.wikipediaFeatures.linkPreview, false);
+});
+
+
+test("Wikipedia の新しい外観を部分保存しても本文書体と細かい寸法を保持する", async () => {
+  const appearance = { ...G.WikipediaReader.DEFAULT_APPEARANCE, font: "line-seed-jp", fontSize: 19, contentWidth: 973 };
+  const h = await host({ wikipediaAppearance: appearance });
+  await h.run('handleApplySettings({wikipediaAppearance:{headingFont:"serif",linkStyle:"underline",coverImage:"show",borderRadius:"square",articleStyle:"pictures"}}, null)');
+  assert.deepEqual(h.data.wikipediaAppearance, { ...appearance, headingFont: "serif", linkStyle: "underline",
+    coverImage: "show", borderRadius: "square", articleStyle: "pictures" });
+  assert.deepEqual(Object.keys(h.writes[0]), ["wikipediaAppearance"]);
 });

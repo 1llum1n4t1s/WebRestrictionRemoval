@@ -33,6 +33,7 @@ const Actions = Object.freeze({
   APPLY_TIKTOK_CLEANER_CS: "applyTiktokCleanerCS",
   /** background → X content script: X クリーナー設定を反映 */
   APPLY_X_CLEANER_CS: "applyXCleanerCS",
+  APPLY_WIKIPEDIA_CS: "applyWikipediaCS",
   /** background → video-gamma content script: <video> ガンマ補正設定を反映（全タブ共通設定） */
   APPLY_VIDEO_GAMMA_CS: "applyVideoGammaCS",
   /** background → video-fill content script: <video> 黒帯除去（ズーム/引き伸ばし）設定を反映（全タブ共通設定） */
@@ -121,6 +122,9 @@ const Offscreen = Object.freeze({
 
 /** @readonly ストレージキー */
 const StorageKeys = Object.freeze({
+  WIKIPEDIA_ENABLED: "wikipediaEnabled",
+  WIKIPEDIA_FEATURES: "wikipediaFeatures",
+  WIKIPEDIA_APPEARANCE: "wikipediaAppearance",
   /** PC ごとの同期オプトインと、同期処理のローカル管理情報。 */
   SETTINGS_SYNC_ENABLED: "settingsSyncEnabled",
   SETTINGS_SYNC_STATE: "_settingsSyncState",
@@ -1151,6 +1155,7 @@ const XCleanerFeatures = Object.freeze([
   Object.freeze({ key: "hideGrok", category: "x_noise" }),
   Object.freeze({ key: "hideEngagementCounts", category: "x_noise" }),
   Object.freeze({ key: "followingTabDefault", category: "x_timeline" }),
+  Object.freeze({ key: "imageDownload", category: "x_extra" }),
 ]);
 
 const XCleanerDefaultFeatures = Object.freeze(
@@ -1165,6 +1170,7 @@ const XCleaner = Object.freeze({
     Object.freeze({ id: "x_layout", icon: "window" }),
     Object.freeze({ id: "x_noise", icon: "ban" }),
     Object.freeze({ id: "x_timeline", icon: "compass" }),
+    Object.freeze({ id: "x_extra", icon: "camera" }),
   ]),
 
   DEFAULT_FEATURES: XCleanerDefaultFeatures,
@@ -1212,7 +1218,7 @@ const XCleaner = Object.freeze({
 });
 
 /**
- * @readonly 画像ダウンロード機能の定数（Instagram / TikTok 共通、独自実装）。
+ * @readonly 画像ダウンロード機能の定数（Instagram / TikTok / X 共通、独自実装）。
  *
  * 各コンテンツ画像にホバー時のダウンロードボタンを overlay 表示し、Blob URL + `<a download>`
  * 方式で保存する。`downloads` permission は追加しない（既存 permissions のままで動作）。
@@ -1234,6 +1240,7 @@ const ImageDownloader = Object.freeze({
   HOSTS: Object.freeze({
     INSTAGRAM: "instagram",
     TIKTOK: "tiktok",
+    X: "x",
   }),
 
   /**
@@ -1274,6 +1281,7 @@ const ImageDownloader = Object.freeze({
    * - 配列の正規表現 → サブドメインを含むパターンマッチ
    */
   ALLOWED_HOSTS: Object.freeze({
+    x: Object.freeze(["pbs.twimg.com"]),
     instagram: Object.freeze([
       /^scontent(-[a-z0-9]+)?(-[a-z0-9]+)?\.cdninstagram\.com$/,
       // /rere レビュー A2-002 修正: 旧 `[a-z0-9-]+\.cdninstagram\.com$` パターンは任意 1 段
@@ -1318,7 +1326,21 @@ const ImageDownloader = Object.freeze({
     if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
       return ImageDownloader.HOSTS.TIKTOK;
     }
+    if (host === "x.com" || host.endsWith(".x.com") || host === "twitter.com" || host.endsWith(".twitter.com")) return ImageDownloader.HOSTS.X;
     return null;
+  },
+
+  /** 投稿画像だけを X CDN のオリジナルサイズ URL にする。アバター・動画サムネは対象外。 */
+  xOriginalUrl(value) {
+    if (typeof value !== "string") return null;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || !ImageDownloader.ALLOWED_HOSTS.x.includes(url.hostname) || url.port || url.username || url.password) return null;
+      const media = url.pathname.match(/^\/media\/([A-Za-z0-9_-]+)(?:\.(jpe?g|png|webp))?(?::(?:orig|large|medium|small|thumb|\d+x\d+))?$/i);
+      const format = url.searchParams.get("format") || media?.[2];
+      if (!media || !/^(?:jpe?g|png|webp)$/i.test(format || "")) return null;
+      return `https://pbs.twimg.com/media/${media[1]}?format=${format.toLowerCase()}&name=orig`;
+    } catch { return null; }
   },
 
   /**
@@ -1341,7 +1363,7 @@ const ImageDownloader = Object.freeze({
   },
 
   _isValidHost(host) {
-    return host === "instagram" || host === "tiktok";
+    return host === "instagram" || host === "tiktok" || host === "x";
   },
 
   /**
@@ -1352,6 +1374,7 @@ const ImageDownloader = Object.freeze({
   isAllowedFetchUrl(host, url) {
     if (!ImageDownloader._isValidHost(host)) return false;
     if (typeof url !== "string" || !url) return false;
+    if (host === ImageDownloader.HOSTS.X) return ImageDownloader.xOriginalUrl(url) === url;
     let hostname;
     try {
       const u = new URL(url);
@@ -2834,7 +2857,68 @@ const ColorPicker = Object.freeze({
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
  */
+const WikipediaReader = Object.freeze({
+  // 旧テーマは保存データとバックアップを読めるように残す。
+  THEMES: Object.freeze(["original", "auto", "light", "dark", "sepia", "algae", "calmness", "deep-ocean", "desert", "fairy-dust", "grey", "nature",
+    "one-dark", "one-light", "dracula", "nord", "monokai", "solarized-dark", "solarized-light", "github-dark", "github-light"]),
+  AVAILABLE_THEMES: Object.freeze(["original", "auto", "one-dark", "one-light", "dracula", "nord", "monokai", "solarized-dark", "solarized-light", "github-dark", "github-light"]),
+  // 本文用の同梱書体。固定ウェイトと可変書体のファイル共有を同じ入口で扱う。
+  FONTS: Object.freeze([
+    Object.freeze({ key: "noto-sans-jp", regular: "NotoSansJP-Regular.woff2", bold: "NotoSansJP-Bold.woff2" }),
+    Object.freeze({ key: "ibm-plex-sans-jp", regular: "IBMPlexSansJP-Regular.woff2", bold: "IBMPlexSansJP-Bold.woff2" }),
+    Object.freeze({ key: "m-plus-2", regular: "MPLUS2.woff2", bold: "MPLUS2.woff2" }),
+    Object.freeze({ key: "m-plus-rounded-1c", regular: "MPLUSRounded1c-Regular.woff2", bold: "MPLUSRounded1c-Bold.woff2" }),
+    Object.freeze({ key: "murecho", regular: "Murecho.woff2", bold: "Murecho.woff2" }),
+    Object.freeze({ key: "zen-kaku-gothic-new", regular: "ZenKakuGothicNew-Regular.woff2", bold: "ZenKakuGothicNew-Bold.woff2" }),
+    Object.freeze({ key: "line-seed-jp", regular: "LINESeedJP-Regular.woff2", bold: "LINESeedJP-Bold.woff2" }),
+  ]),
+  FEATURES: Object.freeze([
+    Object.freeze({ key: "readableLayout", icon: "book" }),
+    Object.freeze({ key: "stickyContents", icon: "list" }),
+    Object.freeze({ key: "imageViewer", icon: "image" }),
+    Object.freeze({ key: "linkPreview", icon: "link" }),
+    Object.freeze({ key: "hideAppearance", icon: "list" }),
+    Object.freeze({ key: "narrowContent", icon: "book" }),
+  ]),
+  DEFAULT_FEATURES: Object.freeze({ readableLayout: true, stickyContents: true, imageViewer: true, linkPreview: true, hideAppearance: false, narrowContent: false }),
+  DEFAULT_APPEARANCE: Object.freeze({ theme: "original", font: "sans", fontSize: 18, contentWidth: 960, lineHeight: 1.85,
+    headingFont: "inherit", linkStyle: "color", coverImage: "hide", borderRadius: "rounded", articleStyle: "full" }),
+  mergeFeatures(value) {
+    const out = { ...WikipediaReader.DEFAULT_FEATURES };
+    for (const key of Object.keys(out)) if (typeof value?.[key] === "boolean") out[key] = value[key];
+    return out;
+  },
+  // 旧設定も受け入れ、追加項目だけ既定値で補完する。
+  isValidAppearance(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const required = ["theme", "font", "fontSize", "contentWidth"];
+    if (!required.every((key) => Object.hasOwn(value, key))) return false;
+    const normalized = WikipediaReader.normalizeAppearance(value);
+    return Object.entries(value).every(([key, item]) => Object.hasOwn(normalized, key) && normalized[key] === item);
+  },
+  normalizeAppearance(value) {
+    const d = WikipediaReader.DEFAULT_APPEARANCE;
+    const integer = (v, fallback, min, max) => typeof v === "number" && Number.isFinite(v)
+      ? Math.min(max, Math.max(min, Math.round(v))) : fallback;
+    return {
+      theme: WikipediaReader.THEMES.includes(value?.theme) ? value.theme : d.theme,
+      font: ["sans", "serif", ...WikipediaReader.FONTS.map(({ key }) => key)].includes(value?.font) ? value.font : d.font,
+      fontSize: integer(value?.fontSize, d.fontSize, 14, 24),
+      contentWidth: integer(value?.contentWidth, d.contentWidth, 640, 1200),
+      lineHeight: typeof value?.lineHeight === "number" && Number.isFinite(value.lineHeight)
+        ? Math.round(Math.min(2.4, Math.max(1.3, value.lineHeight)) * 20) / 20 : d.lineHeight,
+      headingFont: ["inherit", "sans", "serif", ...WikipediaReader.FONTS.map(({ key }) => key)].includes(value?.headingFont) ? value.headingFont : d.headingFont,
+      linkStyle: ["underline", "color"].includes(value?.linkStyle) ? value.linkStyle : d.linkStyle,
+      coverImage: ["show", "hide"].includes(value?.coverImage) ? value.coverImage : d.coverImage,
+      // 旧設定・バックアップの互換用。角の形は表示に使わない。
+      borderRadius: ["rounded", "square"].includes(value?.borderRadius) ? value.borderRadius : d.borderRadius,
+      articleStyle: ["full", "pictures", "text"].includes(value?.articleStyle) ? value.articleStyle : d.articleStyle,
+    };
+  },
+});
+
 const PopupTabs = Object.freeze({
+  WIKIPEDIA: "wikipedia",
   TUNE: "tune",
   YOUTUBE: "youtube",
   INSTAGRAM: "instagram",
@@ -2843,7 +2927,7 @@ const PopupTabs = Object.freeze({
   PICKER: "picker",
   SETTINGS: "settings",
   /** UI の並び順と一致させる（矢印キー巡回の順序に使われる）。X は YouTube の次に置く。 */
-  ALL: Object.freeze(["tune", "youtube", "x", "instagram", "tiktok", "picker", "settings"]),
+  ALL: Object.freeze(["tune", "youtube", "x", "instagram", "tiktok", "wikipedia", "picker", "settings"]),
 
   /** タブ識別子のいずれかなら true */
   isValid(value) {
@@ -2903,6 +2987,9 @@ const PopupTabs = Object.freeze({
    * 3 関数を generated にする (中規模リファクタ、別 PR シリーズ)。
    */
   const SettingsSchema = Object.freeze([
+    Object.freeze({ field: "wikipediaEnabled", storageKey: StorageKeys.WIKIPEDIA_ENABLED, applyAction: Actions.APPLY_WIKIPEDIA_CS }),
+    Object.freeze({ field: "wikipediaFeatures", storageKey: StorageKeys.WIKIPEDIA_FEATURES, applyAction: Actions.APPLY_WIKIPEDIA_CS }),
+    Object.freeze({ field: "wikipediaAppearance", storageKey: StorageKeys.WIKIPEDIA_APPEARANCE, applyAction: Actions.APPLY_WIKIPEDIA_CS }),
     Object.freeze({ field: "searchFixerEnabled", storageKey: StorageKeys.SEARCH_FIXER_ENABLED, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerFeatures", storageKey: StorageKeys.SEARCH_FIXER_FEATURES, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
     Object.freeze({ field: "searchFixerGridItems", storageKey: StorageKeys.SEARCH_FIXER_GRID_ITEMS, applyAction: Actions.APPLY_SEARCH_FIXER_CS }),
@@ -2940,6 +3027,7 @@ const PopupTabs = Object.freeze({
   globalThis.InstagramCleaner = InstagramCleaner;
   globalThis.TikTokCleaner = TikTokCleaner;
   globalThis.XCleaner = XCleaner;
+  globalThis.WikipediaReader = WikipediaReader;
   globalThis.ImageDownloader = ImageDownloader;
   globalThis.VolumeBooster = VolumeBooster;
   globalThis.VideoGamma = VideoGamma;

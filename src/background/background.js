@@ -133,6 +133,9 @@ chrome.runtime.onInstalled.addListener(() => globalThis.enqueueSettingsWrite(asy
     [StorageKeys.INSTAGRAM_CLEANER_FEATURES]: InstagramCleaner.mergeFeatures({}),
     [StorageKeys.TIKTOK_CLEANER_ENABLED]: false,
     [StorageKeys.TIKTOK_CLEANER_FEATURES]: TikTokCleaner.mergeFeatures({}),
+    [StorageKeys.WIKIPEDIA_ENABLED]: false,
+    [StorageKeys.WIKIPEDIA_FEATURES]: WikipediaReader.mergeFeatures({}),
+    [StorageKeys.WIKIPEDIA_APPEARANCE]: WikipediaReader.normalizeAppearance({}),
     [StorageKeys.X_CLEANER_ENABLED]: false,
     [StorageKeys.X_CLEANER_FEATURES]: XCleaner.mergeFeatures({}),
     [StorageKeys.VOLUME_BOOSTER_ENABLED]: false,
@@ -1077,7 +1080,7 @@ async function applySettingsInner(settings, syncGeneration) {
   }
   const merged = { ...existing };
   const featureFields = new Set(["searchFixerFeatures", "instagramCleanerFeatures",
-    "tiktokCleanerFeatures", "xCleanerFeatures"]);
+    "tiktokCleanerFeatures", "xCleanerFeatures", "wikipediaFeatures", "wikipediaAppearance"]);
   const changed = SettingsSchema.filter(({ field }) => Object.hasOwn(settings ?? {}, field));
   for (const { field, storageKey } of changed) {
     merged[field] = featureFields.has(field)
@@ -1121,6 +1124,9 @@ function normalizeSettings(settings) {
     instagramCleanerFeatures: InstagramCleaner.mergeFeatures(settings?.instagramCleanerFeatures),
     tiktokCleanerEnabled: settings?.tiktokCleanerEnabled === true,
     tiktokCleanerFeatures: TikTokCleaner.mergeFeatures(settings?.tiktokCleanerFeatures),
+    wikipediaEnabled: settings?.wikipediaEnabled === true,
+    wikipediaFeatures: WikipediaReader.mergeFeatures(settings?.wikipediaFeatures),
+    wikipediaAppearance: WikipediaReader.normalizeAppearance(settings?.wikipediaAppearance),
     xCleanerEnabled: settings?.xCleanerEnabled === true,
     xCleanerFeatures: XCleaner.mergeFeatures(settings?.xCleanerFeatures),
     videoGammaEnabled: settings?.videoGammaEnabled === true,
@@ -1215,6 +1221,11 @@ async function notifyContentScripts(s) {
     messages.push([{ action: Actions.APPLY_TIKTOK_CLEANER_CS, data: {
       enabled: s.tiktokCleanerEnabled,
       features: s.tiktokCleanerFeatures,
+    } }, TOP_FRAME]);
+  }
+  if (/^https?:\/\/(?:[a-z0-9-]+\.)*wikipedia\.org(?::\d+)?\//i.test(url)) {
+    messages.push([{ action: Actions.APPLY_WIKIPEDIA_CS, data: {
+      enabled: s.wikipediaEnabled, features: s.wikipediaFeatures, appearance: s.wikipediaAppearance,
     } }, TOP_FRAME]);
   }
   if (isXUrl(url)) {

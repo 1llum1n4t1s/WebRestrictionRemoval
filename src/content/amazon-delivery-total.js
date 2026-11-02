@@ -166,22 +166,25 @@
 
   function subscriptionId(tile) {
     const ids = new Set();
+    let outerScope = null;
     // コメントは tile の二段上に置かれる現行 DOM に対応する。
     // 別商品の ID を誤採用しないよう、単一 tile の祖先だけを最大5段調べる。
     for (let scope = tile, depth = 0; scope && depth <= 5; scope = scope.parentElement, depth++) {
       const count = scope.querySelectorAll(C.DELIVERY_ITEM_SELECTOR).length
         + (scope.matches(C.DELIVERY_ITEM_SELECTOR) ? 1 : 0);
       if (count !== 1 || scope.matches(C.DELIVERY_SECTION_SELECTOR)) break;
-      const walker = document.createTreeWalker(scope, NodeFilter.SHOW_COMMENT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        const match = node.data.match(/k-injected\s+k\+b64\s+([A-Za-z0-9+/=]+)/);
-        if (!match) continue;
-        try {
-          const bytes = Uint8Array.from(atob(match[1]), (c) => c.charCodeAt(0));
-          const id = JSON.parse(new TextDecoder().decode(bytes))?.["k-data"]?.subscriptionId;
-          if (typeof id === "string" && id.length && id.length <= 512) ids.add(id);
-        } catch { /* 他の注入コメントは対象外。内容は記録しない。 */ }
-      }
+      outerScope = scope;
+    }
+    if (!outerScope) return null;
+    const walker = document.createTreeWalker(outerScope, NodeFilter.SHOW_COMMENT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const match = node.data.match(/k-injected\s+k\+b64\s+([A-Za-z0-9+/=]+)/);
+      if (!match) continue;
+      try {
+        const bytes = Uint8Array.from(atob(match[1]), (c) => c.charCodeAt(0));
+        const id = JSON.parse(new TextDecoder().decode(bytes))?.["k-data"]?.subscriptionId;
+        if (typeof id === "string" && id.length && id.length <= 512) ids.add(id);
+      } catch { /* 他の注入コメントは対象外。内容は記録しない。 */ }
       if (ids.size > 1) return null;
     }
     return ids.size === 1 ? [...ids][0] : null;
@@ -208,12 +211,13 @@
     return match ? Number(match[0]) : null;
   }
 
-  function detailItems(doc) {
-    return [...doc.querySelectorAll(`${C.DELIVERY_SECTION_SELECTOR} ${C.DELIVERY_ITEM_SELECTOR}`)].map(itemData);
+  function detailItemsByTile(doc) {
+    return new Map([...doc.querySelectorAll(`${C.DELIVERY_SECTION_SELECTOR} ${C.DELIVERY_ITEM_SELECTOR}`)]
+      .map((tile) => [tile, itemData(tile)]));
   }
 
   function extractPage(doc, kind, asin) {
-    if (kind === "manage") return { items: detailItems(doc), expected: expectedCount(doc) };
+    if (kind === "manage") return { items: [...detailItemsByTile(doc).values()], expected: expectedCount(doc) };
     if (kind === "history") {
       // 最新行の URL が不正でも、後続の古い注文へ読み替えない。
       const link = doc.querySelector('#deliveryHistoryPopover table a[href]');
@@ -378,13 +382,15 @@
         return totalItems(detail.items, detail.expected, url);
       });
     }
-    const items = detailItems(document);
+    // 同期走査中の解析だけを共有し、次の走査では再利用されたノードも読み直す。
+    const itemsByTile = detailItemsByTile(document);
+    const items = [...itemsByTile.values()];
     const expected = expectedCount(document);
     const pageSignature = JSON.stringify([location.href, expected, items]);
     for (const section of document.querySelectorAll(C.DELIVERY_SECTION_SELECTOR)) {
       const target = section.querySelector(C.DELIVERY_TARGET_SELECTOR);
       if (!target) continue;
-      const own = [...section.querySelectorAll(C.DELIVERY_ITEM_SELECTOR)].map(itemData);
+      const own = [...section.querySelectorAll(C.DELIVERY_ITEM_SELECTOR)].map((tile) => itemsByTile.get(tile));
       // 画面全体の件数で読込完了を確認し、配送ごとの単価×数量を計算する。
       const complete = expected !== null && expected === items.length;
       const signature = `${pageSignature}|${JSON.stringify(own)}`;

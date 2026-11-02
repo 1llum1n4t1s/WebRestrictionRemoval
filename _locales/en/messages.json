@@ -25,7 +25,7 @@
     "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
   },
   "appDescription": {
-    "message": "Browser extension that locally tunes the readability, audio, and continuity of the page you are viewing.",
+    "message": "Local reading and audio tools for YouTube, Wikipedia, social media, and shopping pages.",
     "description": "Short description (manifest.description)"
   },
   "defaultTitle": {
@@ -42,7 +42,8 @@
     "description": "Tagline shown beneath the popup header"
   },
 
-  "tabbarAriaLabel": { "message": "Popup tabs" },
+  "categorySelectorLabel": { "message": "Category" },
+  "tabbarAriaLabel": { "message": "Category to display" },
   "tabTune": { "message": "Tune" },
   "tabYoutube": { "message": "YouTube" },
   "tabInstagram": { "message": "Instagram" },
@@ -337,7 +338,7 @@
   "applyOkAllStopped": { "message": "⏹  All stopped" },
   "applyOkPrefix": { "message": "✓  " },
   "applyOkSeparator": { "message": "  /  " },
-  "applyError": { "message": "⚠️ Cannot apply on this page" },
+  "applyError": { "message": "⚠️ Could not save or apply settings" },
 
   "volumeErrorInvalidTab": { "message": "⚠ Cannot read tab" },
   "volumeErrorOffscreenUnavailable": { "message": "⚠ Cannot start internal processor" },
@@ -469,6 +470,9 @@
   "feat_tt_imageDownload_label": { "message": "Show download button on images" },
   "feat_tt_imageDownload_desc": { "message": "Overlay a download button on the top-left of photo posts and video thumbnails on hover." },
 
+  "categoryXExtra": { "message": "Extras" },
+  "feat_x_imageDownload_label": { "message": "Show download button on images" },
+  "feat_x_imageDownload_desc": { "message": "Hover over a post image to show a button in its top-left corner; click to save it in original quality" },
   "feat_x_hideRightPane_label": { "message": "Hide the right pane" },
   "feat_x_hideRightPane_desc": { "message": "Hide the entire right column of the three-pane layout (search, trends, who to follow, upsells) and widen the timeline into the freed space." },
   "feat_x_hideTrends_label": { "message": "Hide trends" },
@@ -549,5 +553,217 @@
   "ypcCommand_volume_2": {"message":"YouTube volume button 2"},
   "ypcCommand_volume_3": {"message":"YouTube volume button 3"},
   "ypcCommand_volume_4": {"message":"YouTube volume button 4"},
-  "ypcCommand_volume_5": {"message":"YouTube volume button 5"}
+  "ypcCommand_volume_5": {"message":"YouTube volume button 5"},
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Wikipedia reading settings"
+  },
+  "wikipediaMasterDesc": {
+    "message": "Adjust the layout, text, and colors of Wikipedia articles."
+  },
+  "wikipediaOptions": {
+    "message": "Wikipedia reading options"
+  },
+  "wikipedia_theme": {
+    "message": "Colors"
+  },
+  "wikipedia_noto_sans_jp": { "message": "Noto Sans JP" },
+  "wikipedia_ibm_plex_sans_jp": { "message": "IBM Plex Sans JP" },
+  "wikipedia_m_plus_2": { "message": "M PLUS 2" },
+  "wikipedia_m_plus_rounded_1c": { "message": "M PLUS Rounded 1c" },
+  "wikipedia_murecho": { "message": "Murecho" },
+  "wikipedia_zen_kaku_gothic_new": { "message": "Zen Kaku Gothic New" },
+  "wikipedia_line_seed_jp": { "message": "LINE Seed JP" },
+  "wikipedia_font": {
+    "message": "Body typeface"
+  },
+  "wikipedia_fontSize": {
+    "message": "Text size"
+  },
+  "wikipedia_contentWidth": {
+    "message": "Article width"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "Base width for the article. Hiding the Appearance panel adds its freed space. Turn on “Keep article within set width” to keep this width instead."
+  },
+  "wikipedia_lineHeight": {
+    "message": "Line spacing"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1×"
+  },
+  "wikipedia_original": {
+    "message": "Site colors"
+  },
+  "wikipedia_light": {
+    "message": "Light"
+  },
+  "wikipedia_sepia": {
+    "message": "Sepia"
+  },
+  "wikipedia_dark": {
+    "message": "Dark"
+  },
+  "wikipedia_sans": {
+    "message": "System sans serif"
+  },
+  "wikipedia_serif": {
+    "message": "System serif"
+  },
+  "wikipediaContents": {
+    "message": "Contents"
+  },
+  "wikipediaClose": {
+    "message": "Close"
+  },
+  "wikipediaImage": {
+    "message": "Enlarge image"
+  },
+  "wikipediaReference": {
+    "message": "Reference preview"
+  },
+  "wikipediaSiteMenu": { "message": "Wikipedia menu" },
+  "wikipediaArticleActions": { "message": "Article actions" },
+  "wikipediaArticleInfo": { "message": "Article information" },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "Modern article layout"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "Hide Appearance panel"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "Hide Wikipedia’s Appearance panel on the right side of articles and use its freed space for the article."
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "Keep article within set width"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "Keep the article within “Article width” below, without expanding into the space freed by hiding the Appearance panel. Change the width using “Article width”."
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "Rebuild the page around search, contents, the article and its information. Turn off to restore the original layout."
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "Sticky contents"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "Keep the table of contents visible for quick navigation."
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "Image viewer"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "Enlarge images in the article."
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "Link and reference previews"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "Style Wikipedia’s standard article previews and show reference text in place. Article previews appear when enabled on Wikipedia."
+  },
+  "wikipedia_headingFont": {
+    "message": "Heading typeface"
+  },
+  "wikipedia_inherit": {
+    "message": "Same as body"
+  },
+  "wikipedia_linkStyle": {
+    "message": "Link style"
+  },
+  "wikipedia_underline": {
+    "message": "Underline"
+  },
+  "wikipedia_color": {
+    "message": "Color"
+  },
+  "wikipedia_coverImage": {
+    "message": "Cover image"
+  },
+  "wikipedia_show": {
+    "message": "Show"
+  },
+  "wikipedia_hide": {
+    "message": "Hide"
+  },
+  "wikipedia_articleStyle": {
+    "message": "Article view"
+  },
+  "wikipedia_full": {
+    "message": "Full"
+  },
+  "wikipedia_pictures": {
+    "message": "Text & images"
+  },
+  "wikipedia_text": {
+    "message": "Text only"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "Full includes tables and other content. Text & images omits tables and similar elements. Text only also omits images."
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "Underline uses the text color until you hover over a link. Color always uses the link color."
+  },
+  "wikipedia_group_typography": {
+    "message": "Text and colors"
+  },
+  "wikipedia_group_layout": {
+    "message": "Layout"
+  },
+  "wikipedia_group_display": {
+    "message": "Display"
+  },
+  "wikipedia_small": {
+    "message": "S"
+  },
+  "wikipedia_medium": {
+    "message": "M"
+  },
+  "wikipedia_large": {
+    "message": "L"
+  },
+  "wikipedia_auto": {
+    "message": "Auto"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$ (legacy theme)",
+    "placeholders": { "theme": { "content": "$1" } }
+  },
+  "wikipedia_one_dark": { "message": "One Dark" },
+  "wikipedia_one_light": { "message": "One Light" },
+  "wikipedia_dracula": { "message": "Dracula" },
+  "wikipedia_nord": { "message": "Nord" },
+  "wikipedia_monokai": { "message": "Monokai" },
+  "wikipedia_solarized_dark": { "message": "Solarized Dark" },
+  "wikipedia_solarized_light": { "message": "Solarized Light" },
+  "wikipedia_github_dark": { "message": "GitHub Dark" },
+  "wikipedia_github_light": { "message": "GitHub Light" },
+  "wikipedia_deep_ocean": {
+    "message": "Deep ocean"
+  },
+  "wikipedia_algae": {
+    "message": "Algae"
+  },
+  "wikipedia_calmness": {
+    "message": "Calmness"
+  },
+  "wikipedia_desert": {
+    "message": "Desert"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "Fairy dust"
+  },
+  "wikipedia_grey": {
+    "message": "Grey"
+  },
+  "wikipedia_nature": {
+    "message": "Nature"
+  },
+  "wikipediaGallery": {
+    "message": "Article images"
+  },
+  "wikipediaNoImages": {
+    "message": "No loaded images are available."
+  }
 }

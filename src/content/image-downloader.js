@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * 画像ダウンロード機能（Instagram / TikTok 共通）。
+ * 画像ダウンロード機能（Instagram / TikTok / X 共通）。
  *
  * 各サイトのコンテンツ画像（動画サムネ / 投稿写真 / コミュニティ投稿等）にホバー時のダウンロード
  * ボタンを overlay 表示する。クリック時は `<a download>` + Blob URL 方式で保存する（`downloads`
@@ -13,7 +13,7 @@
  * 動作の不変条件:
  *   - top frame 限定（`window === window.top`）。iframe 内 image は対象外
  *   - サイズ閾値 ImageDownloader.MIN_SIZE_PX 未満の画像（avatar / アイコン）は除外
- *   - クリーナーで非表示の画像（display:none / visibility:hidden / opacity:0）は除外
+ *   - 非表示画像は除外。X が透明な img の代わりに表示する同一写真の背景画像は対象
  *   - `__cpaImageDownloaderRunning` で同一フレーム二重実行防止
  *   - fetch 先は ImageDownloader.ALLOWED_HOSTS の CDN のみ（任意オリジンへの代理 fetch 防止）
  *   - fetch は `credentials: "omit"` + `redirect: "manual"` + `referrerPolicy: "no-referrer"` で
@@ -39,6 +39,11 @@
       features: StorageKeys.TIKTOK_CLEANER_FEATURES,
       applyMsg: Actions.APPLY_TIKTOK_CLEANER_CS,
     },
+    x: {
+      master: StorageKeys.X_CLEANER_ENABLED,
+      features: StorageKeys.X_CLEANER_FEATURES,
+      applyMsg: Actions.APPLY_X_CLEANER_CS,
+    },
   };
   const cfg = HOST_CONFIG[host];
   if (!cfg) return;
@@ -49,7 +54,7 @@
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["src", "srcset"],
+    attributeFilter: ["src", "srcset", ...(host === ImageDownloader.HOSTS.X ? ["href", "inert", "data-testid", "role", "style", "class"] : [])],
   };
   /** triggerBlobDownload で `<a>` を DOM から外す前の delay。Chrome がダウンロードを内部キューに
    *  載せるまでの猶予を確保し、`URL.revokeObjectURL` が早すぎて Blob が破棄される race を防ぐ。
@@ -117,6 +122,25 @@
    * 共通の前提: src 取得 / data: URI 排除 / サイズ閾値判定は decorateImage 側で済んでいる。
    * adapter は「サイト固有の DOM 構造判定」と「最大解像度 URL 解決」のみ担当する。
    */
+  function findXPhotoHost(img) {
+    const safeHost = node => {
+      const control = node.closest('a, button, [role="button"], [role="link"]');
+      const candidate = control ? control.parentElement : node;
+      return candidate && !["BODY", "HTML", "MAIN", "ARTICLE"].includes(candidate.tagName)
+        && !candidate.closest('a, button, [role="button"], [role="link"], [inert]') ? candidate : null;
+    };
+    for (let node = img.parentElement, depth = 0; node && depth < 5; node = node.parentElement, depth++) {
+      if (["BODY", "HTML", "MAIN", "ARTICLE"].includes(node.tagName)) break;
+      if (node.closest("[inert]")) continue;
+      if (node.matches('[data-testid="tweetPhoto"], a[href*="/status/"][href*="/photo/"]')
+        || node.querySelector(':scope > a[href*="/status/"][href*="/photo/"]')) return safeHost(node);
+    }
+    if (!img.closest('[data-testid="swipe-to-dismiss"], [role="dialog"]') || img.closest("[inert]")) return null;
+    let parent = img.parentElement;
+    while (parent && ["A", "SPAN", "PICTURE"].includes(parent.tagName)) parent = parent.parentElement;
+    return parent ? safeHost(parent) : null;
+  }
+
   const adapters = {
     instagram: {
       isContentImage(img) {
@@ -177,6 +201,22 @@
     },
   };
 
+  adapters.x = {
+    isContentImage(img) {
+      if (!ImageDownloader.xOriginalUrl(img.currentSrc || img.src)) return false;
+      return Boolean(findXPhotoHost(img));
+    },
+    resolveMaxResUrl(img) {
+      const url = ImageDownloader.xOriginalUrl(img.currentSrc || img.src);
+      if (!url) return [];
+      const candidates = [url];
+      for (const format of ["jpg", "png"]) {
+        const variant = new URL(url); variant.searchParams.set("format", format);
+        if (!candidates.includes(variant.href)) candidates.push(variant.href);
+      }
+      return candidates;
+    },
+  };
   const adapter = adapters[host];
 
   // === 共通ヘルパ ===
@@ -227,6 +267,27 @@
     return true;
   }
 
+  /** X は表示用の背景画像に透明な img を重ねる。背景も同一写真で可視の場合だけ対象にする。 */
+  function hasVisibleXPhotoBackground(img) {
+    if (host !== ImageDownloader.HOSTS.X || parseFloat(getComputedStyle(img).opacity) !== 0) return false;
+    const photo = img.closest('[data-testid="tweetPhoto"]');
+    const source = ImageDownloader.xOriginalUrl(img.currentSrc || img.src);
+    if (!photo || !source) return false;
+    // 非表示の投稿やカルーセルの画像を、背景画像の存在だけで復活させない。
+    for (let node = img; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden"
+        || (node !== img && parseFloat(style.opacity) === 0)) return false;
+    }
+    return [...photo.children].some(node => {
+      if (node === img || !isVisible(node)) return false;
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      const background = getComputedStyle(node).backgroundImage.match(/^url\(["']?(.*?)["']?\)$/);
+      return background && ImageDownloader.xOriginalUrl(background[1]) === source;
+    });
+  }
+
   /**
    * `<img>` の overlay host となる祖先を返す。
    *
@@ -246,6 +307,9 @@
    * 子孫 hover の両方が解決する。
    */
   function findHostEl(img) {
+    if (host === ImageDownloader.HOSTS.X) {
+      return findXPhotoHost(img);
+    }
     // TikTok 専用: <a href="/photo/"> / <a href="/video/"> はフィードカード全体を wrap して
     // CSS Grid + aspect-ratio sizing を担うため、host class (`position: relative !important`)
     // を当てると width:0 で潰れる（実機検証で確定）。
@@ -300,6 +364,7 @@
   /** DOM から切断された画像の所有 button を次回 scan で撤去するための走査対象。 */
   const decoratedImages = new Set();
   function resolveHostEl(img) {
+    if (host === ImageDownloader.HOSTS.X) return findHostEl(img);
     const cached = hostElCache.get(img);
     if (cached && cached.isConnected && cached.contains(img)) return cached;
     const el = findHostEl(img);
@@ -443,8 +508,16 @@
     try {
       const candidates = adapter.resolveMaxResUrl(img);
       if (!candidates.length) throw new Error("no source URL");
-      const result = await fetchFirstAvailable(candidates, signal);
+      let result = null;
+      if (host === ImageDownloader.HOSTS.X) {
+        // プレビューと原本の形式が違う場合だけ、別形式の orig を順に試す。
+        for (const candidate of candidates) {
+          result = await fetchFirstAvailable([candidate], signal);
+          if (result || !active || signal?.aborted) break;
+        }
+      } else result = await fetchFirstAvailable(candidates, signal);
       if (!result) throw new Error("all candidates failed");
+      if (host === ImageDownloader.HOSTS.X && !/^image\/(jpeg|png|webp)$/i.test(result.blob.type)) throw new Error("not an X image");
       // OFF 切替後の進行中 fetch は戻ってきても downloadトリガしない
       if (!active || (signal && signal.aborted)) return;
       const filename = ImageDownloader.buildFilename(host, result.blob.type);
@@ -588,7 +661,7 @@
     // リフロー誘発なし) を `isVisible` (getComputedStyle) より先に置く。Instagram
     // フィードで <img> 50〜100 枚に対するスタイル計算コストを削減する (/rere C 3-F)。
     if (!passesSizeThreshold(img)) return null;
-    if (!isVisible(img)) return null;
+    if (!isVisible(img) && !hasVisibleXPhotoBackground(img)) return null;
     return src;
   }
 
@@ -606,28 +679,29 @@
       return;
     }
 
-    const lastSrc = img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
+    const overlay = overlayByImage.get(img);
+    // サイトの再描画で dataset が消えても、所有情報を失ってボタンを重複追加しない。
+    const lastSrc = overlay?.src ?? img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY];
 
     // 対象画像の src が変わっていなければ button 位置だけ再 sync する。
     // host や img のサイズが SPA navigation / lazy load / window resize で変わっているケースに対応。
     if (lastSrc === currentSrc) {
       const hostElCached = resolveHostEl(img);
-      const overlay = overlayByImage.get(img);
       if (
         hostElCached &&
         overlay &&
         overlay.hostEl === hostElCached &&
         overlay.button.parentElement === hostElCached
       ) {
+        applyHostPositionClass(hostElCached);
         syncButtonPosition(overlay.button, img);
         return;
       }
       // サイト側の再描画で button または host が差し替わった場合は、古い所有物だけ外して再構築する。
-      if (overlay) detachOverlayForImage(img);
     }
 
     // src が変わったケース → 古い装飾を撤去して再評価
-    if (lastSrc) {
+    if (overlay || lastSrc) {
       detachOverlayForImage(img);
     }
 
@@ -637,20 +711,20 @@
     applyHostPositionClass(hostEl);
     const button = buildButton(img);
     hostEl.appendChild(button);
-    const overlay = { hostEl, button, loadHandler: null };
-    overlayByImage.set(img, overlay);
+    const nextOverlay = { hostEl, button, src: currentSrc, loadHandler: null };
+    overlayByImage.set(img, nextOverlay);
     decoratedImages.add(img);
     // host サイズが img より大きいケース対策: JS で button 位置を img の rect に同期。
     // 初回 sync + img の load (lazy load 等で後からサイズ確定する場合) で再同期。
     syncButtonPosition(button, img);
     if (!img.complete) {
-      overlay.loadHandler = () => {
-        img.removeEventListener("load", overlay.loadHandler);
-        overlay.loadHandler = null;
-        if (overlayByImage.get(img) !== overlay || !active || checkContextInvalidated()) return;
+      nextOverlay.loadHandler = () => {
+        img.removeEventListener("load", nextOverlay.loadHandler);
+        nextOverlay.loadHandler = null;
+        if (overlayByImage.get(img) !== nextOverlay || !active || checkContextInvalidated()) return;
         syncButtonPosition(button, img);
       };
-      img.addEventListener("load", overlay.loadHandler, { once: true });
+      img.addEventListener("load", nextOverlay.loadHandler, { once: true });
     }
     img.dataset[ImageDownloader.SCANNED_SRC_DATASET_KEY] = currentSrc;
   }

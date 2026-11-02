@@ -258,6 +258,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ----- ローカル状態 -----
   let statusTimer = null;
   let applySeq = 0;
+  let applyErrorSeq = 0;
+  const settingOperations = new Map();
+  const pendingSettingsOperations = new Set();
+  const settingNotifications = new Map();
+  const wikipediaAppearanceSetters = new Map();
   /** @type {Map<string, HTMLInputElement>} */
   const featureInputs = new Map();
   /** @type {Map<string, HTMLInputElement>} Instagram クリーナーの個別機能入力 */
@@ -311,6 +316,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     StorageKeys.INSTAGRAM_CLEANER_FEATURES,
     StorageKeys.TIKTOK_CLEANER_ENABLED,
     StorageKeys.TIKTOK_CLEANER_FEATURES,
+    StorageKeys.WIKIPEDIA_ENABLED,
+    StorageKeys.WIKIPEDIA_FEATURES,
+    StorageKeys.WIKIPEDIA_APPEARANCE,
     StorageKeys.X_CLEANER_ENABLED,
     StorageKeys.X_CLEANER_FEATURES,
     StorageKeys.VOLUME_BOOSTER_ENABLED,
@@ -474,6 +482,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     input.checked = storedTtFeatures[key] === true;
   }
 
+  buildWikipediaSettings(stored);
+
   const storedXFeatures = XCleaner.mergeFeatures(stored[StorageKeys.X_CLEANER_FEATURES]);
   for (const [key, input] of xFeatureInputs) {
     input.checked = storedXFeatures[key] === true;
@@ -497,8 +507,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ============================================================
 
   // ---------- DOM 参照 ----------
-  // 6 タブ構成: 調整 (tune) / YouTube / X / Instagram / TikTok / カラーピッカー (picker)。
-  // tab/panel ペアを Map で保持し、setActiveTab / 矢印キー操作を統一的に扱う。
+  // カテゴリ id と画面の対応を保持し、表示の切替と既存の保存値を共有する。
   const $tabTune = document.getElementById("tabTune");
   const $tabYoutube = document.getElementById("tabYoutube");
   const $tabInstagram = document.getElementById("tabInstagram");
@@ -519,9 +528,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: PopupTabs.X, tab: $tabX, panel: $panelX },
     { id: PopupTabs.INSTAGRAM, tab: $tabInstagram, panel: $panelInstagram },
     { id: PopupTabs.TIKTOK, tab: $tabTikTok, panel: $panelTikTok },
+    { id: PopupTabs.WIKIPEDIA, tab: document.getElementById("tabWikipedia"), panel: document.getElementById("panelWikipedia") },
     { id: PopupTabs.PICKER, tab: $tabPicker, panel: $panelPicker },
     { id: PopupTabs.SETTINGS, tab: document.getElementById("tabSettings"), panel: document.getElementById("panelSettings") },
   ];
+  const $categoryTrigger = document.getElementById("categoryTrigger");
+  const $categoryMenu = document.getElementById("categoryMenu");
+  const $categoryName = document.getElementById("categoryName");
+  const $categoryIcon = document.getElementById("categoryIcon");
   const $specimenCard = document.getElementById("specimenCard");
   const $specimenNo = document.getElementById("specimenNo");
   const $specimenTime = document.getElementById("specimenTime");
@@ -619,19 +633,68 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (subId) select(subId);
   }
 
-  for (const entry of TAB_REGISTRY) {
-    entry.tab.addEventListener("click", () => setActiveTab(entry.id));
-    // ←/→ 矢印キーで前後に巡回（WAI-ARIA Authoring Practices 準拠）。最後で → なら最初に折返し。
-    entry.tab.addEventListener("keydown", (ev) => {
-      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+  const categoryIsOpen = () => $categoryMenu.matches(":popover-open");
+  const selectedCategory = () => TAB_REGISTRY.find((entry) => entry.tab.getAttribute("aria-selected") === "true");
+  function positionCategoryMenu() {
+    const rect = $categoryTrigger.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom - 16;
+    const above = rect.top - 16;
+    const opensAbove = below < 220 && above > below;
+    const height = Math.max(80, Math.min(368, opensAbove ? above : below));
+    $categoryMenu.style.width = rect.width + "px";
+    $categoryMenu.style.left = rect.left + "px";
+    $categoryMenu.style.maxHeight = height + "px";
+    $categoryMenu.style.top = opensAbove ? "auto" : rect.bottom + 8 + "px";
+    $categoryMenu.style.bottom = opensAbove ? window.innerHeight - rect.top + 8 + "px" : "auto";
+  }
+  $categoryMenu.addEventListener("beforetoggle", (ev) => {
+    const opening = ev.newState === "open";
+    $categoryTrigger.setAttribute("aria-expanded", String(opening));
+    if (opening) { categorySearch = ""; positionCategoryMenu(); }
+  });
+  $categoryTrigger.addEventListener("keydown", (ev) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(ev.key)) return;
+    ev.preventDefault();
+    if (!categoryIsOpen()) $categoryTrigger.click();
+    const entry = ev.key === "Home" ? TAB_REGISTRY[0] : ev.key === "End" ? TAB_REGISTRY.at(-1) : selectedCategory();
+    entry?.tab.focus();
+  });
+  let categorySearch = "";
+  let categorySearchTime = 0;
+  $categoryMenu.addEventListener("keydown", (ev) => {
+    const index = TAB_REGISTRY.findIndex((entry) => entry.tab === document.activeElement);
+    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(ev.key)) {
       ev.preventDefault();
-      const idx = TAB_REGISTRY.findIndex((e) => e.id === entry.id);
-      if (idx < 0) return;
-      const delta = ev.key === "ArrowRight" ? 1 : -1;
-      const nextIdx = (idx + delta + TAB_REGISTRY.length) % TAB_REGISTRY.length;
-      setActiveTab(TAB_REGISTRY[nextIdx].id, { focus: true });
+      const next = ev.key === "Home" ? 0 : ev.key === "End" ? TAB_REGISTRY.length - 1
+        : (index + (ev.key === "ArrowDown" ? 1 : -1) + TAB_REGISTRY.length) % TAB_REGISTRY.length;
+      TAB_REGISTRY[next].tab.focus();
+      return;
+    }
+    if (ev.key === "Escape" || ev.key === "Tab") {
+      if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); }
+      $categoryMenu.hidePopover();
+      if (ev.key === "Escape") $categoryTrigger.focus();
+      return;
+    }
+    if (ev.key.length === 1 && ev.key !== " " && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+      ev.preventDefault();
+      const now = Date.now();
+      categorySearch = (now - categorySearchTime < 700 ? categorySearch : "") + ev.key.toLocaleLowerCase();
+      categorySearchTime = now;
+      const ordered = [...TAB_REGISTRY.slice(index + 1), ...TAB_REGISTRY.slice(0, index + 1)];
+      ordered.find((entry) => entry.tab.querySelector(".category-option-name").textContent.toLocaleLowerCase().startsWith(categorySearch))?.tab.focus();
+    }
+  });
+  for (const entry of TAB_REGISTRY) {
+    entry.tab.addEventListener("click", () => {
+      setActiveTab(entry.id);
+      $categoryMenu.hidePopover();
+      $categoryTrigger.focus();
     });
   }
+  window.addEventListener("resize", () => { if (categoryIsOpen()) positionCategoryMenu(); });
+  window.addEventListener("scroll", () => { if (categoryIsOpen()) positionCategoryMenu(); }, { passive: true });
+  $categoryTrigger.disabled = false;
 
   function setActiveTab(tabId, { persist = true, focus = false } = {}) {
     const target = PopupTabs.normalize(tabId);
@@ -640,12 +703,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isActive = entry.id === target;
       entry.tab.classList.toggle("is-active", isActive);
       entry.tab.setAttribute("aria-selected", String(isActive));
-      entry.tab.tabIndex = isActive ? 0 : -1;
+      entry.tab.toggleAttribute("autofocus", isActive);
+      entry.tab.tabIndex = -1;
       entry.panel.classList.toggle("is-active", isActive);
       entry.panel.hidden = !isActive;
       if (isActive) activeEntry = entry;
     }
-    if (focus && activeEntry) activeEntry.tab.focus();
+    if (activeEntry) {
+      $categoryName.textContent = activeEntry.tab.querySelector(".category-option-name").textContent;
+      $categoryIcon.setAttribute("href", activeEntry.tab.querySelector("use").getAttribute("href"));
+    }
+    if (focus) $categoryTrigger.focus();
     if (persist) {
       savePopupStorage({ [StorageKeys.POPUP_LAST_TAB]: target })
         .catch(logStorageError("popup-last-tab"));
@@ -704,9 +772,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 別ウィンドウで履歴が変わったら反映（複数 popup 同時起動の保険）
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
+    for (const [key, change] of Object.entries(changes)) settingNotifications.set(key, change);
     if (changes[StorageKeys.COLOR_PICKER_HISTORY]) {
       history = sanitizeHistory(changes[StorageKeys.COLOR_PICKER_HISTORY].newValue);
       renderHistory();
+      renderCurrentHistory();
     }
     if (changes[StorageKeys.COLOR_PICKER_DEFAULT_FORMAT]) {
       defaultFormat = ColorPicker.normalizeFormat(
@@ -801,6 +871,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     apply({ videoGammaEnabled: $videoGammaToggle.checked });
   });
   $videoGammaSlider.addEventListener("input", () => {
+    invalidateSettingOperation("videoGammaValue");
     updateVideoGammaLabel(currentVideoGammaValue());
   });
   $videoGammaSlider.addEventListener("change", () => apply({ videoGammaValue: currentVideoGammaValue() }));
@@ -825,18 +896,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   $videoFillTargetSelect.addEventListener("change", () => apply({ videoFillTarget: VideoFill.normalizeTarget($videoFillTargetSelect.value) }));
 
   // ルーペ: マスタートグル
-  $loupeToggle.addEventListener("change", () => {
+  $loupeToggle.addEventListener("change", async () => {
     updateLoupeRowVisibility();
     // loupeEnabled は APPLY_SETTINGS 経路 (background → notifyContentScripts) で伝達。
     // zoom / size は popup の直接 storage.set + content script の storage.onChanged で同期する。
-    apply({ loupeEnabled: $loupeToggle.checked });
+    const requestedOn = $loupeToggle.checked;
+    const request = apply({ loupeEnabled: requestedOn });
+    const field = JSON.stringify(["loupeEnabled", null]);
+    const operation = settingOperations.get(field);
     // ルーペ ON 時は popup を自動クローズする (ON 状態だと popup がレンズで拡大したい領域を
     // 隠してしまうため、ゆろさん指摘 2026-05-13)。OFF 時は閉じない (連続で他の操作をする可能性)。
-    // `apply()` 内の `sendMessage` は同期で dispatch されるため、close 前に message は送信済み。
-    // 念のため一拍 (50ms) 待ってから close して、Chrome MV3 で稀に発生する message dispatch
-    // 遅延を吸収する。
-    if ($loupeToggle.checked) {
-      setTimeout(() => window.close(), 50);
+    // 最新のONが保存できた場合だけ閉じ、保存失敗の復元・エラー表示を保つ。
+    if (await request && requestedOn) {
+      setTimeout(async () => {
+        await waitForSettingsOperations();
+        if ($loupeToggle.checked && settingOperations.get(field) === operation && applyErrorSeq < operation) window.close();
+      }, 50);
     }
   });
 
@@ -1570,6 +1645,126 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateTtCleanerCountBadge() { updateCleanerPill($tiktokCleanerPill, ttFeatureInputs); }
   function updateTtCleanerDimState() { updateCleanerDim($ttFeatureCategories, $tiktokCleanerToggle); }
 
+  function buildWikipediaSettings(saved) {
+    const toggle = document.getElementById("wikipediaToggle");
+    const options = document.getElementById("wikipediaOptions");
+    const featureRoot = document.getElementById("wikipediaFeatures");
+    const appearanceRoot = document.getElementById("wikipediaAppearance");
+    const inputs = new Map();
+    const features = WikipediaReader.mergeFeatures(saved[StorageKeys.WIKIPEDIA_FEATURES]);
+    const appearance = WikipediaReader.normalizeAppearance(saved[StorageKeys.WIKIPEDIA_APPEARANCE]);
+    toggle.checked = saved[StorageKeys.WIKIPEDIA_ENABLED] === true;
+    options.disabled = !toggle.checked;
+    toggle.addEventListener("change", () => {
+      options.disabled = !toggle.checked;
+      apply({ wikipediaEnabled: toggle.checked });
+    });
+    for (const feature of WikipediaReader.FEATURES) {
+      featureRoot.append(_buildFeatureRow(feature, inputs, "wikipedia-feature-", "feat_wikipedia_"));
+    }
+    for (const [key, input] of inputs) {
+      input.checked = features[key];
+      input.addEventListener("change", () => apply({ wikipediaFeatures: { [key]: input.checked } }));
+    }
+    const fonts = ["sans", "serif", ...WikipediaReader.FONTS.map(({ key }) => key)];
+    const groups = [
+      ["typography", [["theme", WikipediaReader.AVAILABLE_THEMES], ["headingFont", ["inherit", ...fonts]],
+        ["font", fonts], ["fontSize", [14, 24, 1], [14, 16, 18]]]],
+      ["layout", [["contentWidth", [640, 1200, 1], [680, 860, 1200]], ["lineHeight", [1.3, 2.4, 0.05]], ["linkStyle", ["underline", "color"]]]],
+      ["display", [["articleStyle", ["full", "pictures", "text"]]]],
+    ];
+    for (const [group, fields] of groups) {
+      const section = document.createElement("section"); section.className = "wikipedia-group";
+      const heading = document.createElement("h3"); heading.className = "wikipedia-group-title";
+      heading.textContent = i18n("wikipedia_group_" + group); section.append(heading);
+      for (const [key, values, presets] of fields) {
+        const row = document.createElement("div"); row.className = "wikipedia-option";
+        const name = document.createElement("label"); name.textContent = i18n("wikipedia_" + key); row.append(name);
+        const controls = document.createElement("div"); controls.className = "wikipedia-option-controls";
+        if (["linkStyle", "articleStyle"].includes(key)) {
+          name.id = "wikipedia-label-" + key;
+          controls.id = "wikipedia-" + key;
+          controls.classList.add("wikipedia-segments");
+          controls.setAttribute("role", "radiogroup");
+          controls.setAttribute("aria-labelledby", name.id);
+          for (const value of values) {
+            const choice = document.createElement("label"); choice.className = "wikipedia-segment";
+            const radio = document.createElement("input"); radio.type = "radio";
+            radio.name = "wikipedia-" + key; radio.value = value; radio.checked = appearance[key] === value;
+            const caption = document.createElement("span"); caption.textContent = i18n("wikipedia_" + value);
+            radio.addEventListener("change", () => {
+              if (radio.checked) apply({ wikipediaAppearance: { [key]: value } });
+            });
+            choice.append(radio, caption); controls.append(choice);
+          }
+          row.append(controls); section.append(row);
+          wikipediaAppearanceSetters.set(key, (value) => {
+            for (const radio of controls.querySelectorAll("input")) radio.checked = radio.value === value;
+          });
+          if (["articleStyle", "linkStyle"].includes(key)) {
+            const note = document.createElement("p"); note.className = "fr-desc wikipedia-option-note";
+            note.id = "wikipedia-note-" + key; note.textContent = i18n("wikipedia_" + key + "_desc");
+            controls.setAttribute("aria-describedby", note.id); section.append(note);
+          }
+          continue;
+        }
+        const numeric = typeof values[0] === "number";
+        const input = document.createElement(numeric ? "input" : "select");
+        input.id = "wikipedia-" + key; name.htmlFor = input.id;
+        const output = document.createElement("output"); output.htmlFor = input.id;
+        const presetButtons = [];
+        if (numeric) {
+          input.type = "range"; [input.min, input.max, input.step] = values.map(String);
+          if (presets?.length) {
+            const choices = document.createElement("div"); choices.className = "wikipedia-presets";
+            choices.setAttribute("role", "group"); choices.setAttribute("aria-label", i18n("wikipedia_" + key));
+            presets.forEach((value, index) => {
+              const button = document.createElement("button"); button.type = "button";
+              button.textContent = i18n(["wikipedia_small", "wikipedia_medium", "wikipedia_large"][index]);
+              button.setAttribute("aria-label", `${button.textContent}: ${value} px`);
+              button.addEventListener("click", () => { input.value = String(value); refresh(); save(); });
+              presetButtons.push([button, value]); choices.append(button);
+            });
+            controls.append(choices);
+          }
+        } else {
+          for (const value of values) {
+            const option = document.createElement("option"); option.value = value;
+            option.textContent = i18n("wikipedia_" + value.replaceAll("-", "_")); input.append(option);
+          }
+          if (key === "theme" && !values.includes(appearance.theme)) {
+            const option = document.createElement("option"); option.value = appearance.theme;
+            option.textContent = i18n("wikipedia_legacy_theme",
+              i18n("wikipedia_" + appearance.theme.replaceAll("-", "_")));
+            input.append(option);
+          }
+        }
+        input.value = String(appearance[key]);
+        const refresh = () => {
+          output.textContent = numeric ? (key === "lineHeight"
+            ? i18n("wikipedia_lineHeightValue", Number(input.value).toFixed(2)) : `${input.value} px`) : "";
+          if (numeric) input.setAttribute("aria-valuetext", output.textContent);
+          for (const [button, value] of presetButtons) button.setAttribute("aria-pressed", String(Number(input.value) === value));
+        };
+        const save = () => apply({ wikipediaAppearance: { [key]: numeric ? Number(input.value) : input.value } });
+        input.addEventListener("input", () => {
+          invalidateSettingOperation("wikipediaAppearance", key);
+          refresh();
+        });
+        input.addEventListener("change", save);
+        wikipediaAppearanceSetters.set(key, (value) => { input.value = String(value); refresh(); });
+        refresh(); controls.append(input); if (numeric) controls.append(output); row.append(controls); section.append(row);
+        if (key === "contentWidth") {
+          const note = document.createElement("p"); note.className = "fr-desc wikipedia-option-note";
+          note.id = "wikipedia-note-" + key; note.textContent = i18n("wikipedia_contentWidth_desc");
+          input.setAttribute("aria-describedby", note.id); section.append(note);
+        }
+      }
+      appearanceRoot.append(section);
+    }
+  }
+
+
   function buildXFeatureCategories() {
     _buildAccordionCategories(
       $xFeatureCategories, XCleaner.CATEGORIES, XCleaner.FEATURES,
@@ -1637,25 +1832,108 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ----- 適用 -----
   async function apply(patch) {
     const seq = ++applySeq;
+    // 別設定の操作を独立させ、同じサブ機能の新しい操作だけが古い復元を失効させる。
+    const fields = Object.entries(patch).flatMap(([key, value]) =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? Object.keys(value).map((child) => [key, child]) : [[key, null]]);
+    for (const field of fields) settingOperations.set(JSON.stringify(field), seq);
+    let finish;
+    const completion = new Promise((resolve) => { finish = resolve; });
+    pendingSettingsOperations.add(completion);
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.APPLY_SETTINGS,
         data: patch,
         syncGeneration: stored[StorageKeys.SETTINGS_SYNC_APPLIED] ?? null,
       });
-      if (seq !== applySeq) return;
       if (res?.ok) {
-        showStatus(
+        if (seq === applySeq && seq > applyErrorSeq) showStatus(
           buildOkMessage(),
           "ok"
         );
+        return fields.every((field) => settingOperations.get(JSON.stringify(field)) === seq);
       } else {
-        showStatus(i18n("applyError"), "error");
+        if (await restoreFailedSettings(fields, seq)) {
+          applyErrorSeq = applySeq;
+          showStatus(i18n("applyError"), "error");
+        }
       }
     } catch {
-      if (seq !== applySeq) return;
-      showStatus(i18n("applyError"), "error");
+      if (await restoreFailedSettings(fields, seq)) {
+        applyErrorSeq = applySeq;
+        showStatus(i18n("applyError"), "error");
+      }
+    } finally {
+      pendingSettingsOperations.delete(completion);
+      finish();
     }
+    return false;
+  }
+
+  async function waitForSettingsOperations() {
+    // 失敗時の保存値再取得と通知まで待つ。待機中に始まった要求も完了対象に含める。
+    while (pendingSettingsOperations.size) await Promise.all([...pendingSettingsOperations]);
+  }
+
+  function invalidateSettingOperation(key, child = null) {
+    // ドラッグ中も、次のchangeによる保存を待たず以前の復元を失効させる。
+    settingOperations.set(JSON.stringify([key, child]), null);
+  }
+
+  async function restoreFailedSettings(fields, seq) {
+    const isCurrent = ([key, child]) => settingOperations.get(JSON.stringify([key, child])) === seq;
+    if (!fields.some(isCurrent)) return false;
+    const keys = [...new Set(fields.map(([key]) => key))];
+    const notifications = new Map(keys.map((key) => [key, settingNotifications.get(key)]));
+    let saved;
+    try { saved = await chrome.storage.local.get(keys); }
+    catch { return fields.some(isCurrent); } // 読取にも失敗した場合は保存値を推測しない。
+    for (const [key, child] of fields) {
+      if (settingOperations.get(JSON.stringify([key, child])) !== seq) continue;
+      // get の処理中に届いた通知のほうが新しい。
+      const notification = settingNotifications.get(key);
+      const value = notification !== notifications.get(key) ? notification.newValue : saved[key];
+      restoreSettingUi(key, value, child);
+    }
+    return fields.some(isCurrent);
+  }
+
+  function restoreSettingUi(key, value, child) {
+    const masters = {
+      searchFixerEnabled: $searchFixerToggle, amazonDeliveryTotalEnabled: $amazonDeliveryToggle,
+      amazonRankingJumpEnabled: $amazonRankingJumpToggle, amazonMerchantInfoEnabled: $amazonMerchantInfoToggle,
+      instagramCleanerEnabled: $instagramCleanerToggle, tiktokCleanerEnabled: $tiktokCleanerToggle,
+      xCleanerEnabled: $xCleanerToggle, videoGammaEnabled: $videoGammaToggle,
+      videoFillEnabled: $videoFillToggle, loupeEnabled: $loupeToggle,
+      wikipediaEnabled: document.getElementById("wikipediaToggle"),
+    };
+    const features = {
+      searchFixerFeatures: [featureInputs, SearchFixer], instagramCleanerFeatures: [igFeatureInputs, InstagramCleaner],
+      tiktokCleanerFeatures: [ttFeatureInputs, TikTokCleaner], xCleanerFeatures: [xFeatureInputs, XCleaner],
+    };
+    if (masters[key]) masters[key].checked = value === true;
+    else if (features[key]) {
+      const [inputs, spec] = features[key];
+      const input = inputs.get(child);
+      if (input) input.checked = spec.mergeFeatures(value)[child] === true;
+    } else if (key === "wikipediaFeatures") {
+      const input = document.getElementById("wikipedia-feature-" + child);
+      if (input) input.checked = WikipediaReader.mergeFeatures(value)[child] === true;
+    } else if (key === "wikipediaAppearance") {
+      wikipediaAppearanceSetters.get(child)?.(WikipediaReader.normalizeAppearance(value)[child]);
+    } else if (key === "searchFixerGridItems") $gridItemsSelect.value = String(SearchFixer.clampGridItems(value));
+    else if (key === "videoGammaValue") {
+      const gamma = VideoGamma.clampValue(value);
+      $videoGammaSlider.value = String(VideoGamma.valueToSlider(gamma)); updateVideoGammaLabel(gamma);
+    } else if (key === "videoFillMode") {
+      videoFillMode = VideoFill.normalizeMode(value); updateVideoFillModeSegment(videoFillMode);
+    } else if (key === "videoFillTarget") $videoFillTargetSelect.value = VideoFill.normalizeTarget(value);
+    updateCleanerCountBadge(); updateCleanerDimState();
+    updateIgCleanerCountBadge(); updateIgCleanerDimState();
+    updateTtCleanerCountBadge(); updateTtCleanerDimState();
+    updateXCleanerCountBadge(); updateXCleanerDimState();
+    updateVideoGammaRowVisibility(); updateVideoFillRowVisibility(); updateLoupeRowVisibility();
+    document.getElementById("wikipediaOptions").disabled = !document.getElementById("wikipediaToggle").checked;
   }
 
 
@@ -1669,6 +1947,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       [$instagramCleanerToggle, "applyOkInstagram"],
       [$tiktokCleanerToggle, "applyOkTiktok"],
       [$xCleanerToggle, "applyOkX"],
+      [document.getElementById("wikipediaToggle"), "tabWikipedia"],
       [$videoGammaToggle, "applyOkVideoGamma"],
       [$videoFillToggle, "applyOkVideoFill"],
       [$loupeToggle, "applyOkLoupe"],
@@ -1971,6 +2250,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     $status.textContent = msg;
     $status.className = "footer-status " + type;
     if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = null;
+    // 失敗は次の通知で置き換わるまで残し、操作位置でも読み取れるようにする。
+    if (type === "error") return;
     statusTimer = setTimeout(() => {
       $status.textContent = "";
       $status.className = "footer-status";
@@ -2277,7 +2559,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const hex = normalizeHex(btn.getAttribute("data-hex"));
     if (!hex) return;
     const ts = Number(btn.getAttribute("data-ts"));
-    setCurrentColor(hex, { time: Number.isFinite(ts) ? ts : Date.now() });
+    setCurrentColor(hex, { time: Number.isFinite(ts) ? ts : null });
 
     // 履歴クリックでも既定形式で自動コピー
     const { text, label } = formatColor(hex, defaultFormat, { includeHash: hexIncludeHash });
@@ -2364,22 +2646,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     renderPalette();
 
+    renderCurrentHistory(time);
+    const specimenPill = norm.toUpperCase();
+    if ($specimenPill.textContent !== specimenPill) $specimenPill.textContent = specimenPill;
+    for (const btn of $copyBtns) btn.disabled = false;
+  }
+
+  function renderCurrentHistory(time = history[findHistoryIndex(history, currentHex)]?.ts ?? null) {
+    if (!currentHex) return;
     // 履歴に入っている色は「履歴 01」、未保存のプレビューは「未保存」と言い切る
     // （旧 "No. — —" は履歴番号なのか何なのか伝わらなかった）
-    const idx = findHistoryIndex(history, norm);
+    const idx = findHistoryIndex(history, currentHex);
     const no = String(idx + 1).padStart(2, "0");
     const specimenNo =
       idx >= 0
         ? i18n("specimenNoSaved", no) || `No. ${no}`
         : i18n("specimenNoEmpty") || "—";
     if ($specimenNo.textContent !== specimenNo) $specimenNo.textContent = specimenNo;
-    const specimenTime = Number.isFinite(time)
+    const specimenTime = Number.isFinite(time) && time >= 0 && Number.isFinite(new Date(time).getTime())
       ? i18n("specimenTimeSaved", formatTime(time)) || formatTime(time)
       : i18n("specimenTimeEmpty") || "—";
     if ($specimenTime.textContent !== specimenTime) $specimenTime.textContent = specimenTime;
-    const specimenPill = norm.toUpperCase();
-    if ($specimenPill.textContent !== specimenPill) $specimenPill.textContent = specimenPill;
-    for (const btn of $copyBtns) btn.disabled = false;
   }
 
   function renderHistory() {
@@ -2493,9 +2780,9 @@ function sanitizeHistory(raw) {
     if (!entry || typeof entry !== "object") continue;
     const hex = normalizeHex(entry.hex);
     if (!hex || seen.has(hex)) continue;
-    const ts = Number(entry.ts);
+    const ts = entry.ts == null ? NaN : Number(entry.ts);
     seen.add(hex);
-    out.push({ hex, ts: Number.isFinite(ts) ? ts : Date.now() });
+    out.push({ hex, ts: Number.isFinite(ts) && ts >= 0 ? ts : null });
     if (out.length >= ColorPicker.HISTORY_LIMIT) break;
   }
   return out;
@@ -2512,6 +2799,7 @@ function findHistoryIndex(list, hex) {
 function formatTime(ts) {
   if (!Number.isFinite(ts)) return "—";
   const d = new Date(ts);
+  if (!Number.isFinite(d.getTime())) return "—";
   const pad = (n) => String(n).padStart(2, "0");
   const now = new Date();
   const sameDay =

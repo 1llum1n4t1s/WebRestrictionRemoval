@@ -126,6 +126,9 @@
       <path d="M11.4 9.5L13.2 5h3.4l-1.8 4.5" />
       <path d="M18.6 5H20v4.5" />
     </symbol>
+    <symbol id="ic-book" viewBox="0 0 24 24">
+      <path d="M12 5v15M12 5C9 3 5 3 3 4v14c3-1 6-1 9 2 3-3 6-3 9-2V4c-2-1-6-1-9 1z" />
+    </symbol>
     <symbol id="ic-link" viewBox="0 0 24 24">
       <path d="M10.5 13.5a3.8 3.8 0 0 0 5.4 0l2.4-2.4a3.8 3.8 0 0 0-5.4-5.4l-1.2 1.2" />
       <path d="M13.5 10.5a3.8 3.8 0 0 0-5.4 0l-2.4 2.4a3.8 3.8 0 0 0 5.4 5.4l1.2-1.2" />
@@ -157,59 +160,66 @@
       </div>
     </header>
 
-    <!-- ===== Tabbar =====
-         「動的拡張タブ」: 非アクティブは番号のみ、アクティブは番号 + ラベルを展開する。
-         flex-grow を transition することで横スペース問題を解決しつつ、active の存在感を強調。
-         label は max-width 0 → 200px の transition で滑らかに展開する（CSS-only）。
-    -->
-    <nav class="tabbar" role="tablist" data-i18n-attr="aria-label:tabbarAriaLabel" aria-label="ポップアップタブ">
-      <button type="button" id="tabTune" class="tabbar-btn is-active"
-              role="tab" aria-selected="true" aria-controls="panelTune" tabindex="0">
-        <span class="tabbar-no" aria-hidden="true">01</span>
-        <span class="tabbar-label" data-i18n="tabTune">調整</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+    <!-- ===== Category selector ===== -->
+    <button type="button" id="categoryTrigger" class="category-trigger" popovertarget="categoryMenu" disabled aria-haspopup="listbox"
+            aria-expanded="false" aria-controls="categoryMenu" aria-labelledby="categoryLabel categoryName">
+      <span class="category-icon" aria-hidden="true"><svg class="ic"><use id="categoryIcon" href="#ic-sliders"></use></svg></span>
+      <span class="category-current"><span id="categoryLabel" class="category-label" data-i18n="categorySelectorLabel">カテゴリ</span><span id="categoryName" class="category-name">調整</span></span>
+      <svg class="category-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+    </button>
+    <div id="categoryMenu" class="category-menu" popover="auto" role="listbox" data-i18n-attr="aria-label:tabbarAriaLabel" aria-label="表示するカテゴリ">
+      <button type="button" id="tabTune" class="category-option is-active"
+              role="option" aria-selected="true" aria-controls="panelTune" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-sliders"></use></svg>
+        <span class="category-option-name" data-i18n="tabTune">調整</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-      <button type="button" id="tabYoutube" class="tabbar-btn"
-              role="tab" aria-selected="false" aria-controls="panelYoutube" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">02</span>
-        <span class="tabbar-label" data-i18n="tabYoutube">YouTube</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+      <button type="button" id="tabYoutube" class="category-option"
+              role="option" aria-selected="false" aria-controls="panelYoutube" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-clapper"></use></svg>
+        <span class="category-option-name" data-i18n="tabYoutube">YouTube</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-      <button type="button" id="tabX" class="tabbar-btn"
-              role="tab" aria-selected="false" aria-controls="panelX" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">03</span>
-        <span class="tabbar-label" data-i18n="tabX">X</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+      <button type="button" id="tabX" class="category-option"
+              role="option" aria-selected="false" aria-controls="panelX" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-x-mark"></use></svg>
+        <span class="category-option-name" data-i18n="tabX">X</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-      <button type="button" id="tabInstagram" class="tabbar-btn"
-              role="tab" aria-selected="false" aria-controls="panelInstagram" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">04</span>
-        <span class="tabbar-label" data-i18n="tabInstagram">Instagram</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+      <button type="button" id="tabInstagram" class="category-option"
+              role="option" aria-selected="false" aria-controls="panelInstagram" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-camera"></use></svg>
+        <span class="category-option-name" data-i18n="tabInstagram">Instagram</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-      <button type="button" id="tabTikTok" class="tabbar-btn"
-              role="tab" aria-selected="false" aria-controls="panelTikTok" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">05</span>
-        <span class="tabbar-label" data-i18n="tabTiktok">TikTok</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+      <button type="button" id="tabTikTok" class="category-option"
+              role="option" aria-selected="false" aria-controls="panelTikTok" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-music"></use></svg>
+        <span class="category-option-name" data-i18n="tabTiktok">TikTok</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-      <button type="button" id="tabPicker" class="tabbar-btn"
-              role="tab" aria-selected="false" aria-controls="panelPicker" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">06</span>
-        <span class="tabbar-label" data-i18n="tabPicker">カラーピッカー</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+      <button type="button" id="tabWikipedia" class="category-option" role="option" aria-selected="false" aria-controls="panelWikipedia" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-book"></use></svg>
+        <span class="category-option-name" data-i18n="tabWikipedia">Wikipedia</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-      <button type="button" id="tabSettings" class="tabbar-btn"
-              role="tab" aria-selected="false" aria-controls="panelSettings" tabindex="-1">
-        <span class="tabbar-no" aria-hidden="true">07</span>
-        <span class="tabbar-label" data-i18n="tabSettings">設定</span>
-        <span class="tabbar-rule" aria-hidden="true"></span>
+      <button type="button" id="tabPicker" class="category-option"
+              role="option" aria-selected="false" aria-controls="panelPicker" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-compass"></use></svg>
+        <span class="category-option-name" data-i18n="tabPicker">カラーピッカー</span>
+        <span class="category-check" aria-hidden="true">✓</span>
       </button>
-    </nav>
+      <button type="button" id="tabSettings" class="category-option"
+              role="option" aria-selected="false" aria-controls="panelSettings" tabindex="-1">
+        <svg class="ic" aria-hidden="true"><use href="#ic-window"></use></svg>
+        <span class="category-option-name" data-i18n="tabSettings">設定</span>
+        <span class="category-check" aria-hidden="true">✓</span>
+      </button>
+    </div>
 
     <!-- ===== Panel: Tune (オーディオ / 映像 / Amazon) ===== -->
     <div class="panel panel--tune is-active" id="panelTune"
-         role="tabpanel" aria-labelledby="tabTune">
+         role="region" aria-labelledby="tabTune">
 
     <!-- ===== Audio Group ===== -->
     <!-- id="audioGroupSection": Chrome は tabCapture 経路 / Firefox は MES 経路 (volume-booster-mes.js) で両対応。
@@ -499,7 +509,7 @@
     <!-- ===== Panel: YouTube (機能拡張 38 機能 + ホーム列数。配信時刻表示は watch_page カテゴリの
          サブ機能としてアコーディオン内に FEATURES 駆動で自動描画される) ===== -->
     <div class="panel panel--youtube" id="panelYoutube"
-         role="tabpanel" aria-labelledby="tabYoutube" hidden>
+         role="region" aria-labelledby="tabYoutube" hidden>
 
       <section class="grp" data-i18n-attr="aria-label:tabYoutube" aria-label="YouTube">
         <h2 class="grp-title">
@@ -535,7 +545,7 @@
 
     <!-- ===== Panel: X (クリーナー 9 機能) ===== -->
     <div class="panel panel--x" id="panelX"
-         role="tabpanel" aria-labelledby="tabX" hidden>
+         role="region" aria-labelledby="tabX" hidden>
 
       <section class="grp" data-i18n-attr="aria-label:tabX" aria-label="X">
         <h2 class="grp-title">
@@ -568,9 +578,26 @@
 
     </div><!-- /panel.x -->
 
+    <!-- ===== Panel: Wikipedia ===== -->
+    <div class="panel" id="panelWikipedia" role="region" aria-labelledby="tabWikipedia" hidden>
+      <section class="grp" data-i18n-attr="aria-label:tabWikipedia">
+        <h2 class="grp-title"><span class="grp-title-text" data-i18n="tabWikipedia">Wikipedia</span></h2>
+        <label class="toggle-row" id="wikipediaToggleRow">
+          <svg class="tr-icon ic" aria-hidden="true"><use href="#ic-book"></use></svg>
+          <span class="tr-text"><span class="tr-name" data-i18n="wikipediaMaster">Wikipedia 閲覧調整</span><span class="tr-desc" data-i18n="wikipediaMasterDesc">Wikipedia の記事のレイアウト・文字・配色を調整します。</span></span>
+          <span class="switch"><input type="checkbox" id="wikipediaToggle" /><span class="switch-track" aria-hidden="true"></span></span>
+        </label>
+        <fieldset id="wikipediaOptions" class="wikipedia-options">
+          <legend class="fr-name" data-i18n="wikipediaOptions">Wikipedia の閲覧設定</legend>
+          <div class="cat-list" id="wikipediaFeatures"></div>
+          <div id="wikipediaAppearance"></div>
+        </fieldset>
+      </section>
+    </div>
+
     <!-- ===== Panel: Instagram (クリーナー 12 機能) ===== -->
     <div class="panel panel--instagram" id="panelInstagram"
-         role="tabpanel" aria-labelledby="tabInstagram" hidden>
+         role="region" aria-labelledby="tabInstagram" hidden>
 
       <section class="grp" data-i18n-attr="aria-label:tabInstagram" aria-label="Instagram">
         <h2 class="grp-title">
@@ -605,7 +632,7 @@
 
     <!-- ===== Panel: TikTok (クリーナー 3 機能) ===== -->
     <div class="panel panel--tiktok" id="panelTikTok"
-         role="tabpanel" aria-labelledby="tabTikTok" hidden>
+         role="region" aria-labelledby="tabTikTok" hidden>
 
       <section class="grp" data-i18n-attr="aria-label:tabTiktok" aria-label="TikTok">
         <h2 class="grp-title">
@@ -642,7 +669,7 @@
          UI 文言は比喩（標本 / 標本箱 / 調色台）をやめ、何をする場所かをそのまま書く。
          アイコンだけのボタンも置かない（「写」1 文字がコピーだと伝わらなかった反省）。 -->
     <div class="panel panel--picker" id="panelPicker"
-         role="tabpanel" aria-labelledby="tabPicker" hidden>
+         role="region" aria-labelledby="tabPicker" hidden>
 
       <!-- ===== Pick Action (常に最上部の主役 CTA) ===== -->
       <div class="pick-stage">
@@ -843,7 +870,7 @@
 
     </div><!-- /panel.picker -->
 
-    <div class="panel panel--settings" id="panelSettings" role="tabpanel" aria-labelledby="tabSettings" hidden>
+    <div class="panel panel--settings" id="panelSettings" role="region" aria-labelledby="tabSettings" hidden>
     <section class="grp settings-sync" aria-labelledby="settingsSyncTitle">
       <label class="settings-sync-label" for="settingsSyncToggle">
         <span id="settingsSyncTitle" data-i18n="settingsSyncTitle">複数PC間で設定を同期</span>

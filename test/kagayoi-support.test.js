@@ -13,7 +13,6 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..");
 const SETTINGS_HTML = "src/popup/popup.html";
@@ -53,7 +52,6 @@ test("同梱した共通部品が正本の契約を満たす", () => {
 
   for (const [name, source] of [["popup", popupJs], ["footer", footerJs]]) {
     assert.doesNotMatch(source, /\.innerHTML\b/, `${name} も innerHTML を使わない`);
-    assert.doesNotThrow(() => new vm.Script(source), `${name} が構文エラーなく読める`);
   }
 });
 
@@ -82,6 +80,9 @@ test("Firefox 版が問い合わせで送るデータを AMO へ申告してい�
   // "none" は他の値と併記できない。
   for (const manifestPath of ["manifest.json", "manifest.firefox.json"]) {
     const gecko = manifestAt(manifestPath)?.browser_specific_settings?.gecko;
+    if (manifestPath === "manifest.firefox.json") {
+      assert.ok(gecko, "Firefox manifest に browser_specific_settings.gecko が要る");
+    }
     if (!gecko) continue;
     const declared = gecko.data_collection_permissions?.required ?? [];
     const optional = gecko.data_collection_permissions?.optional ?? [];

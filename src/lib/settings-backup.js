@@ -13,12 +13,14 @@
   for (const key of booleanKeys) add(key, false, (v) => typeof v === "boolean");
   for (const [key, spec] of [[K.SEARCH_FIXER_FEATURES, SearchFixer],
     [K.INSTAGRAM_CLEANER_FEATURES, InstagramCleaner], [K.TIKTOK_CLEANER_FEATURES, TikTokCleaner],
-    [K.X_CLEANER_FEATURES, XCleaner]]) {
+    [K.X_CLEANER_FEATURES, XCleaner], [K.WIKIPEDIA_FEATURES, WikipediaReader]]) {
     add(key, spec.DEFAULT_FEATURES, (v) => object(v) && Object.entries(v).every(([k, x]) =>
       // 廃止済みの接続モニターを含む旧バックアップも読み込み、正規化時にその項目だけ落とす。
       (Object.hasOwn(spec.DEFAULT_FEATURES, k) || (key === K.SEARCH_FIXER_FEATURES && k === "connectionMonitor")) &&
       typeof x === "boolean"), (v) => spec.mergeFeatures(v));
   }
+  add(K.WIKIPEDIA_APPEARANCE, WikipediaReader.DEFAULT_APPEARANCE,
+    WikipediaReader.isValidAppearance, WikipediaReader.normalizeAppearance);
   const number = (key, fallback, normalize) => add(key, fallback,
     (v) => typeof v === "number" && Number.isFinite(v) && normalize(v) === v);
   number(K.SEARCH_FIXER_GRID_ITEMS, 0, SearchFixer.clampGridItems);

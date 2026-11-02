@@ -73,3 +73,17 @@ test("Firefox 専用 content_scripts エントリが manifest.firefox.json の�
     "Firefox 専用エントリ (volume-booster-mes 等) が manifest.firefox.json から欠落している"
   );
 });
+
+test("Wikipedia の同梱フォントが揃い、公開先を Wikipedia に限定する", () => {
+  const G = require("./_load-actions.js");
+  const expected = [{ resources: ["src/fonts/wikipedia/*.woff2"], matches: ["*://*.wikipedia.org/*"] }];
+  for (const name of ["manifest.json", "manifest.firefox.json"])
+    assert.deepEqual(readManifest(name).web_accessible_resources, expected);
+  const files = new Set(G.WikipediaReader.FONTS.flatMap(font => [font.regular, font.bold]));
+  for (const file of files) {
+    const bytes = fs.readFileSync(path.join(__dirname, "..", "src/fonts/wikipedia", file));
+    assert.equal(bytes.subarray(0, 4).toString("ascii"), "wOF2", `${file} が有効な WOFF2 である`);
+  }
+  for (const license of ["LICENSE", "MPLUSRounded1c-OFL.txt"])
+    assert.match(fs.readFileSync(path.join(__dirname, "..", "src/fonts/wikipedia", license), "utf8"), /SIL OPEN FONT LICENSE/);
+});

@@ -1,0 +1,717 @@
+/* Wikipedia の本文・編集操作・帰属表示を残し、ON の記事だけに適用する。 */
+html.__cpa-wiki-active {
+  --cpa-wiki-panel: var(--background-color-base, #fff);
+  --cpa-wiki-ink: var(--color-base, #202122);
+  --cpa-wiki-link: var(--color-progressive, #36c);
+  --cpa-wiki-border: var(--border-color-base, #a2a9b1);
+  --cpa-wiki-soft: var(--background-color-neutral, #f7f7f7);
+  --cpa-wiki-font: system-ui, sans-serif;
+  --cpa-wiki-heading-font: var(--cpa-wiki-font);
+  --cpa-wiki-radius: 12px;
+  --cpa-wiki-radius-small: 4px;
+  --cpa-wiki-content-padding: clamp(16px, 3vw, 40px);
+}
+/* ULS 無効時はサイトが隠す標準言語一覧を使う。通常の ULS とは併設しない。 */
+@media screen {
+  html.__cpa-wiki-active body.mw-interlanguage-selector-disabled #p-lang-btn > #p-lang-btn-checkbox:checked ~ .vector-dropdown-content {
+    display: block;
+    width: min(360px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    max-height: min(480px, 65vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  html.__cpa-wiki-active body.mw-interlanguage-selector-disabled #p-lang-btn .interlanguage-link-target {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+html.__cpa-wiki-active[data-cpa-wiki-font="serif"] {
+  /* 具体名の別名 @font-face を介さず、ブラウザ標準の明朝を使う。 */
+  --cpa-wiki-font: serif;
+}
+html.__cpa-wiki-active[data-cpa-wiki-heading-font="sans"] { --cpa-wiki-heading-font: system-ui, sans-serif; }
+html.__cpa-wiki-active[data-cpa-wiki-heading-font="serif"] { --cpa-wiki-heading-font: serif; }
+html.__cpa-wiki-active #firstHeading,
+html.__cpa-wiki-active #mw-content-text :is(h1, h2, h3, h4, h5, h6):not(:where(
+  pre *, code *, .mw-highlight *, .mwe-math-element *, .mw-editsection *,
+  [contenteditable]:not([contenteditable="false" i]), [contenteditable]:not([contenteditable="false" i]) *, [role="textbox"] *
+)) { font-family: var(--cpa-wiki-heading-font) !important; }
+html.__cpa-wiki-active #mw-content-text {
+  font-size: var(--cpa-wiki-size) !important;
+}
+html.__cpa-wiki-active #mw-content-text,
+/* 子要素へ直接指定するフォント置換とも併用できるよう、本文のブロックへ適用する。
+   独自の字形が必要な領域と編集 UI は除外し、OFF ではクラスの撤去だけで元へ戻す。 */
+html.__cpa-wiki-active #mw-content-text :is(
+  p, li, dt, dd, blockquote, figcaption, caption, th, td,
+  article, section, main, aside, nav, header, footer, summary, details
+):not(:where(
+  pre, pre *, code, code *, kbd, kbd *, samp, samp *,
+  .mw-highlight, .mw-highlight *, .mw-monospace, .mw-monospace *, .mono, .mono *,
+  .mwe-math-element, .mwe-math-element *, .mw-editsection, .mw-editsection *,
+  [contenteditable]:not([contenteditable="false" i]), [contenteditable]:not([contenteditable="false" i]) *,
+  [role="textbox"], [role="textbox"] *, .mw-ui-icon, .mw-ui-icon *, .icon, [data-icon]
+)) {
+  font-family: var(--cpa-wiki-font) !important;
+}
+/* Wikipedia 自体の最大幅も緩めないと、大画面でも L が本文まで届かない。 */
+html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) .mw-page-container,
+html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) .mw-page-container-inner { max-width: none !important; }
+html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) .mw-content-container { max-width: none !important; min-width: 0; }
+html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) #content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--cpa-wiki-width) + 352px) !important;
+  min-width: 0;
+  margin-inline: auto !important;
+  padding: var(--cpa-wiki-content-padding) !important;
+  grid-template-columns: minmax(0, var(--cpa-wiki-width)) min-content !important;
+}
+html.__cpa-wiki-active #mw-content-text,
+html.__cpa-wiki-active #mw-content-text > .mw-parser-output { line-height: var(--cpa-wiki-line-height) !important; }
+html.__cpa-wiki-readable #mw-content-text p { margin-block: 0.9em; }
+html.__cpa-wiki-readable #mw-content-text :is(h2, h3) {
+  line-height: 1.4;
+  margin-block: 1.6em 0.6em;
+  scroll-margin-top: 5rem;
+}
+html.__cpa-wiki-readable #mw-content-text :is(img, video) { max-width: 100%; height: auto; }
+html.__cpa-wiki-readable #mw-content-text pre { overflow-x: auto; }
+
+/* 下線方式では通常の本文色を使い、色方式では常時リンク色を使う。 */
+html.__cpa-wiki-active[data-cpa-wiki-links="underline"] #mw-content-text a:not(.new, .mw-file-description, .image, .reference a, .mw-cite-backlink a) {
+  color: inherit !important;
+  text-decoration: underline !important;
+  text-underline-offset: .15em;
+}
+html.__cpa-wiki-active[data-cpa-wiki-links="color"] #mw-content-text a:not(.new, .mw-file-description, .image, .reference a, .mw-cite-backlink a) {
+  color: var(--cpa-wiki-link) !important;
+  text-decoration: none !important;
+}
+html.__cpa-wiki-active #mw-content-text a:not(.new, .mw-file-description, .image, .reference a, .mw-cite-backlink a):is(:hover, :focus-visible) {
+  color: var(--cpa-wiki-link) !important;
+  text-decoration: underline !important;
+}
+html.__cpa-wiki-active #mw-content-text :is(.infobox, .wikitable, .thumbinner, figure .mw-file-element):not(:where(.flagicon *, .mwe-math-element *)) {
+  border-radius: var(--cpa-wiki-radius-small);
+}
+/* 画像付き／本文のみは元の記事の段落と目次を残し、表示対象だけを切り替える。 */
+html.__cpa-wiki-active[data-cpa-wiki-article-style="pictures"] #mw-content-text :is(.mw-parser-output, .mw-parser-output section) > :is(table:not(.mw-collapsible, .infobox), .navbox, .metadata),
+html.__cpa-wiki-active[data-cpa-wiki-article-style="text"] #mw-content-text :is(.mw-parser-output, .mw-parser-output section) > :is(table:not(.mw-collapsible), .navbox, .metadata) {
+  display: none !important;
+}
+html.__cpa-wiki-active[data-cpa-wiki-article-style="text"] #mw-content-text :is(.mw-parser-output, .mw-parser-output section) > :is(figure, .thumb, .gallery, video, audio, a.mw-file-description, a.image) {
+  display: none !important;
+}
+
+html.__cpa-wiki-active[data-cpa-wiki-theme="light"] {
+  --cpa-wiki-panel: #fff;
+  --cpa-wiki-ink: #000;
+  --cpa-wiki-link: #3e69c5;
+  --cpa-wiki-border: #e1e1e1;
+  --cpa-wiki-soft: #f7f7f7;
+  color-scheme: light;
+}
+html.__cpa-wiki-active[data-cpa-wiki-theme="sepia"] {
+  --cpa-wiki-panel: #f6f0e3;
+  --cpa-wiki-ink: #40382e;
+  --cpa-wiki-link: #78492e;
+  --cpa-wiki-border: #cfc1a8;
+  --cpa-wiki-soft: #ece3d2;
+  color-scheme: light;
+}
+html.__cpa-wiki-active.__cpa-wiki-dark {
+  --cpa-wiki-panel: #0a0a0a;
+  --cpa-wiki-ink: #fff;
+  --cpa-wiki-link: #8498ff;
+  --cpa-wiki-border: #3a3a3a;
+  --cpa-wiki-soft: #252525;
+  --color-subtle: color-mix(in srgb, var(--cpa-wiki-ink) 68%, var(--cpa-wiki-panel));
+  --color-placeholder: var(--color-subtle);
+  --color-disabled: var(--color-subtle);
+  color-scheme: dark;
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) {
+  --background-color-base: var(--cpa-wiki-panel);
+  --background-color-neutral: var(--cpa-wiki-soft);
+  --background-color-interactive-subtle: var(--cpa-wiki-soft);
+  --color-base: var(--cpa-wiki-ink);
+  --color-emphasized: var(--cpa-wiki-ink);
+  --color-progressive: var(--cpa-wiki-link);
+  --border-color-base: var(--cpa-wiki-border);
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) :is(body, #content, .mw-page-container, .mw-body, #mw-content-text, .vector-header-container, .vector-header) {
+  background-color: var(--cpa-wiki-panel) !important;
+  color: var(--cpa-wiki-ink) !important;
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--cpa-wiki-ink) !important;
+  border-color: var(--cpa-wiki-border);
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text a:not(.new) { color: var(--cpa-wiki-link); }
+/* 記事テンプレートの固定配色を、現在のテーマの案内面へ合わせる。 */
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text :is(.pathnavbox, .ambox) {
+  background-color: var(--cpa-wiki-soft) !important;
+  color: var(--cpa-wiki-ink) !important;
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text .pathnavbox {
+  border-color: var(--cpa-wiki-border) !important;
+  border-style: solid !important;
+}
+/* ambox の左線は注意の種類を示すため、色を保持する。 */
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text .ambox {
+  border-top-color: var(--cpa-wiki-border) !important;
+  border-right-color: var(--cpa-wiki-border) !important;
+  border-bottom-color: var(--cpa-wiki-border) !important;
+}
+/* ナビゲーション専用の面を調整し、画像・図表の内容色は変更しない。 */
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text :is(.navbox, .navbox-inner, .navbox-subgroup, .navbox-list) {
+  background-color: var(--cpa-wiki-panel) !important;
+  color: var(--cpa-wiki-ink) !important;
+  border-color: var(--cpa-wiki-border) !important;
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text :is(.navbox-title, .navbox-group, .navbox-abovebelow, .navbox-even),
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #catlinks {
+  background-color: var(--cpa-wiki-soft) !important;
+  color: var(--cpa-wiki-ink) !important;
+  border-color: var(--cpa-wiki-border) !important;
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text .navbox-title :is(.navbar, span) {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text .navbox a:not(.new) span { color: inherit !important; }
+/* infobox 内の警告色・地図・グラフは一括上書きしない。 */
+html.__cpa-wiki-active:not([data-cpa-wiki-theme="original"]) #mw-content-text :is(.infobox, .wikitable, .thumbinner, figcaption) {
+  background-color: var(--cpa-wiki-panel);
+  color: var(--cpa-wiki-ink);
+  border-color: var(--cpa-wiki-border);
+}
+/* infobox の段見出しには inline の明色背景があるため、暗色時に文字とのコントラストを保つ。 */
+html.__cpa-wiki-active.__cpa-wiki-dark #mw-content-text :is(.infobox, .wikitable) > tbody > tr > th,
+html.__cpa-wiki-active.__cpa-wiki-dark #mw-content-text .infobox > tbody > tr > td[style*="background"] {
+  background-color: var(--cpa-wiki-soft) !important;
+  color: var(--cpa-wiki-ink) !important;
+}
+html.__cpa-wiki-active.__cpa-wiki-dark #mw-content-text a.new { color: #ff9b91 !important; }
+html.__cpa-wiki-active.__cpa-wiki-dark :is(.mw-logo-wordmark, .mw-logo-tagline) { filter: invert(1); }
+/* Vector の操作アイコンはマスクの背景色を使うため、暗色テーマでは本文色に揃える。 */
+html.__cpa-wiki-active.__cpa-wiki-dark .vector-icon:not(#mw-content-text *) {
+  color: var(--cpa-wiki-ink) !important;
+  background-color: currentColor !important;
+}
+html.__cpa-wiki-active.__cpa-wiki-dark :is(.vector-header, .vector-appearance) button {
+  color: var(--cpa-wiki-ink);
+  background-color: var(--cpa-wiki-panel);
+}
+html.__cpa-wiki-contents :is(#mw-panel-toc, #toc) { display: none !important; }
+/* 表示パネルはピン留め・未ピン留めの両方で同じランドマークを使う。 */
+html.__cpa-wiki-hide-appearance nav.vector-appearance-landmark { display: none !important; }
+/* ページツールが右列に残っている場合は、その表示場所を保つ。 */
+html.__cpa-wiki-hide-appearance .vector-column-end:has(#vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) { display: none !important; }
+html.__cpa-wiki-hide-appearance #content:has(.vector-column-end #vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) {
+  grid-template-columns: minmax(0, 1fr) 0 !important;
+  column-gap: 0 !important;
+}
+html.__cpa-wiki-hide-appearance.__cpa-wiki-narrow #content:has(.vector-column-end #vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: calc(var(--cpa-wiki-width) + var(--cpa-wiki-content-padding) + var(--cpa-wiki-content-padding)) !important;
+  padding: var(--cpa-wiki-content-padding) !important;
+  margin-inline: auto !important;
+}
+html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow).__cpa-wiki-contents .mw-page-container-inner {
+  grid-template-areas: "siteNotice siteNotice siteNotice" "columnStart pageContent columnEnd" "footer footer footer";
+  grid-template-columns: minmax(0, 1fr) minmax(0, calc(var(--cpa-wiki-width) + 352px)) minmax(0, 1fr) !important;
+  column-gap: 0 !important;
+}
+.__cpa-wiki-toc, .__cpa-wiki-reference, .__cpa-wiki-image-dialog {
+  background: var(--cpa-wiki-panel);
+  color: var(--cpa-wiki-ink);
+  border: 1px solid var(--cpa-wiki-border);
+  border-radius: var(--cpa-wiki-radius, 8px);
+  font: 14px/1.6 system-ui, sans-serif;
+  box-shadow: 0 4px 24px #0002;
+}
+.__cpa-wiki-toc {
+  position: fixed;
+  z-index: 99;
+  inset-inline-start: 12px;
+  bottom: 12px;
+  max-width: min(260px, calc(100vw - 24px));
+}
+.__cpa-wiki-toc summary { cursor: pointer; font-weight: 600; padding: 10px 16px; }
+.__cpa-wiki-toc nav { overflow-y: auto; max-height: 55vh; overscroll-behavior: contain; padding: 0 12px 12px; }
+.__cpa-wiki-toc ol { list-style: none; margin: 0; padding: 0; }
+.__cpa-wiki-toc li { margin: 0; }
+.__cpa-wiki-toc li.__cpa-wiki-toc-sub { padding-inline-start: 14px; font-size: 12px; }
+.__cpa-wiki-toc a { display: block; padding: 4px 6px; color: var(--cpa-wiki-link); overflow-wrap: anywhere; }
+.__cpa-wiki-toc a:hover { text-decoration: underline; }
+html.__cpa-wiki-active .__cpa-wiki-toc a[aria-current="location"] {
+  background: var(--cpa-wiki-soft);
+  color: var(--cpa-wiki-link);
+  border-inline-start: 2px solid var(--cpa-wiki-link);
+  font-weight: 650;
+}
+.__cpa-wiki-toc :focus-visible, .__cpa-wiki-image-dialog button:focus-visible {
+  outline: 2px solid var(--cpa-wiki-link);
+  outline-offset: 2px;
+}
+.__cpa-wiki-reference {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 16px));
+  max-height: min(260px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+/* 標準プレビューの取得・有効状態には干渉しない。 */
+html.__cpa-wiki-previews .mwe-popups {
+  background: var(--cpa-wiki-panel);
+  color: var(--cpa-wiki-ink);
+  border: 1px solid var(--cpa-wiki-border);
+  border-radius: var(--cpa-wiki-radius, 8px);
+  font-family: var(--cpa-wiki-font);
+}
+html.__cpa-wiki-previews .mwe-popups .mwe-popups-extract {
+  color: var(--cpa-wiki-ink);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.__cpa-wiki-image-dialog {
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  padding: 16px;
+  text-align: center;
+}
+.__cpa-wiki-image-dialog::backdrop { background: #000b; }
+.__cpa-wiki-image-dialog canvas {
+  display: block;
+  margin: 12px auto;
+  width: min(1200px, calc(100vw - 68px));
+  height: auto;
+  max-width: min(1400px, calc(100vw - 68px));
+  max-height: calc(100vh - 180px);
+  object-fit: contain;
+}
+.__cpa-wiki-image-dialog button {
+  display: block;
+  margin-inline-start: auto;
+  padding: 6px 14px;
+  border: 1px solid var(--cpa-wiki-border);
+  border-radius: var(--cpa-wiki-radius-small);
+  background: var(--cpa-wiki-panel);
+  color: var(--cpa-wiki-ink);
+  cursor: pointer;
+}
+.__cpa-wiki-image-dialog p { margin: 0; max-width: 80ch; }
+@media (min-width: 1400px) {
+  html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow).__cpa-wiki-contents .mw-page-container-inner {
+    grid-template-columns: minmax(210px, 1fr) minmax(0, calc(var(--cpa-wiki-width) + 352px)) minmax(0, 1fr) !important;
+  }
+  .__cpa-wiki-toc { top: 100px; bottom: auto; max-width: 190px; }
+  .__cpa-wiki-toc nav { max-height: calc(100vh - 180px); }
+}
+@media (max-width: 720px) {
+  html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) :is(body, .mw-page-container, .mw-content-container, #bodyContent) { min-width: 0 !important; }
+  html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) #mw-content-text :is(table, .clade-gallery, .navbox, .gallery):not(table table) {
+    display: block;
+    max-width: 100% !important;
+    overflow-x: auto;
+  }
+  html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) #mw-content-text :is(.infobox, .thumb, figure) { max-width: 100%; float: none; margin-inline: auto; }
+  html:is(.__cpa-wiki-readable, .__cpa-wiki-narrow) #content { padding: 16px !important; }
+}
+@media print {
+  .__cpa-wiki-toc, .__cpa-wiki-reference, .__cpa-wiki-image-dialog { display: none !important; }
+}
+
+/* 元のノードを移した閲覧シェル。クラス撤去後は Wikipedia の配置へ戻る。 */
+html.__cpa-wiki-modern {
+  --cpa-wiki-page-padding: 32px;
+  --cpa-wiki-content-padding: 0px;
+}
+html.__cpa-wiki-modern:not([data-cpa-wiki-theme="original"]) {
+  --background-color-interactive: var(--cpa-wiki-soft);
+  --background-color-input-binary--checked: var(--cpa-wiki-link);
+  --background-color-input-binary--disabled: var(--cpa-wiki-border);
+  --background-color-interactive-subtle--hover: var(--cpa-wiki-soft);
+  --background-color-interactive-subtle--active: var(--cpa-wiki-soft);
+  --color-subtle: color-mix(in srgb, var(--cpa-wiki-ink) 72%, var(--cpa-wiki-panel));
+  --color-placeholder: var(--color-subtle);
+  --color-disabled: var(--color-subtle);
+  --color-icon-subtle: var(--color-subtle);
+  --border-color-subtle: var(--cpa-wiki-border);
+}
+/* 元の空レイアウトは縮める。後から出るネイティブUIの祖先は隠さない。 */
+html.__cpa-wiki-modern body > .mw-page-container { padding: 0 !important; margin: 0 !important; min-height: 0; }
+html.__cpa-wiki-modern body > .mw-page-container > .mw-page-container-inner { display: block; min-height: 0; max-width: none; width: auto; padding: 0; }
+html.__cpa-wiki-modern body > .mw-page-container .mw-content-container:not(:has(> *)),
+html.__cpa-wiki-modern body > .mw-page-container .mw-footer-container:not(:has(> *)) { display: none; }
+html.__cpa-wiki-modern.__cpa-wiki-contents .__cpa-wiki-site-menu:not(:has(#vector-main-menu-pinned-container > *)) { display: none; }
+html.__cpa-wiki-modern .__cpa-wiki-site-menu:has(#vector-main-menu-pinned-container > *) > summary { display: none; }
+html.__cpa-wiki-modern.__cpa-wiki-contents :is(#mw-panel-toc, .vector-page-titlebar-toc, #vector-toc-collapsed-button) { display: none !important; }
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-rail { position: static; max-height: none; overflow: visible; }
+html.__cpa-wiki-modern .__cpa-wiki-site-menu :is(#mw-panel-toc, #vector-toc-pinned-container, .vector-toc) { position: static; width: auto; margin: 0; max-height: none; }
+html.__cpa-wiki-modern .__cpa-wiki-shell {
+  color: var(--cpa-wiki-ink);
+  background: var(--cpa-wiki-panel);
+  min-width: 0;
+  min-height: 100vh;
+}
+html.__cpa-wiki-modern .__cpa-wiki-topbar {
+  border-bottom: 1px solid var(--cpa-wiki-border);
+  padding-inline: var(--cpa-wiki-page-padding);
+}
+html.__cpa-wiki-modern .__cpa-wiki-topbar :is(.vector-header-container, .vector-header, .mw-header) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--cpa-wiki-width) + 576px);
+  margin-inline: auto;
+  padding-block: 12px;
+  padding-inline: 0;
+  background: var(--cpa-wiki-panel);
+}
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-header { gap: clamp(20px, 4vw, 64px); min-height: 76px; padding-block: 14px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-start { flex: 0 0 auto; gap: 16px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { flex: 1; min-width: 0; gap: 24px; justify-content: space-between; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-main-menu-dropdown { margin-inline: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-main-menu-dropdown > label { border-radius: 10px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo { gap: 10px; margin: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-icon { width: 32px; height: auto; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-wordmark { height: 19px; width: auto; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-tagline { display: none; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-container { padding-block: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box { flex: 1; min-width: 0; max-width: 600px; margin: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box :is(.vector-typeahead-search-container, .cdx-typeahead-search) { width: 100%; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input { display: flex; width: 100%; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input__input-wrapper { flex: 1 1 0; min-width: 0; width: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input__text-input { width: 100%; min-width: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-text-input__input {
+  min-height: 44px;
+  background: var(--cpa-wiki-soft);
+  color: var(--cpa-wiki-ink);
+  border-color: transparent;
+  border-start-start-radius: 12px;
+  border-end-start-radius: 12px;
+}
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input__end-button {
+  position: static;
+  flex: 0 0 auto;
+  margin-inline-start: 0;
+  padding-inline: 16px;
+  background: var(--cpa-wiki-soft);
+  color: var(--cpa-wiki-ink);
+  border-color: transparent;
+  border-inline-start-color: var(--cpa-wiki-border);
+  border-start-end-radius: 12px;
+  border-end-end-radius: 12px;
+}
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box form { border-radius: 12px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box form:focus-within { outline: 2px solid var(--cpa-wiki-link); outline-offset: 3px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar :is(#pt-donate-2, #pt-createaccount-2, #pt-login-2) > a { display: inline-flex; padding: 7px 10px; border-radius: 8px; color: var(--cpa-wiki-ink); font: 500 13px/1.4 system-ui, sans-serif; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar #pt-login-2 > a { border: 1px solid var(--cpa-wiki-border); }
+html.__cpa-wiki-modern .__cpa-wiki-topbar :is(#pt-donate-2, #pt-createaccount-2, #pt-login-2) > a:hover { background: var(--cpa-wiki-soft); color: var(--cpa-wiki-link); text-decoration: none; }
+@media (max-width: 1100px) {
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-header { gap: 16px; min-height: 64px; }
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { gap: 12px; }
+}
+@media (max-width: 760px) {
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-start { gap: 10px; }
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-wordmark { height: 17px; }
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { flex: 1; margin-inline-start: auto; }
+}
+html.__cpa-wiki-modern .__cpa-wiki-notices {
+  max-width: 1512px;
+  margin-inline: auto;
+  padding-inline: var(--cpa-wiki-page-padding);
+}
+html.__cpa-wiki-modern .__cpa-wiki-reading-grid {
+  display: grid;
+  grid-template-columns: 208px minmax(0, calc(var(--cpa-wiki-width) + 272px));
+  gap: 32px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--cpa-wiki-width) + 576px);
+  margin-inline: auto;
+  padding: 40px var(--cpa-wiki-page-padding) 64px;
+  align-items: start;
+}
+html.__cpa-wiki-modern .__cpa-wiki-rail {
+  position: sticky;
+  top: 24px;
+  min-width: 0;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+  font: 13px/1.6 system-ui, sans-serif;
+}
+html.__cpa-wiki-modern .__cpa-wiki-rail :is(.__cpa-wiki-toc, .__cpa-wiki-site-menu) {
+  position: static;
+  max-width: none;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--cpa-wiki-ink);
+  font: inherit;
+}
+html.__cpa-wiki-modern .__cpa-wiki-rail summary {
+  padding: 10px 8px;
+  cursor: pointer;
+  font-weight: 650;
+}
+html.__cpa-wiki-modern .__cpa-wiki-site-menu {
+  border-bottom: 1px solid var(--cpa-wiki-border) !important;
+  margin-bottom: 16px !important;
+}
+html.__cpa-wiki-modern .__cpa-wiki-site-menu .vector-column-start {
+  display: block;
+  position: static;
+  width: auto;
+  margin: 0;
+  padding: 0 8px 16px;
+}
+html.__cpa-wiki-modern .__cpa-wiki-site-menu :is(.vector-sticky-pinned-container, #vector-main-menu-pinned-container) {
+  position: static;
+  width: auto;
+  padding: 0;
+  max-height: none;
+}
+html.__cpa-wiki-modern .__cpa-wiki-toc nav { max-height: none; padding: 0 0 12px; overflow: visible; }
+html.__cpa-wiki-modern .__cpa-wiki-toc a {
+  padding: 6px 8px;
+  border-inline-start: 2px solid transparent;
+  color: var(--cpa-wiki-ink);
+  border-start-end-radius: var(--cpa-wiki-radius-small);
+  border-end-end-radius: var(--cpa-wiki-radius-small);
+}
+html.__cpa-wiki-modern .__cpa-wiki-toc a:is(:hover, :focus-visible) {
+  background: var(--cpa-wiki-soft);
+  border-inline-start-color: var(--cpa-wiki-link);
+  color: var(--cpa-wiki-link);
+}
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-site-menu { margin-bottom: 0 !important; }
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-reading-grid:not(:has(#vector-main-menu-pinned-container > *, #mw-panel-toc)) { grid-template-columns: minmax(0, calc(var(--cpa-wiki-width) + 272px)); max-width: calc(var(--cpa-wiki-width) + 336px); }
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-reading-grid:not(:has(#vector-main-menu-pinned-container > *, #mw-panel-toc)) > #content { grid-column: 1; }
+html.__cpa-wiki-modern #content {
+  display: grid;
+  grid-area: auto;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-areas: "articleTitle articleTitle" "articleHeader articleHeader" "bodyContent columnEnd";
+  grid-template-columns: minmax(0, 1fr) 248px !important;
+  column-gap: 24px;
+  row-gap: 28px;
+  width: 100%;
+  max-width: calc(var(--cpa-wiki-width) + 272px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0;
+  background: var(--cpa-wiki-panel);
+}
+html.__cpa-wiki-modern .__cpa-wiki-article-header {
+  grid-area: articleHeader;
+  min-width: 0;
+  border-bottom: 1px solid var(--cpa-wiki-border);
+  padding-bottom: 20px;
+}
+html.__cpa-wiki-modern #content > .vector-page-titlebar {
+  grid-area: articleTitle;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+  gap: 16px;
+}
+html.__cpa-wiki-modern #firstHeading {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: clamp(30px, 3.2vw, 48px);
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+html.__cpa-wiki-modern .__cpa-wiki-description {
+  margin: 12px 0 0;
+  max-width: 70ch;
+  font: 16px/1.65 var(--cpa-wiki-font);
+  color: color-mix(in srgb, var(--cpa-wiki-ink) 76%, var(--cpa-wiki-panel));
+}
+html.__cpa-wiki-modern .__cpa-wiki-actions { margin-top: 16px; font: 13px/1.5 system-ui, sans-serif; }
+html.__cpa-wiki-modern .__cpa-wiki-actions > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  padding: 8px 12px;
+  border: 1px solid var(--cpa-wiki-border);
+  border-radius: var(--cpa-wiki-radius-small);
+  background: var(--cpa-wiki-soft);
+  color: var(--cpa-wiki-ink);
+  cursor: pointer;
+  list-style: none;
+}
+html.__cpa-wiki-modern :is(.__cpa-wiki-actions, .__cpa-wiki-facts) > summary::-webkit-details-marker { display: none; }
+html.__cpa-wiki-modern :is(.__cpa-wiki-actions, .__cpa-wiki-facts) > summary::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-start: auto;
+  border-inline-end: 1.5px solid currentColor;
+  border-block-end: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+html.__cpa-wiki-modern :is(.__cpa-wiki-actions, .__cpa-wiki-facts)[open] > summary::after { transform: rotate(225deg); }
+html.__cpa-wiki-modern .__cpa-wiki-actions .vector-page-toolbar { margin-top: 8px; border-color: var(--cpa-wiki-border); }
+html.__cpa-wiki-modern #bodyContent { grid-area: bodyContent; min-width: 0; }
+html.__cpa-wiki-modern #content > #mw-content-text { grid-area: bodyContent; min-width: 0; }
+html.__cpa-wiki-modern #content > .vector-column-end { grid-area: columnEnd; min-width: 0; margin: 0; }
+html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) {
+  grid-template-columns: minmax(0, 1fr) 0 !important;
+  column-gap: 0 !important;
+}
+html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) > .vector-column-end { display: none !important; }
+html.__cpa-wiki-modern.__cpa-wiki-hide-appearance.__cpa-wiki-narrow #content:not(:has(#vector-page-tools-pinned-container > *)) {
+  max-width: var(--cpa-wiki-width) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts {
+  box-sizing: border-box;
+  float: none;
+  clear: both;
+  width: 100%;
+  max-width: 100%;
+  margin: 24px 0;
+  border: 1px solid var(--cpa-wiki-border);
+  border-radius: var(--cpa-wiki-radius);
+  background: var(--cpa-wiki-soft);
+  overflow: clip;
+  font-size: .875em;
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+  border-bottom: 1px solid var(--cpa-wiki-border);
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox {
+  float: none !important;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  border: 0;
+  border-spacing: 0;
+  background: transparent;
+  color: var(--cpa-wiki-ink);
+  font-size: 1em;
+  line-height: 1.6;
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox > tbody > tr > :is(th, td) { padding: 7px 12px; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox > tbody > tr > th {
+  background-color: var(--cpa-wiki-soft) !important;
+  color: var(--cpa-wiki-ink) !important;
+}
+html.__cpa-wiki-modern[data-cpa-wiki-article-style="text"] #mw-content-text .__cpa-wiki-facts { display: none !important; }
+/* 項目を読み順のまま段組みにし、長い値の横にも次の項目を詰めて表示する。 */
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox { display: block; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > caption {
+  display: block; text-align: start; padding: 14px 16px 0; font-size: 1.1em;
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody {
+  display: block; columns: 2 280px; column-gap: 24px; padding: 12px 16px 16px;
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr {
+  display: grid; grid-template-columns: minmax(80px, 30%) minmax(0, 1fr);
+  gap: 12px; break-inside: avoid; padding: 8px 0; border-bottom: 1px solid var(--cpa-wiki-border);
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > :is(th, td) {
+  display: block; min-width: 0; width: auto !important; padding: 0; white-space: normal !important; overflow-wrap: anywhere;
+}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > :only-child { grid-column: 1 / -1; text-align: start !important; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr:has(> td > hr) { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > td > :is(p, ul, ol, dl) { margin-block: 0 6px; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox hr { margin-block: 6px; }
+html.__cpa-wiki-modern .__cpa-wiki-footer {
+  border-top: 1px solid var(--cpa-wiki-border);
+  padding: 24px var(--cpa-wiki-page-padding);
+}
+html.__cpa-wiki-modern .__cpa-wiki-footer #footer { max-width: 1512px; margin-inline: auto; padding: 0; color: var(--cpa-wiki-ink); }
+/* ネイティブ検索・言語・編集の操作欄も、記事と同じテーマへ追従させる。 */
+html.__cpa-wiki-modern .__cpa-wiki-shell :is(.vector-menu-content, .vector-dropdown-content, .vector-main-menu, .vector-appearance, .vector-page-tools) {
+  background-color: var(--cpa-wiki-panel);
+  color: var(--cpa-wiki-ink);
+  border-color: var(--cpa-wiki-border);
+}
+html.__cpa-wiki-modern .__cpa-wiki-shell :is(.vector-menu-content, .vector-page-titlebar, .vector-page-toolbar, .__cpa-wiki-footer) a:not(.new) { color: var(--cpa-wiki-link); }
+html.__cpa-wiki-modern .__cpa-wiki-shell :is(summary, button, input, a):focus-visible { outline: 2px solid var(--cpa-wiki-link); outline-offset: 3px; }
+@media (max-width: 1100px) {
+  html.__cpa-wiki-modern { --cpa-wiki-page-padding: 24px; }
+  html.__cpa-wiki-modern .__cpa-wiki-reading-grid { grid-template-columns: 176px minmax(0, 1fr); gap: 24px; }
+  html.__cpa-wiki-modern #content { grid-template-columns: minmax(0, 1fr) !important; grid-template-areas: "articleTitle" "articleHeader" "bodyContent" "columnEnd"; }
+  html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 760px) {
+  html.__cpa-wiki-modern { --cpa-wiki-page-padding: 16px; }
+  html.__cpa-wiki-modern .__cpa-wiki-reading-grid { grid-template-columns: minmax(0, 1fr); padding-block: 16px 32px; gap: 20px; }
+  html.__cpa-wiki-modern .__cpa-wiki-rail { position: static; max-height: none; overflow: visible; }
+  html.__cpa-wiki-modern .__cpa-wiki-site-menu { margin-bottom: 0 !important; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc nav { max-height: 40vh; overflow-y: auto; }
+  html.__cpa-wiki-modern #content { grid-column: 1; grid-row: 2; padding: 0 !important; row-gap: 20px; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts { margin: 16px 0 24px; }
+  html.__cpa-wiki-modern #mw-content-text :is(table, .clade-gallery, .navbox, .gallery):not(table table) { display: block; max-width: 100% !important; overflow-x: auto; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox { display: table; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.__cpa-wiki-modern { scroll-behavior: auto !important; }
+  html.__cpa-wiki-modern .__cpa-wiki-shell { animation: none; transition: none; }
+}
+@media print {
+  html.__cpa-wiki-modern .__cpa-wiki-shell :is(.__cpa-wiki-topbar, .__cpa-wiki-rail, .__cpa-wiki-actions, .vector-column-end) { display: none !important; }
+  html.__cpa-wiki-modern .__cpa-wiki-reading-grid,
+  html.__cpa-wiki-modern #content { display: block; max-width: none !important; padding: 0 !important; }
+  html.__cpa-wiki-modern .__cpa-wiki-shell { min-height: 0; }
+  html.__cpa-wiki-modern .__cpa-wiki-footer { padding-inline: 0; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts { break-inside: avoid; }
+}
+
+/* 旧テーマは、保存済み設定とバックアップを表示するために残す。 */
+html.__cpa-wiki-active[data-cpa-wiki-theme="algae"] { --cpa-wiki-panel: #f0f7f2; --cpa-wiki-ink: #141e18; --cpa-wiki-link: #36798d; --cpa-wiki-border: #d4e8dc; --cpa-wiki-soft: #e4f0e8; color-scheme: light; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="calmness"] { --cpa-wiki-panel: #f0f3f8; --cpa-wiki-ink: #171b21; --cpa-wiki-link: #1763c4; --cpa-wiki-border: #dce3f0; --cpa-wiki-soft: #e2e8f2; color-scheme: light; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="deep-ocean"] { --cpa-wiki-panel: #1d273a; --cpa-wiki-ink: #edf6f8; --cpa-wiki-link: #4ebfde; --cpa-wiki-border: #324050; --cpa-wiki-soft: #2d364e; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="desert"] { --cpa-wiki-panel: #f4eeeb; --cpa-wiki-ink: #2d2b27; --cpa-wiki-link: #496ea5; --cpa-wiki-border: #d8cfc7; --cpa-wiki-soft: #eae1d5; color-scheme: light; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="fairy-dust"] { --cpa-wiki-panel: #faedf3; --cpa-wiki-ink: #1e1420; --cpa-wiki-link: #8f54b2; --cpa-wiki-border: #edcee0; --cpa-wiki-soft: #f5e0ed; color-scheme: light; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="grey"] { --cpa-wiki-panel: #1a1a1a; --cpa-wiki-ink: #e8e8e8; --cpa-wiki-link: #8498ff; --cpa-wiki-border: #4a4a4a; --cpa-wiki-soft: #363636; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="nature"] { --cpa-wiki-panel: #2f2924; --cpa-wiki-ink: #f8f7f3; --cpa-wiki-link: #5994ff; --cpa-wiki-border: #554d42; --cpa-wiki-soft: #494039; color-scheme: dark; }
+
+/* エディターテーマの背景・文字・アクセントを記事の配色へ割り当てる。 */
+html.__cpa-wiki-active[data-cpa-wiki-theme="one-dark"] { --cpa-wiki-panel: #282c34; --cpa-wiki-ink: #abb2bf; --cpa-wiki-link: #61afef; --cpa-wiki-border: #4b5362; --cpa-wiki-soft: #323843; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="auto"],
+html.__cpa-wiki-active[data-cpa-wiki-theme="one-light"] { --cpa-wiki-panel: #fafafa; --cpa-wiki-ink: #383a42; --cpa-wiki-link: #3e66bf; --cpa-wiki-border: #d4d5da; --cpa-wiki-soft: #ececf0; color-scheme: light; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="dracula"] { --cpa-wiki-panel: #282a36; --cpa-wiki-ink: #f8f8f2; --cpa-wiki-link: #8be9fd; --cpa-wiki-border: #6272a4; --cpa-wiki-soft: #44475a; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="nord"] { --cpa-wiki-panel: #2e3440; --cpa-wiki-ink: #d8dee9; --cpa-wiki-link: #88c0d0; --cpa-wiki-border: #4c566a; --cpa-wiki-soft: #3b4252; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="monokai"] { --cpa-wiki-panel: #272822; --cpa-wiki-ink: #f8f8f2; --cpa-wiki-link: #66d9ef; --cpa-wiki-border: #75715e; --cpa-wiki-soft: #414339; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="solarized-dark"] { --cpa-wiki-panel: #002b36; --cpa-wiki-ink: #93a1a1; --cpa-wiki-link: #30ada4; --cpa-wiki-border: #586e75; --cpa-wiki-soft: #073642; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="solarized-light"] { --cpa-wiki-panel: #fdf6e3; --cpa-wiki-ink: #586e75; --cpa-wiki-link: #006da3; --cpa-wiki-border: #93a1a1; --cpa-wiki-soft: #eee8d5; color-scheme: light; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="github-dark"] { --cpa-wiki-panel: #0d1117; --cpa-wiki-ink: #e6edf3; --cpa-wiki-link: #58a6ff; --cpa-wiki-border: #30363d; --cpa-wiki-soft: #161b22; color-scheme: dark; }
+html.__cpa-wiki-active[data-cpa-wiki-theme="github-light"] { --cpa-wiki-panel: #fff; --cpa-wiki-ink: #1f2328; --cpa-wiki-link: #0969da; --cpa-wiki-border: #d1d9e0; --cpa-wiki-soft: #f6f8fa; color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  html.__cpa-wiki-active[data-cpa-wiki-theme="auto"] { --cpa-wiki-panel: #282c34; --cpa-wiki-ink: #abb2bf; --cpa-wiki-link: #61afef; --cpa-wiki-border: #4b5362; --cpa-wiki-soft: #323843; color-scheme: dark; }
+}
