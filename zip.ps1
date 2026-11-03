@@ -52,14 +52,17 @@ if ($scriptDir) { Set-Location $scriptDir }
 
 # 依存インストール & アイコン生成
 Write-Host "依存パッケージを lockfile どおりにインストール中..." -ForegroundColor Yellow
-pnpm install --frozen-lockfile --silent
+bun run deps --silent
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "pnpm install --frozen-lockfile に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
+    Write-Host "bun run deps に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "アイコンを生成中..." -ForegroundColor Yellow
-node scripts/generate-icons.js
+bun --bun run sync:support
+if ($LASTEXITCODE -ne 0) { throw "Support synchronization failed." }
+
+bun scripts/generate-icons.js
 if ($LASTEXITCODE -ne 0) {
     Write-Host "アイコン生成に失敗しました (exit $LASTEXITCODE)" -ForegroundColor Red
     exit 1
@@ -86,7 +89,7 @@ function Build-Package {
     Write-Host "ファイルをコピー中 ($ManifestSource → manifest.json)..." -ForegroundColor Yellow
     # Firefox 版は manifest.firefox.json を manifest.json として配置する。
     # Chrome 版は manifest.json をそのまま使う。
-    node scripts/copy-package-files.js $Variant $tempDir
+    bun scripts/copy-package-files.js $Variant $tempDir
     if ($LASTEXITCODE -ne 0) { throw "配布ファイルのコピーに失敗しました (exit $LASTEXITCODE)" }
 
     if ($Variant -eq "firefox") {
@@ -94,7 +97,7 @@ function Build-Package {
         # AMO linter の UNSUPPORTED_API 警告 3 件を消すため、__FIREFOX_STRIP_BEGIN__ から
         # __FIREFOX_STRIP_END__ までを (マーカー行を含めて) 削除する。
         $bgPath = "$tempDir/src/background/background.js"
-        node scripts/strip-firefox-background.js $bgPath
+        bun scripts/strip-firefox-background.js $bgPath
         if ($LASTEXITCODE -ne 0) { throw "Firefox 用コードの除外に失敗しました (exit $LASTEXITCODE)" }
         Write-Host "Firefox build: background.js の chrome.offscreen / chrome.tabCapture 呼び出しを strip 済み" -ForegroundColor DarkGray
     }

@@ -27,11 +27,11 @@ fi
 
 # 依存インストール & アイコン生成
 echo "依存パッケージを lockfile どおりにインストール中..."
-if ! pnpm install --frozen-lockfile --silent; then
-  echo "pnpm install --frozen-lockfile に失敗しました"
+if ! bun run deps --silent; then
+  echo "bun run deps に失敗しました"
   exit 1
 fi
-if ! node scripts/generate-icons.js; then
+if ! bun scripts/generate-icons.js; then
   echo "アイコン生成に失敗しました"
   exit 1
 fi
@@ -49,13 +49,13 @@ build_pkg() {
   mkdir -p "$tmp"
 
   # manifest を variant 用にコピー (Firefox は manifest.firefox.json を manifest.json にリネーム)
-  node scripts/copy-package-files.js "$variant" "$tmp"
+  bun scripts/copy-package-files.js "$variant" "$tmp"
 
   if [ "$variant" = "firefox" ]; then
     # Firefox 版は chrome.offscreen / chrome.tabCapture の呼び出しブロックを物理削除する。
     # AMO linter の UNSUPPORTED_API 警告 3 件を消すため、__FIREFOX_STRIP_BEGIN__ から
     # __FIREFOX_STRIP_END__ までを (マーカー行を含めて) 削除する。
-    node scripts/strip-firefox-background.js "$tmp/src/background/background.js"
+    bun scripts/strip-firefox-background.js "$tmp/src/background/background.js"
     echo "Firefox build: background.js の chrome.offscreen / chrome.tabCapture 呼び出しを strip 済み"
   fi
 

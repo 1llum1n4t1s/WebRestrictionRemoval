@@ -3,7 +3,7 @@
 /**
  * actions.js の純粋関数群に対する境界値テスト (#26)。
  *
- * 実行: `node --test test/actions.test.js`
+ * 実行: `bun test ./test/actions.test.js`
  *
  * 対象:
  *   - VolumeBooster: clampValue / percentToGain / gainToPercent / sliderPositionToPercent / percentToSliderPosition

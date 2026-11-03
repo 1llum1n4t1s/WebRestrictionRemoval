@@ -6,7 +6,7 @@ const path = require("node:path");
 
 const target = process.argv[2];
 if (!target) {
-  console.error("使用方法: node scripts/strip-firefox-background.js <background.js>");
+  console.error("使用方法: bun scripts/strip-firefox-background.js <background.js>");
   process.exitCode = 1;
 } else {
   const file = path.resolve(target);

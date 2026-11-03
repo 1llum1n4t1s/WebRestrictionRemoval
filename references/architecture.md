@@ -415,7 +415,7 @@ E2E はタブを作り直さず、実記事の同じ文書でテーマ・幅・�
 
 記事操作と基本情報は `details` で折りたたみます。基本情報は冒頭の説明の後に本文全幅のブロックで置き、画面幅にかかわらず最初は閉じます。本文へ回り込ませず、開閉状態はリサイズで変更しません。初期 URL と文書内リンクが閉じた領域を指す場合は開き、印刷時も内容を展開して帰属とともに印刷します。独自目次を OFF にした場合は標準目次を表示し、固定した標準メニューも保持します。編集の URL・要素・`html` の VisualEditor クラスは文書全体の監視で検出し、編集開始時に元へ戻し、閲覧復帰時に再構成します。リンクのクリックだけで編集待機状態は作りません。固定目次・脚注本文カード・読込済み画像の拡大は追加 UI とし、記事プレビューは Wikipedia の標準カードを調整します。独自 fetch・外部ビューアー・別サイト転送はありません。OFF・対象外遷移・context 失効時には追加 UI とスタイルを撤去します。
 
-画像は読込済みの要素から表示用 canvas へ描画し、再取得・画素の読出し・保存を行いません。`scripts/verify-wikipedia.js` は実際の拡張ポップアップから設定配信と復元を確認する E2E です。未使用の専用絶対パスを `VUORA_BROWSER_TEST_DIR` に指定し、`node --test scripts/verify-wikipedia.js` で実行します。`VUORA_LIVE_WIKIPEDIA=1` を指定すると日本語・英語 Wikipedia の実記事の確認も追加します。画像と専用プロファイルは指定先へ保存するため、終了後は必要な画像だけ保持してプロファイルを清掃します。
+画像は読込済みの要素から表示用 canvas へ描画し、再取得・画素の読出し・保存を行いません。`scripts/verify-wikipedia.js` は実際の拡張ポップアップから設定配信と復元を確認する E2E です。未使用の専用絶対パスを `VUORA_BROWSER_TEST_DIR` に指定し、`bun test ./scripts/verify-wikipedia.js` で実行します。`VUORA_LIVE_WIKIPEDIA=1` を指定すると日本語・英語 Wikipedia の実記事の確認も追加します。画像と専用プロファイルは指定先へ保存するため、終了後は必要な画像だけ保持してプロファイルを清掃します。
 
 本文用 Web フォントは `src/fonts/wikipedia` に通常・太字の12ファイルと OFL ライセンスを同梱します。`Noto Sans JP` / `IBM Plex Sans JP` / `M PLUS 2` / `M PLUS Rounded 1c` / `Murecho` / `Zen Kaku Gothic New` / `LINE Seed JP` を選べます。マスター ON の記事で、選択した書体だけの `@font-face` を生成し、拡張内 URL から必要なウェイトを遅延読込します。Web Accessible Resources の公開先は Wikipedia だけです。OFF・システム書体への変更時には宣言も撤去します。既存の `sans/serif` と旧4項目の保存値は受け入れ、追加項目を補完します。同期・バックアップも同じ検証器を使い、未知の項目・値を拒否します。設定画面用 IBM Plex Sans JP のサブセットは従来どおり別に保持します。
 

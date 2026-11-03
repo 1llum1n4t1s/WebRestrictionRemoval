@@ -33,12 +33,17 @@ jobs:
     # 修復 push と GitHub rerun は提出を開始しない。再開時の外部状態照合は vava が行う。
     if: ${{ github.run_attempt == 1 && startsWith(github.ref, 'refs/heads/release/') && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.created == true)) }}
     outputs:
+      artifact-attempt: ${{ steps.artifact-identity.outputs.attempt }}
       # version を後続 job (publish / publish-firefox) の pre-flight check に渡す。
       # 同 version や不明な状態では停止し、重複提出を防ぐ。
       version: ${{ steps.version.outputs.version }}
       chrome-sha256: ${{ steps.verify-chrome.outputs.sha256 }}
       firefox-sha256: ${{ steps.verify-firefox.outputs.sha256 }}
     steps:
+      - name: Record native artifact producer attempt
+        id: artifact-identity
+        shell: bash
+        run: echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - name: 提出対象を確認
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
@@ -52,13 +57,18 @@ jobs:
       # サプライチェーン攻撃対策で SHA ピン留め (#6)。タグは指すコミットを書き換え可能なため
       # 信頼境界として弱い。Dependabot (.github/dependabot.yml) が SHA + タグコメント形式の
       # 更新 PR を自動生成するので、そちらをマージして最新化する運用。
-      - name: リポジトリをチェックアウト
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        # /rere レビュー A3-004: persist-credentials を明示的に無効化。本 workflow では
-        # GITHUB_TOKEN を使った git push を行わないので、.git/config に書き残さない方が
-        # 防御深層として安全 (script injection 経由の token 漏洩経路を完全に閉じる)
-        with:
-          persist-credentials: false
+      - name: Checkout release commit with native git
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" submodule update --init --recursive
 
       - name: 再開対象のコミットを確認
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -92,35 +102,28 @@ jobs:
           fi
           echo "✅ ブランチ名と manifest バージョン一致: $expected"
 
-      - name: pnpm セットアップ
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
-        with:
-          # メジャーバージョンのみ指定 (例: 11) だと action-setup が起動時に最新パッチへの
-          # 自動切替を試み、その自己更新処理内で pnpm 側のバグを踏んで
-          # "Cannot use 'in' operator to search for 'integrity' in undefined" でクラッシュする
-          # 事例を観測 (2026-07-13)。厳密バージョン固定で自動切替そのものを回避する。
-          version: '12.16.1'
-
-      - name: Node セットアップ
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '26.13.0'
-          cache: 'pnpm'
+      - name: Prepare Bun build toolchain
+        shell: pwsh
+        run: ./scripts/Initialize-BunBuild.ps1 -VersionFile package.json
 
       - name: 依存インストール
-        # lockfile の整合性を強制するため pnpm install --frozen-lockfile のみ。
+        # lockfile の整合性を強制するため bun run deps のみ。
         # frozen-lockfile は lockfile を迂回した最新依存取得を禁止し、サプライチェーン攻撃の
         # 経路を塞ぐ。lockfile が古い場合は CI を失敗させ、開発者に更新を促す。
         env:
           # publish workflow ではスクリーンショット生成をしないため、Puppeteer のブラウザ取得は不要。
           PUPPETEER_SKIP_DOWNLOAD: "1"
-        run: pnpm install --frozen-lockfile
+        run: bun run deps
+      - name: Validate dependency security patches
+        run: bun run test:dependencies
+      - name: Sync support assets
+        run: bun --bun run sync:support
 
       - name: テスト実行
-        run: pnpm test
+        run: bun --bun run test
 
       - name: アイコン生成
-        run: node scripts/generate-icons.js
+        run: bun scripts/generate-icons.js
 
       - name: zip パッケージを作成
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'chrome') }}
@@ -129,7 +132,7 @@ jobs:
           # 含めないと CWS の Submit for review で `PKG_DEFAULT_LOCALE_MISSING` エラー。
           # 2026-05-13: Draft only 時代はフル validation が走らず通過していたが、auto-publish
           # 化で発覚した bug。zip.ps1 / zip.sh は最初から _locales を含めている。
-          node scripts/copy-package-files.js chrome chrome-build
+          bun scripts/copy-package-files.js chrome chrome-build
           (cd chrome-build && zip -r ../web-viewing-assist.zip .)
           ls -lh web-viewing-assist.zip
 
@@ -142,11 +145,15 @@ jobs:
 
       - name: ZIP artifact を保存
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'chrome') }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: web-viewing-assist-zip
-          path: web-viewing-assist.zip
-          if-no-files-found: error
+        shell: pwsh
+        env:
+          R2_ARTIFACT_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ARTIFACT_BUCKET: ${{ vars.R2_ARTIFACT_BUCKET }}
+          R2_ARTIFACT_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          R2_ARTIFACT_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          . ./scripts/R2Artifact.Common.ps1
+          Publish-R2Artifact -AccountId $env:R2_ARTIFACT_ACCOUNT_ID -Bucket $env:R2_ARTIFACT_BUCKET -AccessKeyId $env:R2_ARTIFACT_ACCESS_KEY_ID -SecretAccessKey $env:R2_ARTIFACT_SECRET_ACCESS_KEY -Name 'web-viewing-assist-zip' -Path @('web-viewing-assist.zip') | Out-Null
 
       - name: Firefox 用ソースディレクトリを構築
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'firefox') }}
@@ -155,13 +162,12 @@ jobs:
         # 除外済み。さらに background.js から chrome.offscreen / chrome.tabCapture の呼び出し
         # ブロックを __FIREFOX_STRIP_BEGIN__ / __FIREFOX_STRIP_END__ マーカー間で物理削除する
         # (AMO linter の UNSUPPORTED_API 警告 3 件を消すため、v1.0.33 で導入)。
-        # web-ext sign は zip ではなく source-dir を受け取って自身で xpi を構築するため、
         # ここでは source dir のまま保存する (二度手間の zip 化を避ける)。
         run: |
           mkdir -p firefox-build
-          node scripts/copy-package-files.js firefox firefox-build
+          bun scripts/copy-package-files.js firefox firefox-build
           # Firefox 未対応 API 呼び出しブロックを strip (AMO linter UNSUPPORTED_API 警告対策)
-          node scripts/strip-firefox-background.js firefox-build/src/background/background.js
+          bun scripts/strip-firefox-background.js firefox-build/src/background/background.js
           echo "🦊 Firefox strip 完了 (chrome.offscreen / chrome.tabCapture 呼び出しを削除)"
           echo "📂 firefox-build 内容:"
           ls -la firefox-build/
@@ -175,11 +181,15 @@ jobs:
 
       - name: Firefox source artifact を保存
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'firefox') }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: web-viewing-assist-firefox-source
-          path: firefox-build/
-          if-no-files-found: error
+        shell: pwsh
+        env:
+          R2_ARTIFACT_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ARTIFACT_BUCKET: ${{ vars.R2_ARTIFACT_BUCKET }}
+          R2_ARTIFACT_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          R2_ARTIFACT_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          . ./scripts/R2Artifact.Common.ps1
+          Publish-R2Artifact -AccountId $env:R2_ARTIFACT_ACCOUNT_ID -Bucket $env:R2_ARTIFACT_BUCKET -AccessKeyId $env:R2_ARTIFACT_ACCESS_KEY_ID -SecretAccessKey $env:R2_ARTIFACT_SECRET_ACCESS_KEY -Name 'web-viewing-assist-firefox-source' -Path @('firefox-build/') | Out-Null
 
   publish:
     name: Chrome Web Store にアップロード + Submit for review
@@ -189,11 +199,29 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.target != 'firefox' }}
     environment: chrome-web-store
     steps:
+      - name: Checkout release commit with native git
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" submodule update --init --recursive
+
       - name: ZIP artifact を取得
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: web-viewing-assist-zip
-          path: .
+        shell: pwsh
+        env:
+          ARTIFACT_RUN_ATTEMPT: ${{ needs.package.outputs.artifact-attempt }}
+          R2_ARTIFACT_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ARTIFACT_BUCKET: ${{ vars.R2_ARTIFACT_BUCKET }}
+          R2_ARTIFACT_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          R2_ARTIFACT_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          & ./scripts/Receive-ReleaseArtifact.ps1 -Name 'web-viewing-assist-zip' -Destination '.' -RunAttempt $env:ARTIFACT_RUN_ATTEMPT
 
       - name: ダウンロードした送信 ZIP と検証済み ZIP の同一性を確認
         env:
@@ -202,155 +230,16 @@ jobs:
           test -n "$EXPECTED_SHA256"
           echo "$EXPECTED_SHA256  web-viewing-assist.zip" | sha256sum --check --strict
 
-      - name: バージョン pre-flight check (CWS / 状態不明なら停止)
-        # 未確認の状態では upload や再申請を行わない。
+      - name: Chrome Web Store に検証済み ZIP を HTTP 提出
         env:
-          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
-          MANIFEST_VERSION: ${{ needs.package.outputs.version }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID || secrets.CWS_PUBLISHER_ID }}
         run: |
-          set -euo pipefail
-          shopt -s inherit_errexit
-          # OAuth refresh (publish step と同じ流れ、token はマスク登録)
-          token_response=$(curl -fsS \
-            -X POST "https://oauth2.googleapis.com/token" \
-            --data-urlencode "client_id=${CWS_CLIENT_ID}" \
-            --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
-            --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
-            --data-urlencode "grant_type=refresh_token")
-          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response" || echo "")
-          if [ -z "${access_token:-}" ]; then
-            echo "::error::CWS pre-flight: OAuth token 取得失敗。状態不明のため停止"
-            exit 1
-          fi
-          # add-mask は1行単位。複数行JSON全体を渡すと2行目以降が通常ログとして露出するため、
-          # 実際の秘密値であるaccess_tokenだけを登録する。
-          echo "::add-mask::${access_token}"
-          # Items.get で draft の crxVersion + uploadState を取得
-          draft_response=$(curl -fsS \
-            -H "Authorization: Bearer ${access_token}" \
-            -H "x-goog-api-version: 2" \
-            "https://www.googleapis.com/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}?projection=DRAFT") || draft_response=""
-          if [ -z "$draft_response" ]; then
-            echo "::error::CWS pre-flight: Items.get 失敗。状態不明のため停止"
-            exit 1
-          fi
-          draft_version=$(python3 -c 'import json,re,sys; d=json.load(sys.stdin); v=d.get("crxVersion"); assert isinstance(v,str) and re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,3}",v); print(v)' 2>/dev/null <<< "$draft_response" || echo "")
-          draft_state=$(python3 -c 'import json,sys; d=json.load(sys.stdin); v=d.get("uploadState"); assert isinstance(v,str) and v in ("SUCCESS","NOT_FOUND","IN_PROGRESS","FAILURE"); print(v)' 2>/dev/null <<< "$draft_response" || echo "")
-          echo "📊 CWS draft: version=${draft_version:-(unknown)} state=${draft_state:-(unknown)} / manifest: ${MANIFEST_VERSION}"
-          if [ -z "$draft_version" ] || { [ "$draft_state" != "SUCCESS" ] && [ "$draft_state" != "NOT_FOUND" ]; }; then
-            echo "::error::CWS の version または upload 状態が不明。停止して確認してください"
-            exit 1
-          fi
-          if [ "$draft_version" = "$MANIFEST_VERSION" ]; then
-            echo "::error::CWS に同 version が存在。審査状態を確認できないため再申請しません"
-            exit 1
-          fi
-
-      - name: Chrome Web Store にアップロード + Publish API で Submit for review
-        env:
-          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
-        run: |
-          # フルオート申請フロー (2026-05-13 から auto-publish 化、ゆろさん指示):
-          # 1) ZIP を Draft としてアップロード
-          # 2) Publish API (publishTarget=default) で Submit for review まで自動化
-          # release/x.y.z ブランチの新規作成 push で CI → Submit for review まで一気通貫。
-          #
-          # **listing 変更時の運用注意**: 説明文 / スクリーンショット / カテゴリ / 権限の正当性などの
-          # listing 項目は CWS API に更新エンドポイントが存在しない (v2 API discovery で確認済み)。
-          # listing を変更したいリリースでは、Dashboard で listing を整え、
-          # **その後 release ブランチを新規作成して push** することで listing 更新を反映させる
-          # (Submit for review は Draft の最新コミット + 最新 listing で行われるため、listing 変更が
-          # 先行していれば追従する)。
-          #
-          # upload job は pnpm install / pnpm exec / checkout を行わず、Secrets を第三者 npm lifecycle の後段に置かない。
-          # package job が作った ZIP artifact だけを fresh runner で受け取り、CWS API へ直接アップロードする。
-          #
-          # **stdout/stderr は直接ストリームする**: `output=$(... 2>&1)` で一旦変数に取り込んで echo すると、
-          # GitHub Actions の自動マスキングは「シークレット文字列がそのまま出力された場合」のみ働くため、
-          # CLI が OAuth Bearer Token をエラーメッセージに混ぜてくると平文でログ残存しうる。
-          # 直接ストリームすれば Actions ランナー側のマスキングが各シークレットを `***` に置換できる。
-          # 注意: `set -e` だけだと `var=$(cmd)` 形式での内部コマンド失敗が errexit されない bash 仕様
-          # があるため、access_token が空文字化した状態で curl が "Authorization: Bearer " を送って
-          # 401 で失敗 → 「upload エラー」として現れる紛らわしい状況になる。`inherit_errexit` を
-          # `set -euo pipefail` の直後 (= 後続の全 command substitution の前) に有効化して、token 取得
-          # curl も保護対象に含める (セルフレビュー 2 巡目 #4: shopt 配置を curl より前に移動)。
-          set -euo pipefail
-          shopt -s inherit_errexit
-          # ⚠️ このブロックでは `set -x` を絶対に有効化しない。set -x がトークン取得行を
-          # 展開すると CWS_REFRESH_TOKEN / token_response / access_token のいずれかが
-          # add-mask 登録前に平文ログに出る可能性がある (/rere レビュー A2-S-1 防御)。
-          token_response=$(curl -fsS \
-            -X POST "https://oauth2.googleapis.com/token" \
-            --data-urlencode "client_id=${CWS_CLIENT_ID}" \
-            --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
-            --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
-            --data-urlencode "grant_type=refresh_token")
-          # Python 例外メッセージは標準で token 本体を含まないが、防御深層として stderr を抑制し、
-          # KeyError / JSONDecodeError 時のスタックトレースから付帯情報の漏洩可能性をゼロ化する。
-          # `|| echo ""` で python 非ゼロ終了を空文字に変換し、inherit_errexit で step が落ちる前に
-          # 直後の空チェック分岐 (hard fail) に到達させる (セルフレビュー 2 巡目 #3)。
-          access_token=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null <<< "$token_response" || echo "")
-          if [ -z "${access_token:-}" ]; then
-            echo "::error::access_token のパースに失敗しました (OAuth refresh response が想定形式でない可能性)"
-            exit 1
-          fi
-          # 動的取得した access_token は GitHub Actions の自動マスキング対象外のため、
-          # add-mask で明示的にマスク登録して以降のログ出力でも漏洩しないようにする。
-          # add-mask は1行単位なので、複数行のtoken_response全体は渡さない。
-          # JSONを渡すと先頭行しかマスク対象にならず、後続行のaccess_tokenが通常ログへ露出する。
-          echo "::add-mask::${access_token}"
-
-          # ----- ステップ 1: ZIP を Draft としてアップロード -----
-          echo "📤 Step 1/2: Chrome Web Store に ZIP をアップロード中..."
-          upload_response=$(curl -fsS \
-            -X PUT \
-            -H "Authorization: Bearer ${access_token}" \
-            -H "x-goog-api-version: 2" \
-            -H "Content-Type: application/zip" \
-            --data-binary @web-viewing-assist.zip \
-            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}")
-          echo "✅ アップロード完了"
-          # uploadState を確認 (SUCCESS / IN_PROGRESS / FAILURE)。FAILURE なら publish step に進まない。
-          upload_state=$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("uploadState","UNKNOWN"))' 2>/dev/null <<< "$upload_response")
-          echo "📊 uploadState: ${upload_state}"
-          if [ "$upload_state" != "SUCCESS" ]; then
-            echo "::error::アップロードが SUCCESS ではないため publish を中止します (state=${upload_state})"
-            echo "Response: $upload_response"
-            exit 1
-          fi
-
-          # ----- ステップ 2: Publish API で Submit for review -----
-          # publishTarget=default で全ユーザー公開 (trustedTesters 限定公開も可能だが本番採用)。
-          # status が ["OK"] の場合だけ受理とし、他の応答は状態不明として停止する。
-          echo "📨 Step 2/2: Publish API で Submit for review..."
-          publish_response=$(curl -fsS \
-            -X POST \
-            -H "Authorization: Bearer ${access_token}" \
-            -H "x-goog-api-version: 2" \
-            -H "Content-Length: 0" \
-            "https://www.googleapis.com/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}/publish?publishTarget=default")
-          publish_status=$(python3 -c 'import json,sys; d=json.load(sys.stdin); s=d.get("status") if isinstance(d,dict) else None; print("OK" if s == ["OK"] else "ITEM_PENDING_REVIEW" if s == ["ITEM_PENDING_REVIEW"] else "INVALID")' 2>/dev/null <<< "$publish_response" || echo "INVALID")
-          echo "📊 Publish status: ${publish_status}"
-          case "$publish_status" in
-            OK)
-              echo "🎉 Chrome Web Store が publish 要求を受理しました。公開・審査状態は Dashboard で確認してください"
-              echo "🔗 Dashboard: https://chrome.google.com/webstore/devconsole"
-              ;;
-            ITEM_PENDING_REVIEW)
-              echo "::error::CWS は審査中と応答しましたが、対象 version を確認できないため状態不明です"
-              exit 1
-              ;;
-            *)
-              echo "::error::CWS publish 応答を確認できません。状態を調査してください"
-              exit 1
-              ;;
-          esac
+          pwsh -NoProfile -File scripts/Test-PublishCws.ps1 -WorkDirectory "$RUNNER_TEMP/cws-publisher-tests"
+          pwsh -NoProfile -File scripts/Publish-Cws.ps1 -Archive "web-viewing-assist.zip" -ExpectedSha256 "${{ needs.package.outputs.chrome-sha256 }}" -CheckExistingVersion
 
   publish-firefox:
     name: Firefox AMO に submission
@@ -362,39 +251,44 @@ jobs:
     # AMO 用 environment が必要なら gh api で別途作成可能だが、当面は repository scope の
     # AMO_JWT_ISSUER / AMO_JWT_SECRET secrets で動かす (Chrome 側と同じ秘匿レベル)。
     steps:
-      - name: リポジトリをチェックアウト
-        # web-ext は devDependencies なので package.json + lockfile が必要 (pnpm install で取得)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        # /rere F-OPS-1 修正: package job と防御深層の整合性確保。本 job では git push を
-        # 行わないが、persist-credentials: false で GITHUB_TOKEN を .git/config の extraheader に
-        # 残さない (script injection 経由の token 漏洩経路を完全に閉じる)
-        with:
-          persist-credentials: false
+      - name: Checkout release commit with native git
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" submodule update --init --recursive
 
       - name: Firefox source artifact を取得
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: web-viewing-assist-firefox-source
-          path: firefox-build/
+        shell: pwsh
+        env:
+          ARTIFACT_RUN_ATTEMPT: ${{ needs.package.outputs.artifact-attempt }}
+          R2_ARTIFACT_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ARTIFACT_BUCKET: ${{ vars.R2_ARTIFACT_BUCKET }}
+          R2_ARTIFACT_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          R2_ARTIFACT_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          & ./scripts/Receive-ReleaseArtifact.ps1 -Name 'web-viewing-assist-firefox-source' -Destination 'firefox-build/' -RunAttempt $env:ARTIFACT_RUN_ATTEMPT
 
-      - name: pnpm セットアップ
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
-        with:
-          # 厳密バージョン固定の理由は同ファイル先頭の pnpm セットアップ step コメント参照。
-          version: '12.16.1'
-
-      - name: Node セットアップ
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '26.13.0'
-          cache: 'pnpm'
+      - name: Prepare Bun build toolchain
+        shell: pwsh
+        run: ./scripts/Initialize-BunBuild.ps1 -VersionFile package.json
 
       - name: web-ext 依存インストール
-        # pnpm install --frozen-lockfile で integrity 検証し、実行時に web-ext 10.8.0 を確認。
+        # bun run deps で integrity 検証し、実行時に web-ext 10.8.0 を確認。
         # publish では screenshot 生成不要なので Puppeteer browser DL は skip。
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"
-        run: pnpm install --frozen-lockfile
+        run: bun run deps
+      - name: Validate dependency security patches
+        run: bun run test:dependencies
+      - name: Sync support assets
+        run: bun --bun run sync:support
 
       - name: ダウンロードした実 source-dir と検証済みソースの同一性を確認
         env:
@@ -404,50 +298,22 @@ jobs:
           test -n "$EXPECTED_SHA256"
           python3 scripts/verify-release-artifact.py firefox firefox-build
 
-      - name: AMO の認証済み version 全件を確認
-        # 非公開の listed version も含め、全ページを取得できなければ停止する。
-        # 既存 version は送信済み bytes の同一性を証明できないため再送しない。
+      - name: Firefox AMO に HTTP submission
         env:
-          MANIFEST_VERSION: ${{ needs.package.outputs.version }}
-          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
-          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-        run: node scripts/check-amo-version.mjs
-
-      - name: Firefox AMO に submit (web-ext sign --channel=listed)
-        # web-ext 10+ では submission API がデフォルト動作 (`--use-submission-api` フラグは廃止)。
-        # `--channel=listed` で AMO 公開 (人間レビュー入り)、submission 受付完了で job 成功扱い。
-        # 実際のストア反映はレビュー通過後 (通常 1〜数日)、メール通知あり。
-        env:
-          # AMO API キー (JWT issuer / secret) — 全 variant 共通の Mozilla アカウント credentials。
-          # GitHub Secrets に設定: `gh secret set AMO_JWT_ISSUER` / `gh secret set AMO_JWT_SECRET`
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           EXPECTED_VERSION: ${{ needs.package.outputs.version }}
           EXPECTED_SHA256: ${{ needs.package.outputs.firefox-sha256 }}
         run: |
-          if [ -z "$WEB_EXT_API_KEY" ] || [ -z "$WEB_EXT_API_SECRET" ]; then
-            echo "::error::AMO_JWT_ISSUER / AMO_JWT_SECRET の GitHub Secrets が未設定です"
-            echo "  JWT 発行: https://addons.mozilla.org/ja/developers/addon/api/key/"
-            echo "  登録: gh secret set AMO_JWT_ISSUER / gh secret set AMO_JWT_SECRET"
-            exit 1
-          fi
-          # pnpm exec で frozen-lockfile install 済みのローカル版を呼ぶ (CWS 側と同じ
-          # サプライチェーン方針)。--source-dir は package job で構築した firefox-build/。
-          # --amo-metadata=.amo-metadata.json で version.license: "MIT" を毎回 submission に含める
-          # (AMO API v5 仕様: 各 version 提出時に license 明示必須、過去 version からの継承なし)。
-          # .amo-metadata.json は categories + version.license のみで listing メタは含まないため、
-          # listing の plain text 化リスクなし (AGENTS.md「Firefox AMO 対応」参照)。
-          #
-          # XPI 実物を検証し、送信直前に同一性を再確認する。
-          # 受理後の承認待ちだけを省き、upload / validation / version PUT の失敗は保持する。
-          # timeout/conflict を含む非ゼロ終了は受理状態不明として失敗させる。
-          set -o pipefail
-          node scripts/sign-verified-firefox.mjs sign \
-            --source-dir=firefox-build \
-            --artifacts-dir=web-ext-artifacts \
-            --channel=listed \
-            --approval-timeout=0 \
-            --amo-metadata=.amo-metadata.json 2>&1 | tee /tmp/web-ext.log
-          echo "🦊 Firefox AMO への submission 受付完了 (公開状態は AMO で確認)"
-          echo "🔗 AMO Developer Hub: https://addons.mozilla.org/developers/"
-          echo "⏰ レビュー結果は通常 1〜数日でメール通知"
+          pwsh -NoProfile -File scripts/Test-PublishAmo.ps1 -WorkDirectory "$RUNNER_TEMP/amo-publisher-tests"
+          test ! -e firefox-build/.amo-upload-uuid
+          mkdir -p web-ext-artifacts
+          ARCHIVE="$GITHUB_WORKSPACE/web-ext-artifacts/unsigned-submission.xpi"
+          test ! -e "$ARCHIVE"
+          pwsh -NoProfile -File scripts/Test-FirefoxArchive.ps1 -WorkDirectory "$RUNNER_TEMP/firefox-archive-tests"
+          pwsh -NoProfile -File scripts/New-FirefoxArchive.ps1 -SourceDirectory firefox-build -Archive "$ARCHIVE" > web-ext-artifacts/build-receipt.json
+          VERSION=$(python3 -c 'import json; print(json.load(open("firefox-build/manifest.json"))["version"])')
+          ADDON_ID=$(python3 -c 'import json; print(json.load(open("firefox-build/manifest.json"))["browser_specific_settings"]["gecko"]["id"])')
+          EXPECTED_AMO_METADATA_SHA256="$(sha256sum .amo-metadata.json | cut -d " " -f1)" python3 scripts/verify-release-artifact.py firefox "$ARCHIVE" > web-ext-artifacts/verified.txt
+          SHA256=$(sed -n 's/^zip_sha256=//p' web-ext-artifacts/verified.txt)
+          pwsh -NoProfile -File scripts/Publish-Amo.ps1 -Archive "$ARCHIVE" -Metadata .amo-metadata.json -AddonId "$ADDON_ID" -ExpectedVersion "$VERSION" -ExpectedSha256 "$SHA256"

@@ -7,12 +7,12 @@
  * 23 ファイル列挙コマンドをハードコードしていたが、content_scripts 追加・削除のたびに
  * 手動更新で drift する問題があった。本テストは `src/**\/*.js` を glob で動的列挙し、
  * classic script は `vm.Script`、HTML で module と宣言されたファイルは
- * `node --input-type=module --check` で構文 check (実行はしない) する。
+ * `vm.SourceTextModule` で構文 check (実行はしない) する。
  *
- * 使い方: `pnpm test`（actions.test.js 等と一括実行）。
+ * 使い方: `bun --bun run test`（actions.test.js 等と一括実行）。
  *
  * classic script に `vm.Script` を使う理由:
- *   - Node 標準 test runner と統合して 1 コマンドで回せる
+ *   - Bun の node:test 互換実行 と統合して 1 コマンドで回せる
  *   - 各ファイルに対する subtest として失敗ファイル名が即特定できる
  *   - 子プロセス起動オーバーヘッドが無い (23 ファイル × spawn = 数秒 → 数 ms)
  *
@@ -25,7 +25,6 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { spawnSync } = require("node:child_process");
 
 const SRC_ROOT = path.join(__dirname, "..", "src");
 
@@ -43,12 +42,8 @@ for (const entry of fs.readdirSync(SRC_ROOT, { recursive: true, withFileTypes: t
 
 const checkSyntax = (code, filename, isModule = false) => {
   if (!isModule) return new vm.Script(code, { filename });
-  const result = spawnSync(process.execPath, ["--input-type=module", "--check"], {
-    input: code,
-    encoding: "utf8",
-  });
-  assert.ifError(result.error);
-  assert.equal(result.status, 0, `${filename}: ${result.stderr}`);
+  // link/evaluate を呼ばず、未解決 import を許容したまま module 文法だけを検査する。
+  return new vm.SourceTextModule(code, { identifier: filename });
 };
 
 test("構文検査は script のトップレベル制約と module 構文を非実行で検証する", () => {
@@ -57,7 +52,9 @@ test("構文検査は script のトップレベル制約と module 構文を非�
   }
   checkSyntax('throw new Error("実行禁止");', "classic.js");
   checkSyntax('import "./missing.js"; export const value = await Promise.resolve(1); throw new Error("実行禁止");', "module.js", true);
-  assert.throws(() => checkSyntax("export const = ;", "module.js", true));
+  for (const code of ["export const = ;", "return 5;", "export const a=010;"]) {
+    assert.throws(() => checkSyntax(code, "module.js", true), SyntaxError);
+  }
 });
 
 /**

@@ -10,8 +10,7 @@ LLM (Claude / Codex 等) 向けの詳細な実装規約は [AGENTS.md](AGENTS.md
 
 ## 開発環境
 
-- **Node.js**: 26.13.0 (CI 検証版、Volta 管理を推奨)
-- **pnpm**: 12.16.1 (CI 検証版)
+- **Bun**: 1.4.4（package.json の packageManager と CI で固定）
 - **対象ブラウザ**: Chrome 140+ / Firefox 142+
 
 ## セットアップ
@@ -19,7 +18,7 @@ LLM (Claude / Codex 等) 向けの詳細な実装規約は [AGENTS.md](AGENTS.md
 ```bash
 git clone https://github.com/1llum1n4t1s/WebRestrictionRemoval.git
 cd WebRestrictionRemoval
-pnpm install
+bun install
 ```
 
 ## 主要コマンド
@@ -27,16 +26,16 @@ pnpm install
 ### ビルド
 
 ```bash
-pnpm run build                # アイコン + スクリーンショット一括生成
-pnpm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
-pnpm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
+bun --bun run build                # アイコン + スクリーンショット一括生成
+bun --bun run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
+bun --bun run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
 ```
 
 ### テスト・lint
 
 ```bash
-pnpm test          # Node.js 標準 test runner（件数は出力サマリを参照）
-pnpm run lint      # ESLint v10 flat config
+bun --bun run test          # Bun の node:test 互換テスト（件数は出力サマリを参照）
+bun --bun run lint      # ESLint v10 flat config
 ```
 
 ### ストア申請用パッケージ生成
@@ -82,10 +81,10 @@ bash ./zip.sh firefox
 `release/<X.Y.Z>` ブランチを push すると、GitHub Actions が以下を並列実行します:
 
 1. **Chrome Web Store** へ Submit for review (`web-viewing-assist.zip`)
-2. **Firefox AMO** へ submission API で submit (`web-ext sign --channel=listed`)
+2. **Firefox AMO** へ submission API で submit (`scripts/Publish-Amo.ps1`、受付確認まで)
 
 ### 必要な GitHub Secrets
-- Chrome: `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN` / `CWS_EXTENSION_ID`
+- Chrome: `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN` / `CWS_EXTENSION_ID`。publisher IDは `vars.CWS_PUBLISHER_ID` または同名secret。
 - Firefox: `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` ([発行ページ](https://addons.mozilla.org/ja/developers/addon/api/key/))
 
 Chrome / Firefox の publish は `package` だけに依存する別 job で、Chrome publish が失敗しても Firefox AMO submit は独立して実行されます。Chrome は pre-flight で同 version や状態不明を検出すると停止し、Firefox も認証付きの全ページ照会で既存 version を検出すると非ゼロ終了します。自動の同 version 再提出は行わず、workflow の再実行では package job も実行されません。提出失敗時は各ストアの登録版・審査状態とログを確認してください（[RUNBOOK](docs/RUNBOOK.md#2-c-リリース失敗publishyml)）。

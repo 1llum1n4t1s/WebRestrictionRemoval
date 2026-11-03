@@ -23,15 +23,15 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 
 4. **popup の MES 分岐** — `popup.js` の `VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER` で Firefox を検知し、(a) audio section は Firefox でも**表示したまま** `#volumeMesNote`（DRM サイト非対応の注記、i18n キー `volumeMesFirefoxNote`）の hidden を外す、(b) `pushVolumeNow` は storage 書き込み（MES では EQ 3 キーも同梱して live 反映）だけで early return し `VOLUME_BOOSTER_SET_GAIN` メッセージを送らない。旧「audio section 全体を display:none」方式は 2026-07-02 の MES 経路追加で廃止。
 
-5. **AMO 初回登録** — CI からは新規 add-on 作成不可。ローカルで `WEB_EXT_API_KEY=$AMO_JWT_ISSUER WEB_EXT_API_SECRET=$AMO_JWT_SECRET pnpm exec web-ext sign --source-dir=firefox-build --channel=listed --amo-metadata=.amo-metadata.json` を実行 → gecko id (manifest 内) で AMO 上に新規 add-on 自動作成。**初回完了後は CI の `publish-firefox` job が新バージョン提出を担う**。
+5. **AMO 初回登録** — 未登録GUIDはDeveloper Hubの「Submit a New Add-on」から検証済みXPIを登録する。既存GUID・MIT license・categoriesを維持する。登録済みGUIDへの新versionはnative `scripts/Publish-Amo.ps1` が担当し、未登録の404では停止する。
 
-6. **web-ext lint で受理性確認** — `pnpm exec web-ext lint --source-dir=firefox-build` で AMO validator 相当チェック。**v1.0.33 から errors / warnings / notices すべて 0 件達成済み**。過去に「許容済み warning」だった 4 カテゴリ (`BACKGROUND_SERVICE_WORKER_IGNORED` / `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` / `UNSUPPORTED_API` / `UNSAFE_VAR_ASSIGNMENT`) は #10 のパターンで全部 0 件化済み。新規 warning が出たら同じ手法で潰すこと。
+6. **web-ext lint で受理性確認** — `bun --bun run web-ext lint --source-dir=firefox-build` で AMO validator 相当チェック。**v1.0.33 から errors / warnings / notices すべて 0 件達成済み**。過去に「許容済み warning」だった 4 カテゴリ (`BACKGROUND_SERVICE_WORKER_IGNORED` / `KEY_FIREFOX_ANDROID_UNSUPPORTED_BY_MIN_VERSION` / `UNSUPPORTED_API` / `UNSAFE_VAR_ASSIGNMENT`) は #10 のパターンで全部 0 件化済み。新規 warning が出たら同じ手法で潰すこと。
 
 7. **別 job で Chrome / Firefox 独立実行** — publish.yml の `publish` / `publish-firefox` はどちらも `needs: package` で、互いの publish 結果に依存しない。package 成功後は Chrome publish が失敗しても Firefox AMO submit を実行する。
 
 8. **AMO listing は plain text 化される** — API 経由で送る `<ul>` 等は `&lt;ul&gt;` としてエスケープ保存される。リッチ HTML 表示は AMO Dashboard のリッチテキストエディタ経由のみ可能。`webstore/store-listing.firefox.{ja,en}.txt` は絵文字 + `・` 等で plain text 構造化済み。
 
-9. **`web-ext sign --channel=listed` の `Approval: timeout exceeded` は warning 化済み** (v1.0.31 publish.yml で実装) — Mozilla の AMO 自動 sign は listed channel で動かないため、CLI は 15 分待って `WebExtError: Approval: timeout exceeded` で `exit 1` を返す。 ただし submission 自体は **AMO に受理済み** (ログ URL `addons.mozilla.org/.../versions/<id>` で確認可能)。publish.yml では `tee /tmp/web-ext.log` + `grep "Approval: timeout exceeded"` で検出時のみ `::warning::` + `exit 0` 化して CI を green に保つ。それ以外の `exit 1` (credentials 不備等) はそのまま fail として残す設計。同 version 再 push は AMO に重複拒否されるため、release/X.Y.Z への fast-forward は控える運用。
+9. **AMO受付と公開を区別する** — native publisherは検証済みXPI receiptと同じbytesを送り、PUT受付応答のGUID・versionを確定する。timeout・重複・不明な応答は成功化せず停止し、AMO状態を確認してから再開する。人手レビュー承認は待たない。
 
 10. **AMO warning 完全 0 件化パターン (v1.0.33 で達成、8 件 → 0 件)** — 過去に「許容済み warning」として残していた 4 カテゴリを以下の対処で物理的に消した:
     - **`BACKGROUND_SERVICE_WORKER_IGNORED` (1 件)** → `manifest.firefox.json` から `background.service_worker` を削除し `background.scripts` 単独化（#1 参照）
@@ -44,7 +44,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 
 ### 設計の起点
 - **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する。FEATURES に追加すれば popup UI は自動生成される。actions.js は古典的グローバル定数方式（ES modules ではない）で 4 経路で共有: ① background の `importScripts()`、② manifest content_scripts の最初のエントリで全 http(s) フレームに自動注入、③ popup.html の `<script>` タグ、④ offscreen.html の `<script>` タグ。
-- **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` の `version` フィールド（および `/vava` での lockfile 再生成で連動する `pnpm-lock.yaml`）およびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
+- **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` の `version` フィールド（および `/vava` での lockfile 再生成で連動する `bun.lock`）およびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
 - **デフォルト OFF 方針徹底** — 10 マスタートグル（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF かつミュート OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。ルーペもマスター OFF で content script 内の DOM / リスナーがすべて撤去される（Blob URL も revoke）。
 
 ### メッセージング・content script
@@ -308,7 +308,7 @@ popup load 時の `stored = await chrome.storage.local.get([...keys])` リスト
 ### FEATURES 件数アサートテスト (/rere v1.0.28 確立)
 `test/actions.test.js` の **「FEATURES 件数の固定アサート」テスト** がドキュメント整合性の単一情報源。
 - 件数を増減する場合は **同時に**: (1) FEATURES 配列に追加、(2) アサート値更新、(3) AGENTS.md / README / docs/privacy-policy.md / webstore/store-listing.txt / popup.html コメント / actions.js 内コメント の数値を全部更新
-- 1 つでも update 漏れると `pnpm test` で fail → CI で drift を検知できる
+- 1 つでも update 漏れると `bun --bun run test` で fail → CI で drift を検知できる
 - 過去に 22 / 25 / 26 / 29 が混在した状態が再発しないようにこのテストで防御
 
 ### `chrome.runtime.sendMessage` の expected error (/rere v1.0.28 確立)

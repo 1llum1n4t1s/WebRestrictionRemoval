@@ -9,7 +9,7 @@
  * 新サイト対応や content script 追加時に片方だけ更新すると、Chrome では動くが Firefox では
  * 該当機能が一切注入されない (またはその逆) drift が発生し得るが、従来は
  * syntax-check / FEATURES 件数アサートのどちらもこの配列差分を見ておらず、
- * `pnpm test` が green のまま通過してしまう構造的テストギャップがあった。
+ * `bun --bun run test` が green のまま通過してしまう構造的テストギャップがあった。
  *
  * 本テストは両 content_scripts を正規化 (Firefox 専用 mes エントリを除外) して
  * deep-equal し、片側更新漏れを CI で検知する。新たに Firefox 専用エントリを

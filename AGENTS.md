@@ -66,14 +66,14 @@ popup は **8 カテゴリをカスタムドロップダウンで切り替える
 ## Build Commands
 
 ```bash
-pnpm install                  # 初回 / 開発用
-pnpm run ci:install           # CI 用 (pnpm install --frozen-lockfile。lockfile 厳守)
-pnpm run build                # アイコン + スクリーンショット一括生成
-pnpm run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
-pnpm run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
-pnpm run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
-pnpm test                     # Node.js 標準 test runner（件数は出力サマリ `tests N` を正とする）
-node --test test/actions.test.js                  # 単一テストファイルのみ実行 (さらに --test-name-pattern="FEATURES" で個別ケース絞り込み)
+bun install                  # 初回 / 開発用
+bun --bun run ci:install           # CI 用 (bun run deps。lockfile 厳守)
+bun --bun run build                # アイコン + スクリーンショット一括生成
+bun --bun run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
+bun --bun run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
+bun --bun run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
+bun --bun run test                     # Bun の node:test 互換テスト（件数は出力サマリ `tests N` を正とする）
+bun test ./test/actions.test.js                  # 単一テストファイルのみ実行 (さらに --test-name-pattern="FEATURES" で個別ケース絞り込み)
 pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
@@ -84,7 +84,7 @@ Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-fir
 | ファイル | 担当 |
 |---|---|
 | `test/actions.test.js` | 純粋関数の境界値 + FEATURES 件数 + `globalThis` 公開名の drift 検知（詳細は Key Files 表） |
-| `test/syntax-check.test.js` | `src/**/*.js` を動的列挙して classic script は `vm.Script`、HTML の module 宣言対象は `node --input-type=module --check` で構文 check（content_scripts の追加・削除で手動更新が要らない） |
+| `test/syntax-check.test.js` | `src/**/*.js` を動的列挙して classic script は `vm.Script`、HTML の module 宣言対象は Bun の `SourceTextModule()` で構文 check（content_scripts の追加・削除で手動更新が要らない） |
 | `test/manifest-drift.test.js` | `manifest.json` と `manifest.firefox.json` の content_scripts 一致検証 |
 | `test/audio-pipeline.test.js` | `src/lib/audio-pipeline.js` の DSP ヘルパー |
 | `test/kagayoi-support.test.js` | 同梱した問い合わせ部品と popup / manifest / プライバシーポリシーの契約・正本一致検証 |
@@ -95,14 +95,14 @@ Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-fir
 | `test/instagram-cleaner.test.js` | コメントと本文の分離、投稿動画の再生抑止、OFF・context 失効時の復元 |
 | `test/image-downloader.test.js` | TikTok の安全な挿入先、共有コンテナ内の画像別ボタン所有・URL・位置・撤去 |
 | `test/instagram-video-controls.test.js` | Instagram 動画コントロールの Space 抑止・再生切替・入力除外・repeat・OFF cleanup |
-| `test/_load-actions.js` | 上記から共有する actions.js ロード用ヘルパー。Node.js の自動探索対象にもなるため、総件数は `pnpm test` の出力を正とする |
+| `test/_load-actions.js` | 上記から共有する actions.js ロード用ヘルパー。Bun の探索規則に従うため、総件数は `bun --bun run test` の出力を正とする |
 
 ### 依存パッケージの運用
 
-- **`pnpm-workspace.yaml` が overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` ではない）。transitive 脆弱性は「脆弱範囲だけに効く versioned selector」で固定し、blast radius を最小化する。
-- `web-ext` 配下の transitive 脆弱性は `pnpm-workspace.yaml` の versioned `overrides` で固定する。新規 advisory は `pnpm why <package>` で経路と修正版の有無を確認してから、互換性を保てる最小範囲だけ override する。
-- **`minimumReleaseAgeExclude` は pnpm v11 が自動追記する**（公開直後の版を一定期間使わない供給網ガードの例外記録）。pnpm 11.7.0 では同一 package の複数 exact version を別行にすると除外が不安定なため、同一 package 分だけ `package@version1 || version2` の 1 selector に統合する（pnpm issue #12463 の回避形式）。
-- `@kagayoi/support-extension` は exact 固定し、`pnpm sync:support` で `src/shared/kagayoi-support-*` を正本から同期する。同梱コピーへ製品固有の変更を加えず、正本一致は `pnpm exec kagayoi-support-sync --check` で検証する。
+- **`package.json` の overrides / trustedDependencies が依存制約とビルド許可の正本**。公開後24時間の待機と検証済み版の例外は `bunfig.toml` に置く。
+- `web-ext` 配下の推移依存のセキュリティ修正は `package.json` の overrides で維持する。新規 advisory は `bun why <package>` で経路と修正版を確認する。
+- `bunfig.toml` の `minimumReleaseAge = 86400` で公開後24時間の待機を維持する。検証済みの正確な版だけ `minimumReleaseAgeExcludes` に追加する。
+- `@kagayoi/support-extension` は exact 固定し、`bun --bun run sync:support` で `src/shared/kagayoi-support-*` を正本から同期する。同梱コピーへ製品固有の変更を加えず、正本一致は `bun --bun run kagayoi-support-sync --check` で検証する。
 - **GitHub Actions は SHA ピン + タグコメント運用**。Dependabot は SHA だけ更新して**コメントの version 表記は直さない**ので、bump PR を取り込んだら `gh api repos/<owner>/<repo>/git/matching-refs/tags` で SHA → タグを引き直してコメントを合わせる（実例: v6.0.0 表記のまま v7.0.1 へ上がっていた）。
 - 依存更新の正規ルートは `/deps` スキル。バージョン番号（`manifest.json` / `package.json`）には触れない。
 
@@ -118,7 +118,7 @@ Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-fir
 コード変更後は以下 1 コマンドを実行（構文 check + 純粋関数テスト + drift 検知をすべて含む）:
 
 ```bash
-pnpm test
+bun --bun run test
 ```
 
 内訳（担当範囲の一覧は §Build Commands のテスト表を参照）:
@@ -128,7 +128,7 @@ pnpm test
 Lint は ESLint v10 flat config:
 
 ```bash
-pnpm lint
+bun --bun run lint
 ```
 
 ### デバッグ
@@ -141,7 +141,7 @@ pnpm lint
 
 システム全体の責務・境界・データフロー・不変条件は [DESIGN.md](DESIGN.md) を設計の正本とする。機能別の実装詳細は [references/architecture.md](references/architecture.md) にあるため、**下の機能を触る前に必ず該当節を読む**。
 
-設定キーや保存経路を変更するときは、DESIGN.md の[任意のPC間同期](DESIGN.md#任意のpc間同期)と[手動の設定バックアップ](DESIGN.md#手動の設定バックアップ)を読み、`src/background/settings-sync.js` の同期対象・競合解決単位と `src/lib/settings-backup.js` の許可リスト・既定値・検証規則を確認する。共有スクリプトの追加時は Chrome の `importScripts` と Firefox manifest の `background.scripts` の読み込み順を照合する。検証は `test/settings-sync.test.js`、`test/settings-application.test.js`、`test/settings-backup.test.js` を含む `pnpm test` で行う。
+設定キーや保存経路を変更するときは、DESIGN.md の[任意のPC間同期](DESIGN.md#任意のpc間同期)と[手動の設定バックアップ](DESIGN.md#手動の設定バックアップ)を読み、`src/background/settings-sync.js` の同期対象・競合解決単位と `src/lib/settings-backup.js` の許可リスト・既定値・検証規則を確認する。共有スクリプトの追加時は Chrome の `importScripts` と Firefox manifest の `background.scripts` の読み込み順を照合する。検証は `test/settings-sync.test.js`、`test/settings-application.test.js`、`test/settings-backup.test.js` を含む `bun --bun run test` で行う。
 
 | 触る対象 | 読む節 |
 | --- | --- |
@@ -158,7 +158,7 @@ pnpm lint
 | Gemini Notebook 送信 | Gemini Notebook 送信 |
 | 配信時刻オーバーレイ | 配信時刻オーバーレイ |
 
-Instagram の非表示・動画操作・画像保存を変更するときは、[DESIGN.md のサイト内 DOM と操作 UI の所有境界](DESIGN.md#サイト内-dom-と操作-ui-の所有境界)を確認する。`pnpm test` に加え、実ブラウザで投稿詳細・モーダル・SPA 遷移、入力中の Space、機能 OFF 時の復元を確認する。DOM fixture の成功だけで実サイトの操作性を検証済みとしない。
+Instagram の非表示・動画操作・画像保存を変更するときは、[DESIGN.md のサイト内 DOM と操作 UI の所有境界](DESIGN.md#サイト内-dom-と操作-ui-の所有境界)を確認する。`bun --bun run test` に加え、実ブラウザで投稿詳細・モーダル・SPA 遷移、入力中の Space、機能 OFF 時の復元を確認する。DOM fixture の成功だけで実サイトの操作性を検証済みとしない。
 
 ## Key Files
 
@@ -193,22 +193,22 @@ Instagram の非表示・動画操作・画像保存を変更するときは、[
 | `src/content/youtube-player-overlay.js` | 画質・再生速度・音量・ライブ遅延指標・配信時刻の共通ホスト。isolated 側が分類ノードと MAIN セッション専用 slot を登録し、単一のプレイヤー内スクロール枠・分類順・再生成時の再接続・全登録撤去時の解放を管理。二重ロードを防ぎ、bfcache の登録は保持する |
 | `src/content/image-downloader.{js,css}` | 画像ダウンロード（Instagram / TikTok / X 共通、YouTube は未提供）: 各クリーナー features の `imageDownload` ON 時に動作。site adapter で各サイトのコンテンツ画像（投稿写真 / 動画サムネ、X は投稿画像のみ）を判定 → hover で左上に DL ボタン overlay → クリックで `<a download>` + Blob URL 経由で保存。最大解像度 URL 取得（X は HTTPS の `pbs.twimg.com/media/` を `name=orig` で取得）/ URL ホワイトリスト ALLOWED_HOSTS / fetch セキュリティ 4 原則 / sibling overlay 検出による host 1 階層上昇 / SCANNED マーカー src 値ベース。`__cpa-img-dl-` クラスプレフィックス。 |
 | `src/popup/popup.{html,js,css}` | ポップアップ UI: 8 タブ構成（調整 / YouTube / X / Instagram / TikTok / Wikipedia / カラーピッカー / 設定）。マスタートグルは調整と各サイトタブに配置（総数は機能カウント早見表を参照）。調整タブは音量スライダー（左端 🔊/🔇 ミュートボタン）+ 音量サブトグル × 3（自動歪み防止 / ナイトモード / 壁ドン対策モード）+ **イコライザパネル（オン/オフ + プリセット + プリアンプ + 10 バンド縦スライダー、EQ_BANDS 駆動で動的生成）** + 動画ガンマスライダー + ルーペ master + 倍率セグメント + サイズスライダー、YouTube タブは 38 機能リスト（配信時刻オーバーレイは `watch_page` カテゴリのサブ機能として FEATURES 駆動で自動描画）、各クリーナータブは独立パネル（FEATURES 配列駆動の動的レンダリング、1 行 1 トグル + 説明文）、カラーピッカータブは上から **現在の色 → 色を調整 → 履歴 → コピーの設定** の 4 セクション（操作が上、設定が下）。EyeDropper 採取 + HEX/RGB/HSL の**編集可能な値欄**（貼り付けで即プレビュー・Enter で履歴保存、解釈は `ColorPicker.parseColorInput`、各行に文字ラベル付きコピーボタン）+ **色を調整**（鮮やかさ×明るさの 2D エリア + 色あいスライダー。座標変換は `ColorPicker.rgbToHsv` / `hsvToRgb` / `hexToPaletteHsv`、CSS グラデ 2 枚重ねで canvas 不使用）+ format chips + 履歴グリッド。設定保存・復元、適用フィードバック、ダーク/ライト追従、IBM Plex Sans JP サブセット (Regular 400 / SemiBold 600 / Bold 700) 同梱 + popup.html で 3 weight すべて preload |
-| `src/shared/kagayoi-support-*` | popup 下部の問い合わせ・評価共通部品。`@kagayoi/support-extension` の exact 固定版を `pnpm sync:support` で逐語同期し、MV3 のためリモート JavaScript は実行しない。製品固有の配置・配色は `popup.html` / `popup.css` 側だけで行う |
+| `src/shared/kagayoi-support-*` | popup 下部の問い合わせ・評価共通部品。`@kagayoi/support-extension` の exact 固定版を `bun --bun run sync:support` で逐語同期し、MV3 のためリモート JavaScript は実行しない。製品固有の配置・配色は `popup.html` / `popup.css` 側だけで行う |
 | `src/content/volume-booster-mes.js` | 音量ブースター Firefox 専用 MES 経路 (**manifest.firefox.json のみから注入、Chrome には一切ロードされない**): 全 http(s) の全フレームに `document_idle` 注入、`<video>`/`<audio>` 1 要素 = 1 AudioContext で MediaElementSource + 19 処理ノードを attach。`source → dryGain → destination` と、offscreen.js と同じ 17 ノード DSP の末尾に `wetGain` を置く wet 経路へ分岐する。popup → storage 直書きを `storage.onChanged` で購読する storage 駆動・メッセージレス (user gesture 不要、全タブ自動適用、タブ共有バナーなし)。**Firefox では ctx.close しても音声が直接出力に復帰しない前提**で、誤 attach の予防 (EME_HOSTS 起動 skip / mediaKeys / encrypted 事前検出 / readyState gate / `classifyMesSource` 4 値分類 + same-origin 1 バイト Range GET redirect probe) と bypass 維持 (OFF / UNITY / orphan は dry/wet crossfade、close は DOM 除去 30 秒猶予後 + pagehide のみ) に全振り。拡張リロードで旧 sandbox が消えても、5 秒 heartbeat で更新する 20 秒 lease の AudioParam automation が旧 graph を dry bypass へ戻す。設定適用は ATTACHED レジストリ (WeakRef Set) 反復で shadow DOM / detached 要素にも届く。冒頭 `chrome.runtime.getURL("")` の `moz-extension://` スキーム検査で Chrome 誤ロード時も即 return。DSP コアは audio-pipeline.js 共有 |
 | `src/popup/fonts/IBMPlexSansJP-{Regular,SemiBold,Bold}.woff2` | popup タイポグラフィ用 woff2 サブセット。Regular / SemiBold は IBM 純正の subset 済み版 (約 77 / 81 KB)、Bold は `scripts/fetch-bold-woff2.mjs` で IBM/plex full CJK Bold (npm `@ibm/plex-sans-jp@3.0.0`) を Regular と同じ cmap (652 unicode) で subset 化した版 (約 200 KB、subset-font の woff2 encoder が IBM 純正より圧縮率低めのため大きい)。preload で並列 fetch するので popup 起動コストへの影響は小 |
-| `scripts/fetch-bold-woff2.mjs` | Bold woff2 再生成スクリプト。`pnpm add fontkit subset-font @ibm/plex-sans-jp@3.0.0` 後に `node scripts/fetch-bold-woff2.mjs` を実行すると、既存 Regular の cmap を読んで同じ unicode 集合の Bold woff2 を `src/popup/fonts/IBMPlexSansJP-Bold.woff2` に書き出す。完了後は `pnpm install --frozen-lockfile` で node_modules を pnpm-lock.yaml 通りに復元し、`package.json` / lockfile に紛れ込んだ 3 パッケージを取り除くこと (75 MB の @ibm/plex-sans-jp パッケージは devDependencies には含めない方針) |
+| `scripts/fetch-bold-woff2.mjs` | Bold woff2 再生成スクリプト。`bun add fontkit subset-font @ibm/plex-sans-jp@3.0.0` 後に `bun scripts/fetch-bold-woff2.mjs` を実行すると、既存 Regular の cmap を読んで同じ unicode 集合の Bold woff2 を `src/popup/fonts/IBMPlexSansJP-Bold.woff2` に書き出す。完了後は `bun run deps` で node_modules を bun.lock 通りに復元し、`package.json` / lockfile に紛れ込んだ 3 パッケージを取り除くこと (75 MB の @ibm/plex-sans-jp パッケージは devDependencies には含めない方針) |
 | `src/offscreen/offscreen.{html,js}` | 音量ブースター用 offscreen document (tabCapture 経路の AudioContext 実体、**Chrome の唯一の音量ブースター経路**。Firefox は volume-booster-mes.js が担当): AudioContext + プリアンプ GainNode + BiquadFilterNode × 10 (peaking EQ) + DynamicsCompressor (night mode) + 手動 GainNode + BiquadFilterNode × 2 (highpass、壁ドン対策) + DynamicsCompressor (anti-clip) + WaveShaper (サンプル上限) の **17 ノードチェーン**で **EQ + 圧縮 + 増幅 + 低音カット + リミット**を構成。全サイト一律 (EME 動画含む) で popup 経由の tabCapture 経路から使われる。DSP コアは `src/lib/audio-pipeline.js` を共有 |
 | `icons/icon.svg` | ソースアイコン (512×512); PNG は `icons/icon-{16,48,128}.png` に生成 |
 | `webstore/` | ストア申請用: HTML テンプレート、生成画像、`store-listing.txt`。`generate-screenshots.js` が popup.html から `popup-render.html` + `popup-shim.js` を動的生成 → `01-popup-ui.html` が iframe で実 popup を埋め込んで撮影（drift ゼロ）。生成物 `popup-render.html` / `popup-shim.js` は .gitignore 対象 |
 | `manifest.firefox.json` | Firefox AMO 申請用 manifest (Chrome 用 `manifest.json` から `offscreen` / `tabCapture` permission 除外 + `browser_specific_settings.gecko` + `background.scripts` 併記 + **Firefox 専用 MES 経路の content_scripts エントリ `volume-booster-mes.js` を追加**。Chrome 用 manifest.json はこのエントリを持たない)。zip スクリプトが Firefox xpi 生成時にこれを `manifest.json` として同梱する |
-| `.amo-metadata.json` | `web-ext sign --amo-metadata=...` で AMO 初回登録時に渡すメタデータ (license: MIT, categories: ["other"])。CI からは新規 add-on 作成不可なため、初回のみローカル `web-ext sign` で使う |
+| `.amo-metadata.json` | 登録済みGUIDへ新versionを提出する際のmetadata。`version.license` とcategoriesをネイティブHTTPで送る。未登録GUIDの初回登録はDeveloper Hubで行う。 |
 | `zip.ps1` / `zip.sh` | ストア申請用 ZIP / xpi パッケージ生成 (Windows / Unix)。`-Target chrome\|firefox\|both` で対象切替 |
-| `pnpm-workspace.yaml` | **overrides / allowBuilds の正本**（`package.json` の `pnpm.overrides` は使わない）。transitive 脆弱性は脆弱範囲だけに効く versioned selector で固定する。`minimumReleaseAgeExclude` の同一 package 複数版は pnpm 11.7.0 の既知問題を避けて `||` で 1 selector に統合する。詳細は §依存パッケージの運用 |
+| `bunfig.toml` | 依存の公開後24時間待機と検証済み版の例外。overrides / trustedDependencies は `package.json` が正本。 |
 | `.github/dependabot.yml` | github-actions（SHA ピン維持）と npm の weekly 更新 PR 設定。取り込みの正規ルートは `/deps` スキル |
 | `docs/privacy-policy.md` | プライバシーポリシー |
 | `test/actions.test.js` | 純粋関数テスト: globalThis 公開名 24 件の列挙 (SettingsSchema 含む。**この `required` 配列が公開定数の単一情報源**) / **FEATURES 件数アサート (SearchFixer 38 / IG 12 / TT 3 / X 10 / Wikipedia 6)** / mergeFeatures / ImageDownloader.isAllowedFetchUrl (Instagram fbcdn / cdninstagram は scontent- prefix 限定 / TikTok p\\d+ 必須 / X は HTTPS pbs.twimg.com/media/ 限定 / YouTube 廃止) / detectHost / buildFilename / **Loupe.validateZoom / clampSize / computeLensPosition / computeBackgroundPosition / formatLoupeError 境界値** / **SearchFixer.extractHandleFromHref の ASCII + Unicode + URL encoded 境界値** / **SettingsSchema 整合 + APPLY_SETTINGS_KEYS/toStorageRecord generated 検証 + popup get list drift 検知** 等。件数 drift を CI で検知できる単一情報源 |
 | `test/syntax-check.test.js` / `test/manifest-drift.test.js` / `test/audio-pipeline.test.js` / `test/kagayoi-support.test.js` | 順に「`src/**/*.js` の動的列挙 + 構文 check」「`manifest.json` と `manifest.firefox.json` の content_scripts 一致検証」「`audio-pipeline.js` の DSP ヘルパー」「問い合わせ共通部品と組み込み契約の検証」。共有ローダーは `test/_load-actions.js` |
-| `.github/workflows/publish.yml` | `push: branches: release/**` トリガーで **Chrome Web Store** に **アップロード + Submit for review まで自動化** + **Firefox AMO** に `web-ext sign --channel=listed` で並列 submit。Chrome / Firefox はともに `package` job だけに依存する別 job で、Chrome publish の失敗に依存せず Firefox AMO submit を実行する。必要 Secrets: `CWS_*` (Chrome 4 件) + `AMO_JWT_ISSUER` / `AMO_JWT_SECRET` (Firefox 2 件)。**xpi / zip 自体はこのワークフローで CI 自動公開、listing メタデータは `~/.Codex/skills/vava/scripts/update-amo-listing.mjs` (AMO は API 自動 push 可) / Dashboard 手動 (CWS は API 不対応) で別経路管理**。 |
+| `.github/workflows/publish.yml` | release pushまたは明示した再開を起点に、packageの検証済み成果物をCWS/AMOへネイティブHTTPで並列提出する。両store jobはpackageのみに依存し、既存OAuth/JWT認証とストアidentityを維持する。 |
 | `.cws-id` | Chrome Web Store extension ID 単一行ファイル (現状 `lmkdjffdnkadifjjifameboongbngaep`)。`/vava` スキルの汎用 check-store-listing.mjs が env var `CWS_EXTENSION_ID` 未設定時にフォールバック読み込みする。**公開ストア URL の一部に含まれる identifier (秘密情報ではない) なのでコミット対象**、`.gitignore` 不要 |
 | `memory-bank/WebRestrictionRemoval/*.md` | プロジェクト横断の長期記憶（projectbrief / productContext / systemPatterns / techContext / activeContext / progress の 6 コアファイル）。activeContext と progress は頻繁更新、systemPatterns は設計パターン履歴。**ホスト側ファイルを直接 Read/Edit せず必ず memory-bank-mcp 経由で操作** |
 
@@ -268,6 +268,29 @@ Instagram の非表示・動画操作・画像保存を変更するときは、[
 リポジトリルートで実行する。AMO 更新は公開依頼時のみ実行し、事前に同じコマンドへ `--dry-run` を付けて入力を確認する。
 
 ```powershell
-node "$HOME/.agents/skills/vava/scripts/update-amo-listing.mjs" --slug 'web-viewing-assist' --listing 'ja=webstore/store-listing.firefox.ja.txt' --listing 'en-US=webstore/store-listing.firefox.en.txt' --privacy 'ja=docs/privacy-policy.md' --privacy 'en-US=docs/privacy-policy.en.md' --name 'ja=Vuora' --name 'en-US=Vuora' --homepage 'https://github.com/1llum1n4t1s/WebRestrictionRemoval' --support-url 'https://github.com/1llum1n4t1s/WebRestrictionRemoval/issues' --category 'other'
-node "$HOME/.agents/skills/vava/scripts/check-store-listing.mjs" --cws --amo --slug 'web-viewing-assist' --cws-id-file '.cws-id' --keyword 'cws.description.ja=閲覧中ページ' --keyword 'cws.description.en=Browser extension' --keyword 'amo.summary.ja=13 カテゴリ' --keyword 'amo.summary.ja=Amazon 販売元' --keyword 'amo.summary.ja=Amazon ランキング' --keyword 'amo.summary.en-US=13 categories' --keyword 'amo.summary.en-US=Amazon totals/ranking/seller' --keyword 'amo.description.ja=13 カテゴリ' --keyword 'amo.description.ja=Amazon 販売元' --keyword 'amo.description.ja=Amazon ランキング' --keyword 'amo.description.ja=Firefox 142' --keyword 'amo.description.en-US=13 categories' --keyword 'amo.description.en-US=Amazon seller' --keyword 'amo.description.en-US=jump-to-ranking' --keyword 'amo.description.en-US=Firefox 142'
+bun "$HOME/.agents/skills/vava/scripts/update-amo-listing.mjs" --slug 'web-viewing-assist' --listing 'ja=webstore/store-listing.firefox.ja.txt' --listing 'en-US=webstore/store-listing.firefox.en.txt' --privacy 'ja=docs/privacy-policy.md' --privacy 'en-US=docs/privacy-policy.en.md' --name 'ja=Vuora' --name 'en-US=Vuora' --homepage 'https://github.com/1llum1n4t1s/WebRestrictionRemoval' --support-url 'https://github.com/1llum1n4t1s/WebRestrictionRemoval/issues' --category 'other'
+bun "$HOME/.agents/skills/vava/scripts/check-store-listing.mjs" --cws --amo --slug 'web-viewing-assist' --cws-id-file '.cws-id' --keyword 'cws.description.ja=閲覧中ページ' --keyword 'cws.description.en=Browser extension' --keyword 'amo.summary.ja=13 カテゴリ' --keyword 'amo.summary.ja=Amazon 販売元' --keyword 'amo.summary.ja=Amazon ランキング' --keyword 'amo.summary.en-US=13 categories' --keyword 'amo.summary.en-US=Amazon totals/ranking/seller' --keyword 'amo.description.ja=13 カテゴリ' --keyword 'amo.description.ja=Amazon 販売元' --keyword 'amo.description.ja=Amazon ランキング' --keyword 'amo.description.ja=Firefox 142' --keyword 'amo.description.en-US=13 categories' --keyword 'amo.description.en-US=Amazon seller' --keyword 'amo.description.en-US=jump-to-ranking' --keyword 'amo.description.en-US=Firefox 142'
 ```
+
+### AMO 公開のHTTP境界
+
+公開workflowは生成した最終XPIを既存の配布物検証へ通し、SHA-256・GUID・versionを `scripts/Publish-Amo.ps1`（PowerShell 7）へ渡す。旧web-ext sign/承認タイムアウトを成功化する手順に代えて、JWT認証・全ページの非公開listed版検査・upload検証・GUIDに対するPUT提出の受付応答まで確認する。XPIの同一snapshotをhash検証と送信に使い、保存UUIDの再利用・重複・不明な受付結果は停止する。CI成功は審査完了・ストア公開を意味しない。
+
+### CI中間成果物
+
+job間の検証済み成果物はprivate R2へSigV4で保存し、repository・commit・run・producer attemptのidentityと各ファイルのSHA-256/サイズを検証して復元する。設定は `vars.CLOUDFLARE_ACCOUNT_ID` / `vars.R2_ARTIFACT_BUCKET` と `secrets.R2_ARTIFACT_ACCESS_KEY_ID` / `secrets.R2_ARTIFACT_SECRET_ACCESS_KEY`。キーは当該bucket限定。`ci-artifacts/` は30日保持後にlifecycleで削除され、恒久配布とは区別する。
+
+CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使う。既存OAuth secretsとpublisher/item IDを維持し、同期upload成功・応答ID・manifest版の一致を確認してpublishする。非同期uploadは版を確定できないため自動publishせず停止する。公開workflowはrepository単位の `queue: max` で最大100件まで直列化し、Dashboardや他の手動公開と並行しない。
+
+## Bun依存の脆弱性検出
+
+依存の固定復元は `bun run deps` を使う。lock欠落・破損を拒否し、`[run] bun=true` 経由で依存のpostinstallまでBunで実行する。Node.jsがあるPCでも通常の `bun install` を直接使う経路へ戻さない。
+
+日次と手動実行では `bun audit` でlock全体を監査する。ローカルでも同じコマンドで確認できる。BunはDependabotの通常の更新PRには対応するが、脆弱性起点の自動修正PRには未対応なので、監査失敗の調査と依存更新は別途必要。警告を除外して成功扱いにしない。
+
+
+### 依存の暫定セキュリティ修正
+
+minimatch は 11.0.4 以降、multimatch は named import 対応の 8 系へ override する。ESLint 設定の ESM 経路は @eslint/eslintrc@3.3.7 と @eslint/config-array@0.21.2 の最小 import patch で互換性を保つ。web-ext@10.8.0 の FileFilter は Windows で windowsPathsNoEscape を明示し、開発用ファイルやアーカイブの除外を維持する。
+
+CVE-2026-93753（GHSA-gcqx-w48m-w2h4）の deepmerge 4.3.1 は公式修正版が未公開のため、patches/deepmerge@4.3.1.patch で戻り値への書込みを own データ属性にし、__proto__ 経由の prototype 汚染を防ぐ。bun run test:dependencies で web-ext → addons-linter の実解決先の攻撃入力と通常 API を検証する。Bun 標準の patchedDependencies で適用し、公式修正版の採用時に patch の要否を再確認する。バージョンベースの bun audit 警告は残るため、警告を除外したり成功扱いにしない。

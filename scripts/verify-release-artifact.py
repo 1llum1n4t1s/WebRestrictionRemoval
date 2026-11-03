@@ -1,6 +1,7 @@
 """公開経路の実物だけを検証する。開発テストや機能の実行は行わない。"""
 
 import fnmatch
+import io
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -27,7 +28,8 @@ expected_version = os.environ["EXPECTED_VERSION"]
 
 # ZIP 内の実 bytes を展開して照合する。再コピー・再パッケージはしない。
 if target.is_file():
-    with zipfile.ZipFile(target) as archive:
+    zip_bytes = target.read_bytes()
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
         all_entries = archive.infolist()
         require(len({entry.filename for entry in all_entries}) == len(all_entries), "Duplicate ZIP entries")
         for entry in all_entries:
@@ -41,7 +43,7 @@ if target.is_file():
         entries = [entry for entry in all_entries if not entry.is_dir()]
         require(len({entry.filename for entry in entries}) == len(entries), "Duplicate ZIP entries")
         files = {entry.filename: archive.read(entry) for entry in entries}
-    zip_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+    zip_hash = hashlib.sha256(zip_bytes).hexdigest()
     identity = zip_hash if variant == "chrome" else None
 else:
     require(variant == "firefox" and target.is_dir(), "Expected Firefox source directory or ZIP")

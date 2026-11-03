@@ -108,7 +108,7 @@ module.exports = [
     rules: COMMON_RULES,
   },
   {
-    // ビルドスクリプト: Node ESM (.mjs) + CJS スクリプト
+    // ビルドスクリプト: Bun ESM (.mjs) + CJS スクリプト
     files: [
       "scripts/**/*.mjs",
       "scripts/**/*.js",
@@ -119,6 +119,7 @@ module.exports = [
       sourceType: "module",
       globals: {
         ...globals.node,
+        ...globals.bunBuiltin,
       },
     },
     rules: COMMON_RULES,

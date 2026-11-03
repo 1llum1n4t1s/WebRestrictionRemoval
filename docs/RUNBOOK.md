@@ -107,27 +107,11 @@ Firefox の音量ブースターは、旧 content script sandbox が即時 clean
 
 ---
 
-## 4. Firefox AMO 初回登録手順（引き継ぎメモ）
+## 4. Firefox AMO 初回登録
 
-CI からは新規 add-on 作成不可。次のメンテナがゼロから再現する場合の手順:
+初回は AMO Developer Hub（https://addons.mozilla.org/developers/）の「Submit a New Add-on」から、検証済みFirefox XPIを登録する。`manifest.firefox.json` のGUIDを維持し、categoriesは `other`、licenseはMITとする。共通PowerShell publisherは登録済みGUID専用で、未登録の404では停止する。
 
-1. `package.json` 直下に `.amo-metadata.json`（license: MIT, categories）を確認
-2. AMO Developer Hub で API キーを発行（[発行ページ](https://addons.mozilla.org/ja/developers/addon/api/key/)）
-3. ローカルで、存在しない専用の空ディレクトリを用意し、CI と同じ方法で Firefox 用ソースを構築してから提出する。以下の `firefox-build` は作業用の例であり、既存データがある場合は別の空ディレクトリを指定する:
-   ```bash
-   mkdir firefox-build
-   node scripts/copy-package-files.js firefox firefox-build
-   node scripts/strip-firefox-background.js firefox-build/src/background/background.js
-   WEB_EXT_API_KEY=<issuer> WEB_EXT_API_SECRET=<secret> \
-     pnpm exec web-ext sign \
-     --source-dir=firefox-build \
-     --channel=listed \
-     --amo-metadata=.amo-metadata.json
-   ```
-4. gecko id（`manifest.firefox.json` 内）で AMO 上に新規 add-on 自動作成
-5. 初回完了後は CI の `publish-firefox` job が新 version 提出を担う
-
-**注意**: `Approval: timeout exceeded` は承認待ちのタイムアウトであり、提出状態を確定するものではない。AMO Developer Hub で対象バージョンの状態を確認する。
+初回登録後はCIの `publish-firefox` が最終XPIを検証し、verifier receiptのSHA-256と同じsnapshotだけをネイティブHTTPで提出する。受付応答を確定できない通信断・不正応答・重複は失敗として止める。承認待ちを成功化する処理はなく、CI成功は人手レビュー承認・ストア公開と区別する。
 
 ---
 
@@ -152,7 +136,7 @@ API 経由で送る `<ul>` 等の HTML は `&lt;ul&gt;` としてエスケープ
 7. `webstore/store-listing.{,en,firefox.ja,firefox.en}.txt` の機能リスト
 8. `webstore/02-features.html` の件数（スクリーンショット生成で焼き込まれる）
 
-`pnpm test` で件数 drift を CI 検知できる。
+`bun --bun run test` で件数 drift を CI 検知できる。
 
 ---
 

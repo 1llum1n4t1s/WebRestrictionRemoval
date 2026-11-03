@@ -4,14 +4,15 @@
   "type": "commonjs",
   "description": "Browser extension that bundles the YouTube enhancements, Amazon auto-delivery totals, and a per-tab volume booster.",
   "scripts": {
-    "sync:support": "node --preserve-symlinks-main ./node_modules/@kagayoi/support-extension/bin/kagayoi-support-sync.mjs",
-    "prebuild": "pnpm sync:support",
-    "ci:install": "pnpm install --frozen-lockfile",
-    "generate-icons": "node scripts/generate-icons.js",
-    "generate-screenshots": "node webstore/generate-screenshots.js",
-    "build": "pnpm run generate-icons && pnpm run generate-screenshots",
-    "test": "node --test",
-    "lint": "eslint src/ test/ scripts/ webstore/generate-screenshots.js"
+    "deps": "bun scripts/Install-Dependencies.mjs",
+    "sync:support": "bun --preserve-symlinks-main ./node_modules/@kagayoi/support-extension/bin/kagayoi-support-sync.mjs",
+    "ci:install": "bun install --frozen-lockfile",
+    "generate-icons": "bun scripts/generate-icons.js",
+    "generate-screenshots": "bun webstore/generate-screenshots.js",
+    "build": "bun --bun run sync:support && bun --bun run generate-icons && bun --bun run generate-screenshots",
+    "test": "bun test",
+    "lint": "eslint src/ test/ scripts/ webstore/generate-screenshots.js",
+    "test:dependencies": "bun test ./scripts/dependency-security.test.cjs"
   },
   "devDependencies": {
     "@kagayoi/support-extension": "1.0.9",
@@ -29,5 +30,28 @@
     "web-viewing"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "adm-zip@<0.6.1": "0.6.1",
+    "image-size@>=2.0.0 <2.0.3": "2.0.4",
+    "shell-quote@<1.8.5": "^1.8.5",
+    "fast-uri@>=3.0.0 <3.1.5": "^3.1.5",
+    "undici@>=7.0.0 <7.29.0": "^7.29.0",
+    "brace-expansion@>=1.0.0 <1.1.18": "^1.1.18",
+    "brace-expansion@>=5.0.0 <5.0.9": "^5.0.9",
+    "minimatch": "^11.0.4",
+    "multimatch": "^8.0.0"
+  },
+  "packageManager": "bun@1.4.4",
+  "trustedDependencies": [
+    "puppeteer",
+    "sharp",
+    "spawn-sync"
+  ],
+  "patchedDependencies": {
+    "@eslint/eslintrc@3.3.7": "patches/@eslint%2Feslintrc@3.3.7.patch",
+    "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch",
+    "@eslint/config-array@0.21.2": "patches/@eslint%2Fconfig-array@0.21.2.patch",
+    "web-ext@10.8.0": "patches/web-ext@10.8.0.patch"
+  }
 }

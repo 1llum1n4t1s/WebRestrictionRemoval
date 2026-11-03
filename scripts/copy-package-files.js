@@ -8,7 +8,7 @@ const excluded = {
   firefox: ['src/offscreen'],
 };
 if (!Object.hasOwn(excluded, variant) || !destination) {
-  throw new Error('Usage: node scripts/copy-package-files.js <chrome|firefox> <destination>');
+  throw new Error('Usage: bun scripts/copy-package-files.js <chrome|firefox> <destination>');
 }
 
 const root = path.resolve(__dirname, '..');

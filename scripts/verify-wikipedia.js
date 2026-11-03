@@ -1,7 +1,7 @@
 "use strict";
 /* global chrome, document, getComputedStyle, innerWidth, window, WikipediaReader */
 
-// VUORA_BROWSER_TEST_DIR に検証専用の絶対パスを指定して node --test scripts/verify-wikipedia.js を実行。
+// VUORA_BROWSER_TEST_DIR に検証専用の絶対パスを指定して bun test ./scripts/verify-wikipedia.js を実行。
 // 実際の拡張を専用 Chrome プロファイルへ読み込み、ネットワークを fixture に置換する。
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
