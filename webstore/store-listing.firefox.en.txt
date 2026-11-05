@@ -9,7 +9,7 @@ Firefox AMO Listing (English)
 Vuora (Firefox)
 
 ■ Summary (250 chars max)
-Locally tunes the pages you view. 13 categories: YouTube Enhancements, X Cleaner, Amazon totals/ranking/seller badge, Instagram/TikTok Cleaners, Volume Booster (non-DRM sites), Video Gamma, black-bar removal, Loupe, Color Picker. All default OFF.
+Local tools: YouTube Enhancements, X Cleaner, Amazon totals/ranking/seller, Instagram/TikTok Cleaners, Volume Booster (non-DRM), Video Gamma, black-bar removal, Loupe, Wikipedia, Color Picker. 13 categories; 12 default OFF; Picker always available.
 
 ■ Description (16,000 chars max)
 A productivity helper that bundles 13 categories of features into a single popup.

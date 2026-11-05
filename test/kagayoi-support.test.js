@@ -13,12 +13,76 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { tmpdir } = require("node:os");
+const { spawnSync } = require("node:child_process");
 
 const ROOT = path.join(__dirname, "..");
 const SETTINGS_HTML = "src/popup/popup.html";
 const PRODUCT_ID = "web-restriction-removal";
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
+
+test("support正本checkは正常・不一致・欠落を判定し、対象を書き換えない", (t) => {
+  const temporary = fs.mkdtempSync(path.join(tmpdir(), "vuora-support-check-"));
+  t.after(() => { if (process.env.VUORA_TEST_KEEP_FIXTURES !== "1") fs.rmSync(temporary, { recursive: true }); });
+  const assets = ["kagayoi-support-popup.js", "kagayoi-support-form.css", "kagayoi-support-popup.css",
+    "kagayoi-support-footer.js", "kagayoi-support-footer.css"];
+  const packageRoot = path.join(ROOT, "node_modules/@kagayoi/support-extension");
+  for (const kind of ["matching", "different", "missing"]) {
+    const target = path.join(temporary, kind);
+    const destination = path.join(target, "src/shared");
+    fs.mkdirSync(destination, { recursive: true });
+    for (const asset of assets) {
+      if (kind === "missing" && asset === assets[0]) continue;
+      fs.copyFileSync(path.join(packageRoot, "dist", asset), path.join(destination, asset));
+    }
+    if (kind === "different") fs.writeFileSync(path.join(destination, assets[0]), "fixture mismatch\n");
+    const before = Object.fromEntries(fs.readdirSync(destination).map(name => [name, fs.readFileSync(path.join(destination, name))]));
+    const result = spawnSync(process.execPath, ["--preserve-symlinks-main", path.join(packageRoot, "bin/kagayoi-support-sync.mjs"),
+      "--check", "--target", target], { encoding: "utf8", cwd: ROOT });
+    assert.equal(result.status, kind === "matching" ? 0 : 1, result.stderr);
+    if (kind !== "matching") assert.match(result.stderr, /kagayoi-support-popup\.js/);
+    const after = Object.fromEntries(fs.readdirSync(destination).map(name => [name, fs.readFileSync(path.join(destination, name))]));
+    assert.deepEqual(after, before, `${kind}: --checkは修復・追加しない`);
+  }
+});
+
+test("依存検証・公開の各checkoutは書込同期や製品検証・梱包より前にsupport正本をcheckする", () => {
+  const scripts = JSON.parse(read("package.json")).scripts;
+  const checkOnly = (run, chain = []) => {
+    for (const command of run.split(/&&|\r?\n/)) {
+      if (/(?:sync:support|kagayoi-support-sync)\b/.test(command)) {
+        assert.match(command, /--check(?:\s|$)/, `CIから書込同期を呼ばない: ${chain.join(" -> ")}`);
+      }
+      const call = command.match(/\bbun(?:\s+--bun)?\s+run\s+([\w:-]+)(.*)$/);
+      if (call && scripts[call[1]]) {
+        assert.ok(!chain.includes(call[1]), "script呼出しが循環しない");
+        checkOnly(scripts[call[1]] + call[2], [...chain, call[1]]);
+      }
+    }
+  };
+  const dependency = globalThis.Bun.YAML.parse(read(".github/workflows/dependency-validation.yml"));
+  const publish = globalThis.Bun.YAML.parse(read(".github/workflows/publish.yml"));
+  const validateJob = (name, job) => {
+    assert.ok(job, name);
+    const runs = job.steps.map(step => step.run ?? "");
+    const checks = runs.map((run, index) => /bun --bun run sync:support --check\s*$/.test(run) ? index : -1).filter(index => index >= 0);
+    assert.equal(checks.length, 1, `${name}: checkoutごとに正本checkを1回行う`);
+    const checkIndex = checks[0];
+    for (const [index, run] of runs.entries()) {
+      checkOnly(run);
+      if (index < checkIndex) assert.doesNotMatch(run, /(?:sync:support|kagayoi-support-sync)\b/);
+      if (/bun --bun run (?:test|lint|build(?::[\w-]+)?|generate-icons|generate-screenshots)(?:\s|$)|copy-package-files|verify-release-artifact/.test(run)) {
+        assert.ok(index > checkIndex, `${name}: 製品検証・梱包の前に正本check`);
+      }
+    }
+  };
+  for (const [name, job] of [["dependency", dependency.jobs.validate], ["package", publish.jobs.package],
+    ["firefox", publish.jobs["publish-firefox"]]]) validateJob(name, job);
+  const reordered = structuredClone(dependency.jobs.validate);
+  reordered.steps.unshift({ run: "bun --bun run build:assets" });
+  assert.throws(() => validateJob("reordered", reordered), /製品検証・梱包の前に正本check/);
+});
 
 test("設定画面へ共通のサポートフッターを組み込んでいる", () => {
   const html = read(SETTINGS_HTML);

@@ -13,6 +13,20 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 TARGET="${1:-both}"
+WORK_ROOT="${VUORA_PACKAGE_WORK_ROOT:-$PWD}"
+OUTPUT_ROOT="${VUORA_PACKAGE_OUTPUT_ROOT:-$PWD}"
+KEEP_WORK="${VUORA_PACKAGE_KEEP_WORK:-0}"
+for root in "$WORK_ROOT" "$OUTPUT_ROOT"; do
+  case "$root" in /*) ;; *) echo "Package roots must be absolute directories"; exit 2 ;; esac
+  [ -d "$root" ] || { echo "Package root does not exist: $root"; exit 2; }
+  ancestor="$root"
+  while [ "$ancestor" != / ]; do
+    [ ! -L "$ancestor" ] || { echo "Package root contains a symlink"; exit 2; }
+    ancestor="$(dirname "$ancestor")"
+  done
+done
+WORK_ROOT="$(cd "$WORK_ROOT" && pwd -P)"
+OUTPUT_ROOT="$(cd "$OUTPUT_ROOT" && pwd -P)"
 case "$TARGET" in
   chrome|firefox|both) ;;
   *) echo "Usage: $0 [chrome|firefox|both]"; exit 2 ;;
@@ -36,17 +50,21 @@ if ! bun scripts/generate-icons.js; then
   exit 1
 fi
 
-build_pkg() {
+build_pkg() (
   local variant="$1"           # chrome | firefox
   local output="$2"            # web-viewing-assist-chrome.zip | web-viewing-assist-firefox.xpi
 
   echo ""
   echo "==== $variant 版をビルド中 ===="
-  rm -f "$output"
+  output="$OUTPUT_ROOT/$output"
 
-  local tmp="temp-build-$variant"
-  rm -rf "$tmp"
-  mkdir -p "$tmp"
+  local work
+  work="$(mktemp -d "$WORK_ROOT/package-$variant-XXXXXXXXXX")"
+  local tmp="$work/content"
+  # この呼出しで排他的に確保した領域だけを清掃する。
+  local staged=""
+  trap 'if [ "$KEEP_WORK" != 1 ]; then if [ -n "$staged" ]; then rm -f -- "$staged"; fi; rm -rf -- "$work"; fi' EXIT
+  mkdir "$tmp"
 
   # manifest を variant 用にコピー (Firefox は manifest.firefox.json を manifest.json にリネーム)
   bun scripts/copy-package-files.js "$variant" "$tmp"
@@ -60,8 +78,13 @@ build_pkg() {
   fi
 
   # アーカイブ作成 (zip / xpi いずれも zip 形式、拡張子だけが違う)
-  (cd "$tmp" && zip -r "../$output" . -x "*.DS_Store" "*.swp" "*~") >/dev/null
-  rm -rf "$tmp"
+  (cd "$tmp" && zip -r "$work/package.zip" . -x "*.DS_Store" "*.swp" "*~") >/dev/null
+  # 出力先内でコピーを完了し、同じファイルシステム内の rename だけで置換する。
+  staged="$(mktemp "$OUTPUT_ROOT/.package-XXXXXXXXXX")"
+  cp "$work/package.zip" "$staged"
+  chmod "$(printf '%03o' "$((0666 & ~$(umask)))")" "$staged"
+  mv -f -- "$staged" "$output"
+  staged=""
 
   if [ -f "$output" ]; then
     echo "$variant 版 作成成功: $output ($(ls -lh "$output" | awk '{print $5}'))"
@@ -69,10 +92,7 @@ build_pkg() {
     echo "$variant 版 作成失敗"
     exit 1
   fi
-}
-
-# 旧名 zip を掃除
-rm -f web-viewing-assist.zip web-restriction-remover.zip
+)
 
 if [ "$TARGET" = "chrome" ] || [ "$TARGET" = "both" ]; then
   build_pkg "chrome" "web-viewing-assist-chrome.zip"

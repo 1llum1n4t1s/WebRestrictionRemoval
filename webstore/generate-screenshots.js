@@ -171,6 +171,15 @@ async function generateScreenshot(browser, baseUrl, htmlPath, outputPath, width,
 
   try {
     const page = await context.newPage();
+    const pageErrors = [];
+    const failedResources = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('response', response => {
+      if (response.status() >= 400 && response.request().resourceType() === 'script'
+        && response.request().frame()?.url().endsWith('/webstore/popup-render.html')) {
+        failedResources.push(`${response.status()} ${response.url()}`);
+      }
+    });
     await page.setViewport({ width, height, deviceScaleFactor: 1 });
 
     // ストア素材は「初期インストール時の典型的見た目」をユーザーに伝えるため
@@ -189,6 +198,18 @@ async function generateScreenshot(browser, baseUrl, htmlPath, outputPath, width,
 
     // フォント・絵文字のレンダリング完了を待機
     await page.evaluate(() => document.fonts.ready);
+    const popupFrame = page.frames().find(frame => frame.url().endsWith('/webstore/popup-render.html'));
+    if (path.basename(htmlPath) === '01-popup-ui.html' && !popupFrame) {
+      throw new Error('popup-render.html の描画フレームがありません。');
+    }
+    if (popupFrame) {
+      await popupFrame.waitForSelector('#categoryTrigger:not([disabled])');
+      await popupFrame.waitForSelector('#featureCategories input[data-feature-key]');
+      await popupFrame.waitForSelector('.cat-subtabs--tune');
+    }
+    if (pageErrors.length || failedResources.length) {
+      throw new Error(`描画失敗: ${[...pageErrors, ...failedResources].join('; ')}`);
+    }
 
     await page.screenshot({
       path: outputPath,
@@ -254,7 +275,7 @@ async function startPreviewServer() {
     const resource = relative.split(path.sep).join('/');
     const allowed = templates.has(resource)
       || /^src\/popup\/(?:[^/.]+\.(?:js|css)|fonts\/[^/.]+\.woff2)$/.test(resource)
-      || /^src\/lib\/(?:actions|settings-backup)\.js$/.test(resource)
+      || /^src\/lib\/(?:actions(?:-core|-video|-loupe|-volume)?|settings-backup)\.js$/.test(resource)
       || /^src\/shared\/kagayoi-support-[^/.]+\.(?:js|css)$/.test(resource);
     if (relative.startsWith('..') || path.isAbsolute(relative) || !allowed) {
       response.writeHead(403).end();
@@ -277,6 +298,21 @@ async function startPreviewServer() {
  * メイン処理
  */
 async function main() {
+  const configuredProfile = process.env.VUORA_SCREENSHOT_PROFILE_DIR;
+  if (configuredProfile !== undefined) {
+    if (!path.isAbsolute(configuredProfile) || fs.existsSync(configuredProfile)) {
+      throw new Error('VUORA_SCREENSHOT_PROFILE_DIR は未使用の絶対パスを指定してください。');
+    }
+    for (let parent = path.dirname(configuredProfile);;) {
+      if (!fs.statSync(parent).isDirectory() || fs.lstatSync(parent).isSymbolicLink()) {
+        throw new Error('プロファイルの親階層は実在する通常ディレクトリにしてください。');
+      }
+      const next = path.dirname(parent);
+      if (next === parent) break;
+      parent = next;
+    }
+    fs.accessSync(path.dirname(configuredProfile), fs.constants.W_OK);
+  }
   console.log('🎨 Chrome Web Store用スクリーンショットを生成中...\n');
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -290,6 +326,7 @@ async function main() {
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     protocolTimeout: 300000
   };
+  if (configuredProfile !== undefined) launchOptions.userDataDir = configuredProfile;
   const executablePath = findChromeExecutable();
   if (executablePath) {
     launchOptions.executablePath = executablePath;

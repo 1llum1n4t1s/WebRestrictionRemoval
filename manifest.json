@@ -31,6 +31,7 @@
         "*://*.youtube.com/live_chat*"
       ],
       "js": [
+        "src/lib/actions-core.js",
         "src/lib/actions.js",
         "src/lib/cleaner-core.js",
         "src/content/youtube-player-overlay.js",
@@ -58,28 +59,28 @@
     },
     {
       "matches": ["*://*.youtube.com/*"],
-      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/youtube-player-overlay.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-broadcast-clock.js", "src/content/youtube-notebooklm.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/youtube-player-overlay.js", "src/content/youtube-shorts.js", "src/content/search-fixer.js", "src/content/youtube-broadcast-clock.js", "src/content/youtube-notebooklm.js"],
       "css": ["src/content/youtube-shorts.css", "src/content/search-fixer.css", "src/content/youtube-broadcast-clock.css", "src/content/youtube-notebooklm.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://www.amazon.co.jp/auto-deliveries*"],
-      "js": ["src/lib/actions.js", "src/lib/scan-runner.js", "src/lib/cleaner-core.js", "src/content/amazon-delivery-total.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/scan-runner.js", "src/lib/cleaner-core.js", "src/content/amazon-delivery-total.js"],
       "css": ["src/content/amazon-delivery-total.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://www.amazon.co.jp/*"],
-      "js": ["src/lib/actions.js", "src/lib/scan-runner.js", "src/lib/cleaner-core.js", "src/content/amazon-ranking-jump.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/scan-runner.js", "src/lib/cleaner-core.js", "src/content/amazon-ranking-jump.js"],
       "css": ["src/content/amazon-ranking-jump.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["*://www.amazon.co.jp/*"],
-      "js": ["src/lib/actions.js", "src/lib/scan-runner.js", "src/lib/cleaner-core.js", "src/content/amazon-merchant-info.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/scan-runner.js", "src/lib/cleaner-core.js", "src/content/amazon-merchant-info.js"],
       "css": ["src/content/amazon-merchant-info.css"],
       "run_at": "document_idle",
       "all_frames": false
@@ -92,7 +93,7 @@
     },
     {
       "matches": ["*://*.instagram.com/*"],
-      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/instagram-cleaner.js", "src/content/instagram-video-controls.js", "src/content/image-downloader.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/instagram-cleaner.js", "src/content/instagram-video-controls.js", "src/content/image-downloader.js"],
       "css": ["src/content/instagram-cleaner.css", "src/content/instagram-video-controls.css", "src/content/image-downloader.css"],
       "run_at": "document_idle",
       "all_frames": false
@@ -105,7 +106,7 @@
     },
     {
       "matches": ["*://*.tiktok.com/*"],
-      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/tiktok-cleaner.js", "src/content/image-downloader.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/tiktok-cleaner.js", "src/content/image-downloader.js"],
       "css": ["src/content/tiktok-cleaner.css", "src/content/image-downloader.css"],
       "run_at": "document_idle",
       "all_frames": false
@@ -118,20 +119,20 @@
     },
     {
       "matches": ["*://x.com/*", "*://*.x.com/*", "*://twitter.com/*", "*://*.twitter.com/*"],
-      "js": ["src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/x-cleaner.js", "src/content/image-downloader.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions.js", "src/lib/cleaner-core.js", "src/content/x-cleaner.js", "src/content/image-downloader.js"],
       "css": ["src/content/x-cleaner.css", "src/content/image-downloader.css"],
       "run_at": "document_idle",
       "all_frames": false
     },
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/video-gamma.js", "src/content/video-fill.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions-video.js", "src/content/video-gamma.js", "src/content/video-fill.js"],
       "run_at": "document_idle",
       "all_frames": true
     },
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/actions.js", "src/content/loupe.js"],
+      "js": ["src/lib/actions-core.js", "src/lib/actions-loupe.js", "src/content/loupe.js"],
       "css": ["src/content/loupe.css"],
       "run_at": "document_idle",
       "all_frames": false
@@ -141,6 +142,7 @@
         "*://*.wikipedia.org/*"
       ],
       "js": [
+        "src/lib/actions-core.js",
         "src/lib/actions.js",
         "src/lib/cleaner-core.js",
         "src/lib/scan-runner.js",

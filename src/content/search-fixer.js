@@ -36,10 +36,10 @@
   const extractHandleFromHref = SearchFixer.extractHandleFromHref;
   /** @type {0|4|5|6} ホームグリッド列数（0 = YouTube デフォルト） */
   let gridItems = 0;
-  /** @type {Array<{key: string, name: string}>} 検索結果から除外するチャンネル（channelBlocklist 機能）。
+  /** @type {Set<string>} 検索結果から除外する正規化済みチャンネルキー（channelBlocklist 機能）。
    *  popup → storage 直書きで管理されるため APPLY_SEARCH_FIXER_CS メッセージには乗らず、
    *  初期 storage.get + storage.onChanged の 2 経路のみで同期する。 */
-  let blockedChannels = [];
+  let blockedChannelKeys = new Set();
 
   /** @type {MutationObserver|null} 検索ページ用 observer（active=true & 検索ページのとき走らせる） */
   let resultsObserver = null;
@@ -222,7 +222,7 @@
         gridItems = SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]);
       }
       if (!updatedSettings.has(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS)) {
-        blockedChannels = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
+        blockedChannelKeys = new Set(SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]).map((channel) => channel.key));
       }
       onSettingsChanged();
     })
@@ -262,9 +262,9 @@
     }
     if (StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS in changes) {
       updatedSettings.add(StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS);
-      blockedChannels = SearchFixer.normalizeBlockedChannels(
+      blockedChannelKeys = new Set(SearchFixer.normalizeBlockedChannels(
         changes[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS].newValue
-      );
+      ).map((channel) => channel.key));
       touched = true;
     }
     if (touched) onSettingsChanged();
@@ -961,7 +961,7 @@
   /**
    * YouTube ホームの公式「このチャンネルは表示しない」に相当する機能を検索結果に提供する。
    *
-   *   1. 登録済みチャンネル（blockedChannels）の動画カード (ytd-video-renderer) /
+   *   1. 登録済みチャンネル（blockedChannelKeys）の動画カード (ytd-video-renderer) /
    *      チャンネルカード (ytd-channel-renderer) を検索結果から除去
    *   2. 未登録チャンネルのカードには hover 表示の 🚫 登録ボタンを注入
    *      （クリックで storage に追記 → storage.onChanged → 本関数の再実行で即時除去）
@@ -1055,7 +1055,6 @@
       removeAllBlockButtons();
       return;
     }
-    const blockedSet = new Set(blockedChannels.map((c) => c.key));
     try {
       const renderers = document.querySelectorAll(
           "#primary ytd-item-section-renderer ytd-video-renderer, " +
@@ -1067,7 +1066,7 @@
       for (const renderer of renderers) {
         if (!renderer.isConnected) continue;
         const info = resolveChannelInfo(renderer);
-        if (info) decisions.push({ renderer, info, remove: blockedSet.has(info.key) });
+        if (info) decisions.push({ renderer, info, remove: blockedChannelKeys.has(info.key) });
       }
       for (const decision of decisions) {
         if (!decision.renderer.isConnected) continue;
@@ -1529,14 +1528,13 @@
     const checkMix = f("mix");
     const checkWatched = f("watched");
     const checkMembersOnly = f("membersOnly");
-    // ブロックリストが空なら Set 構築 / per-lockup 照合を丸ごとスキップ（機能 ON 直後・未登録時の無駄走査防止）。
-    const checkChannelBlocklist = f("channelBlocklist") && blockedChannels.length > 0;
+    // ブロックリストが空なら per-lockup 照合を丸ごとスキップ（機能 ON 直後・未登録時の無駄走査防止）。
+    const checkChannelBlocklist = f("channelBlocklist") && blockedChannelKeys.size > 0;
     const checkForeign = f("hideForeignChannels");
     if (
       !(checkShortsBtn || checkLive || checkPlaylist || checkMix || checkWatched ||
         checkMembersOnly || checkChannelBlocklist || checkForeign)
     ) return;
-    const blockedSet = checkChannelBlocklist ? new Set(blockedChannels.map((c) => c.key)) : null;
 
     const lockups = document.querySelectorAll("yt-lockup-view-model");
     for (const lockup of lockups) {
@@ -1555,7 +1553,7 @@
         shouldRemove = true;
       }
       // 3. チャンネルブロックリスト（Set 照合は軽量なのでバッジテキスト解析より先に判定）
-      else if (checkChannelBlocklist && blockedSet.has(resolveLockupChannelKey(lockup))) {
+      else if (checkChannelBlocklist && blockedChannelKeys.has(resolveLockupChannelKey(lockup))) {
         shouldRemove = true;
       }
       // 4. 海外チャンネル除外（テキスト判定は軽量、about fetch が要る分は非同期で後追い除去）

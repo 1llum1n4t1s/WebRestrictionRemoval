@@ -478,12 +478,13 @@
     if (focusKey !== undefined && panelEl.isConnected && document.activeElement === document.body) {
       const replacement = Array.from(panelEl.querySelectorAll("[data-nlm-focus-key]"))
         .find((el) => el.dataset.nlmFocusKey === focusKey);
-      replacement?.focus({ preventScroll: true });
+      (replacement || create || btnEl)?.focus({ preventScroll: true });
     }
   }
 
   function renderPanelError(text) {
     if (!panelEl) return;
+    const hadFocus = panelEl.contains(document.activeElement);
     panelState = "error";
     panelEl.textContent = "";
     const msg = document.createElement("div");
@@ -501,6 +502,10 @@
     });
     panelEl.appendChild(open);
     positionPanel();
+    // 非同期の失敗表示で消えた操作から、既存の復旧導線へ戻す。
+    if (hadFocus && panelEl.isConnected && document.activeElement === document.body) {
+      open.focus({ preventScroll: true });
+    }
   }
 
   /**

@@ -6,7 +6,7 @@
  *
  * 設計方針:
  * - `src/` の IIFE + globalThis 公開定数を明示列挙 (no-implicit-globals 違反を防ぎつつ、
- *   actions.js が公開する定数を読み取り専用 global として承認する)
+ *   用途別の actions*.js が公開する定数を読み取り専用 global として承認する)
  * - `scripts/` / `webstore/generate-screenshots.js` は Node ESM/CJS 環境
  * - `test/` は Node 標準 test runner 環境
  */
@@ -14,7 +14,7 @@
 const globals = require("globals");
 
 const ACTIONS_GLOBALS = {
-  // src/lib/actions.js が globalThis に公開する定数。
+  // src/lib/actions-core.js / actions-video.js / actions-loupe.js / actions-volume.js / actions.js が globalThis に公開する定数。
   // 新規 globalThis 公開を追加したら本リストにも追加すること。
   SettingsSchema: "readonly",
   Actions: "readonly",
@@ -95,7 +95,7 @@ module.exports = [
     rules: COMMON_RULES,
   },
   {
-    // テスト: Node 標準 test runner + actions.js グローバル参照経路を許可
+    // テスト: Node 標準 test runner + 分割定義のグローバル参照経路を許可
     files: ["test/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,

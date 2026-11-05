@@ -9,7 +9,10 @@
 
 param(
     [ValidateSet("chrome","firefox","both")]
-    [string]$Target = "both"
+    [string]$Target = "both",
+    [string]$WorkRoot = $PSScriptRoot,
+    [string]$OutputRoot = $PSScriptRoot,
+    [switch]$KeepWork
 )
 
 # 検証済みの作業対象だけを標準APIで削除する。
@@ -50,6 +53,17 @@ Write-Host ""
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ($scriptDir) { Set-Location $scriptDir }
 
+# 明示した作業先・出力先は既存の絶対パスに限定する。
+foreach ($root in @($WorkRoot, $OutputRoot)) {
+    if (-not [IO.Path]::IsPathRooted($root) -or -not (Test-Path -LiteralPath $root -PathType Container)) { throw 'Package roots must be existing absolute directories.' }
+    $ancestor = [IO.Path]::GetFullPath($root)
+    while ($ancestor) {
+        if ((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Package root contains a reparse point.' }
+        $ancestor = Split-Path $ancestor -Parent
+    }
+}
+$WorkRoot = [IO.Path]::GetFullPath($WorkRoot)
+$OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 # 依存インストール & アイコン生成
 Write-Host "依存パッケージを lockfile どおりにインストール中..." -ForegroundColor Yellow
 bun run deps --silent
@@ -78,14 +92,14 @@ function Build-Package {
     Write-Host ""
     Write-Host "==== $Variant 版をビルド中 ====" -ForegroundColor Cyan
 
-    if (Test-Path $OutputName) {
-        Remove-LocalWorkItem -LiteralPath ($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputName)) -AllowedRoot $PSScriptRoot
-    }
-
-    $tempDir = "temp-build-$Variant"
-    if (Test-Path $tempDir) { Remove-LocalWorkItem -LiteralPath ($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($tempDir)) -AllowedRoot $PSScriptRoot }
-    New-Item -ItemType Directory -Path $tempDir | Out-Null
-
+    # 作業先は既存ディレクトリ配下へ排他的に確保し、固定名の既存データに触れない。
+    $workDir = Join-Path $WorkRoot ("package-$Variant-" + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $workDir -ErrorAction Stop | Out-Null
+    $tempDir = Join-Path $workDir 'content'
+    New-Item -ItemType Directory -Path $tempDir -ErrorAction Stop | Out-Null
+    $OutputName = Join-Path $OutputRoot $OutputName
+    $stagedArchive = $null
+    try {
     Write-Host "ファイルをコピー中 ($ManifestSource → manifest.json)..." -ForegroundColor Yellow
     # Firefox 版は manifest.firefox.json を manifest.json として配置する。
     # Chrome 版は manifest.json をそのまま使う。
@@ -104,12 +118,24 @@ function Build-Package {
 
     Write-Host "アーカイブを作成中..." -ForegroundColor Cyan
     # Compress-Archive は zip 形式。Firefox 用は拡張子を xpi に変えるだけで Firefox AMO が受理する。
-    $tempZip = "$OutputName.tmp.zip"
-    if (Test-Path $tempZip) { Remove-LocalWorkItem -LiteralPath ($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($tempZip)) -AllowedRoot $PSScriptRoot }
-    Compress-Archive -Path "$tempDir/*" -DestinationPath $tempZip -Force
-    Move-Item -Path $tempZip -Destination $OutputName -Force
-
-    Remove-LocalWorkItem -LiteralPath ($ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($tempDir)) -AllowedRoot $PSScriptRoot
+    $tempZip = Join-Path $workDir 'package.zip'
+    Compress-Archive -Path "$tempDir/*" -DestinationPath $tempZip
+    # 別ドライブからのコピー失敗でも既存成果物を守るため、出力先内で完成させる。
+    $stagePath = Join-Path $OutputRoot ('.package-' + [guid]::NewGuid().ToString('N') + '.zip')
+    $destination = [IO.File]::Open($stagePath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $stagedArchive = $stagePath
+    try {
+        $source = [IO.File]::OpenRead($tempZip)
+        try { $source.CopyTo($destination) } finally { $source.Dispose() }
+    } finally { $destination.Dispose() }
+    [IO.File]::Move($stagedArchive, $OutputName, $true)
+    $stagedArchive = $null
+    } finally {
+        if (-not $KeepWork) {
+            if ($stagedArchive) { Remove-LocalWorkItem -LiteralPath $stagedArchive -AllowedRoot $OutputRoot }
+            Remove-LocalWorkItem -LiteralPath $workDir -AllowedRoot $WorkRoot
+        }
+    }
 
     if (Test-Path $OutputName) {
         $size = (Get-Item $OutputName).Length

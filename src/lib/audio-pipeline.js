@@ -14,7 +14,7 @@
  * 提供するのは dB→gain 変換 / compressor・filter preset 適用 / bass cut・EQ チェーン構築 / EQ 適用
  * / 最終サンプル上限 / 最上位接続 (自動音量正規化の normalizer 関数群は撤去済み)。
  *
- * 値定数は actions.js の `VolumeBooster` を経由 (既存集約場所)。
+ * 値定数は actions-volume.js の `VolumeBooster` を経由 (音量定義の正本)。
  *
  * 二重ロード許容: offscreen.html / manifest content_scripts で個別ロードされても
  * `__cpaAudioPipelineLoaded` ガードで 2 回目以降は即 return する (actions.js と同じパターン)。

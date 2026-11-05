@@ -6,10 +6,11 @@
   "scripts": {
     "deps": "bun scripts/Install-Dependencies.mjs",
     "sync:support": "bun --preserve-symlinks-main ./node_modules/@kagayoi/support-extension/bin/kagayoi-support-sync.mjs",
-    "ci:install": "bun install --frozen-lockfile",
+    "ci:install": "bun scripts/Install-Dependencies.mjs",
     "generate-icons": "bun scripts/generate-icons.js",
     "generate-screenshots": "bun webstore/generate-screenshots.js",
-    "build": "bun --bun run sync:support && bun --bun run generate-icons && bun --bun run generate-screenshots",
+    "build": "bun --bun run sync:support && bun --bun run build:assets",
+    "build:assets": "bun --bun run generate-icons && bun --bun run generate-screenshots",
     "test": "bun test",
     "lint": "bun --no-env-file --no-install --bun run eslint src/ test/ scripts/ webstore/generate-screenshots.js",
     "test:dependencies": "bun test ./scripts/dependency-security.test.cjs"

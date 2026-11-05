@@ -116,8 +116,8 @@ jobs:
         run: bun run deps
       - name: Validate dependency security patches
         run: bun run test:dependencies
-      - name: Sync support assets
-        run: bun --bun run sync:support
+      - name: Verify support assets
+        run: bun --bun run sync:support --check
 
       - name: テスト実行
         run: bun --bun run test
@@ -287,8 +287,8 @@ jobs:
         run: bun run deps
       - name: Validate dependency security patches
         run: bun run test:dependencies
-      - name: Sync support assets
-        run: bun --bun run sync:support
+      - name: Verify support assets
+        run: bun --bun run sync:support --check
 
       - name: ダウンロードした実 source-dir と検証済みソースの同一性を確認
         env:

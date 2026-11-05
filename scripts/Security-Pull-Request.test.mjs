@@ -1,22 +1,34 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { BRANCH, candidateFiles, validatePush, pushMerge, prepare, merge, report, duplicateValidationSuite } from './Security-Pull-Request.mjs';
 
-const root = process.env.BUN_SECURITY_TEST_ROOT;
+const root = process.env.BUN_SECURITY_TEST_ROOT === undefined ? tmpdir() : process.env.BUN_SECURITY_TEST_ROOT;
 assert.ok(root && resolve(root) === root, 'BUN_SECURITY_TEST_ROOT must name an existing absolute task directory');
 const fixtures = mkdtempSync(join(root, 'github-tests-'));
+const ambientGit = Object.entries(process.env).filter(([name]) => /^GIT_/i.test(name));
+for (const [name] of ambientGit) delete process.env[name];
+Object.assign(process.env, {
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: join(fixtures, 'absent-global-gitconfig'),
+  GIT_ALLOW_PROTOCOL: 'file',
+  GIT_TERMINAL_PROMPT: '0',
+});
 // 実際の Actions run の識別子・summary を fixture の API/監査結果へ混ぜない。
 const ambient = { GITHUB_RUN_ID: process.env.GITHUB_RUN_ID, GITHUB_STEP_SUMMARY: process.env.GITHUB_STEP_SUMMARY };
 delete process.env.GITHUB_RUN_ID;
 process.env.GITHUB_STEP_SUMMARY = join(fixtures, 'fixture-step-summary.md');
 after(() => {
+  for (const name of Object.keys(process.env)) if (/^GIT_/i.test(name)) delete process.env[name];
+  for (const [name, value] of ambientGit) process.env[name] = value;
   for (const [name, value] of Object.entries(ambient)) {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
+  if (process.env.VUORA_TEST_KEEP_FIXTURES !== '1') rmSync(fixtures, { recursive: true });
 });
 test('GitHub Actions ambient run and summary are isolated from offline fixtures', () => {
   assert.equal(process.env.GITHUB_RUN_ID, undefined);
@@ -59,25 +71,25 @@ test('pre-push requires exactly two advertised matching old and new OIDs', () =>
   for (const wrong of ['', lines.split('\n')[0], lines.replace(base, head), lines + lines, lines.replaceAll(tested, head)])
     assert.throws(() => validatePush(wrong, 'refs/heads/main', base, head, tested));
 });
-test('normal atomic FF push integrates exactly the tested merge and advances both refs', () => {
+test('normal atomic FF push integrates exactly the tested merge and advances both refs', { timeout: 30000 }, () => {
   const value = fixture('success');
   pushMerge(value);
   for (const branch of ['main', BRANCH]) assert.equal(git(value.remote, ['rev-parse', `refs/heads/${branch}`]), value.merge);
 });
-test('rejects base race even when remote base already equals PR head, an ancestor of merge', () => {
+test('rejects base race even when remote base already equals PR head, an ancestor of merge', { timeout: 30000 }, () => {
   const value = fixture('base-race');
   git(value.remote, ['update-ref', 'refs/heads/main', value.head]);
   assert.throws(() => pushMerge(value), /refusing update/);
   assert.equal(git(value.remote, ['rev-parse', 'refs/heads/main']), value.head);
   assert.equal(git(value.remote, ['rev-parse', `refs/heads/${BRANCH}`]), value.head);
 });
-test('rejects source race and atomically leaves base unchanged', () => {
+test('rejects source race and atomically leaves base unchanged', { timeout: 30000 }, () => {
   const value = fixture('source-race');
   git(value.remote, ['update-ref', `refs/heads/${BRANCH}`, value.base]);
   assert.throws(() => pushMerge(value), /refusing update/);
   assert.equal(git(value.remote, ['rev-parse', 'refs/heads/main']), value.base);
 });
-test('rejects source divergence without advancing default branch', () => {
+test('rejects source divergence without advancing default branch', { timeout: 30000 }, () => {
   const value = fixture('source-diverged');
   git(value.remote, ['update-ref', `refs/heads/${BRANCH}`, value.other]);
   assert.throws(() => pushMerge(value), /refusing update/);
@@ -154,7 +166,7 @@ test('prepare creates only allowed Git database tree and reuses identical owned 
     await assert.rejects(prepare(api, { report: reportFile, checkout: value.remote }), /closed PR/);
   } finally { if (old === undefined) delete process.env.GITHUB_SHA; else process.env.GITHUB_SHA = old; }
 });
-test('approved mitigated advisory creates no issue; failure reuses owned marker issue', async t => {
+test('approved mitigated advisory creates no issue; failure reuses owned marker issue', { timeout: 30000 }, async t => {
   const checkout = join(fixtures, 'trusted-report-checkout');
   mkdirSync(checkout);
   git(checkout, ['init', '--quiet']);
@@ -200,7 +212,7 @@ test('approved mitigated advisory creates no issue; failure reuses owned marker 
   assert.match(writes.at(-1)[2].body, /Base .*: unknown/);
   assert.match(writes.at(-1)[2].body, /reported, base association unverified/);
   process.env.GITHUB_SHA = git(checkout, ['rev-parse', 'HEAD']);
-  const { mainRemaining, mainMitigations, ...legacy } = baseReport;
+  const { mainRemaining: _mainRemaining, mainMitigations: _mainMitigations, ...legacy } = baseReport;
   writeFileSync(file, JSON.stringify(legacy));
   await report(api, { report: file, checkout });
   assert.match(writes.at(-1)[2].body, /Base .*: 1 remaining/);

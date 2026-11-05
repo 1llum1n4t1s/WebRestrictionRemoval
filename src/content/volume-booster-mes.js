@@ -77,7 +77,7 @@
 
   // EME (DRM) 多用サイトでは MES attach で動画音声が完全無音化するため起動自体を skip。
   // Firefox には tabCapture フォールバックが無いので、これらのサイトでは音量ブースターは
-  // 効かない (音は普通に出る)。判定リストは actions.js の VolumeBooster.EME_HOSTS に集約。
+  // 効かない (音は普通に出る)。判定リストは actions-volume.js の VolumeBooster.EME_HOSTS に集約。
   if (VolumeBooster.isEmeHost(location.hostname)) return;
 
   // WeakMap<HTMLMediaElement, AudioState>。要素が GC されれば state も自動解放される。

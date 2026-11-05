@@ -52,17 +52,17 @@
   let scanRaf = 0;
   let orphaned = false;
   /** /rere C2-Critical1 修正: loadedmetadata listener の一括 abort 用 AbortController。
-   *  revertAll() 時に abort して全 listener を解除、新たな AbortController に差し替えて再受付。 */
-  let metaListenerCtrl = new AbortController();
+   *  活性化時だけ生成し、revertAll() 時に abort して全 listener を解除する。 */
+  let metaListenerCtrl = null;
   /** loadedmetadata listener を attach 済みの video 集合 (二重登録防止)。
    *  Codex 4 巡目 P2 修正: 旧実装は DOM プロパティ `__cpaVfMetaAttached` で追跡していたが、
    *  revertAll() の abort で listener を全解除しても、detach 済み video のマーカーは
    *  `document.getElementsByTagName("video")` の走査外で取り残された。すると SPA がその video を
    *  reinsert + ユーザーが再 ON したとき、stale マーカーで ensureMetaListener が早期 return し、
    *  metadata 未ロードなら transform が永久に当たらなかった。WeakSet にして abort 時に
-   *  `new WeakSet()` へ差し替えれば、detach 済みも含めた全 video の追跡を O(1) で一括リセットでき、
+   *  破棄して次の活性化時に `new WeakSet()` を作れば、detach 済みも含めた全 video の追跡を O(1) で一括リセットでき、
    *  iterate 不可ゆえの取り残しが構造的に起きない (DOM プロパティ汚染も解消)。 */
-  let metaAttached = new WeakSet();
+  let metaAttached = null;
 
   function isActive() {
     return enabled === true;
@@ -100,16 +100,17 @@
   }
 
   function revertAll() {
+    if (!metaListenerCtrl) return;
     // DOM 上の video を走査して revert する。detach 済み video は observer の removedNodes 検知時に
     // 既に revertVideo 済みなので、ここで取りこぼしても OFF 後に transform が残ることはない。
     const vids = document.getElementsByTagName("video");
     for (let i = 0; i < vids.length; i++) revertVideo(vids[i]);
-    // loadedmetadata listener を一括 abort し、attach 追跡 WeakSet も新品に差し替えて
+    // loadedmetadata listener を一括 abort し、attach 追跡 WeakSet も破棄して
     // 全 video 分 (detach 済み含む) を O(1) でリセットする。これで reinsert + 再 ON 時に
     // ensureMetaListener が確実に listener を貼り直せる (Codex 4 巡目 P2)。
     metaListenerCtrl.abort();
-    metaListenerCtrl = new AbortController();
-    metaAttached = new WeakSet();
+    metaListenerCtrl = null;
+    metaAttached = null;
   }
 
   // intrinsic サイズが確定する loadedmetadata で再適用（videoWidth=0 の段階を取りこぼさない）。
@@ -202,6 +203,10 @@
 
   function applyState() {
     if (isActive()) {
+      if (!metaListenerCtrl) {
+        metaListenerCtrl = new AbortController();
+        metaAttached = new WeakSet();
+      }
       scanAndApply();
       ensureObserver();
     } else {

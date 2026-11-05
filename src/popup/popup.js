@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $volumeBassCutToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_BASS_CUT_ENABLED] === true;
   // イコライザの復元 + UI 構築 + イベントバインド（buildEqUi/bindEqEvents/syncEqUi/updateEqPanelState は function 宣言で hoist 済み）。
   // 旧実装の防御ラッパー (DOM 存在 if + try/catch) は撤去: $volumeEq* は popup.html 同梱の静的要素で
-  // 常時存在し、TDZ 起因の ReferenceError は EQ_PRESET_I18N_KEYS の actions.js 移設 (/simplify) で根治済み。
+  // 常時存在し、TDZ 起因の ReferenceError は EQ_PRESET_I18N_KEYS を音量定義と共有することで根治済み（現在の正本は actions-volume.js）。
   $volumeEqToggle.checked = stored[StorageKeys.VOLUME_BOOSTER_EQ_ENABLED] === true;
   eqGains = VolumeBooster.clampEqGains(stored[StorageKeys.VOLUME_BOOSTER_EQ_GAINS]);
   eqPreamp = VolumeBooster.clampEqPreamp(stored[StorageKeys.VOLUME_BOOSTER_EQ_PREAMP]);
@@ -464,30 +464,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  const storedFeatures = SearchFixer.mergeFeatures(stored[StorageKeys.SEARCH_FIXER_FEATURES]);
-  for (const [key, input] of featureInputs) {
-    input.checked = storedFeatures[key] === true;
-  }
+  restoreFeatureInputs(featureInputs, SearchFixer, stored[StorageKeys.SEARCH_FIXER_FEATURES]);
   $gridItemsSelect.value = String(SearchFixer.clampGridItems(stored[StorageKeys.SEARCH_FIXER_GRID_ITEMS]));
   blockedChannels = SearchFixer.normalizeBlockedChannels(stored[StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]);
   renderBlockedChannels();
 
-  const storedIgFeatures = InstagramCleaner.mergeFeatures(stored[StorageKeys.INSTAGRAM_CLEANER_FEATURES]);
-  for (const [key, input] of igFeatureInputs) {
-    input.checked = storedIgFeatures[key] === true;
-  }
+  restoreFeatureInputs(igFeatureInputs, InstagramCleaner, stored[StorageKeys.INSTAGRAM_CLEANER_FEATURES]);
 
-  const storedTtFeatures = TikTokCleaner.mergeFeatures(stored[StorageKeys.TIKTOK_CLEANER_FEATURES]);
-  for (const [key, input] of ttFeatureInputs) {
-    input.checked = storedTtFeatures[key] === true;
-  }
+  restoreFeatureInputs(ttFeatureInputs, TikTokCleaner, stored[StorageKeys.TIKTOK_CLEANER_FEATURES]);
 
   buildWikipediaSettings(stored);
 
-  const storedXFeatures = XCleaner.mergeFeatures(stored[StorageKeys.X_CLEANER_FEATURES]);
-  for (const [key, input] of xFeatureInputs) {
-    input.checked = storedXFeatures[key] === true;
-  }
+  restoreFeatureInputs(xFeatureInputs, XCleaner, stored[StorageKeys.X_CLEANER_FEATURES]);
 
   updateCleanerCountBadge();
   updateCleanerDimState();
@@ -1020,7 +1008,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== イコライザ (10 バンドグラフィック EQ) =====
   /** プリセット <select> の option と、プリアンプ + 10 バンドのスライダー列を生成する。 */
   function buildEqUi() {
-    // プリセット id → i18n キー対応は actions.js の VolumeBooster.EQ_PRESET_I18N_KEYS が単一情報源。
+    // プリセット id → i18n キー対応は actions-volume.js の VolumeBooster.EQ_PRESET_I18N_KEYS が単一情報源。
     $volumeEqPreset.textContent = "";
     const ids = [...Object.keys(VolumeBooster.EQ_PRESETS), VolumeBooster.EQ_PRESET_CUSTOM];
     for (const id of ids) {
@@ -1166,34 +1154,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  for (const [key, input] of featureInputs) {
-    input.addEventListener("change", () => {
-      updateCleanerCountBadge();
-      apply({ searchFixerFeatures: { [key]: input.checked } });
-    });
+  function restoreFeatureInputs(inputMap, spec, raw) {
+    const merged = spec.mergeFeatures(raw);
+    for (const [key, input] of inputMap) input.checked = merged[key] === true;
   }
+
+  function bindFeatureInputs(inputMap, updateBadge, settingKey) {
+    for (const [key, input] of inputMap) {
+      input.addEventListener("change", () => {
+        updateBadge();
+        apply({ [settingKey]: { [key]: input.checked } });
+      });
+    }
+  }
+  bindFeatureInputs(featureInputs, updateCleanerCountBadge, "searchFixerFeatures");
   $gridItemsSelect.addEventListener("change", () => apply({ searchFixerGridItems: SearchFixer.clampGridItems($gridItemsSelect.value) }));
-
-  for (const [key, input] of igFeatureInputs) {
-    input.addEventListener("change", () => {
-      updateIgCleanerCountBadge();
-      apply({ instagramCleanerFeatures: { [key]: input.checked } });
-    });
-  }
-
-  for (const [key, input] of ttFeatureInputs) {
-    input.addEventListener("change", () => {
-      updateTtCleanerCountBadge();
-      apply({ tiktokCleanerFeatures: { [key]: input.checked } });
-    });
-  }
-
-  for (const [key, input] of xFeatureInputs) {
-    input.addEventListener("change", () => {
-      updateXCleanerCountBadge();
-      apply({ xCleanerFeatures: { [key]: input.checked } });
-    });
-  }
+  bindFeatureInputs(igFeatureInputs, updateIgCleanerCountBadge, "instagramCleanerFeatures");
+  bindFeatureInputs(ttFeatureInputs, updateTtCleanerCountBadge, "tiktokCleanerFeatures");
+  bindFeatureInputs(xFeatureInputs, updateXCleanerCountBadge, "xCleanerFeatures");
 
   // ----- DOM 構築 -----
 
@@ -1263,6 +1241,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const listEl = document.getElementById("blockedChannelsList");
     const countEl = document.getElementById("blockedChannelsCount");
     if (!listEl || !countEl) return;
+    const focusedIndex = Array.from(listEl.querySelectorAll(".blocked-remove")).indexOf(document.activeElement);
+    const focusedKey = focusedIndex >= 0
+      ? document.activeElement.closest(".blocked-row").querySelector(".blocked-name").title : null;
     listEl.textContent = "";
     countEl.textContent = blockedChannels.length > 0 ? `${blockedChannels.length}` : "";
     if (blockedChannels.length === 0) {
@@ -1270,6 +1251,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       empty.className = "blocked-empty";
       empty.textContent = i18n("sfBlockedChannelsEmpty");
       listEl.appendChild(empty);
+      if (focusedIndex >= 0) {
+        document.querySelector('#featureCategories .cat-subtab[aria-selected="true"]')?.focus();
+      }
       return;
     }
     for (const entry of blockedChannels) {
@@ -1287,6 +1271,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       remove.addEventListener("click", () => removeBlockedChannel(entry.key));
       row.append(name, remove);
       listEl.appendChild(row);
+    }
+    if (focusedIndex >= 0) {
+      const rows = Array.from(listEl.querySelectorAll(".blocked-row"));
+      const next = rows.find(row => row.querySelector(".blocked-name").title === focusedKey)
+        ?? rows[Math.min(focusedIndex, rows.length - 1)];
+      next.querySelector(".blocked-remove").focus();
     }
   }
 
@@ -1526,7 +1516,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * カテゴリをサブタブで切り替える DOM を構築する（YouTube / Instagram クリーナーで共用）。
    *
-   * 機能数が多いクリーナー（YouTube 39 機能 / Instagram 12 機能）を 1 画面に縦積みすると
+   * 機能数が多いクリーナー（YouTube 38 機能 / Instagram 12 機能）を 1 画面に縦積みすると
    * 非常に長くなるため、カテゴリごとにサブタブで切り替えられるようにして縦の情報量を圧縮する。
    * 各機能の `<input>` は全カテゴリ分まとめて DOM / inputMap に存在し続ける（非表示パネルでも
    * checked 状態は保持され、ON 数カウントや apply() の収集に影響しない）。

@@ -1,5 +1,5 @@
 "use strict";
-/* global window, document, Event, SettingsBackup */
+/* global window, document, Event, SettingsBackup, SearchFixer */
 // 未使用の絶対パス VUORA_BROWSER_TEST_DIR に専用プロファイルと確認画像を作る。
 // 外部通信は遮断し、同梱popup全体のstorage/runtime境界だけをmockする。
 const {test}=require("node:test");
@@ -36,7 +36,8 @@ test("popup: 履歴通知・保存失敗・同時操作", {timeout:60000}, async
  await page.setViewport({width:500,height:900});
  await page.evaluateOnNewDocument((messages)=>{
  const listeners=[];window.saved={colorPickerHistory:[{hex:'#123456',ts:8640000000000001}],popupLastTab:'picker'};
- window.pending=[];window.delayedReads=[];
+ window.pending=[];window.delayedReads=[];window.blockedPending=[];
+ window.finishBlocked=(index,ok,channels)=>window.blockedPending[index].resolve(ok?{ok:true,channels}:{ok:false,error:'mock-blocked-failure'});
  window.closeCount=0;window.close=()=>{window.closeCount++;};
  window.emit=(patch)=>{
   const changes={};
@@ -72,6 +73,7 @@ test("popup: 履歴通知・保存失敗・同時操作", {timeout:60000}, async
   },sync:{get:async()=>({})}},
   runtime:{getManifest:()=>({version:'1.0.0'}),getURL:p=>window.location.origin+'/'+p,
    onMessage:{addListener:()=>{}},sendMessage:async message=>{
+    if(message.action==='UPDATE_BLOCKED_CHANNELS')return new Promise(resolve=>window.blockedPending.push({message,resolve}));
     if(message.action==='applySettings')return new Promise((resolve,reject)=>window.pending.push({message,resolve,reject}));
     if(message.action==='UPDATE_COLOR_HISTORY'){
      const history=[{hex:message.hex,ts:message.ts},...window.saved.colorPickerHistory.filter(entry=>entry.hex!==message.hex)];
@@ -87,6 +89,53 @@ test("popup: 履歴通知・保存失敗・同時操作", {timeout:60000}, async
  await page.goto(`http://127.0.0.1:${server.address().port}/src/popup/popup.html`);
  await page.waitForSelector('.history-chip');
  const check=async(fn,...args)=>page.evaluate(fn,...args);
+ // 除外一覧は独立キューで制御し、既存の設定保存リクエスト番号を維持する。
+ const channels=[{key:'@a',name:'A'},{key:'@b',name:'B'},{key:'@c',name:'C'}];
+ await check(channels=>window.emit({searchFixerEnabled:true,searchFixerBlockedChannels:channels}),channels);
+ await page.click('#categoryTrigger'); await page.click('#tabYoutube');
+ await check(()=>document.querySelectorAll('#featureCategories .cat-subtab')[SearchFixer.CATEGORIES.findIndex(cat=>cat.id==='video_filter')].click());
+ await page.focus('.blocked-row:nth-child(2) .blocked-remove');
+ await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>window.blockedPending.length===1);
+ await check(()=>window.finishBlocked(0,false));
+ await page.waitForFunction(()=>document.querySelectorAll('.blocked-row').length===3);
+ assert.equal(await check(()=>document.activeElement?.closest('.blocked-row')?.querySelector('.blocked-name')?.title),'@b','失敗後もBの解除ボタンにfocusを保つ');
+ const focusedKey=()=>check(()=>document.activeElement?.closest('.blocked-row')?.querySelector('.blocked-name')?.title);
+ const unblock=async()=>{
+  const index=await check(()=>window.blockedPending.length);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(index=>window.blockedPending.length===index+1,{},index);
+  return index;
+ };
+ // storage通知→応答: B消去後は同じ位置のC、遅い応答もfocusを維持。
+ let blockedIndex=await unblock();
+ await check(channels=>window.emit({searchFixerBlockedChannels:channels}),[channels[0],channels[2]]);
+ assert.equal(await focusedKey(),'@c');
+ await check((index,channels)=>window.finishBlocked(index,true,channels),blockedIndex,[channels[0],channels[2]]);
+ await page.waitForFunction(()=>document.activeElement?.closest('.blocked-row')?.querySelector('.blocked-name')?.title==='@c');
+ // 応答→storage通知: 末尾C消去後は前のA。最後の一件なら既存の選択サブタブへ。
+ blockedIndex=await unblock();
+ await check((index,channels)=>window.finishBlocked(index,true,channels),blockedIndex,[channels[0]]);
+ await page.waitForFunction(()=>document.querySelectorAll('.blocked-row').length===1);
+ assert.equal(await focusedKey(),'@a');
+ await check(channels=>window.emit({searchFixerBlockedChannels:channels}),[channels[0]]);
+ assert.equal(await focusedKey(),'@a');
+ blockedIndex=await unblock();
+ await check(index=>window.finishBlocked(index,true,[]),blockedIndex);
+ await page.waitForFunction(()=>document.querySelectorAll('.blocked-row').length===0);
+ assert.equal(await check(()=>document.activeElement===document.querySelector('#featureCategories .cat-subtab[aria-selected="true"]')),true);
+ // 外部追加でも既存keyのfocusを維持し、一覧外へ移したfocusは応答で奪わない。
+ await check(channels=>window.emit({searchFixerBlockedChannels:channels}),channels);
+ await page.focus('.blocked-row:nth-child(2) .blocked-remove');
+ await check(channels=>window.emit({searchFixerBlockedChannels:[{key:'@d',name:'D'},...channels]}),channels);
+ assert.equal(await focusedKey(),'@b');
+ blockedIndex=await unblock();
+ await page.focus('#searchFixerToggle');
+ await check((index,channels)=>window.finishBlocked(index,true,channels),blockedIndex,[channels[0],channels[2]]);
+ await page.waitForFunction(()=>document.querySelectorAll('.blocked-row').length===2);
+ assert.equal(await check(()=>document.activeElement?.id),'searchFixerToggle');
+ console.log('PASS blocked channel keyboard focus: failure, notification/response both orders, last row, empty, external insert, focus moved outside');
+ await page.click('#categoryTrigger'); await page.click('#tabPicker');
  assert.equal(await check(()=>[document.querySelector('#specimenTime').textContent,
   document.querySelector('.history-chip').title].some(text=>text.includes('NaN'))),false);
  assert.equal(await check(()=>document.querySelector('#specimenTime').textContent),'—');

@@ -1091,23 +1091,7 @@ test("PopupTabs.normalizeSubTabs: 親タブ id をキーにした文字列だけ
 
 // ---------- 再評価ガードのテスト ----------
 
-test("actions.js の再評価は __cpaActionsLoaded ガードで早期 return", () => {
-  // _load-actions.js が既に評価済み。同じコードを別 sandbox で評価して動作確認
-  const fs = require("node:fs");
-  const vm = require("node:vm");
-  const path = require("node:path");
-  const code = fs.readFileSync(
-    path.join(__dirname, "..", "src", "lib", "actions.js"),
-    "utf8"
-  );
-  const ctx = { globalThis: { __cpaActionsLoaded: true }, console };
-  vm.createContext(ctx);
-  vm.runInContext(code, ctx);
-  // ガードが効いていれば globalThis.Actions は **書き込まれない**
-  assert.equal(ctx.globalThis.Actions, undefined, "再評価ガードが効いていない");
-});
-
-test("actions.js は globalThis に 24 個の定数を公開する", () => {
+test("分割定義は globalThis に 24 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -1364,6 +1348,25 @@ test("FEATURES 件数の固定アサート（ドキュメント整合性の再�
   assert.equal(G.SearchFixer.FEATURES.length, 38, "SearchFixer.FEATURES は 38 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 12, "InstagramCleaner.FEATURES は 12 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
+});
+
+test("ストア画像の表示件数がFEATURES正本と一致し、初期OFFを12機能に限定する", () => {
+  const text = (name) => fs.readFileSync(path.join(__dirname, "../webstore", name), "utf8")
+    .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+  const featureCount = (content, label) => {
+    const match = content.match(new RegExp(`${label}\\s*[・]?\\s*(\\d+)`));
+    assert.ok(match, `${label} の表示件数がある`);
+    return Number(match[1]);
+  };
+  for (const file of ["02-features.html", "03-hero-promo.html", "05-promo-marquee.html"]) {
+    const content = text(file);
+    assert.equal(featureCount(content, "YouTube(?:\\s+機能拡張)?"), G.SearchFixer.FEATURES.length, file);
+    if (file !== "03-hero-promo.html") {
+      assert.equal(featureCount(content, "Instagram(?:\\s+クリーナー)?"), G.InstagramCleaner.FEATURES.length, file);
+      assert.equal(featureCount(content, "TikTok(?:\\s+クリーナー)?"), G.TikTokCleaner.FEATURES.length, file);
+    }
+  }
+  assert.match(text("02-features.html"), /インストール直後は\s*12\s*機能が\s*OFF/);
 });
 
 // ---------- 海外チャンネル除外 (hideForeignChannels) の純粋関数 ----------

@@ -1,9 +1,9 @@
-// Chrome service worker は importScripts で actions.js をロードする。
+// Chrome service worker は importScripts で定義ファイルをロードする。
 // Firefox MV3 (event page) では importScripts は worker 限定 API のため呼べないが、
-// manifest.firefox.json の background.scripts に actions.js を併記してあり、
+// manifest.firefox.json の background.scripts に定義ファイルを併記してあり、
 // background.js 実行時には既に評価済みなのでここでは skip する。
 if (typeof importScripts === "function") {
-  importScripts("/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js");
+  importScripts("/src/lib/actions-core.js", "/src/lib/actions-video.js", "/src/lib/actions-loupe.js", "/src/lib/actions-volume.js", "/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js");
 }
 
 // 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する

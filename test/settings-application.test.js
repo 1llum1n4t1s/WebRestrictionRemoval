@@ -44,7 +44,9 @@ const host = async (initial = {}, firefox = false) => {
       },
     },
   });
-  vm.runInContext(read("lib/actions.js"), context);
+  for (const file of ["actions-core.js", "actions-video.js", "actions-loupe.js", "actions-volume.js", "actions.js"]) {
+    vm.runInContext(read(`lib/${file}`), context);
+  }
   vm.runInContext(read("lib/settings-backup.js"), context);
   vm.runInContext(read("background/settings-sync.js"), context);
   vm.runInContext(read("background/background.js"), context);
@@ -194,7 +196,8 @@ test("popup の各操作は該当項目だけを読み込み時の世代とと�
   });
   const bindingStart = source.indexOf('  $searchFixerToggle.addEventListener("change"');
   const bindings = source.slice(bindingStart, source.indexOf("  // ルーペ: 倍率セグメント", bindingStart));
-  const featureStart = source.indexOf("  for (const [key, input] of featureInputs)", bindingStart);
+  const featureStart = source.indexOf("  function bindFeatureInputs(", bindingStart);
+  assert.ok(featureStart >= 0, "feature change登録の共通ヘルパーが存在する");
   const featureBindings = source.slice(featureStart, source.indexOf("  // ----- DOM 構築", featureStart));
   for (const name of new Set((bindings + featureBindings).match(/\$\w+/g))) context[name] = control(name);
   for (const name of new Set((bindings + featureBindings).match(/update\w+/g))) context[name] = () => {};

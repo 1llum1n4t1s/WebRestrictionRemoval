@@ -71,13 +71,13 @@
   let scanRaf = 0;
   let orphaned = false;
   /** loadedmetadata listener の一括 abort 用 AbortController。revertAll() で abort して
-   *  新 AbortController に差し替え、metaAttached WeakSet も新品にして detach 済み含め O(1) リセット。 */
-  let metaListenerCtrl = new AbortController();
+   *  null に戻す。次の活性化時に WeakSet と共に生成し直す。 */
+  let metaListenerCtrl = null;
   /** loadedmetadata listener を attach 済みの video 集合 (二重登録防止)。
-   *  WeakSet にして revertAll で `new WeakSet()` 差し替えで detach 済みも一括リセット。
+   *  WeakSet を revertAll で破棄し、次の活性化時に作り直して detach 済みも一括リセット。
    *  DOM プロパティマーカーだと detach 済みを取り残し reinsert+再 ON 時に listener 再 attach
    *  できないため WeakSet を採用 (video-fill の Codex 4 巡目 P2 と同型対策)。 */
-  let metaAttached = new WeakSet();
+  let metaAttached = null;
 
   function isActive() {
     return currentEnabled === true && !VideoGamma.isUnity(currentValue);
@@ -164,15 +164,16 @@
   }
 
   function revertAll() {
+    if (!metaListenerCtrl) return;
     // DOM 上の video を走査して revert。detach 済み video は observer の removedNodes 検知時に
     // 既に revertVideo 済みなので、ここで取りこぼしても OFF 後に inline filter が残ることはない。
     const vids = document.getElementsByTagName("video");
     for (let i = 0; i < vids.length; i++) revertVideo(vids[i]);
-    // loadedmetadata listener を一括 abort し、attach 追跡 WeakSet も新品に差し替えて
+    // loadedmetadata listener を一括 abort し、attach 追跡 WeakSet も破棄して
     // 全 video 分 (detach 済み含む) を O(1) でリセットする (video-fill と同型)。
     metaListenerCtrl.abort();
-    metaListenerCtrl = new AbortController();
-    metaAttached = new WeakSet();
+    metaListenerCtrl = null;
+    metaAttached = null;
   }
 
   /**
@@ -271,6 +272,10 @@
 
   function applyState() {
     if (isActive()) {
+      if (!metaListenerCtrl) {
+        metaListenerCtrl = new AbortController();
+        metaAttached = new WeakSet();
+      }
       ensureSvgFilter(currentValue);
       scanAndApply();
       ensureObserver();
