@@ -11,7 +11,7 @@
     "generate-screenshots": "bun webstore/generate-screenshots.js",
     "build": "bun --bun run sync:support && bun --bun run generate-icons && bun --bun run generate-screenshots",
     "test": "bun test",
-    "lint": "eslint src/ test/ scripts/ webstore/generate-screenshots.js",
+    "lint": "bun --no-env-file --no-install --bun run eslint src/ test/ scripts/ webstore/generate-screenshots.js",
     "test:dependencies": "bun test ./scripts/dependency-security.test.cjs"
   },
   "devDependencies": {
