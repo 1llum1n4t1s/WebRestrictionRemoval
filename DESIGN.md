@@ -1,5 +1,7 @@
 # Vuora 設計
 
+共有定義は依存順に分割する。`actions-core.js` が Actions / ExtensionPaths / SenderCheck / StorageKeys、`actions-video.js` が VideoGamma / VideoFill、`actions-loupe.js` が Loupe、`actions-volume.js` が VolumeBooster、`actions.js` がサイト別定義・Offscreen・SettingsSchema 等の正本。各ファイルは独立した再評価ガードと `globalThis` 公開を持ち、同じフレームでは参照を維持する。共有定義に依存する各 content_scripts エントリは共通→必要な定義を自前で読み込み、他エントリの実行順に依存しない。全サイトの映像・ルーペ・Firefox 音量はサイト用 `actions.js` を読み込まない。Firefox 音量は共通→音量→audio-pipeline の順。popup と background は共通→映像→ルーペ→音量→サイト、offscreen は共通→音量→サイトの順に読み込む。
+
 この文書は、現在のコード・manifest・テスト・運用設定から確認できる Vuora のシステム設計をまとめた正本です。利用方法は [README.md](README.md)、エージェント向けの作業・検証規約は [AGENTS.md](AGENTS.md)、機能別の実装詳細は [references/architecture.md](references/architecture.md) を参照してください。
 
 ## 目的と範囲
@@ -13,7 +15,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 | コンポーネント | 責務 | 境界 |
 |---|---|---|
 | `src/popup/` | 8タブの設定 UI、設定の復元・保存、即時適用、カラーピッカー、問い合わせ導線 | サイト DOM は直接操作せず、設定と操作要求を storage または background へ渡す |
-| `src/lib/actions.js` | Actions、StorageKeys、SettingsSchema、機能定義、純粋関数の単一情報源 | DOM・ブラウザ固有ライフサイクルを持たない |
+| `src/lib/actions-core.js` / `actions-video.js` / `actions-loupe.js` / `actions-volume.js` / `actions.js` | 共通の Actions・StorageKeys、用途別の機能定義・純粋関数、SettingsSchema の単一情報源 | DOM・ブラウザ固有ライフサイクルを持たない |
 | `src/background/background.js` | popup / content script の sender 検証、設定配布、ルーペ撮影、Chrome 音量処理の調停、Gemini Notebook RPC、設定移行 | UI とサイト DOM を持たず、権限が必要な処理を集約する |
 | `src/content/` | サイト別 DOM / CSS 適用、動画要素処理、HUD、画像ダウンロード | 対象 URL とフレームを manifest で限定し、機能 OFF または context 失効時に状態を戻す |
 | `src/offscreen/` | Chrome の tabCapture 音声ストリームと AudioContext / DSP graph の維持 | Chrome 専用。Firefox manifest からは offscreen / tabCapture を除外する |
@@ -98,7 +100,7 @@ Firefox では attach を開始する前に、メタデータ取得済み・ペ�
 
 ### 定数と純粋ロジックを集中する
 
-機能定義、設定 schema、メッセージ ID、境界計算を `actions.js` に集め、popup・background・content scripts 間の重複を避けています。IIFE と `globalThis` 公開は bundler なしで manifest の読み込み順を利用できる一方、公開名の drift が起きやすいため `test/actions.test.js` で名前と件数を固定します。
+機能定義・境界計算を用途別の `actions-video.js` / `actions-loupe.js` / `actions-volume.js` / `actions.js`、設定 schema を `actions.js`、メッセージ ID と保存キーを `actions-core.js` に置き、popup・background・content scripts 間の重複を避けています。IIFE と `globalThis` 公開は bundler なしで manifest の読み込み順を利用できる一方、公開名の drift が起きやすいため `test/actions.test.js` で名前と件数を固定します。
 
 ### サイト適用を content script に分離する
 

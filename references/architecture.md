@@ -6,7 +6,9 @@
 
 ## Architecture
 
-3 つのレイヤが `chrome.runtime` メッセージパッシングで連携する。アクション定数は `src/lib/actions.js` で集中管理。
+3 つのレイヤが `chrome.runtime` メッセージパッシングで連携する。アクション定数は `src/lib/actions-core.js` で管理。
+
+共有定義の責務・依存関係・各実行経路の読込順は、正本の [DESIGN.md 冒頭](../DESIGN.md#vuora-設計) を参照する。
 
 ```text
 Popup (src/popup/popup.{html,js,css})
@@ -214,7 +216,7 @@ Service worker。役割:
 ### Instagram クリーナー (`src/content/instagram-cleaner.js` + `src/content/instagram-cleaner.css`)
 `*://*.instagram.com/*` 限定の content_scripts エントリで `all_frames: false`（top frame のみ）に `run_at: document_idle` で注入。`window.__cpaInstagramCleanerRunning` で二重実行防止。`instagramCleanerEnabled` (master) + `instagramCleanerFeatures` (オブジェクト) の 2 キーで管理。12 機能の単一情報源は `actions.js` の `InstagramCleaner.FEATURES`。
 
-**run_at 注意**: 最初の content_scripts エントリ（`http(s)://*/*` で `actions.js` を含む）が `document_idle` のため、Instagram エントリも揃えないと「`InstagramCleaner is not defined`」エラーになる。Chrome は `run_at` が違うと早い方を先に評価するので、`document_start` を指定すると `actions.js` 未ロード状態で走ってしまう。CSS は manifest の `css:` 配列で別経路で document_start に近いタイミングで注入されるため、JS を idle にしても見た目への影響は小さい。
+**注入順序**: Instagram の `document_idle` エントリ自身が `actions-core.js` → `actions.js` → `cleaner-core.js` → Instagram の各 consumer を読み込む。他サイトや全サイトエントリの `run_at`・評価順には依存しない。`document_start` の early エントリは独立して設定を確認し、明示的に ON の機能だけ先制非表示にする。CSS は manifest の `css` 配列から読み込む。
 
 Instagram の冗長 UI（Reels / Explore / Stories / Threads / いいね数 / 動画 / コメント / Notes / メッセージカウンター）を非表示にする独自実装。クリーンアップ目的に機能を絞っており、寄付ボタン UI 注入・多言語ローカライズ・フォント変更・グレースケール / 正方形化等は実装しない。
 
@@ -307,12 +309,12 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 - `volumeBoosterEnabled` (master) + `volumeBoosterLastGain` (数値 0〜300、初期 100) + `volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterBassCutEnabled` / `volumeBoosterMutedEnabled` + イコライザ 4 キー (`volumeBoosterEqEnabled` / `volumeBoosterEqGains` 10 要素配列 / `volumeBoosterEqPreamp` / `volumeBoosterEqPreset`) の **10 storage key** で管理
 - 全設定はグローバル永続化（タブ間共通）。マスター OFF は全 AudioContext を解放
 - **ミュート UI**: popup の音量スライダー左にトグルボタン（🔊/🔇、`aria-pressed` ベース）。ミュート ON 中もスライダー値は last gain 位置のまま表示・操作可能で、ユーザーは「ミュート維持のままスライダー値を変更 → ミュート解除で意図した音量に復帰」できる
-- 数値の単一情報源は [`src/lib/actions.js`](../src/lib/actions.js) の `VolumeBooster` 定数 — ドキュメントとコードに齟齬が出たら必ずコードを正とすること
+- 数値の単一情報源は [`src/lib/actions-volume.js`](../src/lib/actions-volume.js) の `VolumeBooster` 定数 — ドキュメントとコードに齟齬が出たら必ずコードを正とすること
 
 ### Gemini Notebook 送信 (`src/content/youtube-notebooklm.{js,css}` + background の RPC クライアント)
 アカウント一覧は取得日時を添えて端末内に保持し、background のメモリと storage、content の表示すべてに同じ12時間の有効期限を適用する。期限切れではメール表示とノートブック候補を一緒に破棄し、アカウント一覧の読み取り後に現在の選択 index のノートブック一覧を再取得する。取得失敗時は古いメールに戻さず番号で表示し、OFF・再有効化をまたぐ旧応答は破棄する。ページ持続中もボタン表示中は期限タイマーで更新し、送信操作でも期限を再確認する。12時間以内の Google 側のログイン変更を即時検出する契約ではないため、選択 index の自動変更は行わない。
 
-`*://*.youtube.com/*` の top frame に注入（**配信時刻オーバーレイと同じ content_scripts エントリに相乗り**で actions.js 二重ロードを回避）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.notebookLmSend`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず `APPLY_SEARCH_FIXER_CS` を購読、`computeActive()` で判定）。視聴中の動画 / 検索結果 / プレイリスト / チャンネルの動画を、ユーザー自身の Google アカウントの **Gemini Notebook にソースとして追加**する。カテゴリは新設の `integration`（🔗）。
+`*://*.youtube.com/*` の top frame に注入（**配信時刻オーバーレイと同じ content_scripts エントリに相乗り**し、先頭の `actions-core.js` → `actions.js` を共有）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.notebookLmSend`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず `APPLY_SEARCH_FIXER_CS` を購読、`computeActive()` で判定）。視聴中の動画 / 検索結果 / プレイリスト / チャンネルの動画を、ユーザー自身の Google アカウントの **Gemini Notebook にソースとして追加**する。カテゴリは新設の `integration`（🔗）。
 
 **外部通信の例外 2**: 本機能は画像ダウンロードの CDN 取得と並ぶ、外部通信を行う例外。**送信されるのはユーザーがボタンを押した瞬間の YouTube 動画 URL と（新規作成時の）ノートブック名だけ**で、視聴履歴収集やバックグラウンド送信は行わない。docs/privacy-policy.{md,en.md} の「例外 2」に明記済み。
 
@@ -357,11 +359,11 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 **その他の不変条件**: 対象ページは `/watch`（単一）/ `/results` / `/playlist` / チャンネルの `/videos` `/streams`（一括）。一括系は**描画済みカードのみ**が対象で、件数をボタンに出すので「全部入っていない」誤解を防ぐ。URL は `NotebookLm.normalizeWatchUrl` で `watch?v=<id>` に正規化（`&list=` 等が残ると Gemini Notebook 側で重複ソース化する）。上限超過分は黙って捨てず件数を表示する。`createElement` ベースで Trusted Types 安全、`CleanerCore.subscribeStored` による設定再取得の直列化、context invalidation guard、`pagehide(persisted=false)` teardown、`__cpa-nlm-` プレフィックス。
 
 ### 配信時刻オーバーレイ (`src/content/youtube-broadcast-clock.{js,css}`)
-`*://*.youtube.com/*` の top frame に注入（`document_idle`、**Gemini Notebook 送信と同じ content_scripts エントリに相乗り**で actions.js 二重ロードを回避）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.broadcastClock`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず、`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js と共に購読し `computeActive()` で判定。Shorts 5 サブ機能と同じ統合方式）。**ライブ配信のアーカイブ（過去ライブの VOD）再生中に、その瞬間が実際に配信されていた時刻を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・ローカルタイム）で HUD 表示する（画質・再生速度・音量と共通のプレイヤー内オーバーレイ）**。純粋ロジックは `actions.js` の `BroadcastClock` namespace、DOM / fetch / lifecycle のみ本 cs が担当。
+`*://*.youtube.com/*` の top frame に注入（`document_idle`、**Gemini Notebook 送信と同じ content_scripts エントリに相乗り**し、先頭の `actions-core.js` → `actions.js` を共有）。**YouTube 機能拡張のサブ機能** `searchFixerFeatures.broadcastClock`（master `searchFixerEnabled` AND で制御。独立 storage key は持たず、`APPLY_SEARCH_FIXER_CS` を search-fixer.js / youtube-shorts.js と共に購読し `computeActive()` で判定。Shorts 5 サブ機能と同じ統合方式）。**ライブ配信のアーカイブ（過去ライブの VOD）再生中に、その瞬間が実際に配信されていた時刻を `yyyy/MM/dd　hh:mm:ss`（全角スペース区切り・全桁ゼロ埋め・24 時間制・ローカルタイム）で HUD 表示する（画質・再生速度・音量と共通のプレイヤー内オーバーレイ）**。純粋ロジックは `actions.js` の `BroadcastClock` namespace、DOM / fetch / lifecycle のみ本 cs が担当。
 
 **配信時刻の算出**: `配信時刻 = liveBroadcastDetails.startTimestamp + video.currentTime`。`BroadcastClock.computeBroadcastEpochMs(startMs, currentTimeSec)` で epoch を出し `BroadcastClock.formatTimestamp(epochMs)` で整形する（両純粋関数とも `test/actions.test.js` で境界値テスト。全角スペース・ゼロ埋め・24 時間制を固定アサート）。
 
-**データ取得（同一オリジン fetch、外部送信ゼロを維持）**: content script（isolated world）からは MAIN world の `ytInitialPlayerResponse` を直接読めないため、`/watch?v=<id>` を **same-origin 認証 fetch（`credentials:"same-origin"` + `redirect:"manual"`、search-fixer.js の `/feed/channels` 取得と同型。外部 CDN 向け fetch 4 原則とは別パターン）** して HTML 内の `liveBroadcastDetails` を `BroadcastClock.parseLiveBroadcastDetails` で正規表現抽出する（**自オリジンへの取得のみで外部送信はゼロ**）。結果は **videoId 単位で sessionStorage cache**（`__cpa_bc_info_v1::` prefix、負例＝通常動画も cache して再 fetch を防ぐ）、`fetchInFlightVideoId` で同一動画への重複 fetch を防止。
+**データ取得（YouTube への同一オリジン fetch）**: content script（isolated world）からは MAIN world の `ytInitialPlayerResponse` を直接読めないため、`/watch?v=<id>` を **same-origin 認証 fetch（`credentials:"same-origin"` + `redirect:"manual"`、search-fixer.js の `/feed/channels` 取得と同型。外部 CDN 向け fetch 4 原則とは別パターン）** して HTML 内の `liveBroadcastDetails` を `BroadcastClock.parseLiveBroadcastDetails` で正規表現抽出する（動画 ID・認証 Cookie・IP が YouTube に伝わる。開発者サーバーには送信しない）。結果は **videoId 単位で sessionStorage cache**（`__cpa_bc_info_v1::` prefix、負例＝通常動画も cache して再 fetch を防ぐ）、`fetchInFlightVideoId` で同一動画への重複 fetch を防止。トップフレームの対象 URL・有効な動画 ID・プレーヤー動画が揃い、マスターと `broadcastClock` が ON の場合に限る。タイムアウト15秒、参照元はブラウザ・ページ制御。配信中・失敗は保存せず、保存には明示 TTL がなくタブセッション内で保持、OFF でも既存保存は消さない。OFF・通常 `pagehide`・孤立検出で abort し、プレーヤー動画と新動画 ID の検出時も旧要求を abort する。全 SPA 遷移で abort するわけではない。
 
 **対象判定**: `liveBroadcastDetails` を持ち、かつ配信終了済み（`isLiveNow !== true`）のアーカイブのみ表示。通常動画（liveBroadcastDetails なし）・配信中ライブ・プレミア公開待ちには出さない。videoId は `BroadcastClock.extractVideoId`（`/watch?v=` と `/live/<id>` 両対応、11 文字厳密マッチ）で取得。
 
@@ -409,7 +411,7 @@ E2E はタブを作り直さず、実記事の同じ文書でテーマ・幅・�
 
 表示パネルを非表示にし、右列にページツールがピン留めされていない場合は、右列と間隔の分を本文に使います。`narrowContent` を ON にすると空いた領域へ広げず、設定済みの記事幅に収めます。ほかのページツールが右列にある場合はその列を保ちます。行間は文字サイズに対する倍率 `lineHeight`（1.30〜2.40、0.05刻み）で保存し、本文へ適用します。旧設定に行間がなければ従来の1.85倍で補完します。
 
-`*://*.wikipedia.org/*` の top frame に `actions.js` → `cleaner-core.js` → `scan-runner.js` → `wikipedia-reader.js` と専用 CSS を読み込みます。`wikipediaEnabled` は既定 OFF。`wikipediaFeatures` の `readableLayout` / `stickyContents` / `imageViewer` / `linkPreview` はマスター ON のときだけ既定 ON、`hideAppearance` / `narrowContent` は既定 OFF です。後者は Vector の表示パネルと表示ボタンをピン留め状態にかかわらず隠します。外観はテーマ・本文書体・見出し書体・文字サイズ・行間・記事幅・リンク表示・記事表示を調整できます。テーマ一覧 `WikipediaReader.AVAILABLE_THEMES` は Wikipedia 自体の配色と自動切替に加え One Dark / Light、Dracula、Nord、Monokai、Solarized Dark / Light、GitHub Dark / Light。旧テーマの保存値も `WikipediaReader.THEMES` で受け入れ、使用中の場合だけ旧値を選択欄に残します。自動切替は One Light / Dark をシステム設定に合わせます。書体はシステムのゴシック／明朝と同梱7書体（見出しは「本文と同じ」も選択可）。文字サイズは S/M/L が 14/16/18px、細かい指定は14–24px。記事幅は640–1200pxで、S/M/L（680/860/1200px）と細かい指定を併用できます。`WikipediaReader` の正規化関数を popup・background・同期・バックアップと content script で共有します。
+`*://*.wikipedia.org/*` の top frame に `actions-core.js` → `actions.js` → `cleaner-core.js` → `scan-runner.js` → `wikipedia-reader.js` と専用 CSS を読み込みます。`wikipediaEnabled` は既定 OFF。`wikipediaFeatures` の `readableLayout` / `stickyContents` / `imageViewer` / `linkPreview` はマスター ON のときだけ既定 ON、`hideAppearance` / `narrowContent` は既定 OFF です。後者は Vector の表示パネルと表示ボタンをピン留め状態にかかわらず隠します。外観はテーマ・本文書体・見出し書体・文字サイズ・行間・記事幅・リンク表示・記事表示を調整できます。テーマ一覧 `WikipediaReader.AVAILABLE_THEMES` は Wikipedia 自体の配色と自動切替に加え One Dark / Light、Dracula、Nord、Monokai、Solarized Dark / Light、GitHub Dark / Light。旧テーマの保存値も `WikipediaReader.THEMES` で受け入れ、使用中の場合だけ旧値を選択欄に残します。自動切替は One Light / Dark をシステム設定に合わせます。書体はシステムのゴシック／明朝と同梱7書体（見出しは「本文と同じ」も選択可）。文字サイズは S/M/L が 14/16/18px、細かい指定は14–24px。記事幅は640–1200pxで、S/M/L（680/860/1200px）と細かい指定を併用できます。`WikipediaReader` の正規化関数を popup・background・同期・バックアップと content script で共有します。
 
 記事閲覧 (`ns-0` / `action-view`) 時だけ適用します。`readableLayout` は Vector 2022 と必要な標準ヘッダー・タイトルバー・ツールバーがある文書で、検索を含む上部バー、目次の左列、記事ヘッダー、本文、基本情報、記事操作、帰属フッターへ構造を組み直します。Wikipedia の実ノードを移すため、検索・言語切替・編集・履歴・本文の ID やイベントを保持します。移動前の位置へコメントを挿入し、解除時に逆順で戻します。独自ラッパー内のサイト所有ノードは ID に依存せず復元し、サイトが差し替えたノードも保持します。元のページ全体が交換された場合は古い文書を復活させません。旧 Vector 等では元の構造を保ち、外観調整だけを適用します。
 

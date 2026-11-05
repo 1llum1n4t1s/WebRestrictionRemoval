@@ -18,7 +18,7 @@ LLM (Claude / Codex 等) 向けの詳細な実装規約は [AGENTS.md](AGENTS.md
 ```bash
 git clone https://github.com/1llum1n4t1s/WebRestrictionRemoval.git
 cd WebRestrictionRemoval
-bun install
+bun run deps
 ```
 
 ## 主要コマンド
@@ -55,8 +55,8 @@ bash ./zip.sh firefox
 ```
 
 生成物:
-- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (12 機能フル対応、音量ブースターは tabCapture 経路)
-- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (12 機能フル対応。音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js` = manifest.firefox.json のみに登録される content script で提供、DRM サイトでは無効。background の tabCapture 経路は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip)
+- `web-viewing-assist-chrome.zip` — Chrome Web Store 用 (13 カテゴリ対応、音量ブースターは tabCapture 経路)
+- `web-viewing-assist-firefox.xpi` — Firefox AMO 用 (13 カテゴリ対応。音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js` = manifest.firefox.json のみに登録される content script で提供、DRM サイトでは無効。background の tabCapture 経路は `HAS_VOLUME_BOOSTER` guard で Firefox では全 skip)
 
 ## ローカル動作確認
 
@@ -125,7 +125,7 @@ Popup (src/popup/popup.{html,js,css})
 
 | パス | 役割 |
 |------|------|
-| `src/lib/actions.js` | 単一情報源 (Actions / StorageKeys / SettingsSchema 等を `globalThis` に公開) |
+| `src/lib/actions-core.js` / `actions-video.js` / `actions-loupe.js` / `actions-volume.js` / `actions.js` | 用途別の単一情報源（共通 / 映像 / ルーペ / 音量 / サイト定義・SettingsSchema を `globalThis` に公開） |
 | `src/lib/scan-runner.js` | rAF + MutationObserver + context invalidation guard の共通ランタイム |
 | `src/lib/audio-pipeline.js` | 音量ブースター DSP コア 9 関数 (`dbToGain` / `applyCompressorPreset` / `applyFilterPreset` / `createBassCutChain` / `applyEqualizer` / `createEqChain` / `createOutputCeiling` / `applyOutputCeiling` / `connectAudioGraph`。caller は offscreen.js = Chrome と volume-booster-mes.js = Firefox の 2 つ) |
 | `src/background/background.js` | Service Worker (settings 集約 / offscreen 管理 / 音量ブースター制御) |
@@ -141,8 +141,8 @@ Popup (src/popup/popup.{html,js,css})
 
 詳細は [AGENTS.md](AGENTS.md) を参照。要点だけ抜粋:
 
-- **新機能追加は `src/lib/actions.js` から手をつける** (FEATURES 配列 / StorageKeys / Actions が単一情報源)
-- **デフォルト OFF 方針徹底** — 11 マスタートグルすべて初期 OFF（機能数の正本は AGENTS.md の早見表）
+- **新機能追加は対象の定義元から手をつける** — Actions / StorageKeys は `src/lib/actions-core.js`、映像・ルーペ・音量は対応する `actions-video.js` / `actions-loupe.js` / `actions-volume.js`、サイト FEATURES / SettingsSchema は `actions.js`。各 consumer の読み込み元に共通→必要定義を先に列挙し、他エントリの実行順に依存させない。
+- **デフォルト OFF 方針徹底** — 全マスタートグルが初期 OFF（件数の正本は AGENTS.md の早見表）
 - **`SenderCheck` で sender 検証必須** — background の各 message handler 冒頭
 - **MutationObserver で DOM 書き戻すときは `ScanRunner.create()` を使う** (rAF coalesce + disconnect→render→takeRecords→observe ガード)
 - **Extension context invalidation guard** — `chrome.runtime?.id` 検知 + observer/timer 停止 + cleanup (PATTERN SYNC は 14 ファイル実装済み)

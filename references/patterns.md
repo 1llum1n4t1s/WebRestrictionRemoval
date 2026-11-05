@@ -17,7 +17,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
    - `minimum_chrome_version` 削除
    - `host_permissions: ["<all_urls>"]` を追加 (Firefox AMO 推奨)
 
-2. **`importScripts` ガード** — `background.js` 冒頭は `if (typeof importScripts === "function") importScripts("/src/lib/actions.js");` でガードする。Firefox event page では importScripts は worker 限定 API のため呼べないが、manifest の `background.scripts` で actions.js を先に評価しているので skip して OK。
+2. **`importScripts` ガード** — Chrome background は `typeof importScripts === "function"` の場合だけ共通→映像→ルーペ→音量→サイト定義を依存順に読み込む。Firefox event page は manifest の `background.scripts` が同じ順で読み込む。各 content_scripts エントリも共通→必要な定義を独立して列挙し、他エントリの実行順に依存しない。
 
 3. **`HAS_VOLUME_BOOSTER` ランタイム検知** — `const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";` を background.js で定義し、`VOLUME_BOOSTER_SET_GAIN` / `VOLUME_BOOSTER_RELEASE_TAB` メッセージ handler、`chrome.tabs.onActivated` / `chrome.tabs.onRemoved` / `chrome.storage.onChanged` の音量関連経路で早期 return する。
 
@@ -43,13 +43,13 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 
 
 ### 設計の起点
-- **`src/lib/actions.js` は単一情報源** — 新機能追加は actions.js から手をつける。Actions / StorageKeys / 機能 FEATURES 配列がここに集約され、popup の動的レンダリング → background の dispatch → content script の購読が全てここの定数を参照する。FEATURES に追加すれば popup UI は自動生成される。actions.js は古典的グローバル定数方式（ES modules ではない）で 4 経路で共有: ① background の `importScripts()`、② manifest content_scripts の最初のエントリで全 http(s) フレームに自動注入、③ popup.html の `<script>` タグ、④ offscreen.html の `<script>` タグ。
+- **共有定義は用途別の単一情報源** — Actions / StorageKeys / ExtensionPaths / SenderCheck は `src/lib/actions-core.js`、映像は `actions-video.js`、ルーペは `actions-loupe.js`、音量は `actions-volume.js`、サイト別 FEATURES / SettingsSchema 等は `actions.js` に定義する。FEATURES の追加は popup の動的生成に反映される。各ファイルは IIFE と `globalThis` 公開を使い、background（Chrome の `importScripts()` / Firefox の `background.scripts`）、各 content_scripts エントリ、popup / offscreen の `<script>` から依存順に読み込む。全サイトには映像・ルーペ・Firefox 音量それぞれの共通→必要定義だけを注入する。
 - **バージョン番号は手動で書き換えない** — `manifest.json` / `package.json` の `version` フィールド（および `/vava` での lockfile 再生成で連動する `bun.lock`）およびドキュメント中の `v1.x.y` 表記は `/vava` スキル経由でのみ更新する。コード変更コミットでバージョン番号には触れない。
-- **デフォルト OFF 方針徹底** — 10 マスタートグル（YouTube 機能拡張 / Amazon 合計 / Amazon ランキング / Amazon バッジ / Instagram クリーナー / TikTok クリーナー / 動画ガンマ補正 / 動画黒帯除去 / ルーペ / 音量ブースター）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF かつミュート OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。ルーペもマスター OFF で content script 内の DOM / リスナーがすべて撤去される（Blob URL も revoke）。
+- **デフォルト OFF 方針徹底** — 全マスタートグル（件数の正本は AGENTS.md の早見表）が `onInstalled` で false 初期化、復元は `=== true` で防御的に判定。音量ブースターはマスター OFF に加え、ON でも「スライダー 100% かつ全サブトグル OFF かつミュート OFF」のときリソース解放される（インストール直後はマスター OFF かつ全サブトグル OFF = 完全に無処理）。ルーペもマスター OFF で content script 内の DOM / リスナーがすべて撤去される（Blob URL も revoke）。
 
 ### メッセージング・content script
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
-- **content_scripts の二重ロード許容** — `actions.js` は **各 content_scripts エントリで個別にロード** する（manifest.json の各エントリの `js` 配列冒頭に含める）。同一 isolated world で複数回ロードされても `__cpaActionsLoaded` ガード (`src/lib/actions.js` 冒頭) で 2 回目以降は即 return するため、定数二重宣言エラーを起こさず安全。これにより各サイトエントリの実行順序や `run_at` 差異に依存せず、`actions.js` 依存を持つ全 content script が確実に `Actions` / `StorageKeys` 等の定数を参照できる。**例外: `document_start` 専用 early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js` / `x-early.js`) は actions.js を含めない** (最速注入のため、生 storage key 文字列で書く)。理由: `document_start` 注入と `document_idle` 注入は別エントリ扱いだが、同一 isolated world で同じ `const` を二重宣言すると SyntaxError になるため、early は最小スクリプト + actions.js 非読込で衝突を防ぐ。
+- **content_scripts の二重ロード許容** — 共有定義が必要な各エントリの配列先頭に `actions-core.js` と必要な定義ファイルを依存順に含める。各ファイル固有の再評価ガードが同じ isolated world でのオブジェクト参照を維持するため、他エントリの実行順や `run_at` に依存しない。サイト用は共通→`actions.js`、全サイト映像は共通→映像、ルーペは共通→ルーペ、Firefox 音量は共通→音量→`audio-pipeline.js` の順。`document_start` の early-framework / 各サイト early script と MAIN world の youtube-player-controls-main は共有定義に依存せず、これらを読み込まない。early script は生の storage key を用いて最小限の注入を行う。
 - **early script は共通フレームワーク経由** — `src/content/early-framework.js` がクラス条件付き `<style>` 注入・`chrome.storage.local.get`・`storage.onChanged` 購読を集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、4 サイトの early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js` / `x-early.js`) が config を渡して setup を呼ぶ。クラス・inline 非表示は master と該当 feature の明示的な ON を確認してから適用し、未取得・未設定・OFF・初回取得失敗時は表示を変えない。読取前の FOUC は許容する。新サイトの early script もこのパターンに乗せ、サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す。
 - **二重実行防止** — `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__cpaAmazonRankingJumpRunning` / `window.__cpaAmazonMerchantInfoRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaVideoFillRunning` / `window.__cpaLoupeRunning` / `window.__cpaBroadcastClockRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
 
@@ -116,7 +116,7 @@ Chrome の音量ブースターは tabCapture → offscreen の AudioContext 一
 - **Offscreen Document の 1 拡張 1 文書制約** — `reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。新しい用途を追加するときは既存ドキュメントに同居させること。
 - **`minimum_chrome_version: "140"` 固定** — `chrome.runtime.getContexts`（116+）等の new API は **typeof チェックなしで直接呼んで良い**。legacy fallback の `if (typeof chrome.runtime.getContexts !== "function")` 分岐はバグ温床（receiver 不在エラーを active 扱いして 30 秒 cycle 無限再 schedule した Claude Code P2 指摘あり）なので追加しないこと。
 
-**DSP preset チューニング履歴** (新規に DSP に触る前に必ず読む。値定数の正は `src/lib/actions.js` `VolumeBooster`、フロー制御の正は `src/lib/audio-pipeline.js`。ナイトモード / 自動歪み防止 preset の調整履歴は actions.js の `NIGHT_MODE_PRESET` / `ANTI_CLIP_PRESET` コメント、壁ドン対策は `BASS_CUT_PRESET` / `BASS_CUT_BYPASS` コメントを参照):
+**DSP preset チューニング履歴** (新規に DSP に触る前に必ず読む。値定数の正は `src/lib/actions-volume.js` `VolumeBooster`、フロー制御の正は `src/lib/audio-pipeline.js`。ナイトモード / 自動歪み防止 preset の調整履歴は actions-volume.js の `NIGHT_MODE_PRESET` / `ANTI_CLIP_PRESET` コメント、壁ドン対策は `BASS_CUT_PRESET` / `BASS_CUT_BYPASS` コメントを参照):
 
 | Version | 変更内容 | 動機 / 棄却された alternative |
 |---|---|---|
@@ -273,7 +273,7 @@ popup の `apply()` が popup load 時のスナップショット変数を元に
 **経路 D: popup の stored get リスト欠落 (致命バグパターン、過去 RTX 動画強化機能で発覚)**
 popup load 時の `stored = await chrome.storage.local.get([...keys])` リストと、stored 参照箇所 (`stored[KEY]`) は完全に対応している必要がある。**get リストに無いキーを参照すると `undefined` → UI で常に false 表示 → apply() で false 上書き → storage の既存 true が破壊**される。
 - 対策: 新規 master トグル / 設定キー追加時の **6 ポイントチェックリスト** を必ず通す
-  1. `StorageKeys.<KEY>` を `src/lib/actions.js` に追加
+  1. `StorageKeys.<KEY>` を `src/lib/actions-core.js` に追加（設定項目の `SettingsSchema` は `src/lib/actions.js`）
   2. `onInstalled` の defaults 初期化リスト (`background.js`) に `<KEY>` を追加
   3. `APPLY_SETTINGS_KEYS` / `normalizeSettings` / `toStorageRecord` の 3 関数全てに `<KEY>` を追加 (drift 防止)
   4. **popup の `stored = chrome.storage.local.get([...])` リストに `<KEY>` を追加** ⚠️
