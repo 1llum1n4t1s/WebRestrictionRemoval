@@ -29,7 +29,7 @@ concurrency:
 jobs:
   package:
     name: ZIP パッケージ作成
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, ARM64, m3mb14]
     # 修復 push と GitHub rerun は提出を開始しない。再開時の外部状態照合は vava が行う。
     if: ${{ github.run_attempt == 1 && startsWith(github.ref, 'refs/heads/release/') && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.created == true)) }}
     outputs:
@@ -193,7 +193,7 @@ jobs:
 
   publish:
     name: Chrome Web Store にアップロード + Submit for review
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, ARM64, m3mb14]
     needs: package
     # Firefox の再開時は、審査中・公開済みの Chrome へ再提出しない。
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.target != 'firefox' }}
@@ -243,7 +243,7 @@ jobs:
 
   publish-firefox:
     name: Firefox AMO に submission
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, ARM64, m3mb14]
     needs: package
     # package 成功を必須にし、Chrome の結果からは独立して提出する。
     # Chrome のみ再開するときは Firefox へ再提出しない。
