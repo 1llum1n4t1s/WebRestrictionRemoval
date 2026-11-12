@@ -205,7 +205,8 @@
           group.append(button);
         }
         liveControls = group;
-        area.querySelector(".__cpa-ypc-settings")?.append(group);
+        // ライブ指標は一目で見る情報なので、設定の中ではなくツールバー（選択欄の列）に並べる。
+        controls.append(group);
       }
       area.prepend(controls);
     }

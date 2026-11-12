@@ -1613,11 +1613,16 @@
     const items = document.querySelectorAll(
       "ytd-video-renderer.style-scope.ytd-item-section-renderer"
     );
+    // DOMTokenList の remove / add は対象クラスの有無にかかわらず class 属性を書き戻すため、
+    // 毎 scan で全結果へ remove → add すると同じ状態でも属性変更と style 再計算が起きる。
+    // 目標状態と食い違うクラスだけを触り、最終的な class 状態は従来と同一に保つ。
+    const want = enabled ? (isDark ? "__cpa-sfx-thumb-dark" : "__cpa-sfx-thumb-light") : null;
     items.forEach((el) => {
-      el.classList.remove("__cpa-sfx-thumb-dark", "__cpa-sfx-thumb-light");
-      if (enabled) {
-        el.classList.add(isDark ? "__cpa-sfx-thumb-dark" : "__cpa-sfx-thumb-light");
+      const cls = el.classList;
+      for (const name of ["__cpa-sfx-thumb-dark", "__cpa-sfx-thumb-light"]) {
+        if (name !== want && cls.contains(name)) cls.remove(name);
       }
+      if (want && !cls.contains(want)) cls.add(want);
     });
     // 装飾済みマーカー: SPA で検索結果ページから離れた後の clearThumbnailHighlight が
     // querySelectorAll を走らせるかどうかをこのフラグで判定 (空走査回避)
@@ -4003,6 +4008,10 @@
     subsGridState = null;
     // 撤去途中に例外があっても、旧 observer の通知は失効させる。
     try { oldGridState?.observer?.disconnect(); } catch {}
+    // 並べ替えラベル修復はグリッド状態の確立前から動くため、ensureSubsGridToolbar が途中で
+    // 例外になると subsGridState なしで残る。orphanCleanupRan で再実行されないので、
+    // グリッド撤去の有無にかかわらずここで止める（停止済みなら no-op）。
+    try { stopSubsSortLabelRepair(); } catch {}
     try { applySubscriptionsRelevant(false); } catch {}
     try { detachResultsObserver(); } catch {}
     try { detachLiveChatObserver(); } catch {}

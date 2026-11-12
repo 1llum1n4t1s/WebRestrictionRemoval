@@ -53,13 +53,24 @@
     }
     if (root.parentElement !== area) area.append(root);
     // 操作欄の直上から動画の上端まで使い、全画面・シアター・埋め込みの寸法に追従する。
-    const availableHeight = Math.max(0, area.getBoundingClientRect().top - player.getBoundingClientRect().top - 8);
+    const areaRect = area.getBoundingClientRect();
+    const playerRect = player.getBoundingClientRect();
+    const availableHeight = Math.max(0, areaRect.top - playerRect.top - 8);
     root.style.setProperty("--ypc-available-height", `${availableHeight}px`);
+    // 表示先が左側操作群など狭い要素でも、ツールバーは自身の左端から動画の右端までを使う。
+    // 配置基準が表示先と異なる場合もあるため、表示先ではなくオーバーレイ自身の左端から測る。
+    const availableWidth = Math.max(0, playerRect.right - root.getBoundingClientRect().left - 12);
+    root.style.setProperty("--ypc-available-width", `${availableWidth}px`);
+    // 設定ポップオーバーはツールバーの上に開くため、ツールバー（折り返しを含む）の高さを差し引く。
+    const popoverMax = Math.max(120, availableHeight - root.getBoundingClientRect().height - 8);
+    root.style.setProperty("--ypc-popover-max-height", `${popoverMax}px`);
     if (observedPlayer !== player || observedArea !== area) {
       resizeObserver ??= new ResizeObserver(scheduleSync);
       resizeObserver.disconnect();
       resizeObserver.observe(player);
       resizeObserver.observe(area);
+      // ツールバーの折り返し・ライブ指標の増減で高さが変わったときもポップオーバーの上限を更新する。
+      resizeObserver.observe(root);
       observedPlayer = player;
       observedArea = area;
     }

@@ -21,7 +21,7 @@ Adjust article width, typeface, text size, and colors on Wikipedia. Includes sti
 
 🔹 YouTube Enhancements (38 sub-features)
 Remove search-result noise, Shorts removal (5 sub-features), watch-page tidying, comment/live-chat hiding, grid column count, hiding "Most relevant" in Subscriptions, subscription channel expansion (subs feed → grid + lazy thumbnail), and more granular controls for YouTube's verbose UI.
-Reduce live latency and switch video quality, playback speed, and player volume. Archive broadcast time also appears as a labeled section in the shared overlay.
+Reduce live latency and switch video quality, playback speed, and player volume. The selectors and archive broadcast time sit as small chips just above the player controls, and other settings open from a gear button.
 
 🔹 X Cleaner (10 sub-features)
 Hide the right pane (widening the timeline into it) / trends / who to follow / messages dock / promoted posts / Premium upsells / Grok / engagement counts, and open Home on the "Following" tab. Selectors are structural data-testid matches only, so they do not depend on the display language. Enable image download under Extras to save post images in original quality using the button shown on hover. On click only, image downloads send the image path, format, name=orig and IP address to HTTPS pbs.twimg.com/media/. No cookies or referrer are sent, and redirects are rejected.

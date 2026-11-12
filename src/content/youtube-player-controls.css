@@ -1,112 +1,239 @@
-/* プレイヤー内の共通パネル。操作・現在値・設定の階層を揃える。 */
+/*
+ * プレイヤー内の共通オーバーレイ。
+ * 操作欄の直上に「チップ型の1行ツールバー」を左寄せで置き、動画を覆う面積を最小にする。
+ * 設定はツールバーの上に開くポップオーバーとし、展開中もツールバー（画質・音量・速度）を操作できる。
+ * 表示先は通常の操作欄・全画面のクイック操作・左側操作群・埋め込みの #player-controls と複数あるため、
+ * 幅と高さは共通ホストが実寸から計算した変数（--ypc-available-width / -height）に従う。
+ */
 .__cpa-ypc-overlay {
   --ypc-accent: #ffffff;
+  --ypc-surface: rgba(18, 18, 18, 0.78);
+  --ypc-surface-strong: rgba(28, 28, 28, 0.96);
+  --ypc-border: rgba(255, 255, 255, 0.14);
+  --ypc-hover: rgba(255, 255, 255, 0.12);
+  --ypc-muted: rgba(255, 255, 255, 0.66);
+  --ypc-chip-height: 34px;
   position: absolute;
   left: 0;
   bottom: calc(100% + 8px);
-  width: 100%;
-  max-height: var(--ypc-available-height, calc(100vh - 80px));
+  width: var(--ypc-available-width, 100%);
+  max-width: 100vw;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  overflow: auto;
+  /* 方向は明示する（ページ側・旧版の縦並び指定が残っていても横並びのツールバーにする）。 */
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
   container-type: inline-size;
   box-sizing: border-box;
-  border: 1px solid #ffffff24;
-  border-radius: 8px;
-  background: #00000099;
-  box-shadow: 0 8px 28px #0006;
+  border: 0;
+  background: none;
   color: #f5f5f5;
-  font: 12px / 1.5 system-ui, sans-serif;
+  font: 500 12px / 1.4 Roboto, "YouTube Sans", system-ui, sans-serif;
   text-align: left;
   text-shadow: none;
   white-space: normal;
-  scrollbar-width: thin;
-  scrollbar-color: #777777 transparent;
   color-scheme: dark;
+  /* ツールバー以外の空白は動画のクリック・ホバーを妨げない。 */
+  pointer-events: none;
 }
+.__cpa-ypc-overlay > * { pointer-events: auto; }
 .__cpa-ypc-overlay *, .__cpa-ypc-overlay *::before, .__cpa-ypc-overlay *::after { box-sizing: border-box; }
 .__cpa-ypc-overlay[hidden], .__cpa-ypc-overlay [hidden] { display: none !important; }
 /* YouTube の自動非表示より、設定中・キーボード操作中の表示を優先する。 */
 .ytp-chrome-bottom:has(> .__cpa-ypc-overlay:hover, > .__cpa-ypc-overlay:focus-within, > .__cpa-ypc-overlay .__cpa-ypc-settings[open]) { opacity: 1 !important; }
-.__cpa-ypc-controls { display: flex; gap: 8px; min-width: 0; margin-bottom: 4px; }
-.__cpa-ypc-controls:empty { display: none; }
+
+/* ---------- 分類（セクション）の並び ---------- */
 .__cpa-ypc-section { flex: none; min-width: 0; }
-.__cpa-ypc-group {
-  display: flex;
+/*
+ * プレイヤー操作の slot（MAIN が参照する登録ノード）と選択欄の列は箱を作らず、
+ * 中のチップをオーバーレイ直下の flex 項目として扱う。狭い幅でもチップ単位で折り返せる。
+ * hidden 指定（広告中）は上の display:none !important が優先される。
+ */
+.__cpa-ypc-player, .__cpa-ypc-controls { display: contents; }
+
+/* ---------- チップ共通 ---------- */
+/*
+ * 選択欄・ライブ指標・配信時刻のチップと設定の歯車チップは同じ外観を共有する。
+ * 対応ブラウザ（Chrome 140+ / Firefox 142+）は接頭辞なしの backdrop-filter / appearance / mask を
+ * 解釈するため、-webkit- 接頭辞は付けない。
+ */
+.__cpa-ypc-group, .__cpa-ypc-settings > summary {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid #ffffff12;
-  border-radius: 8px;
-  background: #ffffff06;
+  gap: 6px;
+  height: var(--ypc-chip-height);
+  border: 1px solid var(--ypc-border);
+  border-radius: calc(var(--ypc-chip-height) / 2);
+  background: var(--ypc-surface);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
-.__cpa-ypc-controls > .__cpa-ypc-group { flex: 1; gap: 6px; padding: 0; border: 0; background: none; }
-.__cpa-ypc-heading { display: flex; flex: 0 0 86px; flex-direction: column; gap: 3px; font: inherit; }
-.__cpa-ypc-label { flex: none; color: #bdbdbd; font-size: 11px; font-weight: 500; white-space: nowrap; }
-.__cpa-ypc-select { flex: 1; width: 0; min-width: 0; height: 30px; padding: 3px 6px; border: 1px solid #ffffff40; border-radius: 5px; background: #222; color: #f5f5f5; font: inherit; cursor: pointer; }
-.__cpa-ypc-live { flex-wrap: wrap; padding: 8px 10px; }
+.__cpa-ypc-group { min-width: 0; padding: 0 4px 0 12px; }
+.__cpa-ypc-heading { display: inline-flex; align-items: center; font: inherit; }
+.__cpa-ypc-label { flex: none; color: var(--ypc-muted); font-size: 11px; font-weight: 500; white-space: nowrap; }
+
+/* 画質・音量・速度: ラベル付きチップの中に枠なしの選択欄を置く。 */
+.__cpa-ypc-select {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  max-width: 14em;
+  height: calc(var(--ypc-chip-height) - 8px);
+  padding: 0 22px 0 8px;
+  border: 0;
+  border-radius: 13px;
+  appearance: none;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23ffffff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+  color: #ffffff;
+  font: 500 13px / 1 Roboto, "YouTube Sans", system-ui, sans-serif;
+  cursor: pointer;
+}
+.__cpa-ypc-select:hover { background-color: var(--ypc-hover); }
+.__cpa-ypc-overlay option { background: #282828; color: #ffffff; }
+
+/* ---------- ライブ指標（ツールバー内の小さなチップ） ---------- */
+.__cpa-ypc-group.__cpa-ypc-live { gap: 4px; padding: 0 4px; }
 .__cpa-ypc-live:not(:has(button:not([hidden]))) { display: none; }
 .ytp-button.__cpa-ypc-button {
   width: auto;
-  min-width: 42px;
-  height: 30px;
+  min-width: 0;
+  height: calc(var(--ypc-chip-height) - 8px);
   margin: 0;
-  padding: 0 9px;
-  border: 1px solid #ffffff24;
-  border-radius: 6px;
-  background: #ffffff08;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
   color: #eeeeee;
-  font: 12px / 28px system-ui, sans-serif;
+  font: 500 12px / 26px Roboto, "YouTube Sans", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
   text-shadow: none;
   white-space: nowrap;
+  opacity: 1;
   cursor: pointer;
 }
-.ytp-button.__cpa-ypc-button:hover { border-color: #ffffff99; background: #ffffff14; }
-.ytp-button.__cpa-ypc-button.__cpa-ypc-active { border-color: var(--ypc-accent); background: #ffffff26; color: #ffffff; }
-.__cpa-ypc-settings { border: 1px solid #ffffff24; border-radius: 6px; background: #00000014; color: #eeeeee; font: inherit; }
-.__cpa-ypc-settings > summary { position: sticky; top: -6px; z-index: 1; padding: 6px 10px; border-radius: 6px 6px 0 0; background: #000a; color: var(--ypc-accent); cursor: pointer; font-weight: 600; }
-.__cpa-ypc-settings[open] > summary { border-bottom: 1px solid #ffffff1a; }
-.__cpa-ypc-setting-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; }
-.__cpa-ypc-setting-item { min-width: 0; border: 1px solid #ffffff12; border-radius: 6px; background: #ffffff04; }
-.__cpa-ypc-setting-item--wide { grid-column: 1 / -1; }
-.__cpa-ypc-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px; font: inherit; cursor: pointer; }
+.ytp-button.__cpa-ypc-button:hover { background: var(--ypc-hover); }
+.ytp-button.__cpa-ypc-button.__cpa-ypc-active { background: #ffffff; color: #0f0f0f; }
+
+/* ---------- 設定（ツールバーのチップ + 上に開くポップオーバー） ---------- */
+/* details 自体は位置指定しないので、ポップオーバーの配置基準はオーバーレイになる。 */
+.__cpa-ypc-settings { display: block; flex: none; color: #eeeeee; font: inherit; }
+.__cpa-ypc-settings > summary {
+  padding: 0 12px 0 10px;
+  color: #ffffff;
+  font-weight: 500;
+  white-space: nowrap;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.__cpa-ypc-settings > summary::-webkit-details-marker { display: none; }
+.__cpa-ypc-settings > summary::marker { content: ""; }
+/* 歯車アイコン。文字は summary 内の span に残し、狭い表示でもアクセシブル名を保つ。 */
+.__cpa-ypc-settings > summary::before {
+  content: "";
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z' transform='translate(-1 0)'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform 0.2s ease;
+}
+.__cpa-ypc-settings > summary:hover { background-color: rgba(48, 48, 48, 0.88); }
+.__cpa-ypc-settings[open] > summary { background: #ffffff; color: #0f0f0f; border-color: #ffffff; }
+.__cpa-ypc-settings[open] > summary::before { transform: rotate(60deg); }
+
+/* ポップオーバー本体。位置の基準はオーバーレイ（ツールバー）で、その上へ開く。 */
+.__cpa-ypc-popover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(680px, 100%);
+  max-height: var(--ypc-popover-max-height, 60vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ypc-border);
+  border-radius: 12px;
+  background: var(--ypc-surface-strong);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+  scrollbar-width: thin;
+  scrollbar-color: #717171 transparent;
+  pointer-events: auto;
+}
+.__cpa-ypc-setting-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px; }
+.__cpa-ypc-setting-item { min-width: 0; border-radius: 8px; }
+.__cpa-ypc-setting-item:hover { background: rgba(255, 255, 255, 0.05); }
+.__cpa-ypc-setting-item--wide { grid-column: 1 / -1; margin-top: 6px; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); }
+.__cpa-ypc-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; padding: 8px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 .__cpa-ypc-setting-row > span { min-width: 0; overflow-wrap: anywhere; }
-.__cpa-ypc-setting-row small { display: block; margin-top: 4px; color: #bdbdbd; font-size: 11px; line-height: 1.5; }
+.__cpa-ypc-setting-row small { display: block; margin-top: 3px; color: var(--ypc-muted); font-size: 11px; font-weight: 400; line-height: 1.45; }
 .__cpa-ypc-setting-row input[type="checkbox"] {
   appearance: none;
-  flex: 0 0 30px;
-  width: 30px;
-  height: 18px;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 20px;
   margin: 0;
-  border: 1px solid #888888;
-  border-radius: 20px;
-  background: #444444;
+  border: 0;
+  border-radius: 10px;
+  background: #5f5f5f;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
-.__cpa-ypc-setting-row input[type="checkbox"]::before { content: ""; display: block; width: 12px; height: 12px; margin: 2px; border-radius: 50%; background: #dddddd; }
-.__cpa-ypc-setting-row input:checked { background: var(--ypc-accent); border-color: var(--ypc-accent); }
-.__cpa-ypc-setting-row input:checked::before { transform: translateX(12px); background: #222222; }
-.__cpa-ypc-settings select { flex: 0 0 auto; max-width: 45%; min-height: 30px; padding: 3px 6px; border: 1px solid #888888; border-radius: 5px; background: #222222; color: #f5f5f5; font: inherit; }
-.__cpa-ypc-overlay :disabled { opacity: .55; cursor: wait; }
-.__cpa-ypc-advanced { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); column-gap: 12px; border-top: 1px solid #ffffff12; }
-.__cpa-ypc-advanced .__cpa-ypc-setting-row { min-height: 40px; padding-block: 6px; }
-.__cpa-ypc-save-status:not(:empty) { padding: 10px; color: #ffb8b5; }
+.__cpa-ypc-setting-row input[type="checkbox"]::before { content: ""; display: block; width: 16px; height: 16px; margin: 2px; border-radius: 50%; background: #ffffff; transition: transform 0.15s ease; }
+.__cpa-ypc-setting-row input:checked { background: #3ea6ff; }
+.__cpa-ypc-setting-row input:checked::before { transform: translateX(14px); }
+.__cpa-ypc-settings select { flex: 0 0 auto; max-width: 45%; min-height: 30px; padding: 3px 8px; border: 1px solid var(--ypc-border); border-radius: 8px; background: #3a3a3a; color: #f5f5f5; font: inherit; }
+.__cpa-ypc-overlay :disabled { opacity: 0.55; cursor: wait; }
+.__cpa-ypc-advanced { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); column-gap: 8px; margin: 0 8px 6px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.__cpa-ypc-advanced .__cpa-ypc-setting-row { min-height: 38px; padding-block: 4px; font-size: 12px; }
+.__cpa-ypc-save-status:not(:empty) { position: sticky; top: 0; z-index: 1; padding: 10px 14px; background: #3b1715; color: #ffb8b5; }
 .__cpa-ypc-overlay :is(button, input, select, summary):focus-visible { outline: 2px solid var(--ypc-accent); outline-offset: 2px; }
-@container (min-width: 520px) { .__cpa-ypc-setting-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
-@container (min-width: 1040px) { .__cpa-ypc-advanced:has(> :nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@container (max-width: 360px) {
-  .__cpa-ypc-controls > .__cpa-ypc-group { flex-direction: column; align-items: stretch; gap: 2px; }
-  .__cpa-ypc-select { flex: auto; width: 100%; }
-  .__cpa-bc-section { flex-wrap: wrap; gap: 8px; }
-  .__cpa-bc-section .__cpa-ypc-heading { flex-basis: 100%; flex-direction: row; align-items: baseline; justify-content: space-between; }
+
+/* ---------- 幅に応じた調整（表示先の実寸 = オーバーレイ幅で判定） ---------- */
+@container (min-width: 520px) { .__cpa-ypc-setting-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; column-gap: 6px; } }
+@container (max-width: 900px) {
+  /* 通常サイズ以下では設定チップを歯車だけにして、選択欄と配信時刻を1行に収めやすくする。 */
+  .__cpa-ypc-settings > summary { padding: 0 8px; }
+  .__cpa-ypc-settings > summary > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@container (max-width: 560px) {
+  /* 狭いプレイヤーでは項目名も視覚的に隠して1行に収める（選択欄の aria-label・要約のテキストは保持）。 */
+  .__cpa-ypc-controls .__cpa-ypc-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .__cpa-ypc-controls > .__cpa-ypc-group { padding-left: 4px; }
+  .__cpa-ypc-popover { width: 100%; }
+  /*
+   * 小さなプレイヤーで設定を開いている間は、ライブ指標と配信時刻のチップを一時的に畳み、
+   * ポップオーバーの高さを確保する（選択欄と歯車は残し、閉じれば元に戻る）。
+   */
+  .__cpa-ypc-overlay:has(.__cpa-ypc-settings[open]) :is(.__cpa-ypc-live, .__cpa-bc-section) { display: none; }
 }
 @media (forced-colors: active) {
+  .__cpa-ypc-group, .__cpa-ypc-settings > summary, .__cpa-ypc-popover { border: 1px solid CanvasText; }
+  /* 白線の矢印画像は明るい配色で埋もれるため、強制カラーではネイティブの選択欄表示に戻す。 */
+  .__cpa-ypc-select { appearance: auto; background-image: none; }
   .__cpa-ypc-setting-row input[type="checkbox"] { appearance: auto; }
   .__cpa-ypc-setting-row input[type="checkbox"]::before { display: none; }
+  .__cpa-ypc-settings > summary::before { background: ButtonText; }
   .ytp-button.__cpa-ypc-button.__cpa-ypc-active { outline: 2px solid Highlight; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .__cpa-ypc-overlay *, .__cpa-ypc-overlay *::before { transition: none !important; }
 }
 .__cpa-ypc-hide-slider .ytp-volume-panel,
 .__cpa-ypc-hide-slider .ytdVolumeControlsSliderContainer,

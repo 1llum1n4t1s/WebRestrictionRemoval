@@ -9,6 +9,8 @@
   let stopped = false;
   let heartbeat = null;
   let settingsPanel = null;
+  // 設定ポップオーバーの外側クリック監視を、セッション撤去時に解除する。
+  let panelCleanup = null;
   let bindings = [];
   let playerSlot = null;
   let syncGeneration = null;
@@ -25,6 +27,8 @@
   function stopSession() {
     post("stop");
     session = null;
+    panelCleanup?.();
+    panelCleanup = null;
     settingsPanel = null;
     bindings = [];
     playerSlot = null;
@@ -40,8 +44,16 @@
       const panel = document.createElement("details");
       panel.className = "__cpa-ypc-settings";
       const summary = document.createElement("summary");
-      summary.textContent = chrome.i18n.getMessage("ypcWatchSettings");
+      // 文字は span に入れ、狭い表示では CSS で視覚的にだけ隠して歯車アイコンのみにする。
+      const summaryText = document.createElement("span");
+      summaryText.textContent = chrome.i18n.getMessage("ypcWatchSettings");
+      // 歯車だけの表示でもマウスで用途が分かるように、同じ文言をツールチップに出す。
+      summary.title = summaryText.textContent;
+      summary.append(summaryText);
       panel.append(summary);
+      // 設定はツールバーの上に開くポップオーバーへまとめる（保存エラー表示も同じ枠の先頭に置く）。
+      const popover = document.createElement("div");
+      popover.className = "__cpa-ypc-popover";
       const status = document.createElement("div");
       status.className = "__cpa-ypc-save-status";
       status.setAttribute("role", "status");
@@ -125,8 +137,33 @@
       }
       // 詳細の多い遅延設定を末尾へまとめ、操作順も表示順に揃える。
       if (latencyItem) list.append(latencyItem);
-      panel.append(status, list);
+      popover.append(status, list);
+      panel.append(popover);
       for (const type of ["click", "dblclick", "keydown", "keyup", "pointerdown"]) panel.addEventListener(type, (event) => event.stopPropagation());
+      // 開いている間だけ document を監視し、オーバーレイ外（動画面など）の操作と、
+      // オーバーレイ内（ツールバーの選択欄を含む）での Escape で閉じる。選択欄の操作では閉じない。
+      let outside = null;
+      const insideOverlay = (target) => target instanceof Node && Boolean(panel.closest(".__cpa-ypc-overlay")?.contains(target));
+      panel.addEventListener("toggle", () => {
+        outside?.abort();
+        outside = null;
+        if (!panel.open) return;
+        outside = new AbortController();
+        const { signal } = outside;
+        document.addEventListener("pointerdown", (event) => {
+          // 表示先から一時的に外れている間は閉じておく（開いたまま監視だけ外れる状態を作らない）。
+          if (!panel.isConnected || !insideOverlay(event.target)) panel.open = false;
+        }, { capture: true, signal });
+        document.addEventListener("keydown", (event) => {
+          if (event.key !== "Escape" || !insideOverlay(event.target)) return;
+          // YouTube 側のキーボードショートカットへは渡さず、歯車へフォーカスを戻す
+          // （ブラウザ自身の Escape による全画面解除は止められない）。
+          event.stopPropagation();
+          panel.open = false;
+          summary.focus();
+        }, { capture: true, signal });
+      });
+      panelCleanup = () => { outside?.abort(); outside = null; };
       settingsPanel = panel;
       slot.append(panel);
     }

@@ -70,6 +70,8 @@
 
   /** @type {number} 最終 render 時刻（throttle 判定） */
   let lastRenderAt = 0;
+  /** @type {ReturnType<typeof setTimeout> | null} 間引き明けの追従描画（撤去時に取り消す） */
+  let trailingRenderTimer = null;
 
   // ---------- ユーティリティ ----------
 
@@ -200,6 +202,7 @@
   }
 
   function removeOverlay() {
+    cancelTrailingRender();
     window.__cpaYouTubeOverlay.remove("broadcast");
     overlayEl = null;
     overlayTimeEl = null;
@@ -209,9 +212,26 @@
 
   function scheduleRender() {
     const now = performance.now();
-    if (now - lastRenderAt < BroadcastClock.RENDER_THROTTLE_MS) return;
+    const wait = BroadcastClock.RENDER_THROTTLE_MS - (now - lastRenderAt);
+    if (wait > 0) {
+      // 間引き中の要求を捨てると、一時停止直前の timeupdate のように後続イベントが来ない場合に
+      // 最後の currentTime が描画されず古い時刻が残る。間引き明けに1回だけ追従描画を予約する。
+      if (trailingRenderTimer === null) {
+        trailingRenderTimer = setTimeout(() => {
+          trailingRenderTimer = null;
+          scheduleRender();
+        }, wait);
+      }
+      return;
+    }
     lastRenderAt = now;
     requestAnimationFrame(render);
+  }
+
+  function cancelTrailingRender() {
+    if (trailingRenderTimer === null) return;
+    clearTimeout(trailingRenderTimer);
+    trailingRenderTimer = null;
   }
 
   function render() {

@@ -22,7 +22,7 @@ Adjust article width, typeface, text size, and colors on Wikipedia. Includes sti
 · 📺 YouTube cleanup (opt-in, default OFF)
   Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
   YouTube Enhancements offers 38 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, hiding "Most relevant" in Subscriptions, live-latency reduction, and quality / playback-speed / player-volume selectors).
-  Quality, volume, and playback speed appear in one row of selectors when enabled. Playback speeds range from 0.25x to 2x. Other settings share one accordion: general settings use two columns and live-latency settings use a full-width section. Narrow players use one column. Archive broadcast time remains outside the accordion. Assign shortcuts in your browser's extension settings.
+  Quality, volume, and playback speed appear in one row of selectors when enabled. Playback speeds range from 0.25x to 2x. Selectors, live indicators, and archive broadcast time sit in compact chips just above the control bar, so they barely cover the video. Other settings open in a panel from the gear button: general settings use two columns and live-latency settings use a full-width section (one column on narrow players). Assign shortcuts in your browser's extension settings.
 
 · 🐦 X cleaner (opt-in, default OFF)
   Ten sub-features to hide distracting UI and save post images on X (formerly Twitter). Enable image download under Extras to save post images in original quality using the button shown on hover.

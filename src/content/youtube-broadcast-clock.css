@@ -1,18 +1,30 @@
-/* 共通プレーヤー枠内の配信時刻。等幅表示で秒更新時の幅変動を防ぐ。 */
+/* 共通オーバーレイのツールバーに並ぶ配信時刻チップ。等幅数字で秒更新時の幅変動を防ぐ。 */
+
+.__cpa-bc-section.__cpa-ypc-group { padding-right: 12px; }
 
 .__cpa-bc-time {
-  flex: 1;
+  flex: none;
   min-width: 0;
-  align-self: center;
   box-sizing: border-box;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Cascadia Code", Consolas, "Roboto Mono", "DejaVu Sans Mono", monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-align: left;
-  color: #f4f4f6;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  white-space: nowrap;
+  text-shadow: none;
+}
+
+/* 狭いプレイヤーでは見出しを視覚的に隠し、時刻だけのチップにする（role=status の読み上げ名は保持）。 */
+@container (max-width: 560px) {
+  .__cpa-bc-section .__cpa-ypc-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
