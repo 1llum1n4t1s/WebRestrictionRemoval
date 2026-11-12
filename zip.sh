@@ -45,6 +45,13 @@ if ! bun run deps --silent; then
   echo "bun run deps に失敗しました"
   exit 1
 fi
+# zip.ps1 と同じく、同梱する問い合わせ部品を固定版の正本へ同期してから梱包する。
+echo "問い合わせ部品を同期中..."
+if ! bun --bun run sync:support; then
+  echo "問い合わせ部品の同期に失敗しました"
+  exit 1
+fi
+echo "アイコンを生成中..."
 if ! bun scripts/generate-icons.js; then
   echo "アイコン生成に失敗しました"
   exit 1

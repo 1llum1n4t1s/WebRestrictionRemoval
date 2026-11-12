@@ -72,9 +72,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "アイコンを生成中..." -ForegroundColor Yellow
+Write-Host "問い合わせ部品を同期中..." -ForegroundColor Yellow
 bun --bun run sync:support
 if ($LASTEXITCODE -ne 0) { throw "Support synchronization failed." }
+
+Write-Host "アイコンを生成中..." -ForegroundColor Yellow
 
 bun scripts/generate-icons.js
 if ($LASTEXITCODE -ne 0) {
