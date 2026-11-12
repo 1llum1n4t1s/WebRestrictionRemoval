@@ -759,11 +759,5 @@
   },
   "wikipedia_nature": {
     "message": "Nature"
-  },
-  "wikipediaGallery": {
-    "message": "Article images"
-  },
-  "wikipediaNoImages": {
-    "message": "No loaded images are available."
   }
 }

@@ -6,7 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { StorageKeys, VideoGamma, VideoFill, Actions, SenderCheck } = require("./_load-actions");
 
-function fixture(kind) {
+const fixture = (kind) => {
   const prefix = kind === "gamma" ? "VIDEO_GAMMA" : "VIDEO_FILL";
   const property = kind === "gamma" ? "filter" : "transform";
   const values = new Map([[property, ["original", "important"]], ["transform-origin", ["left top", ""]]]);
@@ -43,7 +43,7 @@ function fixture(kind) {
     metadata() { for (const l of listeners) if (!l.signal.aborted) l.fn(); },
     get scans() { return scans; }, get controllers() { return controllers; }, get host() { return host; },
     get observed() { return observer?.connected === true; } };
-}
+};
 
 for (const kind of ["gamma", "fill"]) {
   test(`${kind}: OFF は動画に触れず、ON/OFF・再ONで元のinlineを保つ`, async () => {

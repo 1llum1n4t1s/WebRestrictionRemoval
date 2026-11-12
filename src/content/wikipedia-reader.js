@@ -153,9 +153,9 @@
     if (opened) target.scrollIntoView({ block: "start" });
   }
 
-  const msg = (key) => {
-    try { return chrome.i18n.getMessage(key); } catch { return ""; }
-  };
+  // 文言取得は manifest で先に読み込む ScanRunner の共有ヘルパーに寄せる。
+  // fallback に "" を渡し、未定義キー・context 失効時も従来どおり空文字を返す（textContent に "undefined" を出さない）。
+  const msg = (key) => ScanRunner.safeMsg(key, "");
   const article = () => document.querySelector("#mw-content-text .mw-parser-output");
   function isArticle() {
     const query = new URL(location.href).searchParams;

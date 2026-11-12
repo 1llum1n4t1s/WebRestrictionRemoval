@@ -6,7 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const { SearchFixer, StorageKeys, Actions, SenderCheck } = require("./_load-actions");
 
-function fixture(pathname) {
+const fixture = (pathname) => {
   const cards = [];
   const events = {};
   let initialResolve, changed;
@@ -47,7 +47,7 @@ function fixture(pathname) {
     async initial(blocked = []) { initialResolve({ ...settings, [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: blocked }); await Promise.resolve(); await Promise.resolve(); },
     change(blocked) { changed({ [StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS]: { newValue: blocked } }, "local"); },
     navigate() { events["yt-navigate-finish"](); } };
-}
+};
 
 for (const pathname of ["/results", "/feed/subscriptions"]) {
   test(`チャンネル除外 ${pathname}: 未登録・登録・解除をstorage通知から反映`, async () => {

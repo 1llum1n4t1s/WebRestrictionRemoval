@@ -758,11 +758,5 @@
   },
   "wikipedia_nature": {
     "message": "自然"
-  },
-  "wikipediaGallery": {
-    "message": "記事内の画像"
-  },
-  "wikipediaNoImages": {
-    "message": "表示できる読み込み済みの画像がありません。"
   }
 }

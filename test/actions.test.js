@@ -1727,8 +1727,6 @@ test("SettingsSchema: 全 storageKey が StorageKeys に / 全 applyAction が A
 // 本テストでは background.js を fs.readFileSync で読み、APPLY_SETTINGS_KEYS / toStorageRecord
 // 定義に直接 StorageKeys.<XXX> 列挙が残っていないことを assert (= SettingsSchema 駆動化を保証)。
 test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema 駆動 (B2-I003/D-003)", () => {
-  const fs = require("node:fs");
-  const path = require("node:path");
   const bgPath = path.resolve(__dirname, "..", "src", "background", "background.js");
   const bgSrc = fs.readFileSync(bgPath, "utf8");
 
@@ -1756,8 +1754,6 @@ test("background.js の APPLY_SETTINGS_KEYS / toStorageRecord は SettingsSchema
 // 検証方法: popup.js を fs.readFileSync で読み、`StorageKeys.<XXX>` パターンを正規表現抽出して
 // SettingsSchema の storageKey と field 名から導出した期待集合と比較する。
 test("popup.js の chrome.storage.local.get リストに SettingsSchema の全 storageKey が含まれる (F-OPS-2)", () => {
-  const fs = require("node:fs");
-  const path = require("node:path");
   const popupPath = path.resolve(__dirname, "..", "src", "popup", "popup.js");
   const popupSrc = fs.readFileSync(popupPath, "utf8");
 
