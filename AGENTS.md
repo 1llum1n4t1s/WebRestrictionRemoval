@@ -84,6 +84,13 @@ Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-fir
 | `test/instagram-cleaner.test.js` | コメントと本文の分離、投稿動画の再生抑止、OFF・context 失効時の復元 |
 | `test/image-downloader.test.js` | TikTok の安全な挿入先、共有コンテナ内の画像別ボタン所有・URL・位置・撤去 |
 | `test/instagram-video-controls.test.js` | Instagram 動画コントロールの Space 抑止・再生切替・入力除外・repeat・OFF cleanup |
+| `test/actions-loading.test.js` | popup / offscreen / 両 background と各注入エントリの分割定義の読み込み順・依存閉包・再評価時の参照同一性 |
+| `test/broadcast-clock-render.test.js` | 配信時刻オーバーレイの描画間引き中の最終位置の追従描画（一時停止直前の時刻を残さない）と撤去時の予約取消 |
+| `test/live-chat-collapse.test.js` | ライブチャット折りたたみの再生リスト遷移後の再適用と手動再表示の維持、遷移中 OFF・失効時の解除と遅延通知の扱い |
+| `test/search-fixer-blocked-channels.test.js` | チャンネル除外リストの storage 通知反映・500件上限・初期取得より新しい通知の優先 |
+| `test/video-adjustments.test.js` | ガンマ補正 / 黒帯除去の OFF 時非接触・元の inline style 復元・metadata 待機の解除 |
+| `scripts/Install-Dependencies.test.mjs` | `bun run deps` の固定復元入口が版不一致・lock 欠落・不正を拒否すること |
+| `scripts/dependency-security.test.cjs` | deepmerge patch の prototype 汚染防止と通常 API の維持、minimatch / multimatch override・ESLint 設定経路の import patch・web-ext FileFilter の除外維持（`bun run test:dependencies` でも単独実行） |
 | `test/_load-actions.js` | 上記から共有する分割定義ロード用ヘルパー。Bun の探索規則に従うため、総件数は `bun --bun run test` の出力を正とする |
 
 ### 依存パッケージの運用
@@ -179,7 +186,6 @@ Instagram の非表示・動画操作・画像保存を変更するときは、[
 
 ```powershell
 bun "$HOME/.agents/skills/vava/scripts/update-amo-listing.mjs" --slug 'web-viewing-assist' --listing 'ja=webstore/store-listing.firefox.ja.txt' --listing 'en-US=webstore/store-listing.firefox.en.txt' --privacy 'ja=docs/privacy-policy.md' --privacy 'en-US=docs/privacy-policy.en.md' --name 'ja=Vuora' --name 'en-US=Vuora' --homepage 'https://github.com/1llum1n4t1s/WebRestrictionRemoval' --support-url 'https://github.com/1llum1n4t1s/WebRestrictionRemoval/issues' --category 'other'
-bun "$HOME/.agents/skills/vava/scripts/check-store-listing.mjs" --cws --amo --slug 'web-viewing-assist' --cws-id-file '.cws-id' --keyword 'cws.description.ja=閲覧中ページ' --keyword 'cws.description.en=Browser extension' --keyword 'amo.summary.ja=13 カテゴリ' --keyword 'amo.summary.ja=Amazon 販売元' --keyword 'amo.summary.ja=Amazon ランキング' --keyword 'amo.summary.en-US=13 categories' --keyword 'amo.summary.en-US=Amazon totals/ranking/seller' --keyword 'amo.description.ja=13 カテゴリ' --keyword 'amo.description.ja=Amazon 販売元' --keyword 'amo.description.ja=Amazon ランキング' --keyword 'amo.description.ja=Firefox 142' --keyword 'amo.description.en-US=13 categories' --keyword 'amo.description.en-US=Amazon seller' --keyword 'amo.description.en-US=jump-to-ranking' --keyword 'amo.description.en-US=Firefox 142'
 ```
 
 ### AMO 公開のHTTP境界
@@ -201,6 +207,6 @@ CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使う。既存OAu
 
 ### 依存の暫定セキュリティ修正
 
-minimatch は 11.0.4 以降、multimatch は named import 対応の 8 系へ override する。ESLint 設定の ESM 経路は @eslint/eslintrc@3.3.7 と @eslint/config-array@0.21.2 の最小 import patch で互換性を保つ。web-ext@10.8.0 の FileFilter は Windows で windowsPathsNoEscape を明示し、開発用ファイルやアーカイブの除外を維持する。
+minimatch は 11.0.4 以降、multimatch は named import 対応の 8 系へ override する。node-forge は web-ext → @devicefarmer/adbkit@3 の指定（`^1.3.1`）では 1.4.3 を許容するが、bun.lock の adbkit 依存記録が 1.4.2 のままで `bun audit fix` でも上がらないため、Forge の TLS・Ed25519・ReDoS 修正を含む 1.4.3 を下限として override する（override なしで lock が 1.4.3 以上へ解決されるようになった時点で撤去する）。ESLint 設定の ESM 経路は @eslint/eslintrc@3.3.7 と @eslint/config-array@0.21.2 の最小 import patch で互換性を保つ。web-ext@10.8.0 の FileFilter は Windows で windowsPathsNoEscape を明示し、開発用ファイルやアーカイブの除外を維持する。
 
 CVE-2026-93753（GHSA-gcqx-w48m-w2h4）の deepmerge 4.3.1 は公式修正版が未公開のため、patches/deepmerge@4.3.1.patch で戻り値への書込みを own データ属性にし、__proto__ 経由の prototype 汚染を防ぐ。bun run test:dependencies で web-ext → addons-linter の実解決先の攻撃入力と通常 API を検証する。Bun 標準の patchedDependencies で適用し、公式修正版の採用時に patch の要否を再確認する。バージョンベースの bun audit 警告は残るため、警告を除外したり成功扱いにしない。
