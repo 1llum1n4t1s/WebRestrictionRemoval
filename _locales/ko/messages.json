@@ -1,0 +1,1699 @@
+{
+  "settingsSyncTitle": {
+    "message": "PC 간 설정 동기화"
+  },
+  "settingsSyncDescription": {
+    "message": "각 PC에서 같은 브라우저에 같은 계정으로 로그인하고, 브라우저의 확장 프로그램 동기화를 켠 뒤 이 옵션을 켜세요. 켤 때는 기존 동기화 설정이 우선하며, 이후 충돌은 설정별로 더 최근의 업데이트 정보를 따릅니다. Chrome과 Firefox 간에는 동기화할 수 없습니다. 인증 정보, 전송 대상 계정, 색상 기록, 패널 위치는 이 PC에만 보관됩니다. 끄더라도 클라우드 데이터는 삭제되지 않습니다."
+  },
+  "settingsSyncOff": {
+    "message": "동기화가 꺼져 있습니다. 설정은 이 PC에 저장됩니다."
+  },
+  "settingsSyncWorking": {
+    "message": "동기화된 설정을 확인하는 중…"
+  },
+  "settingsSyncReady": {
+    "message": "브라우저 동기화 저장소에 저장했습니다. 다른 PC에 반영되기까지 시간이 걸릴 수 있습니다."
+  },
+  "settingsSyncError": {
+    "message": "동기화에 실패했습니다. 로컬 설정은 유지됩니다. 브라우저 동기화와 저장 용량 제한을 확인한 뒤 다시 시도하세요. 설정과 보존 중인 삭제 기록이 동기화 용량을 초과할 수 있습니다."
+  },
+  "settingsSyncRetry": {
+    "message": "동기화 재시도"
+  },
+  "appName": {
+    "message": "Vuora",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
+  },
+  "appDescription": {
+    "message": "YouTube, Wikipedia, SNS, 쇼핑 페이지를 위한 로컬 읽기·오디오 도구입니다.",
+    "description": "Short description (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "Vuora",
+    "description": "Hover tooltip on the toolbar icon"
+  },
+  "headerTitle": {
+    "message": "Vuora",
+    "description": "h1 in the popup header"
+  },
+  "headerTagline": {
+    "message": "증폭, 정리, 유지 — 하나의 패널에서",
+    "description": "Tagline shown beneath the popup header"
+  },
+  "categorySelectorLabel": {
+    "message": "카테고리"
+  },
+  "tabbarAriaLabel": {
+    "message": "표시할 카테고리"
+  },
+  "tabTune": {
+    "message": "조정"
+  },
+  "tabYoutube": {
+    "message": "YouTube"
+  },
+  "tabInstagram": {
+    "message": "Instagram"
+  },
+  "tabTiktok": {
+    "message": "TikTok"
+  },
+  "tabX": {
+    "message": "X"
+  },
+  "tabPicker": {
+    "message": "컬러 피커"
+  },
+  "groupAudio": {
+    "message": "오디오"
+  },
+  "groupVideo": {
+    "message": "영상"
+  },
+  "groupAmazon": {
+    "message": "Amazon"
+  },
+  "volumeBoosterMaster": {
+    "message": "볼륨 부스터"
+  },
+  "volumeBoosterMasterDesc": {
+    "message": "탭 오디오를 증폭하고 음색을 조정합니다. 설정은 탭을 전환할 때 자동으로 적용됩니다."
+  },
+  "volumeSubLabel": {
+    "message": "볼륨 부스터"
+  },
+  "volumeSubDesc": {
+    "message": "플레이어 볼륨을 100%로 두고 여기서 조정하면 가장 좋은 결과를 얻을 수 있습니다."
+  },
+  "volumeMesFirefoxNote": {
+    "message": "Firefox 버전은 페이지 내 처리(MediaElementSource)로 오디오를 증폭하며, 설정은 모든 탭에 자동 적용됩니다. DRM으로 보호된 영상(Netflix, Prime Video 등)은 지원하지 않습니다."
+  },
+  "volumeReset100Btn": {
+    "message": "100%로 초기화"
+  },
+  "volumeReset100Aria": {
+    "message": "볼륨을 100%로 초기화"
+  },
+  "volumeStepDownAria": {
+    "message": "볼륨 10% 낮추기"
+  },
+  "volumeStepDownTitle": {
+    "message": "볼륨 10% 낮추기"
+  },
+  "volumeStepUpAria": {
+    "message": "볼륨 10% 높이기"
+  },
+  "volumeStepUpTitle": {
+    "message": "볼륨 10% 높이기"
+  },
+  "volumeMuteAriaOff": {
+    "message": "음소거"
+  },
+  "volumeMuteAriaOn": {
+    "message": "음소거 해제"
+  },
+  "volumeMuteTitleOff": {
+    "message": "음소거 (볼륨 유지)"
+  },
+  "volumeMuteTitleOn": {
+    "message": "음소거 해제 (볼륨 복원)"
+  },
+  "volumeAntiClipLabel": {
+    "message": "자동 왜곡 방지"
+  },
+  "volumeAntiClipDesc": {
+    "message": "갑작스러운 고함이나 효과음의 피크를 억제해 증폭 시 클리핑을 줄입니다."
+  },
+  "volumeNightModeLabel": {
+    "message": "야간 모드"
+  },
+  "volumeNightModeDesc": {
+    "message": "큰 목소리와 폭발음을 부드럽게 압축해 작은 게임 소리가 묻히지 않게 합니다."
+  },
+  "volumeBassCutLabel": {
+    "message": "벽 울림 방지"
+  },
+  "volumeBassCutDesc": {
+    "message": "깊은 저음을 줄여 벽이나 바닥을 타고 울려 이웃에게 방해되는 일을 막습니다."
+  },
+  "volumeEqLabel": {
+    "message": "이퀄라이저"
+  },
+  "volumeEqDesc": {
+    "message": "10밴드 EQ로 주파수 대역별로 조정합니다. 저음·고음을 강조하거나 프리셋을 선택할 수 있습니다."
+  },
+  "volumeEqPresetLabel": {
+    "message": "프리셋"
+  },
+  "volumeEqPreamp": {
+    "message": "프리앰프"
+  },
+  "volumeEqPresetFlat": {
+    "message": "플랫"
+  },
+  "volumeEqPresetBass": {
+    "message": "저음 강조"
+  },
+  "volumeEqPresetTreble": {
+    "message": "고음 강조"
+  },
+  "volumeEqPresetVocal": {
+    "message": "보컬"
+  },
+  "volumeEqPresetLoudness": {
+    "message": "라우드니스"
+  },
+  "volumeEqPresetEargasm": {
+    "message": "이어가즘 익스플로전"
+  },
+  "volumeEqPresetEargasmKai": {
+    "message": "이어가즘 익스플로전 Kai"
+  },
+  "volumeEqPresetPerfect": {
+    "message": "퍼펙트"
+  },
+  "volumeEqPresetPerfectKai": {
+    "message": "퍼펙트 Kai"
+  },
+  "volumeEqPresetCustom": {
+    "message": "사용자 지정"
+  },
+  "videoGammaMaster": {
+    "message": "영상 감마"
+  },
+  "videoGammaMasterDescPre": {
+    "message": "페이지의 "
+  },
+  "videoGammaMasterDescPost": {
+    "message": " 요소에 감마 보정을 적용합니다. 어두운 영상은 밝게, 지나치게 밝은 영상은 부드럽게 만듭니다."
+  },
+  "videoGammaSubLabel": {
+    "message": "감마 값"
+  },
+  "videoGammaSubDesc": {
+    "message": "1.0은 보정 없음입니다. 1.0 미만은 어두운 부분이 밝아지고, 1.0 초과는 대비가 강해집니다(어두워짐)."
+  },
+  "videoGammaResetBtn": {
+    "message": "1.0으로 초기화"
+  },
+  "videoGammaResetAria": {
+    "message": "감마를 1.0으로 초기화"
+  },
+  "videoFillMaster": {
+    "message": "영상 검은 띠 제거"
+  },
+  "videoFillMasterDesc": {
+    "message": "영상을 확대하거나 늘려 화면을 채움으로써 울트라와이드 화면의 레터박스/필러박스 검은 띠를 없앱니다."
+  },
+  "videoFillModeLabel": {
+    "message": "표시 방식"
+  },
+  "videoFillModeAriaLabel": {
+    "message": "표시 방식 선택"
+  },
+  "videoFillModeZoom": {
+    "message": "확대"
+  },
+  "videoFillModeStretch": {
+    "message": "늘이기"
+  },
+  "videoFillTargetLabel": {
+    "message": "내 모니터"
+  },
+  "videoFillTargetDesc": {
+    "message": "화면의 가로세로 비율이나 해상도를 선택하세요. 각 영상의 형태를 자동 감지해 검은 띠를 제거합니다."
+  },
+  "videoFillGroupAspect": {
+    "message": "가로세로 비율"
+  },
+  "videoFillGroupResolution": {
+    "message": "해상도"
+  },
+  "loupeMaster": {
+    "message": "돋보기"
+  },
+  "loupeMasterDesc": {
+    "message": "원형 렌즈로 현재 화면을 확대합니다. 영상을 일시정지한 뒤 사용하면 좋습니다. 왼쪽 클릭으로 끕니다."
+  },
+  "loupeZoomLabel": {
+    "message": "배율"
+  },
+  "loupeZoomAriaLabel": {
+    "message": "배율 선택"
+  },
+  "loupeSizeLabel": {
+    "message": "렌즈 크기"
+  },
+  "loupeSizeDesc": {
+    "message": "렌즈 지름을 150~1000px 사이에서 조정합니다."
+  },
+  "loupeErrorInvalidTab": {
+    "message": "⚠ 탭을 읽을 수 없음"
+  },
+  "loupeErrorUnsupportedPage": {
+    "message": "⚠ 이 페이지에서는 돋보기를 사용할 수 없음"
+  },
+  "loupeErrorPermission": {
+    "message": "⚠ 권한 오류"
+  },
+  "loupeErrorQuota": {
+    "message": "⚠ 캡처 빈도 제한 초과"
+  },
+  "loupeErrorUnknown": {
+    "message": "⚠ 돋보기를 시작하지 못함"
+  },
+  "amazonDeliveryMaster": {
+    "message": "정기배송 월별 합계"
+  },
+  "amazonDeliveryMasterDescPre": {
+    "message": "월별 합계를 "
+  },
+  "amazonDeliveryMasterDescPost": {
+    "message": " 페이지에 표시합니다. 가격이 없는 항목은 Amazon에서 현재 정기배송 가격을 가져오고, 가져올 수 없으면 이전 배송의 단가를 사용합니다."
+  },
+  "amazonRankingJumpMaster": {
+    "message": "랭킹 이동 버튼"
+  },
+  "amazonRankingJumpMasterDesc": {
+    "message": "상품 페이지 상단에 \"이 상품의 랭킹으로 이동\" 버튼을 표시합니다.",
+    "description": "Master toggle description for the Amazon jump-to-ranking button"
+  },
+  "amazonRankingJumpButton": {
+    "message": "이 상품의 랭킹으로 이동"
+  },
+  "amazonRankingJumpAriaLabel": {
+    "message": "이 상품의 랭킹으로 이동"
+  },
+  "amazonMerchantInfoMaster": {
+    "message": "판매자/배송 뱃지"
+  },
+  "amazonMerchantInfoMasterDesc": {
+    "message": "상품 페이지 상단에 판매자/배송 뱃지를 표시합니다(Amazon 배송 = 녹색 / 마켓플레이스 = 주황색 경고).",
+    "description": "Master toggle description for the Amazon seller / shipper badge"
+  },
+  "amazonMerchantInfoSoldBy": {
+    "message": "판매"
+  },
+  "amazonMerchantInfoShipsFrom": {
+    "message": "배송"
+  },
+  "amazonMerchantInfoAriaAmazon": {
+    "message": "Amazon 배송"
+  },
+  "amazonMerchantInfoAriaMarketplace": {
+    "message": "마켓플레이스 상품"
+  },
+  "amazonMerchantInfoAriaUnknown": {
+    "message": "판매자 미확인"
+  },
+  "searchFixerMaster": {
+    "message": "YouTube 기능 확장"
+  },
+  "searchFixerMasterDesc": {
+    "message": "Shorts 제거, 검색 노이즈 필터링, 시청 페이지 정리, 댓글 숨김, 라이브 채팅 숨김, 구독 기능 확장, Gemini Notebook로 영상 보내기 등 40개 하위 기능을 한 번에 관리합니다."
+  },
+  "instagramCleanerMaster": {
+    "message": "Instagram 클리너"
+  },
+  "instagramCleanerMasterDesc": {
+    "message": "릴스, 탐색, 스토리 등 불필요한 UI를 한 번에 숨깁니다."
+  },
+  "tiktokCleanerMaster": {
+    "message": "TikTok 클리너"
+  },
+  "tiktokCleanerMasterDesc": {
+    "message": "댓글 패널, 추천 계정 영역 등 불필요한 UI를 한 번에 숨깁니다."
+  },
+  "xCleanerMaster": {
+    "message": "X 클리너"
+  },
+  "xCleanerMasterDesc": {
+    "message": "오른쪽 패널, 광고, 유료 구독 유도 등 방해되는 UI를 한 번에 숨깁니다."
+  },
+  "cleanerHint": {
+    "message": "마스터 토글(클리너)이 켜져 있을 때만 작동합니다. 사용할 하위 기능을 선택하세요."
+  },
+  "pickerActivateJp": {
+    "message": "화면에서 색상 추출"
+  },
+  "pickerActivateEn": {
+    "message": "스포이드 실행"
+  },
+  "pickerNoteIdle": {
+    "message": "버튼을 눌러 화면의 아무 색이나 추출하세요(Esc로 취소)."
+  },
+  "specimenTitle": {
+    "message": "현재 색상"
+  },
+  "specimenPillEmpty": {
+    "message": "없음"
+  },
+  "specimenNoEmpty": {
+    "message": "저장 안 됨"
+  },
+  "specimenNoSaved": {
+    "message": "기록 $NO$",
+    "placeholders": {
+      "no": {
+        "content": "$1",
+        "example": "01"
+      }
+    }
+  },
+  "specimenTimeEmpty": {
+    "message": "—"
+  },
+  "specimenTimeSaved": {
+    "message": "저장 $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "12:34"
+      }
+    }
+  },
+  "copyBtnLabel": {
+    "message": "복사"
+  },
+  "copyBtnDone": {
+    "message": "복사됨"
+  },
+  "copyHexAria": {
+    "message": "HEX 복사"
+  },
+  "copyRgbAria": {
+    "message": "RGB 복사"
+  },
+  "copyHslAria": {
+    "message": "HSL 복사"
+  },
+  "editHexAria": {
+    "message": "HEX 값(편집 가능)"
+  },
+  "editRgbAria": {
+    "message": "RGB 값(편집 가능)"
+  },
+  "editHslAria": {
+    "message": "HSL 값(편집 가능)"
+  },
+  "valueEditHint": {
+    "message": "세 필드 모두 편집할 수 있습니다. 색상 코드를 붙여넣으면 바로 확인할 수 있고, Enter를 누르면 기록에 저장됩니다."
+  },
+  "paletteTitle": {
+    "message": "색상 조정"
+  },
+  "paletteAreaAria": {
+    "message": "채도와 밝기 조정(방향키로 미세 조정, Shift로 큰 단위 이동)"
+  },
+  "paletteAxisHint": {
+    "message": "드래그해 조정 — 가로 = 채도 / 세로 = 밝기"
+  },
+  "paletteSaturationLabel": {
+    "message": "채도"
+  },
+  "paletteBrightnessLabel": {
+    "message": "밝기"
+  },
+  "palettePercentValue": {
+    "message": "$VALUE$%",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "paletteHueLabel": {
+    "message": "색상"
+  },
+  "paletteHueAria": {
+    "message": "색상"
+  },
+  "palettePillValue": {
+    "message": "색상 $H$° / 채도 $S$% / 밝기 $V$%",
+    "placeholders": {
+      "h": {
+        "content": "$1",
+        "example": "213"
+      },
+      "s": {
+        "content": "$2",
+        "example": "45"
+      },
+      "v": {
+        "content": "$3",
+        "example": "55"
+      }
+    }
+  },
+  "paletteAddBtn": {
+    "message": "이 색상을 기록에 저장"
+  },
+  "paletteResetBtn": {
+    "message": "조정 취소"
+  },
+  "formatTitle": {
+    "message": "복사 설정"
+  },
+  "formatLegend": {
+    "message": "자동 복사 형식"
+  },
+  "formatRowAria": {
+    "message": "자동 복사 형식"
+  },
+  "formatHashLabel": {
+    "message": "HEX에 # 포함"
+  },
+  "formatNote": {
+    "message": "스포이드로 추출하거나 기록 항목을 클릭하면 선택한 형식으로 색상이 자동 복사됩니다."
+  },
+  "historyTitle": {
+    "message": "기록"
+  },
+  "historyHint": {
+    "message": "색상을 클릭하면 현재 색상으로 지정되고, 아래에서 설정한 형식으로 복사됩니다."
+  },
+  "historyEmpty": {
+    "message": "아직 색상이 없습니다. 스포이드로 추출하거나 색상 코드를 붙여넣고 Enter를 누르세요."
+  },
+  "historyClearBtn": {
+    "message": "기록 모두 삭제"
+  },
+  "extVersionAriaLabel": {
+    "message": "확장 프로그램 버전"
+  },
+  "eyedropperUnsupported": {
+    "message": "EyeDropper API를 지원하지 않습니다. Chrome 95 이상을 사용하세요."
+  },
+  "pickerNoteActive": {
+    "message": "스포이드 작동 중 — 화면의 아무 곳이나 클릭하세요(Esc로 취소)"
+  },
+  "pickerNoteRetake": {
+    "message": "다시 누르면 계속 추출합니다."
+  },
+  "pickerNoteCancelled": {
+    "message": "추출을 취소했습니다."
+  },
+  "pickerNoteFailed": {
+    "message": "색상 추출에 실패했습니다. 다시 시도하세요."
+  },
+  "pickerCopyOk": {
+    "message": "추출 완료 — $FORMAT$ 복사됨: $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "추출 완료 — $FORMAT$: $TEXT$ (복사 실패)",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerInputInvalid": {
+    "message": "색상으로 인식할 수 없습니다(예: #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%))."
+  },
+  "pickerInputAdded": {
+    "message": "기록에 저장했습니다: $HEX$",
+    "placeholders": {
+      "hex": {
+        "content": "$1",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "historyClearedToast": {
+    "message": "기록을 삭제했습니다."
+  },
+  "pickerHistorySaveFailed": {
+    "message": "기록을 저장하지 못했습니다. 다시 시도하세요."
+  },
+  "copyOkToast": {
+    "message": "$FORMAT$ 복사됨: $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "copyFailToast": {
+    "message": "복사에 실패했습니다."
+  },
+  "copyToast": {
+    "message": "$FORMAT$: $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipAria": {
+    "message": "$HEX$을(를) 현재 색상으로 지정하고 복사",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      }
+    }
+  },
+  "pillTemplate": {
+    "message": "$ON$/$TOTAL$ 활성",
+    "placeholders": {
+      "on": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "gridItemsLabel": {
+    "message": "홈 열 수"
+  },
+  "gridItemsDesc": {
+    "message": "홈과 검색 결과 그리드의 한 줄당 영상 수를 고정합니다(자동은 YouTube 기본 열 수를 유지)."
+  },
+  "gridAuto": {
+    "message": "자동 (YouTube 기본)"
+  },
+  "grid4Cols": {
+    "message": "4열"
+  },
+  "grid5Cols": {
+    "message": "5열"
+  },
+  "grid6Cols": {
+    "message": "6열"
+  },
+  "categoryMenuUi": {
+    "message": "메뉴/UI"
+  },
+  "categoryVideoFilter": {
+    "message": "영상 필터"
+  },
+  "categoryWatchPage": {
+    "message": "시청 페이지"
+  },
+  "categorySearchOnly": {
+    "message": "검색 결과"
+  },
+  "categoryIntegration": {
+    "message": "연동"
+  },
+  "nlmSendLabel": {
+    "message": "Gemini Notebook"
+  },
+  "nlmAccount": {
+    "message": "Google 계정"
+  },
+  "nlmAccountDefault": {
+    "message": "기본 (0)"
+  },
+  "nlmAccountNth": {
+    "message": "계정 {0}"
+  },
+  "nlmPickNotebook": {
+    "message": "대상 노트북"
+  },
+  "nlmNewNotebook": {
+    "message": "+ 새 노트북 만들기"
+  },
+  "nlmLoading": {
+    "message": "노트북 불러오는 중…"
+  },
+  "nlmEmpty": {
+    "message": "기존 노트북 없음"
+  },
+  "nlmSending": {
+    "message": "전송 중…"
+  },
+  "nlmSkipped": {
+    "message": "{0}개 건너뜀(소스 한도)"
+  },
+  "nlmOpenNotebookLm": {
+    "message": "Gemini Notebook 열기"
+  },
+  "nlmErrorNetwork": {
+    "message": "Gemini Notebook에 연결할 수 없음"
+  },
+  "nlmErrorProtocol": {
+    "message": "연결할 수 없음 — Gemini Notebook의 인터페이스가 변경됨"
+  },
+  "nlmOpenNotebook": {
+    "message": "생성된 노트북 열기"
+  },
+  "nlmErrorFull": {
+    "message": "이 노트북이 소스 한도에 도달함"
+  },
+  "nlmErrorAuth": {
+    "message": "Gemini Notebook에 로그인하세요"
+  },
+  "nlmErrorNoUrls": {
+    "message": "보낼 영상이 없음"
+  },
+  "nlmErrorRpc": {
+    "message": "Gemini Notebook로 전송하지 못함"
+  },
+  "nlmErrorUnknown": {
+    "message": "Gemini Notebook로 전송하지 못함"
+  },
+  "ytCleanerSubtabsAria": {
+    "message": "YouTube 기능 확장 카테고리"
+  },
+  "igCleanerSubtabsAria": {
+    "message": "Instagram 클리너 카테고리"
+  },
+  "tuneSubtabsAria": {
+    "message": "조정 카테고리"
+  },
+  "categoryIgMain": {
+    "message": "기본"
+  },
+  "categoryIgExtra": {
+    "message": "추가 기능"
+  },
+  "categoryTtMain": {
+    "message": "기본"
+  },
+  "categoryXLayout": {
+    "message": "레이아웃"
+  },
+  "categoryXNoise": {
+    "message": "노이즈"
+  },
+  "categoryXTimeline": {
+    "message": "타임라인"
+  },
+  "applyOkSearchFixer": {
+    "message": "YT 기능 확장"
+  },
+  "applyOkAmazon": {
+    "message": "Amazon"
+  },
+  "applyOkAmazonRanking": {
+    "message": "랭킹 이동"
+  },
+  "applyOkAmazonMerchantInfo": {
+    "message": "판매자 뱃지"
+  },
+  "applyOkInstagram": {
+    "message": "Instagram"
+  },
+  "applyOkTiktok": {
+    "message": "TikTok"
+  },
+  "applyOkX": {
+    "message": "X"
+  },
+  "applyOkVideoGamma": {
+    "message": "영상 감마"
+  },
+  "applyOkVideoFill": {
+    "message": "검은 띠 제거"
+  },
+  "applyOkLoupe": {
+    "message": "돋보기"
+  },
+  "applyOkAllStopped": {
+    "message": "⏹  모두 중지됨"
+  },
+  "applyOkPrefix": {
+    "message": "✓  "
+  },
+  "applyOkSeparator": {
+    "message": "  /  "
+  },
+  "applyError": {
+    "message": "⚠️ 설정을 저장하거나 적용하지 못함"
+  },
+  "volumeErrorInvalidTab": {
+    "message": "⚠ 탭을 읽을 수 없음"
+  },
+  "volumeErrorOffscreenUnavailable": {
+    "message": "⚠ 내부 처리기를 시작할 수 없음"
+  },
+  "volumeErrorInvalidStream": {
+    "message": "⚠ 오디오를 캡처할 수 없음"
+  },
+  "volumeErrorTabClosed": {
+    "message": "⚠ 탭이 닫힘"
+  },
+  "volumeErrorUserGesture": {
+    "message": "⚠ 팝업이 열려 있을 때만 변경 가능"
+  },
+  "volumeErrorUnsupportedPage": {
+    "message": "⚠ 이 페이지에서는 지원되지 않음"
+  },
+  "volumeErrorPermission": {
+    "message": "⚠ 권한 오류"
+  },
+  "volumeErrorUnknown": {
+    "message": "⚠ 볼륨을 변경하지 못함"
+  },
+  "volumeErrorCommunication": {
+    "message": "⚠ 통신 오류"
+  },
+  "amazonTotalText": {
+    "message": "합계"
+  },
+  "amazonTotalReference": {
+    "message": "예상 합계(현재 가격)"
+  },
+  "amazonTotalPreviousReference": {
+    "message": "예상 합계(이전 가격 포함)"
+  },
+  "amazonTotalReferenceNote": {
+    "message": "청구 금액은 달라질 수 있음"
+  },
+  "amazonTotalLoading": {
+    "message": "합계 불러오는 중…"
+  },
+  "amazonTotalUnavailable": {
+    "message": "합계를 가져올 수 없음"
+  },
+  "subsAllShortcutLabel": {
+    "message": "전체 구독"
+  },
+  "subsSearchPlaceholder": {
+    "message": "채널 이름 또는 핸들로 필터"
+  },
+  "imageDownloadButtonLabel": {
+    "message": "이미지 다운로드"
+  },
+  "feat_sf_playlist_label": {
+    "message": "재생목록"
+  },
+  "feat_sf_playlist_desc": {
+    "message": "재생목록 항목을 제거합니다(playlist?list= 링크 / \"N개 동영상\" 뱃지)."
+  },
+  "feat_sf_mix_label": {
+    "message": "믹스"
+  },
+  "feat_sf_mix_desc": {
+    "message": "YouTube가 자동 생성한 믹스를 제거합니다(&list=RD&start_radio=1 / \"믹스\" 뱃지)."
+  },
+  "feat_sf_shortsBtn_label": {
+    "message": "Shorts (개별)"
+  },
+  "feat_sf_shortsBtn_desc": {
+    "message": "영상 그리드에 섞여 있는 단독 Shorts 카드를 제거합니다(썸네일 URL이 /shorts/인 세로 영상 항목)."
+  },
+  "feat_sf_removeShortsShelf_label": {
+    "message": "Shorts 선반"
+  },
+  "feat_sf_removeShortsShelf_desc": {
+    "message": "홈의 Shorts 선반(ytd-rich-shelf-renderer[is-shorts])과 검색 결과의 Shorts 가로 선반(ytd-reel-shelf-renderer)을 완전히 제거합니다."
+  },
+  "feat_sf_live_label": {
+    "message": "라이브 / 프리미어 / 스테이션"
+  },
+  "feat_sf_live_desc": {
+    "message": "썸네일에 LIVE / 프리미어 / 스테이션 뱃지가 있는 영상을 제거합니다. \"스테이션\"은 YouTube가 자동 생성한 무한 BGM 스트림입니다."
+  },
+  "feat_sf_membersOnly_label": {
+    "message": "멤버 전용"
+  },
+  "feat_sf_membersOnly_desc": {
+    "message": "채널 멤버십이 있어야 시청할 수 있는 \"멤버 전용\" 썸네일 뱃지가 붙은 영상을 제거합니다."
+  },
+  "feat_sf_watched_label": {
+    "message": "시청 완료"
+  },
+  "feat_sf_watched_desc": {
+    "message": "이어보기 오버레이가 표시되는(이미 시청한) 영상을 제거합니다."
+  },
+  "feat_sf_hideSubscriptionsRelevant_label": {
+    "message": "구독 피드의 \"관련성 높음\" 숨기기"
+  },
+  "feat_sf_hideSubscriptionsRelevant_desc": {
+    "message": "구독 피드의 \"관련성 높음\" 영역을 제목, 영상, 더보기 버튼까지 숨깁니다. 일반 최신 영상은 그대로 표시됩니다."
+  },
+  "feat_sf_removeFeedSections_label": {
+    "message": "섹션"
+  },
+  "feat_sf_removeFeedSections_desc": {
+    "message": "홈(피드 페이지만)의 \"회원님을 위한 주제\", \"속보\", \"게임 룸\" 추천 섹션(ytd-rich-section-renderer)을 제거합니다."
+  },
+  "feat_sf_shelf_label": {
+    "message": "영상 선반"
+  },
+  "feat_sf_shelf_desc": {
+    "message": "\"인기\", \"뉴스\" 같은 영상 그룹 섹션(ytd-shelf-renderer)을 제거합니다."
+  },
+  "feat_sf_cardList_label": {
+    "message": "카드 목록"
+  },
+  "feat_sf_cardList_desc": {
+    "message": "관련 주제 가로 카드 목록(ytd-horizontal-card-list-renderer, 두 번째 이후)을 제거합니다."
+  },
+  "feat_sf_course_label": {
+    "message": "강좌"
+  },
+  "feat_sf_course_desc": {
+    "message": "\"강좌\" 뱃지가 붙은 학습 콘텐츠 카드(.yt-lockup-view-model--wrapper)를 제거합니다."
+  },
+  "feat_sf_channel_label": {
+    "message": "채널 소개 카드"
+  },
+  "feat_sf_channel_desc": {
+    "message": "검색 결과에 삽입되는 \"이 채널\" 소개 카드(ytd-channel-renderer)를 제거합니다."
+  },
+  "feat_sf_hideForeignChannels_label": {
+    "message": "다른 국가 채널 숨기기"
+  },
+  "feat_sf_hideForeignChannels_desc": {
+    "message": "검색 결과와 피드에서 내 국가 밖 채널의 영상을 제거합니다(YouTube 검색 필터에는 국가 조건이 없어 자체 구현입니다). 제목과 채널 이름의 문자 체계로 먼저 분류하고, 판별되지 않은 경우에만 채널 정보 페이지를 확인합니다. 국가를 공개하지 않은 채널은 계속 표시됩니다."
+  },
+  "feat_sf_notebookLmSend_label": {
+    "message": "Gemini Notebook로 보내기"
+  },
+  "feat_sf_notebookLmSend_desc": {
+    "message": "시청 중인 영상 또는 검색 결과/재생목록/채널 페이지의 영상을 내 Google Gemini Notebook에 소스로 추가합니다. 페이지 내 버튼(시청 페이지는 좋아요/공유 옆, 검색 결과는 검색 필터 옆, 재생목록은 전체 재생 아래, 채널은 제목 줄)에서 대상 노트북을 선택하며, 새 노트북 생성도 가능합니다. 영상 URL은 버튼을 누를 때만 전송되며, 시청 기록 수집이나 백그라운드 전송은 없습니다. Gemini Notebook에 로그인되어 있어야 합니다."
+  },
+  "feat_sf_channelBlocklist_label": {
+    "message": "채널 차단 목록"
+  },
+  "feat_sf_channelBlocklist_desc": {
+    "message": "검색 결과, 홈, 구독, 인기 등 YouTube 전반에서 차단한 채널의 영상을 제거합니다(홈의 공식 \"채널 추천 안함\"의 확장판). 검색 결과의 채널 이름 옆 🚫 버튼으로 등록하고, 아래 목록에서 차단을 해제합니다."
+  },
+  "sfBlockChannelBtnTitle": {
+    "message": "검색 결과에서 이 채널 숨기기"
+  },
+  "sfShowCommentsButton": {
+    "message": "댓글 표시"
+  },
+  "sfHideCommentsButton": {
+    "message": "댓글 숨기기"
+  },
+  "sfBlockedChannelsTitle": {
+    "message": "차단한 채널"
+  },
+  "sfBlockedChannelsEmpty": {
+    "message": "차단한 채널이 없습니다. YouTube 검색 결과의 채널 이름 옆 🚫 버튼으로 차단하세요."
+  },
+  "sfBlockedChannelRemove": {
+    "message": "차단 해제"
+  },
+  "feat_sf_reel_label": {
+    "message": "Shorts 가로 선반"
+  },
+  "feat_sf_reel_desc": {
+    "message": "Shorts 가로 선반(grid-shelf-view-model)을 제거합니다. 홈의 Shorts 선반은 \"영상 필터\"의 removeShortsShelf, 왼쪽 사이드바 항목은 \"메뉴/UI\"의 removeShortsSidebar로 제거합니다."
+  },
+  "feat_sf_secondary_label": {
+    "message": "관련 검색 블록"
+  },
+  "feat_sf_secondary_desc": {
+    "message": "하단의 \"관련 검색어\" 추천 블록(ytd-secondary-search-container-renderer)을 제거합니다."
+  },
+  "feat_sf_verified_label": {
+    "message": "인증 채널 영상"
+  },
+  "feat_sf_verified_desc": {
+    "message": "인증 뱃지가 있는 채널(공식 계정, 뉴스)의 영상을 제거합니다. 피드 페이지 지원은 추후 제공됩니다."
+  },
+  "feat_sf_artist_label": {
+    "message": "아티스트 채널 영상"
+  },
+  "feat_sf_artist_desc": {
+    "message": "공식 아티스트 채널 뱃지가 있는 영상(공식 MV 등)을 제거합니다. 피드 페이지 지원은 추후 제공됩니다."
+  },
+  "feat_sf_chapter_label": {
+    "message": "챕터가 있는 영상"
+  },
+  "feat_sf_chapter_desc": {
+    "message": "펼칠 수 있는 챕터 정보(expandable-metadata-renderer)가 있는 영상을 제거합니다."
+  },
+  "feat_sf_demoteUnmatched_label": {
+    "message": "키워드 불일치 영상 흐리게"
+  },
+  "feat_sf_demoteUnmatched_desc": {
+    "message": "제목/설명에 검색 키워드가 없는 영상을 반투명 흑백으로 표시합니다(마우스를 올리면 복원)."
+  },
+  "feat_sf_highlightThumb_label": {
+    "message": "썸네일 윤곽선"
+  },
+  "feat_sf_highlightThumb_desc": {
+    "message": "각 썸네일에 붉은색 윤곽선과 그림자를 추가해 구분하기 쉽게 합니다(다크/라이트 테마 모두 지원)."
+  },
+  "feat_sf_hideComments_label": {
+    "message": "댓글 숨기기"
+  },
+  "feat_sf_hideComments_desc": {
+    "message": "시청 페이지의 댓글을 처음에는 숨기고, 표시/숨김 버튼을 제공합니다. 라이브 채팅에는 영향이 없습니다."
+  },
+  "feat_sf_hideLiveChat_label": {
+    "message": "라이브 채팅 숨기기"
+  },
+  "feat_sf_hideLiveChat_desc": {
+    "message": "YouTube 자체의 접기 동작으로 라이브 스트림 다시보기의 채팅 패널을 접습니다. 일반 영상에는 영향이 없습니다."
+  },
+  "feat_sf_broadcastClock_label": {
+    "message": "스트림 다시보기에 방송 시각 표시"
+  },
+  "feat_sf_broadcastClock_desc": {
+    "message": "라이브 스트림 다시보기를 재생할 때, 각 장면이 실제로 방송된 시각(yyyy/MM/dd hh:mm:ss)을 공용 화질·재생 속도·볼륨 오버레이에 표시합니다. 일반 영상이나 진행 중인 라이브에는 표시되지 않습니다. 방송 중 중단이나 편집이 있었던 다시보기는 시각이 어긋날 수 있습니다."
+  },
+  "bcOverlayLabel": {
+    "message": "방송"
+  },
+  "feat_sf_redirectShortsUrl_label": {
+    "message": "Shorts URL을 /watch로 이동"
+  },
+  "feat_sf_redirectShortsUrl_desc": {
+    "message": "/shorts/<ID> 세로 영상 페이지를 일반 /watch?v=<ID> 플레이어로 강제 전환합니다."
+  },
+  "feat_sf_playlistReverse_label": {
+    "message": "재생목록에 역순 버튼 표시"
+  },
+  "feat_sf_playlistReverse_desc": {
+    "message": "이 설정은 역순 버튼의 표시 여부만 제어하며 순서는 바꾸지 않습니다. 켜면 재생목록 패널에 \"역순: ON/OFF\" 버튼, 재생목록 페이지에 \"역순 재생\" 버튼이 표시됩니다. 역순 여부는 재생목록마다 버튼으로 선택하며(현재 탭에서만 유지), ON이면 마지막 영상에서 첫 영상 방향으로 재생됩니다. 이 설정을 끄면 버튼이 사라지고 원래 순서로 돌아갑니다."
+  },
+  "ytPlaylistReverseStateOn": {
+    "message": "역순: ON"
+  },
+  "ytPlaylistReverseStateOff": {
+    "message": "역순: OFF"
+  },
+  "ytPlaylistReverseOnTitle": {
+    "message": "이 재생목록을 역순으로 재생 중입니다. 클릭하면 원래 순서로 돌아갑니다"
+  },
+  "ytPlaylistReverseOffTitle": {
+    "message": "원래 순서로 재생 중입니다. 클릭하면 역순으로 바뀝니다"
+  },
+  "ytPlaylistReversePlay": {
+    "message": "역순 재생"
+  },
+  "feat_sf_gameCrop_label": {
+    "message": "게임 화면 확대 버튼 표시"
+  },
+  "feat_sf_gameCrop_desc": {
+    "message": "이 설정은 버튼의 표시 여부만 제어합니다. 켜면 플레이어 툴바에 \"게임 화면\" 칩이 표시됩니다. 스트리머가 게임 화면을 영상 일부에 맞춰 넣고 주변에 프레임이나 아바타를 배치한 스트림에서, 게임 영역을 드래그하면 플레이어가 그 영역만 확대됩니다. 영역은 채널별로 이 기기에 저장되며 해당 채널의 영상에 자동으로 다시 적용됩니다. 이 설정을 끄면 칩과 확대가 해제됩니다(저장된 영역은 유지)."
+  },
+  "gcLabel": {
+    "message": "게임 화면"
+  },
+  "gcToggleOn": {
+    "message": "확대: ON"
+  },
+  "gcToggleOff": {
+    "message": "확대: OFF"
+  },
+  "gcToggleOnTitle": {
+    "message": "게임 화면으로 확대 중입니다. 클릭하면 전체 영상을 표시합니다"
+  },
+  "gcToggleOffTitle": {
+    "message": "전체 영상을 표시 중입니다. 클릭하면 저장된 게임 화면으로 확대합니다"
+  },
+  "gcSelect": {
+    "message": "영역 선택"
+  },
+  "gcReselect": {
+    "message": "영역 변경"
+  },
+  "gcSelectTitle": {
+    "message": "영상을 드래그해 게임 화면을 선택하세요"
+  },
+  "gcRemove": {
+    "message": "삭제"
+  },
+  "gcRemoveTitle": {
+    "message": "이 채널에 저장된 게임 화면 영역 삭제"
+  },
+  "gcHint": {
+    "message": "드래그해 게임 화면을 선택하세요(Esc로 취소)"
+  },
+  "ytPlaylistReversePlayTitle": {
+    "message": "마지막 영상부터 첫 영상 방향으로 재생합니다"
+  },
+  "feat_sf_searchGrid_label": {
+    "message": "검색 결과를 그리드로 표시"
+  },
+  "feat_sf_searchGrid_desc": {
+    "message": "검색 결과를 한 줄 목록에서 여러 열의 그리드로 바꿉니다(열 수는 그리드 설정을 따르며, 자동은 홈의 열 수와 같습니다)."
+  },
+  "feat_sf_removeShortsChip_label": {
+    "message": "Shorts 필터 칩"
+  },
+  "feat_sf_removeShortsChip_desc": {
+    "message": "검색 페이지 상단 필터 줄(\"전체 / 동영상 / Shorts / 재생목록 …\")에서 \"Shorts\" 칩만 제거합니다."
+  },
+  "feat_sf_removeShortsSidebar_label": {
+    "message": "Shorts 사이드바 항목"
+  },
+  "feat_sf_removeShortsSidebar_desc": {
+    "message": "왼쪽 사이드바의 \"Shorts\" 항목을 제거합니다(펼친 형태와 접은 형태 모두)."
+  },
+  "feat_sf_subsLeftnavInjectAll_label": {
+    "message": "왼쪽 메뉴에 전체 구독 표시"
+  },
+  "feat_sf_subsLeftnavInjectAll_desc": {
+    "message": "YouTube의 표시 개수 제한으로 숨겨진 구독 채널을 모두 왼쪽 사이드바의 구독 섹션에 추가합니다(/feed/channels에서 동일 출처로 가져오며 24시간 캐시)."
+  },
+  "feat_sf_subsAllShortcut_label": {
+    "message": "\"전체 구독\" 바로가기"
+  },
+  "feat_sf_subsAllShortcut_desc": {
+    "message": "왼쪽 사이드바 구독 섹션 맨 위에 /feed/channels로 이동하는 항목을 기본 메뉴와 같은 스타일로 추가합니다."
+  },
+  "feat_sf_subsChannelsGrid_label": {
+    "message": "구독 페이지를 그리드로 표시(검색·정렬 포함)"
+  },
+  "feat_sf_subsChannelsGrid_desc": {
+    "message": "/feed/channels를 반응형 그리드로 바꾸고 채널 이름이나 핸들로 검색할 수 있게 합니다. 정렬은 YouTube 자체 컨트롤을 사용합니다. 각 카드는 화면에 가까워질 때 최신 영상 썸네일을 가져옵니다(24시간 캐시)."
+  },
+  "feat_sf_homeGrid_label": {
+    "message": "홈/피드를 그리드로 정렬"
+  },
+  "feat_sf_homeGrid_desc": {
+    "message": "홈과 구독 피드를 빈틈 없는 그리드로 배치합니다(Shorts 같은 선반을 넘어 영상을 채웁니다). 열 수가 자동일 때도 정렬됩니다(4/5/6열에서는 이 토글이 꺼져 있어도 항상 그리드로 표시)."
+  },
+  "feat_ig_reels_label": {
+    "message": "릴스 제거"
+  },
+  "feat_ig_reels_desc": {
+    "message": "사이드바/내비게이션의 릴스 항목을 숨기고 /reels/ URL을 홈으로 강제 이동합니다."
+  },
+  "feat_ig_explore_label": {
+    "message": "탐색 제거"
+  },
+  "feat_ig_explore_desc": {
+    "message": "사이드바/내비게이션의 탐색 항목을 숨기고 /explore/ URL을 홈으로 강제 이동합니다."
+  },
+  "feat_ig_stories_label": {
+    "message": "스토리 트레이 숨기기(홈)"
+  },
+  "feat_ig_stories_desc": {
+    "message": "홈 피드 상단의 스토리 트레이(24시간 후 사라지는 짧은 영상)를 CSS로 숨깁니다."
+  },
+  "feat_ig_storiesAll_label": {
+    "message": "스토리 URL을 홈으로 이동"
+  },
+  "feat_ig_storiesAll_desc": {
+    "message": "/stories/ 방문을 모두 홈으로 이동합니다(공유된 링크의 실수 클릭 방지)."
+  },
+  "feat_ig_threads_label": {
+    "message": "Threads 홍보 숨기기"
+  },
+  "feat_ig_threads_desc": {
+    "message": "Threads 앱을 홍보하는 배너, 사이드바 항목, 푸터 링크를 숨깁니다."
+  },
+  "feat_ig_vanity_label": {
+    "message": "좋아요·팔로워 수 숨기기"
+  },
+  "feat_ig_vanity_desc": {
+    "message": "<article> 내부의 숫자 버튼(쉼표, k, M 등)을 감지해 숨겨, 남과 비교하는 피로를 줄입니다."
+  },
+  "feat_ig_blockVideos_label": {
+    "message": "게시물 내 영상 차단"
+  },
+  "feat_ig_blockVideos_desc": {
+    "message": "피드 <article> 안의 <video> 요소를 표시하고 CSS로 썸네일로 바꿔 자동 재생을 막습니다."
+  },
+  "feat_ig_comments_label": {
+    "message": "댓글 숨기기"
+  },
+  "feat_ig_comments_desc": {
+    "message": "댓글 목록, 입력 폼, \"댓글 N개 보기\" 링크를 CSS로 숨깁니다."
+  },
+  "feat_ig_notes_label": {
+    "message": "노트 숨기기"
+  },
+  "feat_ig_notes_desc": {
+    "message": "DM 화면 상단의 노트(프로필 사진 위의 짧은 상태 메시지) 줄을 숨깁니다."
+  },
+  "feat_ig_msgCounters_label": {
+    "message": "읽지 않은 DM 뱃지 숨기기"
+  },
+  "feat_ig_msgCounters_desc": {
+    "message": "내비게이션의 읽지 않은 DM 수 뱃지(숫자가 있는 빨간 원)를 숨겨 알림 부담을 줄입니다."
+  },
+  "feat_ig_videoControls_label": {
+    "message": "영상 탐색 막대 표시"
+  },
+  "feat_ig_videoControls_desc": {
+    "message": "영상 위치를 바꾸는 탐색 막대를 표시하고, 텍스트 입력란 밖에서는 Space로 재생을 일시정지하거나 재개합니다."
+  },
+  "instagramVideoControlsAria": {
+    "message": "영상 재생 컨트롤"
+  },
+  "instagramVideoSeekAria": {
+    "message": "영상 위치"
+  },
+  "feat_ig_imageDownload_label": {
+    "message": "이미지에 다운로드 버튼 표시"
+  },
+  "feat_ig_imageDownload_desc": {
+    "message": "마우스를 올리면 게시물 사진(피드 / 프로필 그리드 / 게시물 상세)의 왼쪽 위에 다운로드 버튼을 겹쳐 표시합니다. srcset에서 가장 큰 변형을 선택합니다."
+  },
+  "feat_tt_hideComments_label": {
+    "message": "댓글 숨기기"
+  },
+  "feat_tt_hideComments_desc": {
+    "message": "댓글 패널(플레이어 옆에 표시되는 댓글 목록), 댓글 아이콘 버튼, 댓글 수를 CSS로 숨깁니다."
+  },
+  "feat_tt_hideSuggested_label": {
+    "message": "추천 계정 숨기기"
+  },
+  "feat_tt_hideSuggested_desc": {
+    "message": "추천 / 팔로잉 피드와 프로필에 삽입되는 \"추천 계정\" 영역을 CSS로 숨깁니다."
+  },
+  "feat_tt_imageDownload_label": {
+    "message": "이미지에 다운로드 버튼 표시"
+  },
+  "feat_tt_imageDownload_desc": {
+    "message": "마우스를 올리면 사진 게시물과 영상 썸네일의 왼쪽 위에 다운로드 버튼을 겹쳐 표시합니다."
+  },
+  "categoryXExtra": {
+    "message": "추가 기능"
+  },
+  "feat_x_imageDownload_label": {
+    "message": "이미지에 다운로드 버튼 표시"
+  },
+  "feat_x_imageDownload_desc": {
+    "message": "게시물 이미지에 마우스를 올리면 왼쪽 위에 버튼이 표시되며, 클릭하면 원본 화질로 저장합니다"
+  },
+  "feat_x_hideRightPane_label": {
+    "message": "오른쪽 패널 숨기기"
+  },
+  "feat_x_hideRightPane_desc": {
+    "message": "3단 레이아웃의 오른쪽 열 전체(검색, 트렌드, 팔로우 추천, 유료 구독 유도)를 숨기고 확보된 공간만큼 타임라인을 넓힙니다."
+  },
+  "feat_x_hideTrends_label": {
+    "message": "트렌드 숨기기"
+  },
+  "feat_x_hideTrends_desc": {
+    "message": "오른쪽 패널은 유지하고 트렌드 블록만 숨깁니다."
+  },
+  "feat_x_hideWhoToFollow_label": {
+    "message": "팔로우 추천 숨기기"
+  },
+  "feat_x_hideWhoToFollow_desc": {
+    "message": "오른쪽 패널의 \"팔로우 추천\" 블록을 숨깁니다."
+  },
+  "feat_x_hideMessagesDock_label": {
+    "message": "메시지 도크 숨기기"
+  },
+  "feat_x_hideMessagesDock_desc": {
+    "message": "오른쪽 아래에 고정된 메시지/채팅 도크 패널을 숨깁니다(메시지 페이지는 평소처럼 사용 가능)."
+  },
+  "feat_x_hidePromoted_label": {
+    "message": "프로모션 게시물 숨기기"
+  },
+  "feat_x_hidePromoted_desc": {
+    "message": "타임라인에 삽입되는 광고(프로모션) 게시물을 셀 전체를 제거해 빈 공간 없이 숨깁니다."
+  },
+  "feat_x_hidePremiumUpsell_label": {
+    "message": "Premium 유도 숨기기"
+  },
+  "feat_x_hidePremiumUpsell_desc": {
+    "message": "오른쪽 패널의 구독 유도 카드와 왼쪽 메뉴의 Premium 항목을 숨깁니다."
+  },
+  "feat_x_hideGrok_label": {
+    "message": "Grok 숨기기"
+  },
+  "feat_x_hideGrok_desc": {
+    "message": "왼쪽 메뉴의 Grok 항목, 오른쪽 아래의 Grok 드로어, 게시물 안의 Grok 버튼을 숨깁니다."
+  },
+  "feat_x_hideEngagementCounts_label": {
+    "message": "참여 수 숨기기"
+  },
+  "feat_x_hideEngagementCounts_desc": {
+    "message": "답글 / 리포스트 / 좋아요 / 조회 수만 숨깁니다. 버튼은 그대로여서 기존처럼 사용할 수 있습니다."
+  },
+  "feat_x_followingTabDefault_label": {
+    "message": "홈을 \"팔로잉\"으로 열기"
+  },
+  "feat_x_followingTabDefault_desc": {
+    "message": "홈을 \"추천\"에서 \"팔로잉\"으로 전환합니다(페이지당 한 번만 전환하며, 직접 \"추천\"으로 되돌리면 더 이상 개입하지 않습니다)."
+  },
+  "tabSettings": {
+    "message": "설정"
+  },
+  "settingsBackupTitle": {
+    "message": "설정 저장 및 불러오기"
+  },
+  "settingsBackupDescription": {
+    "message": "모든 기능 설정, EQ, 차단 채널, 색상 기록, 선택한 탭을 JSON으로 저장해 다른 PC나 브라우저에서 사용할 수 있습니다. 불러오면 파일에 포함된 항목을 덮어씁니다. 동기화 켜기/끄기, 전송 대상 계정, 인증 정보, 캐시, 사이트 내 오버레이 위치는 제외됩니다. 동기화가 켜져 있으면 불러온 기능 설정도 다른 PC에 동기화됩니다."
+  },
+  "settingsExport": {
+    "message": "내보내기"
+  },
+  "settingsImport": {
+    "message": "불러오기"
+  },
+  "settingsExportSuccess": {
+    "message": "설정 다운로드를 시작했습니다."
+  },
+  "settingsExportError": {
+    "message": "내보내기에 실패했습니다. 설정과 다운로드 위치를 확인한 뒤 다시 시도하세요."
+  },
+  "settingsImportSuccess": {
+    "message": "설정을 불러왔습니다."
+  },
+  "settingsImportError": {
+    "message": "불러오기에 실패했습니다. 올바른 Vuora 설정 JSON 파일(최대 5MB)을 선택하세요."
+  },
+  "feat_sf_liveLatency_label": {
+    "message": "라이브 지연 제어"
+  },
+  "feat_sf_liveLatency_desc": {
+    "message": "라이브 스트림을 따라잡는 방식과 표시할 정보를 선택합니다."
+  },
+  "feat_sf_playbackQuality_label": {
+    "message": "화질 선택기"
+  },
+  "feat_sf_playbackQuality_desc": {
+    "message": "플레이어 화질을 바꾸는 선택기를 추가합니다."
+  },
+  "feat_sf_playbackRate_label": {
+    "message": "재생 속도 선택기"
+  },
+  "feat_sf_playbackRate_desc": {
+    "message": "0.25x~2x 재생 속도 선택기를 추가합니다."
+  },
+  "feat_sf_playerVolume_label": {
+    "message": "플레이어 볼륨 선택기"
+  },
+  "feat_sf_playerVolume_desc": {
+    "message": "플레이어 볼륨 선택기를 추가하고 기본 볼륨 컨트롤을 사용자 지정합니다."
+  },
+  "ypcWatchSettings": {
+    "message": "영상 페이지 설정"
+  },
+  "yp_details": {
+    "message": "상세"
+  },
+  "yp_auto": {
+    "message": "자동"
+  },
+  "yp_enabled": {
+    "message": "속도를 자동 조정해 따라잡기"
+  },
+  "yp_playbackRate": {
+    "message": "자동 따라잡기 속도"
+  },
+  "yp_showPlaybackRate": {
+    "message": "현재 재생 속도 표시"
+  },
+  "yp_showLatency": {
+    "message": "라이브 대비 지연 표시"
+  },
+  "yp_showHealth": {
+    "message": "버퍼링된 앞쪽 시간 표시"
+  },
+  "yp_showEstimation": {
+    "message": "라이브까지 예상 소요 시간 표시"
+  },
+  "yp_showCurrent": {
+    "message": "재생 위치 표시(클릭하면 타임스탬프 URL 복사)"
+  },
+  "yp_smooth": {
+    "message": "충분히 버퍼링되면 속도 조정"
+  },
+  "yp_smoothThreshold": {
+    "message": "속도 조정에 필요한 버퍼 시간(초)"
+  },
+  "yp_smoothAuto": {
+    "message": "버퍼 시간 기준을 자동 설정"
+  },
+  "yp_skip": {
+    "message": "많이 뒤처지면 최신 위치로 이동"
+  },
+  "yp_skipThreshold": {
+    "message": "이만큼 뒤처지면 이동(초)"
+  },
+  "yp_hideSlider": {
+    "message": "기본 볼륨 슬라이더 숨기기"
+  },
+  "yp_hideVolumeIcon": {
+    "message": "기본 볼륨 아이콘 숨기기"
+  },
+  "yp_latencyNote": {
+    "message": "자동 속도 조정이 꺼져 있어도 정보를 표시할 수 있습니다. 속도 조정은 라이브 재생 중에만 적용됩니다."
+  },
+  "yp_buttonNote": {
+    "message": "화질, 볼륨, 재생 속도를 오버레이 선택기 한 줄에서 바꿉니다. 재생 속도는 0.25x~2x입니다. 단축키는 브라우저의 확장 프로그램 설정에서 지정하세요."
+  },
+  "ypcQuality": {
+    "message": "화질"
+  },
+  "ypcRate": {
+    "message": "재생 속도"
+  },
+  "ypcVolume": {
+    "message": "볼륨"
+  },
+  "ypcCopied": {
+    "message": "복사됨"
+  },
+  "ypcSaveError": {
+    "message": "설정을 저장하지 못했습니다. 다시 시도하세요."
+  },
+  "ypcCommand_quality_1": {
+    "message": "YouTube 화질 버튼 1"
+  },
+  "ypcCommand_quality_2": {
+    "message": "YouTube 화질 버튼 2"
+  },
+  "ypcCommand_quality_3": {
+    "message": "YouTube 화질 버튼 3"
+  },
+  "ypcCommand_quality_4": {
+    "message": "YouTube 화질 버튼 4"
+  },
+  "ypcCommand_quality_5": {
+    "message": "YouTube 화질 버튼 5"
+  },
+  "ypcCommand_quality_6": {
+    "message": "YouTube 화질 버튼 6"
+  },
+  "ypcCommand_quality_7": {
+    "message": "YouTube 화질 버튼 7"
+  },
+  "ypcCommand_quality_8": {
+    "message": "YouTube 화질 버튼 8"
+  },
+  "ypcCommand_quality_9": {
+    "message": "YouTube 화질 버튼 9"
+  },
+  "ypcCommand_rate_1": {
+    "message": "YouTube 재생 속도 버튼 1"
+  },
+  "ypcCommand_rate_2": {
+    "message": "YouTube 재생 속도 버튼 2"
+  },
+  "ypcCommand_rate_3": {
+    "message": "YouTube 재생 속도 버튼 3"
+  },
+  "ypcCommand_rate_4": {
+    "message": "YouTube 재생 속도 버튼 4"
+  },
+  "ypcCommand_rate_5": {
+    "message": "YouTube 재생 속도 버튼 5"
+  },
+  "ypcCommand_rate_6": {
+    "message": "YouTube 재생 속도 버튼 6"
+  },
+  "ypcCommand_rate_7": {
+    "message": "YouTube 재생 속도 버튼 7"
+  },
+  "ypcCommand_rate_8": {
+    "message": "YouTube 재생 속도 버튼 8"
+  },
+  "ypcCommand_volume_1": {
+    "message": "YouTube 볼륨 버튼 1"
+  },
+  "ypcCommand_volume_2": {
+    "message": "YouTube 볼륨 버튼 2"
+  },
+  "ypcCommand_volume_3": {
+    "message": "YouTube 볼륨 버튼 3"
+  },
+  "ypcCommand_volume_4": {
+    "message": "YouTube 볼륨 버튼 4"
+  },
+  "ypcCommand_volume_5": {
+    "message": "YouTube 볼륨 버튼 5"
+  },
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Wikipedia 읽기 설정"
+  },
+  "wikipediaMasterDesc": {
+    "message": "Wikipedia 문서의 레이아웃, 글꼴, 색상을 조정합니다."
+  },
+  "wikipediaOptions": {
+    "message": "Wikipedia 읽기 옵션"
+  },
+  "wikipedia_theme": {
+    "message": "색상"
+  },
+  "wikipedia_noto_sans_jp": {
+    "message": "Noto Sans JP"
+  },
+  "wikipedia_ibm_plex_sans_jp": {
+    "message": "IBM Plex Sans JP"
+  },
+  "wikipedia_m_plus_2": {
+    "message": "M PLUS 2"
+  },
+  "wikipedia_m_plus_rounded_1c": {
+    "message": "M PLUS Rounded 1c"
+  },
+  "wikipedia_murecho": {
+    "message": "Murecho"
+  },
+  "wikipedia_zen_kaku_gothic_new": {
+    "message": "Zen Kaku Gothic New"
+  },
+  "wikipedia_line_seed_jp": {
+    "message": "LINE Seed JP"
+  },
+  "wikipedia_font": {
+    "message": "본문 글꼴"
+  },
+  "wikipedia_fontSize": {
+    "message": "글자 크기"
+  },
+  "wikipedia_contentWidth": {
+    "message": "문서 너비"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "문서의 기본 너비입니다. 외형 패널을 숨기면 확보된 공간이 더해집니다. 이 너비를 유지하려면 \"문서를 설정한 너비 안에 유지\"를 켜세요."
+  },
+  "wikipedia_lineHeight": {
+    "message": "줄 간격"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1×"
+  },
+  "wikipedia_original": {
+    "message": "사이트 색상"
+  },
+  "wikipedia_light": {
+    "message": "라이트"
+  },
+  "wikipedia_sepia": {
+    "message": "세피아"
+  },
+  "wikipedia_dark": {
+    "message": "다크"
+  },
+  "wikipedia_sans": {
+    "message": "시스템 고딕체"
+  },
+  "wikipedia_serif": {
+    "message": "시스템 명조체"
+  },
+  "wikipediaContents": {
+    "message": "목차"
+  },
+  "wikipediaClose": {
+    "message": "닫기"
+  },
+  "wikipediaImage": {
+    "message": "이미지 확대"
+  },
+  "wikipediaReference": {
+    "message": "각주 미리보기"
+  },
+  "wikipediaSiteMenu": {
+    "message": "Wikipedia 메뉴"
+  },
+  "wikipediaDisplaySettings": {
+    "message": "표시 설정"
+  },
+  "wikipediaArticleInfo": {
+    "message": "문서 정보"
+  },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "최신 문서 레이아웃"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "외형 패널 숨기기"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "문서 오른쪽의 Wikipedia 외형 패널을 숨기고 확보된 공간을 문서에 사용합니다."
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "문서를 설정한 너비 안에 유지"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "외형 패널을 숨겨 확보된 공간으로 넓히지 않고 아래 \"문서 너비\" 안에 유지합니다. 너비는 \"문서 너비\"에서 변경하세요."
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "검색, 목차, 문서, 문서 정보를 중심으로 페이지를 재구성합니다. 끄면 원래 레이아웃으로 돌아갑니다."
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "목차 고정"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "빠르게 이동할 수 있도록 목차를 계속 표시합니다."
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "이미지 뷰어"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "문서의 이미지를 확대합니다."
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "링크 및 각주 미리보기"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "Wikipedia 기본 문서 미리보기에 스타일을 적용하고 각주 내용을 그 자리에 표시합니다. 문서 미리보기는 Wikipedia에서 켜져 있을 때 표시됩니다."
+  },
+  "wikipedia_headingFont": {
+    "message": "제목 글꼴"
+  },
+  "wikipedia_inherit": {
+    "message": "본문과 동일"
+  },
+  "wikipedia_linkStyle": {
+    "message": "링크 스타일"
+  },
+  "wikipedia_underline": {
+    "message": "밑줄"
+  },
+  "wikipedia_color": {
+    "message": "색상"
+  },
+  "wikipedia_coverImage": {
+    "message": "대표 이미지"
+  },
+  "wikipedia_show": {
+    "message": "표시"
+  },
+  "wikipedia_hide": {
+    "message": "숨김"
+  },
+  "wikipedia_articleStyle": {
+    "message": "문서 보기"
+  },
+  "wikipedia_full": {
+    "message": "전체"
+  },
+  "wikipedia_pictures": {
+    "message": "텍스트와 이미지"
+  },
+  "wikipedia_text": {
+    "message": "텍스트만"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "전체는 표 등 모든 콘텐츠를 포함합니다. 텍스트와 이미지는 표 등을 제외합니다. 텍스트만은 이미지도 제외합니다."
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "밑줄은 링크에 마우스를 올리기 전까지 글자 색을 사용합니다. 색상은 항상 링크 색을 사용합니다."
+  },
+  "wikipedia_group_typography": {
+    "message": "글꼴과 색상"
+  },
+  "wikipedia_group_layout": {
+    "message": "레이아웃"
+  },
+  "wikipedia_group_display": {
+    "message": "표시"
+  },
+  "wikipedia_small": {
+    "message": "소"
+  },
+  "wikipedia_medium": {
+    "message": "중"
+  },
+  "wikipedia_large": {
+    "message": "대"
+  },
+  "wikipedia_auto": {
+    "message": "자동"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$ (이전 테마)",
+    "placeholders": {
+      "theme": {
+        "content": "$1"
+      }
+    }
+  },
+  "wikipedia_one_dark": {
+    "message": "One Dark"
+  },
+  "wikipedia_one_light": {
+    "message": "One Light"
+  },
+  "wikipedia_dracula": {
+    "message": "Dracula"
+  },
+  "wikipedia_nord": {
+    "message": "Nord"
+  },
+  "wikipedia_monokai": {
+    "message": "Monokai"
+  },
+  "wikipedia_solarized_dark": {
+    "message": "Solarized Dark"
+  },
+  "wikipedia_solarized_light": {
+    "message": "Solarized Light"
+  },
+  "wikipedia_github_dark": {
+    "message": "GitHub Dark"
+  },
+  "wikipedia_github_light": {
+    "message": "GitHub Light"
+  },
+  "wikipedia_deep_ocean": {
+    "message": "딥 오션"
+  },
+  "wikipedia_algae": {
+    "message": "해조류"
+  },
+  "wikipedia_calmness": {
+    "message": "평온"
+  },
+  "wikipedia_desert": {
+    "message": "사막"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "요정의 가루"
+  },
+  "wikipedia_grey": {
+    "message": "회색"
+  },
+  "wikipedia_nature": {
+    "message": "자연"
+  },
+  "languageAuto": { "message": "자동(브라우저)" },
+  "languageSelectLabel": { "message": "언어" },
+  "languageSelectTitle": { "message": "언어(열려 있는 페이지는 새로고침 후 적용)" }
+}

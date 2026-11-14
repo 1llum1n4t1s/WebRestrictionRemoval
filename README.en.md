@@ -4,6 +4,7 @@
 
 A Chrome / Firefox extension that consolidates **13 features for comfortable browsing** into a single popup.
 All features start OFF — opt in only to what you need. Normal browsing assistance stays on-device; network requests run only for the features you explicitly enable or operate.
+The interface follows your browser's UI language (9 languages: English, Japanese, Simplified Chinese, Traditional Chinese, Korean, Spanish, French, German, and Brazilian Portuguese; English otherwise). You can also switch to a different language with the selector next to the popup title.
 
 ---
 
@@ -11,7 +12,7 @@ All features start OFF — opt in only to what you need. Normal browsing assista
 
 | Feature | Description |
 |---------|-------------|
-| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / reduce live latency / quality, speed, and volume selection / send to Gemini Notebook and more — **38 sub-features** |
+| 🧹 **YouTube Enhancements** | Shorts removal / hide comments / hide live chat / subscriptions-as-grid / broadcast-time overlay (show original air time on stream archives) / hide channels from other countries / reduce live latency / quality, speed, and volume selection / reverse playlist playback / game-screen zoom / send to Gemini Notebook and more — **40 sub-features** |
 | 🐦 **X cleaner** | Hide the right pane (widening the timeline into it) / trends / who to follow / promoted posts / Premium upsells / Grok / engagement counts + open Home on "Following" + save post images in original quality (**10 sub-features**) |
 | 📦 **Amazon Subscribe & Save monthly total** | Shows unit price × quantity totals, including future deliveries whose prices are not listed. Retrieves current subscription prices and labels reference totals; previous-order prices are identified when used as a fallback. Legacy monthly pages remain supported |
 | 🏆 **Amazon jump-to-ranking button** | Consolidates Bestsellers links from the product detail section, one-click jump to the most specific subcategory |
@@ -47,7 +48,7 @@ Search for **"Vuora"** on [addons.mozilla.org](https://addons.mozilla.org/).
 
 1. Click the toolbar icon to open the popup.
 2. **Turn ON only the master toggles you need** (everything is OFF by default).
-3. Tune each feature in the popup (the 38 YouTube Enhancements sub-features, Volume Booster slider, etc.).
+3. Tune each feature in the popup (the 40 YouTube Enhancements sub-features, Volume Booster slider, etc.).
 4. Settings are persisted across sessions.
 
 The YouTube watch-page category includes live-latency reduction and controls for quality, playback speed, and player volume. When enabled, quality, volume, and speed can be selected in the shared overlay; speed choices range from 0.25 to 2 times. Other settings appear in a collapsible section, with detailed live-latency settings below. Assign shortcuts in your browser's extension settings.
@@ -59,7 +60,7 @@ Archive broadcast time appears outside the settings section in the same overlay.
 Use the category dropdown at the top to switch between eight tabs. Your last tab and subcategory are remembered.
 
 - **Tune**: Audio / Video / Amazon features and their settings
-- **YouTube**: 38 YouTube Enhancements sub-features
+- **YouTube**: 40 YouTube Enhancements sub-features
 - **X**: 10 X cleaner sub-features
 - **Instagram**: 12 Instagram cleaner sub-features
 - **TikTok**: 3 TikTok cleaner sub-features

@@ -33,8 +33,6 @@ const Actions = Object.freeze({
   APPLY_LOUPE_CS: "applyLoupeCS",
   /** popup → background: 音量ブースターの gain を指定タブで変更 */
   VOLUME_BOOSTER_SET_GAIN: "volumeBoosterSetGain",
-  /** popup → background: 指定タブのブーストを解放（スライダー 100% 復帰時） */
-  VOLUME_BOOSTER_RELEASE_TAB: "volumeBoosterReleaseTab",
   /** loupe content script → background: 現在タブのスクリーンキャプチャを要求し、JPEG DataURL を取得する */
   LOUPE_REQUEST_CAPTURE: "loupeRequestCapture",
   /** youtube-notebooklm content script → background: NotebookLM のノートブック一覧を取得する */
@@ -98,7 +96,7 @@ const StorageKeys = Object.freeze({
   SETTINGS_SYNC_STATUS: "_settingsSyncStatus",
   SETTINGS_SYNC_RETRY: "_settingsSyncRetry",
   SETTINGS_SYNC_APPLIED: "_settingsSyncApplied",
-  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 38 サブ機能の親） */
+  /** YouTube 機能拡張マスタートグル（Shorts 削除・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張を含む全 40 サブ機能の親） */
   SEARCH_FIXER_ENABLED: "searchFixerEnabled",
   /** YouTube 機能拡張の個別機能オン/オフ（オブジェクト） */
   SEARCH_FIXER_FEATURES: "searchFixerFeatures",
@@ -106,10 +104,11 @@ const StorageKeys = Object.freeze({
   /** ホームページのリッチグリッド列数（0 = YouTube デフォルト、4/5/6 が選択肢） */
   SEARCH_FIXER_GRID_ITEMS: "searchFixerGridItems",
   /** 検索結果から除外するチャンネルのリスト（{key, name} 配列。key = "@handle" 小文字 or "UC..." チャンネル ID）。
-   *  popup → storage 直書きパターン（SettingsSchema 非経由、content script は storage.onChanged で購読）。 */
+   *  popup / content script → background（UPDATE_BLOCKED_CHANNELS）の保存キュー経由で更新する
+   *  （SettingsSchema 非経由、content script は storage.onChanged で購読）。 */
   SEARCH_FIXER_BLOCKED_CHANNELS: "searchFixerBlockedChannels",
   /** NotebookLM 送信の送信先 Google アカウント（`authuser` インデックス、0 = 既定）。
-   *  content script → storage 直書きパターン（SettingsSchema 非経由）。マルチログイン環境で
+   *  content script → background（SAVE_NOTEBOOK_ACCOUNT）の保存キュー経由で更新する（SettingsSchema 非経由）。マルチログイン環境で
    *  意図しないアカウントへ動画 URL が入るのを防ぐ（/rere D-5）。 */
   NOTEBOOK_LM_ACCOUNT_INDEX: "notebookLmAccountIndex",
   /** ログイン中 Google アカウント一覧のキャッシュ（`{at, accounts}`、background 直書き）。
@@ -189,10 +188,142 @@ const StorageKeys = Object.freeze({
    *  `chrome.storage.local` が破損・リセットされた可能性として開発者コンソールに警告を出す（#3）。
    *  接頭辞 "_" でユーザー向け設定キーと区別する。 */
   INSTALL_SENTINEL: "_installSentinel",
+  /** 表示言語の選択（"auto" 相当は未設定）。ポップアップのヘッダーで切り替える。端末内のみ（同期・バックアップ対象外）。 */
+  UI_LANGUAGE: "uiLanguage",
+  /** 選択した言語の文言（`Localizer.compact` の形）。コンテンツスクリプトも同じ言語で表示するため storage に置く。 */
+  UI_MESSAGES: "uiMessages",
+  /** `uiMessages` を作ったときの拡張機能の版。更新で文言が変わったら、新しい版の文言へ作り直す判定に使う。 */
+  UI_VERSION: "uiMessagesVersion",
 });
+
+/**
+ * 表示言語の切り替え。拡張機能の標準の `chrome.i18n` はブラウザの UI 言語に固定で変更できないため、
+ * 利用者が選んだ言語の文言（_locales の messages.json）を storage に保存し、`chrome.i18n.getMessage` /
+ * `getUILanguage` をその言語を優先する版に差し替える（既存の呼び出し箇所は変更不要）。
+ * 未選択（自動）やキーが無いときはブラウザ標準の動作に戻す。manifest の `__MSG_*__`（拡張機能名・
+ * ショートカットの説明）はブラウザが処理するため、ブラウザの言語のまま。
+ */
+const Localizer = (() => {
+  const LANGUAGES = Object.freeze([
+    Object.freeze({ code: "en", name: "English" }),
+    Object.freeze({ code: "ja", name: "日本語" }),
+    Object.freeze({ code: "zh_CN", name: "简体中文" }),
+    Object.freeze({ code: "zh_TW", name: "繁體中文" }),
+    Object.freeze({ code: "ko", name: "한국어" }),
+    Object.freeze({ code: "es", name: "Español" }),
+    Object.freeze({ code: "fr", name: "Français" }),
+    Object.freeze({ code: "de", name: "Deutsch" }),
+    Object.freeze({ code: "pt_BR", name: "Português (Brasil)" }),
+  ]);
+  const CODES = LANGUAGES.map((language) => language.code);
+  const normalizeCode = (raw) => (CODES.includes(raw) ? raw : null);
+  /** `zh_CN` → `zh-CN`（html の lang 属性用） */
+  const toTag = (code) => String(code).replace("_", "-");
+
+  /** messages.json を保存用に圧縮する（description を捨て、{ key: { m, p? } } にする）。 */
+  function compact(json) {
+    const out = {};
+    if (!json || typeof json !== "object") return out;
+    for (const [key, entry] of Object.entries(json)) {
+      if (typeof entry?.message !== "string") continue;
+      out[key] = entry.placeholders ? { m: entry.message, p: entry.placeholders } : { m: entry.message };
+    }
+    return out;
+  }
+
+  /** `$NAME$`（placeholders）→ `$1`…`$9`（引数）の順に置換する。Chrome の getMessage と同じ規則。 */
+  function format(entry, substitutions) {
+    const args = substitutions === undefined || substitutions === null ? [] : Array.isArray(substitutions) ? substitutions : [substitutions];
+    let text = entry.m;
+    if (entry.p) {
+      for (const [name, value] of Object.entries(entry.p)) {
+        text = text.replace(new RegExp(`\\$${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\$`, "gi"), () => String(value?.content ?? ""));
+      }
+    }
+    return text.replace(/\$([1-9])|\$\$/g, (match, digit) => (digit ? String(args[Number(digit) - 1] ?? "") : "$"));
+  }
+
+  let code = null;
+  let messages = null;
+  let nativeGetMessage = null;
+  let nativeGetUILanguage = null;
+
+  /** 差し替えが実際に効いたか。効かない環境では選んだ言語を名乗らず、ブラウザ標準の言語のまま動かす。 */
+  let installed = false;
+  const KEYS = [StorageKeys.UI_LANGUAGE, StorageKeys.UI_MESSAGES, StorageKeys.UI_VERSION];
+
+  function apply(stored) {
+    const next = normalizeCode(stored?.[StorageKeys.UI_LANGUAGE]);
+    const dictionary = stored?.[StorageKeys.UI_MESSAGES];
+    code = installed && next && dictionary && typeof dictionary === "object" ? next : null;
+    messages = code ? dictionary : null;
+  }
+
+  const currentVersion = () => { try { return chrome.runtime.getManifest().version; } catch { return null; } };
+  const reload = () => chrome.storage.local.get(KEYS).then(apply).catch(() => {});
+
+  /** 選んだ言語の文言を同梱の messages.json から読み、保存する（ポップアップの選択・更新後の再作成が使う）。 */
+  async function save(raw) {
+    const target = normalizeCode(raw);
+    if (!target) throw new Error("unsupported-language");
+    const response = await fetch(chrome.runtime.getURL(`_locales/${target}/messages.json`));
+    if (!response.ok) throw new Error("locale-fetch-failed");
+    const dictionary = compact(await response.json());
+    await chrome.storage.local.set({ [StorageKeys.UI_LANGUAGE]: target, [StorageKeys.UI_MESSAGES]: dictionary, [StorageKeys.UI_VERSION]: currentVersion() });
+  }
+
+  /**
+   * 拡張機能の更新後に、保存済みの辞書が古い版のままなら作り直す。更新でキーが増えたり文言が変わっても、
+   * 選んだ言語とブラウザ標準の言語が混ざらないようにする（background の onInstalled とポップアップの起動時が呼ぶ）。
+   */
+  async function ensureFresh() {
+    try {
+      const stored = await chrome.storage.local.get(KEYS);
+      const target = normalizeCode(stored[StorageKeys.UI_LANGUAGE]);
+      if (target && stored[StorageKeys.UI_VERSION] !== currentVersion()) {
+        await save(target);
+        await reload();
+      }
+    } catch { /* 作り直せなければ保存済みの辞書で続ける */ }
+  }
+
+  function install() {
+    const api = typeof chrome !== "undefined" ? chrome : null;
+    if (!api?.i18n?.getMessage || !api?.storage?.local) return Promise.resolve();
+    nativeGetMessage = api.i18n.getMessage.bind(api.i18n);
+    nativeGetUILanguage = api.i18n.getUILanguage?.bind(api.i18n);
+    const wrapper = (key, substitutions) => {
+      const entry = messages?.[key];
+      if (entry && typeof entry.m === "string") return format(entry, substitutions);
+      return nativeGetMessage(key, substitutions);
+    };
+    try {
+      api.i18n.getMessage = wrapper;
+      if (nativeGetUILanguage) api.i18n.getUILanguage = () => (code ? toTag(code) : nativeGetUILanguage());
+    } catch {
+      // 代入できない環境では次の defineProperty を試す。
+    }
+    if (api.i18n.getMessage !== wrapper) {
+      try { Object.defineProperty(api.i18n, "getMessage", { value: wrapper, configurable: true, writable: true }); } catch { /* 差し替え不可 */ }
+    }
+    // 差し替えが効いたときだけ選んだ言語を使う（効かないのに言語だけ名乗ると、表示と選択がずれる）。
+    installed = api.i18n.getMessage === wrapper;
+    try {
+      api.storage.onChanged.addListener((changes, area) => {
+        if (area !== "local" || !(StorageKeys.UI_LANGUAGE in changes || StorageKeys.UI_MESSAGES in changes)) return;
+        reload();
+      });
+    } catch { /* 文書破棄中 */ }
+    return reload();
+  }
+
+  const ready = install();
+  return Object.freeze({ LANGUAGES, normalizeCode, toTag, compact, format, save, ensureFresh, ready, get code() { return code; }, get installed() { return installed; } });
+})();
 
   globalThis.Actions = Actions;
   globalThis.ExtensionPaths = ExtensionPaths;
   globalThis.SenderCheck = SenderCheck;
   globalThis.StorageKeys = StorageKeys;
+  globalThis.Localizer = Localizer;
 })();

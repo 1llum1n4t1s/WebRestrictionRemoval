@@ -15,7 +15,8 @@
 // データ取得: isolated world からは MAIN world の ytInitialPlayerResponse を読めないため、
 // `/watch?v=<id>` を same-origin fetch（credentials:"same-origin" + redirect:"manual"）して
 // HTML 内の liveBroadcastDetails を抽出する。結果は sessionStorage に videoId 単位で cache し、
-// 動画ごと 1 回の fetch に抑える（負例＝通常動画も cache して再 fetch を防ぐ）。
+// 動画ごと 1 回の fetch に抑える（負例＝通常動画も cache して再 fetch を防ぐ。sessionStorage への
+// 保存に失敗しても再取得しないよう、通常動画の判定は動画が変わるまでメモリにも保持する）。
 //
 //   - master OFF / サブ機能 OFF / 拡張機能 disable / 非アーカイブ / SPA 離脱時は HUD・listener を撤去
 //   - top frame 限定（埋め込みプレイヤーには介入しない）
@@ -49,6 +50,10 @@
   let currentVideoId = null;
   /** @type {{ startMs:number, endMs:(number|null), isLiveNow:boolean } | null} 現在動画の配信情報（アーカイブ確定時のみ非 null） */
   let broadcastInfo = null;
+  /** 現在動画が配信由来でない通常動画と確定したか（メモリ上の負例）。sessionStorage の負例 cache は
+   *  読み出し・JSON.parse・Promise 連鎖のコストがあり、書き込みに失敗（容量超過・サイトデータ遮断）すると
+   *  rescan のたびに /watch を再取得してしまうため、動画が変わるまでメモリで再判定を止める。 */
+  let broadcastNone = false;
   /** @type {string | null} fetch 進行中の videoId（重複 fetch 防止） */
   let fetchInFlightVideoId = null;
   let fetchAbort = null;
@@ -323,6 +328,7 @@
       fetchAbort = null;
       currentVideoId = videoId;
       broadcastInfo = null;
+      broadcastNone = false;
       fetchBackoffMs = 0;
       fetchLastFailedAt = 0;
       hideClock();
@@ -340,6 +346,9 @@
       showClock();
       return;
     }
+
+    // 通常動画と確定済みなら、再取得・storage 読み出しをせず終える（HUD はこの時点で撤去済み）。
+    if (broadcastNone) return;
 
     // 配信情報を取得（fetch は videoId 単位で重複防止 + 失敗時は backoff 経過まで再試行しない）
     if (fetchInFlightVideoId === videoId) return;
@@ -374,7 +383,9 @@
       broadcastInfo = info;
       showClock();
     } else {
-      // 通常動画 / 配信中 / 取得失敗 → HUD は出さない
+      // 通常動画 / 配信中 / 取得失敗 → HUD は出さない。
+      // 通常動画（none）だけは動画が変わるまで再判定しない。配信中・失敗は従来どおり backoff 付きで再試行する。
+      if (info?.none === true) broadcastNone = true;
       hideClock();
     }
   }
@@ -386,6 +397,7 @@
     }
     currentVideoId = null;
     broadcastInfo = null;
+    broadcastNone = false;
   }
 
   // ---------- activate / deactivate ----------

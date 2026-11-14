@@ -6,7 +6,8 @@
  * 責務:
  *   - chrome.storage.local から現在の設定を復元し、UI 要素にバインド
  *   - 各 input の変更を都度 background に APPLY_SETTINGS で送信
- *   - SearchFixer / InstagramCleaner の機能トグルと select は actions.js の FEATURES 配列から動的生成
+ *   - SearchFixer / InstagramCleaner / TikTokCleaner / XCleaner の機能トグルと select は
+ *     actions.js の FEATURES 配列から動的生成
  *     （個別機能数は actions.js を単一情報源とし、ここでは数値をハードコードしない）
  *   - 音量ブースターはマスタートグル付き。マスター OFF / マスター ON かつスライダー 100% かつ
  *     全サブトグル OFF かつミュート OFF のとき AudioContext を解放、
@@ -18,11 +19,12 @@
  *     そのまま微調整でき、こちらも保存は明示ボタン（この色を履歴に保存）でのみ行う
  *
  * ローカライズ:
- *   - 全 UI 文字列は `_locales/{en,ja}/messages.json` から `chrome.i18n.getMessage` 経由で取得する
+ *   - 全 UI 文字列は `_locales/<9 言語>/messages.json` から `chrome.i18n.getMessage` 経由で取得する
+ *     （ヘッダーの言語選択で切り替えた場合は `Localizer` が選んだ言語の文言を優先する）
  *   - 静的テキストは popup.html の `data-i18n` / `data-i18n-attr` 属性で指定し、
  *     applyI18nToDom() が DOMContentLoaded で一括適用する
  *   - 動的テキスト（status / picker note / pill 等）は i18n() ヘルパー経由
- *   - ブラウザ UI 言語が ja → 日本語、それ以外 → 英語にフォールバック
+ *   - ブラウザ UI 言語に合う言語、無ければ英語にフォールバック
  *     （manifest.json の `default_locale: "en"` で実現）
  */
 
@@ -162,6 +164,67 @@ const IS_GECKO_EXTENSION = (() => {
 // 自動適用する。VOLUME_BOOSTER_SET_GAIN メッセージ送信・active tab 判定は不要。
 const VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER;
 
+/**
+ * <html lang> を UI 言語に追従させる（フォントフォールバック・スクリーンリーダー・問い合わせ部品用）。
+ *
+ * 問い合わせ・評価の部品（kagayoi-support-footer.js）は module script で、DOMContentLoaded より
+ * 前に最寄りの `[lang]` から表示言語を決めて描画する。DOMContentLoaded 内で lang を切り替えると
+ * 英語環境でも部品が日本語のまま表示されるため、classic script の読込時（module より前）に実行する。
+ */
+(() => {
+  try {
+    // 利用者が選んだ表示言語は、storage の非同期読み込みを待てないこの時点のため、
+    // 拡張機能ページ自身の localStorage に控えた値を同期的に使う（問い合わせ部品が lang を先に読む）。
+    let chosen = null;
+    try { chosen = Localizer.normalizeCode(window.localStorage.getItem("cpaUiLanguage")); } catch { /* 読めなければ自動 */ }
+    if (chosen) {
+      document.documentElement.lang = Localizer.toTag(chosen);
+    } else if (chrome?.i18n?.getUILanguage) {
+      const ui = chrome.i18n.getUILanguage();
+      if (typeof ui === "string" && ui.length > 0) {
+        // 実際の UI 言語を設定し、文字種に合った書体・字形・ハイフネーションを使えるようにする。
+        // 問い合わせ部品は日本語かそれ以外かだけを見る（ja 以外は英語表示）。
+        document.documentElement.lang = ui;
+      }
+    }
+  } catch {
+    // 読めなくても表示には影響しない
+  }
+})();
+
+/**
+ * ヘッダーの言語選択。「自動」はブラウザの言語、それ以外は選んだ言語の文言を storage に保存し、
+ * ポップアップを開き直して反映する（開いているページは再読み込みで反映される）。
+ * 言語名は各言語の自国語表記のまま（どの表示言語でも選べるように）。
+ */
+function initLanguageSelect() {
+  const select = document.getElementById("uiLanguage");
+  if (!select) return;
+  select.replaceChildren();
+  const auto = new Option(chrome.i18n.getMessage("languageAuto") || "Auto", "auto");
+  select.add(auto);
+  for (const language of Localizer.LANGUAGES) select.add(new Option(language.name, language.code));
+  select.value = Localizer.code ?? "auto";
+  select.addEventListener("change", async () => {
+    const code = Localizer.normalizeCode(select.value);
+    select.disabled = true;
+    try {
+      if (code) {
+        await Localizer.save(code);
+        try { window.localStorage.setItem("cpaUiLanguage", code); } catch { /* 控えが無くても storage の値で表示できる */ }
+      } else {
+        await chrome.storage.local.remove([StorageKeys.UI_LANGUAGE, StorageKeys.UI_MESSAGES, StorageKeys.UI_VERSION]);
+        try { window.localStorage.removeItem("cpaUiLanguage"); } catch { /* 同上 */ }
+      }
+      location.reload();
+    } catch {
+      // 失敗時は元の選択に戻す。
+      select.value = Localizer.code ?? "auto";
+      select.disabled = false;
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   // Firefox 版 (MES 経路): オーディオセクションは表示したまま、MES 経路の制約
   // (DRM 保護動画では動作しない) を注記する。Chrome では注記を隠したまま (hidden 属性)。
@@ -171,18 +234,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ----- ローカライズ: 静的テキストを最初に置換し、英語環境での FOUT を最小化 -----
-  // <html lang> も UI 言語に追従させる（フォントフォールバックや スクリーンリーダー向け）
-  try {
-    if (chrome?.i18n?.getUILanguage) {
-      const ui = chrome.i18n.getUILanguage();
-      if (typeof ui === "string" && ui.length > 0) {
-        document.documentElement.lang = ui.startsWith("ja") ? "ja" : "en";
-      }
-    }
-  } catch {
-    // 読めなくても表示には影響しない
-  }
+  // <html lang> は classic script の読込時（DOMContentLoaded 登録の直前の即時関数）に
+  // 設定済み。ここでは静的テキストの置換だけを行う。
+  // 選択した表示言語（storage）の読み込みを待ってから、文言を置き換える。
+  try { await Localizer.ready; } catch { /* 標準の言語で続ける */ }
+  // 更新後に辞書が古い版のままなら、ここで作り直してから描画する（選んだ言語と標準の言語を混ぜない）。
+  await Localizer.ensureFresh();
   applyI18nToDom();
+  initLanguageSelect();
 
   // ----- 観測性: 拡張バージョンを footer に表示 (I-7) -----
   // サポート対応時の「バージョンを教えてください」コストを削るため、popup を開けば常時見える形で提示。
@@ -486,7 +545,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateXCleanerCountBadge();
   updateXCleanerDimState();
 
-  // 調整タブを 4 セクション（オーディオ / 映像 / Amazon / セッション）のサブタブに分割する。
+  // 調整タブを 3 セクション（オーディオ / 映像 / Amazon）のサブタブに分割する。
   // 各セクションのマスタートグルは復元済みなので、ここで初期 badge 件数も確定する。
   buildTuneSubTabs();
 
@@ -1303,21 +1362,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   /**
-   * クリーナー詳細アコーディオンの DOM ビルダー（YouTube 機能拡張 / Instagram クリーナー / TikTok クリーナー共通）。
+   * 機能トグル 1 行（ラベル + 説明文 + switch）を構築して inputMap に登録し、`<label>` を返す。
+   * YouTube 機能拡張のサブタブ表示 / Instagram / TikTok のスタック表示で共通利用する。
    *
-   * 構造: `cat` > `cat-head` (アイコン + ラベル) + `cat-list` (各機能のトグル行)。
    * 各 `feature-row` は 1 行 1 トグル + 説明文の縦積みレイアウト。
    * 各 `<input type="checkbox">` には `id="${idPrefix}${item.key}"` を付与し、
    * `inputMap` (`Map<key, input>`) に登録して呼び出し側で値の収集・復元に使う。
    *
-   * カテゴリ id が "menu_ui" のときは先頭にホーム列数行を動的挿入する。
-   *
    * @param {string} messageKeyPrefix `feat_sf_` / `feat_ig_` / `feat_tt_` のいずれか。
    *   これに `${item.key}_label` / `${item.key}_desc` を後置して messages.json から取得する。
-   */
-  /**
-   * 機能トグル 1 行（ラベル + 説明文 + switch）を構築して inputMap に登録し、`<label>` を返す。
-   * YouTube 機能拡張のサブタブ表示 / Instagram / TikTok のスタック表示で共通利用する。
    */
   function _buildFeatureRow(item, inputMap, idPrefix, messageKeyPrefix) {
     const row = document.createElement("label");
@@ -1355,10 +1408,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return row;
   }
 
-  /**
-   * 1 カテゴリ分の `cat-list`（機能トグル行の集合）を構築して返す。
-   * menu_ui カテゴリのときは先頭にホーム列数行を挿入する。
-   */
   // 詳細値は部分パッチだけを保存し、他の画面・同期による編集を維持する。
   function buildPlayerSettings(stored) {
     const spec = SearchFixer.PLAYER_CONTROLS;
@@ -1436,6 +1485,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     refresh();
   }
 
+  /**
+   * 1 カテゴリ分の `cat-list`（機能トグル行の集合）を構築して返す。
+   * menu_ui カテゴリのときは先頭にホーム列数行を挿入する。
+   * YouTube 機能拡張 / Instagram クリーナー / TikTok クリーナーのサブタブ・スタック表示で共通利用する。
+   */
   function _buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix) {
     const list = document.createElement("div");
     list.className = "cat-list";
@@ -1516,7 +1570,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * カテゴリをサブタブで切り替える DOM を構築する（YouTube / Instagram クリーナーで共用）。
    *
-   * 機能数が多いクリーナー（YouTube 38 機能 / Instagram 12 機能）を 1 画面に縦積みすると
+   * 機能数が多いクリーナー（YouTube 40 機能 / Instagram 12 機能）を 1 画面に縦積みすると
    * 非常に長くなるため、カテゴリごとにサブタブで切り替えられるようにして縦の情報量を圧縮する。
    * 各機能の `<input>` は全カテゴリ分まとめて DOM / inputMap に存在し続ける（非表示パネルでも
    * checked 状態は保持され、ON 数カウントや apply() の収集に影響しない）。
@@ -1560,6 +1614,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const panel = document.createElement("div");
       panel.className = "cat-panel";
       panel.setAttribute("role", "tabpanel");
+      // タブとパネルを相互に関連付ける（id は機能トグルの `feature-*` 等と衝突しない接頭辞）。
+      tab.id = `subtab-${groupKey}-${cat.id}`;
+      panel.id = `subpanel-${groupKey}-${cat.id}`;
+      tab.setAttribute("aria-controls", panel.id);
+      panel.setAttribute("aria-labelledby", tab.id);
       panel.appendChild(_buildCatList(cat, items, inputMap, idPrefix, messageKeyPrefix));
 
       tabs.push(tab);
@@ -1989,7 +2048,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateVideoFillModeSegment(mode) {
     const m = VideoFill.normalizeMode(mode);
     $videoFillModeSegment.querySelectorAll(".seg-btn").forEach((btn) => {
-      btn.classList.toggle("is-active", btn.dataset.mode === m);
+      const active = btn.dataset.mode === m;
+      btn.classList.toggle("is-active", active);
+      // 見た目だけでなく支援技術にも選択中のモードを伝える（ルーペの倍率ボタンと同じ属性）。
+      btn.setAttribute("aria-pressed", String(active));
     });
   }
 
@@ -2078,7 +2140,7 @@ document.addEventListener("DOMContentLoaded", async () => {
    * ゲスチャを兼ねる (= popup を一度開かないと boost されない)。ブースト中のタブには Chrome の
    * 「このタブのコンテンツは共有されています」バナーが出る (tabCapture の仕様で抑止不可)。
    *
-   * storage への 6 キー書き込みは boost トリガーではなく **永続化のみ** の役割: popup 再表示時の
+   * storage への音量関連キーの書き込み（SAVE_POPUP_STORAGE 経由）は boost トリガーではなく **永続化のみ** の役割: popup 再表示時の
    * スライダー / トグル復元と、background の autoApplyVolumeBooster (タブ切替時に既ブーストタブへ
    * 最新設定を再適用) が参照する。100% かつ全サブトグル OFF かつミュート OFF のときは background 側で
    * release されるため、ここではただ送るだけでよい。

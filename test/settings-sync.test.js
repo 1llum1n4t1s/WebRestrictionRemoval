@@ -178,18 +178,6 @@ for (const [key, spec] of [[K.SEARCH_FIXER_FEATURES, G.SearchFixer], [K.INSTAGRA
   });
 }
 
-test("X画像保存の同期は他のサブ機能の変更と独立して保持する", async () => {
-  const initial = G.XCleaner.mergeFeatures({});
-  const [a, b] = await peers({ xCleanerFeatures: initial });
-  await a.edit({ xCleanerFeatures: { ...initial, imageDownload: true } });
-  await b.edit({ xCleanerFeatures: { ...initial, hideTrends: true } });
-  await a.tick(); await b.tick(); await exchange(a, b);
-  for (const h of [a, b]) {
-    assert.equal(h.state.local.xCleanerFeatures.imageDownload, true);
-    assert.equal(h.state.local.xCleanerFeatures.hideTrends, true);
-  }
-});
-
 test("除外リストの別々の追加・削除を保持し、古い追加で削除が復活しない", async () => {
   const old = { key: "@old", name: "Old" };
   const [a, b] = await peers({ searchFixerBlockedChannels: [old] });

@@ -1,0 +1,1699 @@
+{
+  "settingsSyncTitle": {
+    "message": "Synchroniser les réglages entre PC"
+  },
+  "settingsSyncDescription": {
+    "message": "Sur chaque PC, connectez-vous au même compte dans le même navigateur, activez la synchronisation des extensions dans le navigateur, puis activez cette option. À l’activation, les réglages déjà synchronisés ont priorité ; ensuite, en cas de conflit, la mise à jour la plus récente de chaque réglage l’emporte. Chrome et Firefox ne peuvent pas se synchroniser entre eux. L’authentification, les comptes de destination, l’historique des couleurs et la position des panneaux restent sur ce PC. Désactiver l’option ne supprime pas les données dans le cloud."
+  },
+  "settingsSyncOff": {
+    "message": "Synchronisation désactivée. Les réglages sont enregistrés sur ce PC."
+  },
+  "settingsSyncWorking": {
+    "message": "Vérification des réglages synchronisés…"
+  },
+  "settingsSyncReady": {
+    "message": "Enregistré dans la synchronisation du navigateur. Les autres PC peuvent mettre du temps à recevoir les changements."
+  },
+  "settingsSyncError": {
+    "message": "Échec de la synchronisation. Les réglages locaux sont conservés. Vérifiez la synchronisation et les limites de stockage du navigateur, puis réessayez. Les réglages et les suppressions conservées peuvent dépasser le quota de synchronisation."
+  },
+  "settingsSyncRetry": {
+    "message": "Relancer la synchro"
+  },
+  "appName": {
+    "message": "Vuora",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
+  },
+  "appDescription": {
+    "message": "Outils locaux de lecture et d’audio pour YouTube, Wikipedia, les réseaux sociaux et les pages d’achat.",
+    "description": "Short description (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "Vuora",
+    "description": "Hover tooltip on the toolbar icon"
+  },
+  "headerTitle": {
+    "message": "Vuora",
+    "description": "h1 in the popup header"
+  },
+  "headerTagline": {
+    "message": "Amplifier, épurer, durer — depuis un seul panneau",
+    "description": "Tagline shown beneath the popup header"
+  },
+  "categorySelectorLabel": {
+    "message": "Catégorie"
+  },
+  "tabbarAriaLabel": {
+    "message": "Catégorie à afficher"
+  },
+  "tabTune": {
+    "message": "Réglages"
+  },
+  "tabYoutube": {
+    "message": "YouTube"
+  },
+  "tabInstagram": {
+    "message": "Instagram"
+  },
+  "tabTiktok": {
+    "message": "TikTok"
+  },
+  "tabX": {
+    "message": "X"
+  },
+  "tabPicker": {
+    "message": "Pipette"
+  },
+  "groupAudio": {
+    "message": "Audio"
+  },
+  "groupVideo": {
+    "message": "Vidéo"
+  },
+  "groupAmazon": {
+    "message": "Amazon"
+  },
+  "volumeBoosterMaster": {
+    "message": "Amplificateur de volume"
+  },
+  "volumeBoosterMasterDesc": {
+    "message": "Amplifie et façonne le son de l’onglet. Les réglages s’appliquent automatiquement au changement d’onglet."
+  },
+  "volumeSubLabel": {
+    "message": "Amplificateur de volume"
+  },
+  "volumeSubDesc": {
+    "message": "Réglez le volume du lecteur sur 100 % et ajustez ici pour un résultat optimal."
+  },
+  "volumeMesFirefoxNote": {
+    "message": "L’édition Firefox amplifie le son par un traitement dans la page (MediaElementSource) ; les réglages s’appliquent automatiquement à tous les onglets. Les vidéos protégées par DRM (Netflix, Prime Video, etc.) ne sont pas prises en charge."
+  },
+  "volumeReset100Btn": {
+    "message": "Remettre à 100 %"
+  },
+  "volumeReset100Aria": {
+    "message": "Remettre le volume à 100 %"
+  },
+  "volumeStepDownAria": {
+    "message": "Baisser le volume de 10 %"
+  },
+  "volumeStepDownTitle": {
+    "message": "Baisser le volume de 10 %"
+  },
+  "volumeStepUpAria": {
+    "message": "Augmenter le volume de 10 %"
+  },
+  "volumeStepUpTitle": {
+    "message": "Augmenter le volume de 10 %"
+  },
+  "volumeMuteAriaOff": {
+    "message": "Couper le son"
+  },
+  "volumeMuteAriaOn": {
+    "message": "Rétablir le son"
+  },
+  "volumeMuteTitleOff": {
+    "message": "Couper le son (volume conservé)"
+  },
+  "volumeMuteTitleOn": {
+    "message": "Rétablir le son (volume restauré)"
+  },
+  "volumeAntiClipLabel": {
+    "message": "Anti-distorsion auto"
+  },
+  "volumeAntiClipDesc": {
+    "message": "Atténue les cris soudains et les pics d’effets pour limiter l’écrêtage lors de l’amplification."
+  },
+  "volumeNightModeLabel": {
+    "message": "Mode nuit"
+  },
+  "volumeNightModeDesc": {
+    "message": "Compresse doucement les voix fortes et les explosions pour que le son discret des jeux ne soit pas noyé."
+  },
+  "volumeBassCutLabel": {
+    "message": "Anti-vibrations des murs"
+  },
+  "volumeBassCutDesc": {
+    "message": "Coupe les basses profondes pour qu’elles ne résonnent pas à travers les murs ou les planchers et ne gênent pas vos voisins."
+  },
+  "volumeEqLabel": {
+    "message": "Égaliseur"
+  },
+  "volumeEqDesc": {
+    "message": "Réglez chaque bande de fréquences avec un égaliseur à 10 bandes. Renforcez les basses ou les aigus, ou choisissez un préréglage."
+  },
+  "volumeEqPresetLabel": {
+    "message": "Préréglage"
+  },
+  "volumeEqPreamp": {
+    "message": "Préampli"
+  },
+  "volumeEqPresetFlat": {
+    "message": "Neutre"
+  },
+  "volumeEqPresetBass": {
+    "message": "Basses renforcées"
+  },
+  "volumeEqPresetTreble": {
+    "message": "Aigus renforcés"
+  },
+  "volumeEqPresetVocal": {
+    "message": "Voix"
+  },
+  "volumeEqPresetLoudness": {
+    "message": "Loudness"
+  },
+  "volumeEqPresetEargasm": {
+    "message": "Eargasm Explosion"
+  },
+  "volumeEqPresetEargasmKai": {
+    "message": "Eargasm Explosion Kai"
+  },
+  "volumeEqPresetPerfect": {
+    "message": "Parfait"
+  },
+  "volumeEqPresetPerfectKai": {
+    "message": "Parfait Kai"
+  },
+  "volumeEqPresetCustom": {
+    "message": "Personnalisé"
+  },
+  "videoGammaMaster": {
+    "message": "Gamma vidéo"
+  },
+  "videoGammaMasterDescPre": {
+    "message": "Applique une correction gamma aux éléments "
+  },
+  "videoGammaMasterDescPost": {
+    "message": " de la page. Éclaircit les vidéos sombres et adoucit celles qui sont trop lumineuses."
+  },
+  "videoGammaSubLabel": {
+    "message": "Valeur gamma"
+  },
+  "videoGammaSubDesc": {
+    "message": "1,0 = aucune correction. En dessous de 1,0, les ombres sont relevées (plus clair) ; au-dessus de 1,0, le contraste augmente (plus sombre)."
+  },
+  "videoGammaResetBtn": {
+    "message": "Remettre à 1,0"
+  },
+  "videoGammaResetAria": {
+    "message": "Remettre le gamma à 1,0"
+  },
+  "videoFillMaster": {
+    "message": "Supprimer les bandes noires"
+  },
+  "videoFillMasterDesc": {
+    "message": "Supprime les bandes noires (letterbox/pillarbox) sur les écrans ultralarges en zoomant ou en étirant la vidéo pour remplir l’écran."
+  },
+  "videoFillModeLabel": {
+    "message": "Mode d’affichage"
+  },
+  "videoFillModeAriaLabel": {
+    "message": "Choisir le mode d’affichage"
+  },
+  "videoFillModeZoom": {
+    "message": "Zoom"
+  },
+  "videoFillModeStretch": {
+    "message": "Étirer"
+  },
+  "videoFillTargetLabel": {
+    "message": "Votre écran"
+  },
+  "videoFillTargetDesc": {
+    "message": "Choisissez le format ou la résolution de votre écran ; la forme de chaque vidéo est détectée automatiquement pour supprimer les bandes noires."
+  },
+  "videoFillGroupAspect": {
+    "message": "Format d’image"
+  },
+  "videoFillGroupResolution": {
+    "message": "Résolution"
+  },
+  "loupeMaster": {
+    "message": "Loupe"
+  },
+  "loupeMasterDesc": {
+    "message": "Agrandit l’affichage actuel avec une lentille circulaire. À utiliser de préférence après avoir mis une vidéo en pause. Clic gauche pour désactiver."
+  },
+  "loupeZoomLabel": {
+    "message": "Zoom"
+  },
+  "loupeZoomAriaLabel": {
+    "message": "Choisir le niveau de zoom"
+  },
+  "loupeSizeLabel": {
+    "message": "Taille de la lentille"
+  },
+  "loupeSizeDesc": {
+    "message": "Ajustez le diamètre de la lentille entre 150 et 1000 px."
+  },
+  "loupeErrorInvalidTab": {
+    "message": "⚠ Onglet illisible"
+  },
+  "loupeErrorUnsupportedPage": {
+    "message": "⚠ Loupe indisponible sur cette page"
+  },
+  "loupeErrorPermission": {
+    "message": "⚠ Erreur d’autorisation"
+  },
+  "loupeErrorQuota": {
+    "message": "⚠ Limite de captures dépassée"
+  },
+  "loupeErrorUnknown": {
+    "message": "⚠ Impossible de lancer la loupe"
+  },
+  "amazonDeliveryMaster": {
+    "message": "Total mensuel Abonnez-vous et économisez"
+  },
+  "amazonDeliveryMasterDescPre": {
+    "message": "Affiche un total par mois sur la page "
+  },
+  "amazonDeliveryMasterDescPost": {
+    "message": ". Pour les prix absents, récupère auprès d’Amazon les prix actuels de Abonnez-vous et économisez, ou utilise le prix unitaire de la livraison précédente s’ils sont indisponibles."
+  },
+  "amazonRankingJumpMaster": {
+    "message": "Bouton Aller au classement"
+  },
+  "amazonRankingJumpMasterDesc": {
+    "message": "Affiche un bouton « Aller au classement de ce produit » en haut des pages produit.",
+    "description": "Master toggle description for the Amazon jump-to-ranking button"
+  },
+  "amazonRankingJumpButton": {
+    "message": "Aller au classement de ce produit"
+  },
+  "amazonRankingJumpAriaLabel": {
+    "message": "Aller au classement de ce produit"
+  },
+  "amazonMerchantInfoMaster": {
+    "message": "Badge vendeur / expéditeur"
+  },
+  "amazonMerchantInfoMasterDesc": {
+    "message": "Affiche un badge vendeur / expéditeur en haut des pages produit (expédié par Amazon = vert / vendeur tiers = avertissement orange).",
+    "description": "Master toggle description for the Amazon seller / shipper badge"
+  },
+  "amazonMerchantInfoSoldBy": {
+    "message": "Vendu"
+  },
+  "amazonMerchantInfoShipsFrom": {
+    "message": "Expédié"
+  },
+  "amazonMerchantInfoAriaAmazon": {
+    "message": "Expédié par Amazon"
+  },
+  "amazonMerchantInfoAriaMarketplace": {
+    "message": "Offre d’un vendeur tiers"
+  },
+  "amazonMerchantInfoAriaUnknown": {
+    "message": "Vendeur non vérifié"
+  },
+  "searchFixerMaster": {
+    "message": "Améliorations YouTube"
+  },
+  "searchFixerMasterDesc": {
+    "message": "Gérez 40 sous-fonctions à la fois : suppression des Shorts, filtrage du bruit des recherches, épuration des pages de lecture, masquage des commentaires et du chat en direct, améliorations des abonnements, envoi de vidéos vers Gemini Notebook, et plus."
+  },
+  "instagramCleanerMaster": {
+    "message": "Nettoyeur Instagram"
+  },
+  "instagramCleanerMasterDesc": {
+    "message": "Masque les éléments superflus comme Reels, Explorer et les Stories d’un seul bouton."
+  },
+  "tiktokCleanerMaster": {
+    "message": "Nettoyeur TikTok"
+  },
+  "tiktokCleanerMasterDesc": {
+    "message": "Masque les éléments superflus comme le panneau des commentaires et les comptes suggérés d’un seul bouton."
+  },
+  "xCleanerMaster": {
+    "message": "Nettoyeur X"
+  },
+  "xCleanerMasterDesc": {
+    "message": "Masque les éléments distrayants comme la colonne de droite, les publicités et les offres payantes d’un seul bouton."
+  },
+  "cleanerHint": {
+    "message": "Actif uniquement quand l’interrupteur principal (nettoyeur) est activé. Choisissez les sous-fonctions souhaitées."
+  },
+  "pickerActivateJp": {
+    "message": "Choisir une couleur à l’écran"
+  },
+  "pickerActivateEn": {
+    "message": "activer la pipette"
+  },
+  "pickerNoteIdle": {
+    "message": "Appuyez sur le bouton pour choisir une couleur à l’écran (Échap pour annuler)."
+  },
+  "specimenTitle": {
+    "message": "Couleur actuelle"
+  },
+  "specimenPillEmpty": {
+    "message": "Aucune"
+  },
+  "specimenNoEmpty": {
+    "message": "Non enregistrée"
+  },
+  "specimenNoSaved": {
+    "message": "Historique n° $NO$",
+    "placeholders": {
+      "no": {
+        "content": "$1",
+        "example": "01"
+      }
+    }
+  },
+  "specimenTimeEmpty": {
+    "message": "—"
+  },
+  "specimenTimeSaved": {
+    "message": "Enregistrée à $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "12:34"
+      }
+    }
+  },
+  "copyBtnLabel": {
+    "message": "Copier"
+  },
+  "copyBtnDone": {
+    "message": "Copié"
+  },
+  "copyHexAria": {
+    "message": "Copier le HEX"
+  },
+  "copyRgbAria": {
+    "message": "Copier le RGB"
+  },
+  "copyHslAria": {
+    "message": "Copier le HSL"
+  },
+  "editHexAria": {
+    "message": "Valeur HEX (modifiable)"
+  },
+  "editRgbAria": {
+    "message": "Valeur RGB (modifiable)"
+  },
+  "editHslAria": {
+    "message": "Valeur HSL (modifiable)"
+  },
+  "valueEditHint": {
+    "message": "Les trois champs sont modifiables. Collez un code couleur pour le voir aussitôt, ou appuyez sur Entrée pour l’ajouter à l’historique."
+  },
+  "paletteTitle": {
+    "message": "Ajuster la couleur"
+  },
+  "paletteAreaAria": {
+    "message": "Ajuster la saturation et la luminosité (flèches pour affiner, Maj pour des pas plus grands)"
+  },
+  "paletteAxisHint": {
+    "message": "Faites glisser pour ajuster — horizontal = saturation / vertical = luminosité"
+  },
+  "paletteSaturationLabel": {
+    "message": "Saturation"
+  },
+  "paletteBrightnessLabel": {
+    "message": "Luminosité"
+  },
+  "palettePercentValue": {
+    "message": "$VALUE$ %",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "paletteHueLabel": {
+    "message": "Teinte"
+  },
+  "paletteHueAria": {
+    "message": "Teinte"
+  },
+  "palettePillValue": {
+    "message": "Teinte $H$° / Saturation $S$ % / Luminosité $V$ %",
+    "placeholders": {
+      "h": {
+        "content": "$1",
+        "example": "213"
+      },
+      "s": {
+        "content": "$2",
+        "example": "45"
+      },
+      "v": {
+        "content": "$3",
+        "example": "55"
+      }
+    }
+  },
+  "paletteAddBtn": {
+    "message": "Ajouter cette couleur à l’historique"
+  },
+  "paletteResetBtn": {
+    "message": "Annuler les ajustements"
+  },
+  "formatTitle": {
+    "message": "Réglages de copie"
+  },
+  "formatLegend": {
+    "message": "Format de la copie automatique"
+  },
+  "formatRowAria": {
+    "message": "Format de la copie automatique"
+  },
+  "formatHashLabel": {
+    "message": "Inclure # dans le HEX"
+  },
+  "formatNote": {
+    "message": "Les couleurs sont copiées automatiquement dans le format choisi quand vous utilisez la pipette ou cliquez sur une entrée de l’historique."
+  },
+  "historyTitle": {
+    "message": "Historique"
+  },
+  "historyHint": {
+    "message": "Cliquez sur une couleur pour en faire la couleur actuelle et la copier dans le format défini ci-dessous."
+  },
+  "historyEmpty": {
+    "message": "Aucune couleur pour l’instant. Utilisez la pipette, ou collez un code couleur puis appuyez sur Entrée."
+  },
+  "historyClearBtn": {
+    "message": "Vider l’historique"
+  },
+  "extVersionAriaLabel": {
+    "message": "Version de l’extension"
+  },
+  "eyedropperUnsupported": {
+    "message": "L’API EyeDropper n’est pas prise en charge. Utilisez Chrome 95 ou une version ultérieure."
+  },
+  "pickerNoteActive": {
+    "message": "Pipette active — cliquez n’importe où à l’écran (Échap pour annuler)"
+  },
+  "pickerNoteRetake": {
+    "message": "Appuyez de nouveau pour continuer à choisir."
+  },
+  "pickerNoteCancelled": {
+    "message": "Sélection annulée."
+  },
+  "pickerNoteFailed": {
+    "message": "Échec de la sélection de couleur. Veuillez réessayer."
+  },
+  "pickerCopyOk": {
+    "message": "Couleur choisie — $FORMAT$ copié : $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "Couleur choisie — $FORMAT$ : $TEXT$ (échec de la copie)",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerInputInvalid": {
+    "message": "Impossible de lire cela comme une couleur (ex. : #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%))."
+  },
+  "pickerInputAdded": {
+    "message": "$HEX$ ajouté à l’historique",
+    "placeholders": {
+      "hex": {
+        "content": "$1",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "historyClearedToast": {
+    "message": "Historique vidé."
+  },
+  "pickerHistorySaveFailed": {
+    "message": "Impossible d’enregistrer l’historique. Veuillez réessayer."
+  },
+  "copyOkToast": {
+    "message": "$FORMAT$ copié : $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "copyFailToast": {
+    "message": "Échec de la copie."
+  },
+  "copyToast": {
+    "message": "$FORMAT$ : $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipAria": {
+    "message": "Définir $HEX$ comme couleur actuelle et la copier",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      }
+    }
+  },
+  "pillTemplate": {
+    "message": "$ON$/$TOTAL$ actives",
+    "placeholders": {
+      "on": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "gridItemsLabel": {
+    "message": "Colonnes de l’accueil"
+  },
+  "gridItemsDesc": {
+    "message": "Fixe le nombre de vidéos par ligne dans les grilles de l’accueil et des résultats de recherche (Auto conserve le nombre de colonnes par défaut de YouTube)."
+  },
+  "gridAuto": {
+    "message": "Auto (défaut YouTube)"
+  },
+  "grid4Cols": {
+    "message": "4 col."
+  },
+  "grid5Cols": {
+    "message": "5 col."
+  },
+  "grid6Cols": {
+    "message": "6 col."
+  },
+  "categoryMenuUi": {
+    "message": "Menu / Interface"
+  },
+  "categoryVideoFilter": {
+    "message": "Filtre vidéo"
+  },
+  "categoryWatchPage": {
+    "message": "Page de lecture"
+  },
+  "categorySearchOnly": {
+    "message": "Résultats de recherche"
+  },
+  "categoryIntegration": {
+    "message": "Intégrations"
+  },
+  "nlmSendLabel": {
+    "message": "Gemini Notebook"
+  },
+  "nlmAccount": {
+    "message": "Compte Google"
+  },
+  "nlmAccountDefault": {
+    "message": "Par défaut (0)"
+  },
+  "nlmAccountNth": {
+    "message": "Compte {0}"
+  },
+  "nlmPickNotebook": {
+    "message": "Bloc-notes de destination"
+  },
+  "nlmNewNotebook": {
+    "message": "+ Créer un bloc-notes"
+  },
+  "nlmLoading": {
+    "message": "Chargement des blocs-notes…"
+  },
+  "nlmEmpty": {
+    "message": "Aucun bloc-notes existant"
+  },
+  "nlmSending": {
+    "message": "Envoi en cours…"
+  },
+  "nlmSkipped": {
+    "message": "{0} élément(s) ignoré(s) (limite de sources)"
+  },
+  "nlmOpenNotebookLm": {
+    "message": "Ouvrir Gemini Notebook"
+  },
+  "nlmErrorNetwork": {
+    "message": "Impossible de joindre Gemini Notebook"
+  },
+  "nlmErrorProtocol": {
+    "message": "Connexion impossible — l’interface de Gemini Notebook a changé"
+  },
+  "nlmOpenNotebook": {
+    "message": "Ouvrir le bloc-notes créé"
+  },
+  "nlmErrorFull": {
+    "message": "Ce bloc-notes a atteint sa limite de sources"
+  },
+  "nlmErrorAuth": {
+    "message": "Veuillez vous connecter à Gemini Notebook"
+  },
+  "nlmErrorNoUrls": {
+    "message": "Aucune vidéo à envoyer"
+  },
+  "nlmErrorRpc": {
+    "message": "Échec de l’envoi vers Gemini Notebook"
+  },
+  "nlmErrorUnknown": {
+    "message": "Échec de l’envoi vers Gemini Notebook"
+  },
+  "ytCleanerSubtabsAria": {
+    "message": "Catégories des améliorations YouTube"
+  },
+  "igCleanerSubtabsAria": {
+    "message": "Catégories du nettoyeur Instagram"
+  },
+  "tuneSubtabsAria": {
+    "message": "Catégories des réglages"
+  },
+  "categoryIgMain": {
+    "message": "Principal"
+  },
+  "categoryIgExtra": {
+    "message": "Extras"
+  },
+  "categoryTtMain": {
+    "message": "Principal"
+  },
+  "categoryXLayout": {
+    "message": "Mise en page"
+  },
+  "categoryXNoise": {
+    "message": "Bruit"
+  },
+  "categoryXTimeline": {
+    "message": "Fil"
+  },
+  "applyOkSearchFixer": {
+    "message": "Améliorations YT"
+  },
+  "applyOkAmazon": {
+    "message": "Amazon"
+  },
+  "applyOkAmazonRanking": {
+    "message": "Accès au classement"
+  },
+  "applyOkAmazonMerchantInfo": {
+    "message": "Badge vendeur"
+  },
+  "applyOkInstagram": {
+    "message": "Instagram"
+  },
+  "applyOkTiktok": {
+    "message": "TikTok"
+  },
+  "applyOkX": {
+    "message": "X"
+  },
+  "applyOkVideoGamma": {
+    "message": "Gamma vidéo"
+  },
+  "applyOkVideoFill": {
+    "message": "Sans bandes noires"
+  },
+  "applyOkLoupe": {
+    "message": "Loupe"
+  },
+  "applyOkAllStopped": {
+    "message": "⏹  Tout est arrêté"
+  },
+  "applyOkPrefix": {
+    "message": "✓  "
+  },
+  "applyOkSeparator": {
+    "message": "  /  "
+  },
+  "applyError": {
+    "message": "⚠️ Impossible d’enregistrer ou d’appliquer les réglages"
+  },
+  "volumeErrorInvalidTab": {
+    "message": "⚠ Onglet illisible"
+  },
+  "volumeErrorOffscreenUnavailable": {
+    "message": "⚠ Impossible de démarrer le processeur interne"
+  },
+  "volumeErrorInvalidStream": {
+    "message": "⚠ Impossible de capturer l’audio"
+  },
+  "volumeErrorTabClosed": {
+    "message": "⚠ L’onglet a été fermé"
+  },
+  "volumeErrorUserGesture": {
+    "message": "⚠ Modifiable uniquement quand la fenêtre est ouverte"
+  },
+  "volumeErrorUnsupportedPage": {
+    "message": "⚠ Non pris en charge sur cette page"
+  },
+  "volumeErrorPermission": {
+    "message": "⚠ Erreur d’autorisation"
+  },
+  "volumeErrorUnknown": {
+    "message": "⚠ Échec de la mise à jour du volume"
+  },
+  "volumeErrorCommunication": {
+    "message": "⚠ Erreur de communication"
+  },
+  "amazonTotalText": {
+    "message": "Total"
+  },
+  "amazonTotalReference": {
+    "message": "Total estimé (prix actuels)"
+  },
+  "amazonTotalPreviousReference": {
+    "message": "Total estimé (inclut des prix précédents)"
+  },
+  "amazonTotalReferenceNote": {
+    "message": "Le montant facturé peut varier"
+  },
+  "amazonTotalLoading": {
+    "message": "Chargement du total…"
+  },
+  "amazonTotalUnavailable": {
+    "message": "Impossible de récupérer le total"
+  },
+  "subsAllShortcutLabel": {
+    "message": "Tous les abonnements"
+  },
+  "subsSearchPlaceholder": {
+    "message": "Filtrer par nom ou identifiant de chaîne"
+  },
+  "imageDownloadButtonLabel": {
+    "message": "Télécharger l’image"
+  },
+  "feat_sf_playlist_label": {
+    "message": "Playlists"
+  },
+  "feat_sf_playlist_desc": {
+    "message": "Supprime les playlists (liens playlist?list= / badges « N vidéos »)."
+  },
+  "feat_sf_mix_label": {
+    "message": "Mix"
+  },
+  "feat_sf_mix_desc": {
+    "message": "Supprime les mix générés automatiquement par YouTube (&list=RD&start_radio=1 / badge « Mix »)."
+  },
+  "feat_sf_shortsBtn_label": {
+    "message": "Shorts (isolés)"
+  },
+  "feat_sf_shortsBtn_desc": {
+    "message": "Supprime les cartes Shorts isolées mêlées aux grilles de vidéos (éléments verticaux dont l’URL de miniature contient /shorts/)."
+  },
+  "feat_sf_removeShortsShelf_label": {
+    "message": "Étagère Shorts"
+  },
+  "feat_sf_removeShortsShelf_desc": {
+    "message": "Supprime physiquement l’étagère Shorts de l’accueil (ytd-rich-shelf-renderer[is-shorts]) et l’étagère horizontale Shorts des résultats de recherche (ytd-reel-shelf-renderer)."
+  },
+  "feat_sf_live_label": {
+    "message": "Direct / Première / Station"
+  },
+  "feat_sf_live_desc": {
+    "message": "Supprime les vidéos avec un badge DIRECT / Première / Station sur la miniature. « Station » = flux de musique infinis générés automatiquement par YouTube."
+  },
+  "feat_sf_membersOnly_label": {
+    "message": "Réservé aux membres"
+  },
+  "feat_sf_membersOnly_desc": {
+    "message": "Supprime les vidéos avec le badge « Réservé aux membres », qui exigent un abonnement à la chaîne pour être regardées."
+  },
+  "feat_sf_watched_label": {
+    "message": "Déjà vues"
+  },
+  "feat_sf_watched_desc": {
+    "message": "Supprime les vidéos qui affichent une incrustation de reprise de lecture (déjà regardées)."
+  },
+  "feat_sf_hideSubscriptionsRelevant_label": {
+    "message": "Masquer « Les plus pertinentes » dans les abonnements"
+  },
+  "feat_sf_hideSubscriptionsRelevant_desc": {
+    "message": "Masque la section « Les plus pertinentes » des abonnements, avec son titre, ses vidéos et son bouton « Afficher plus ». Les dernières vidéos habituelles restent visibles."
+  },
+  "feat_sf_removeFeedSections_label": {
+    "message": "Sections"
+  },
+  "feat_sf_removeFeedSections_desc": {
+    "message": "Supprime les sections de recommandation « Sujets pour vous », « Dernières actualités » et « Salle de jeux » (ytd-rich-section-renderer) de l’accueil (pages de flux uniquement)."
+  },
+  "feat_sf_shelf_label": {
+    "message": "Étagère de vidéos"
+  },
+  "feat_sf_shelf_desc": {
+    "message": "Supprime les sections de groupes de vidéos (ytd-shelf-renderer) comme « Tendances » ou « Actualités »."
+  },
+  "feat_sf_cardList_label": {
+    "message": "Liste de cartes"
+  },
+  "feat_sf_cardList_desc": {
+    "message": "Supprime la liste horizontale de cartes de sujets associés (ytd-horizontal-card-list-renderer, à partir de la deuxième)."
+  },
+  "feat_sf_course_label": {
+    "message": "Cours"
+  },
+  "feat_sf_course_desc": {
+    "message": "Supprime les cartes de contenu éducatif avec le badge « Cours » (.yt-lockup-view-model--wrapper)."
+  },
+  "feat_sf_channel_label": {
+    "message": "Carte de présentation de chaîne"
+  },
+  "feat_sf_channel_desc": {
+    "message": "Supprime les cartes de présentation « Cette chaîne » (ytd-channel-renderer) insérées dans les résultats de recherche."
+  },
+  "feat_sf_hideForeignChannels_label": {
+    "message": "Masquer les chaînes d’autres pays"
+  },
+  "feat_sf_hideForeignChannels_desc": {
+    "message": "Supprime les vidéos des chaînes hors de votre pays dans les résultats de recherche et les flux (les filtres de recherche de YouTube n’ont pas de critère de pays ; il s’agit donc d’une implémentation propre). Les titres et noms de chaînes sont d’abord classés selon leur système d’écriture ; seuls les cas indécis déclenchent la consultation de la page À propos de la chaîne. Les chaînes qui n’indiquent pas de pays restent visibles."
+  },
+  "feat_sf_notebookLmSend_label": {
+    "message": "Envoyer vers Gemini Notebook"
+  },
+  "feat_sf_notebookLmSend_desc": {
+    "message": "Ajoute la vidéo en cours de lecture, ou les vidéos d’une page de résultats / playlist / chaîne, comme sources à votre propre Gemini Notebook Google. Choisissez le bloc-notes de destination avec le bouton intégré à la page (à côté de J’aime/Partager sur les pages de lecture, près du filtre de recherche sur les pages de résultats, sous Tout lire pour les playlists, sur la ligne du titre pour les chaînes) ; vous pouvez aussi en créer un nouveau. Les URL de vidéos ne sont envoyées que lorsque vous appuyez sur le bouton — aucune collecte d’historique de visionnage, aucune transmission en arrière-plan. Nécessite d’être connecté à Gemini Notebook."
+  },
+  "feat_sf_channelBlocklist_label": {
+    "message": "Liste de chaînes bloquées"
+  },
+  "feat_sf_channelBlocklist_desc": {
+    "message": "Supprime les vidéos des chaînes bloquées sur tout YouTube — résultats de recherche, accueil, abonnements, tendances, etc. (version étendue de l’option officielle « Ne pas recommander la chaîne » de l’accueil). Ajoutez une chaîne avec le bouton 🚫 à côté de son nom dans les résultats de recherche ; débloquez-la depuis la liste ci-dessous."
+  },
+  "sfBlockChannelBtnTitle": {
+    "message": "Masquer cette chaîne dans les résultats de recherche"
+  },
+  "sfShowCommentsButton": {
+    "message": "Afficher les commentaires"
+  },
+  "sfHideCommentsButton": {
+    "message": "Masquer les commentaires"
+  },
+  "sfBlockedChannelsTitle": {
+    "message": "Chaînes bloquées"
+  },
+  "sfBlockedChannelsEmpty": {
+    "message": "Aucune chaîne bloquée pour l’instant. Utilisez le bouton 🚫 à côté du nom d’une chaîne dans les résultats de recherche YouTube pour la bloquer."
+  },
+  "sfBlockedChannelRemove": {
+    "message": "Débloquer"
+  },
+  "feat_sf_reel_label": {
+    "message": "Étagère horizontale Shorts"
+  },
+  "feat_sf_reel_desc": {
+    "message": "Supprime l’étagère horizontale Shorts (grid-shelf-view-model). L’étagère Shorts de l’accueil est supprimée par removeShortsShelf dans « Filtre vidéo » ; l’entrée de la barre latérale gauche par removeShortsSidebar dans « Menu / Interface »."
+  },
+  "feat_sf_secondary_label": {
+    "message": "Bloc de recherches associées"
+  },
+  "feat_sf_secondary_desc": {
+    "message": "Supprime le bloc de suggestions « Recherches associées » en bas de page (ytd-secondary-search-container-renderer)."
+  },
+  "feat_sf_verified_label": {
+    "message": "Vidéos de chaînes certifiées"
+  },
+  "feat_sf_verified_desc": {
+    "message": "Supprime les vidéos des chaînes avec un badge de certification (comptes officiels, actualités). Prise en charge des pages de flux à venir."
+  },
+  "feat_sf_artist_label": {
+    "message": "Vidéos de chaînes d’artistes"
+  },
+  "feat_sf_artist_desc": {
+    "message": "Supprime les vidéos avec un badge de chaîne officielle d’artiste (ex. clips officiels). Prise en charge des pages de flux à venir."
+  },
+  "feat_sf_chapter_label": {
+    "message": "Vidéos avec chapitres"
+  },
+  "feat_sf_chapter_desc": {
+    "message": "Supprime les vidéos qui affichent des chapitres dépliables (expandable-metadata-renderer)."
+  },
+  "feat_sf_demoteUnmatched_label": {
+    "message": "Griser les résultats sans le mot-clé"
+  },
+  "feat_sf_demoteUnmatched_desc": {
+    "message": "Estompe à moitié et passe en niveaux de gris les vidéos dont le titre ou la description ne contient pas le mot-clé recherché (rétabli au survol)."
+  },
+  "feat_sf_highlightThumb_label": {
+    "message": "Contour des miniatures"
+  },
+  "feat_sf_highlightThumb_desc": {
+    "message": "Ajoute un contour rouge akane et une ombre portée autour de chaque miniature pour mieux les repérer (fonctionne en thème sombre et clair)."
+  },
+  "feat_sf_hideComments_label": {
+    "message": "Masquer les commentaires"
+  },
+  "feat_sf_hideComments_desc": {
+    "message": "Masque les commentaires de la page de lecture au départ, avec un bouton pour les afficher ou les masquer. Le chat des directs n’est pas concerné."
+  },
+  "feat_sf_hideLiveChat_label": {
+    "message": "Masquer le chat en direct"
+  },
+  "feat_sf_hideLiveChat_desc": {
+    "message": "Réduit le panneau du chat sur les directs archivés avec l’action de réduction propre à YouTube. Les vidéos ordinaires ne sont pas concernées."
+  },
+  "feat_sf_broadcastClock_label": {
+    "message": "Afficher l’heure de diffusion sur les archives de directs"
+  },
+  "feat_sf_broadcastClock_desc": {
+    "message": "Pendant la lecture d’une archive de direct, affiche l’heure réelle de diffusion de chaque instant (aaaa/MM/jj hh:mm:ss) dans l’incrustation commune de qualité, vitesse de lecture et volume. Non affiché pour les vidéos ordinaires ni les directs en cours. La précision peut dériver sur les archives comportant des interruptions ou des montages en cours de diffusion."
+  },
+  "bcOverlayLabel": {
+    "message": "Diffusion"
+  },
+  "feat_sf_redirectShortsUrl_label": {
+    "message": "Rediriger les URL Shorts vers /watch"
+  },
+  "feat_sf_redirectShortsUrl_desc": {
+    "message": "Force une page verticale /shorts/<ID> à s’ouvrir dans le lecteur classique /watch?v=<ID>."
+  },
+  "feat_sf_playlistReverse_label": {
+    "message": "Afficher le bouton d’ordre inverse sur les playlists"
+  },
+  "feat_sf_playlistReverse_desc": {
+    "message": "Ce réglage contrôle uniquement l’affichage du bouton d’ordre inverse ; il ne modifie pas l’ordre. Activé, le panneau de playlist reçoit un bouton « Inverser : ON/OFF » et les pages de playlist un bouton « Lire à l’envers ». L’inversion se choisit par playlist avec le bouton (conservée uniquement dans l’onglet actuel) ; tant qu’elle est activée, la lecture va de la dernière vidéo vers la première. Désactiver ce réglage supprime les boutons et rétablit l’ordre d’origine."
+  },
+  "ytPlaylistReverseStateOn": {
+    "message": "Inverser : ON"
+  },
+  "ytPlaylistReverseStateOff": {
+    "message": "Inverser : OFF"
+  },
+  "ytPlaylistReverseOnTitle": {
+    "message": "Cette playlist est lue à l’envers. Cliquez pour rétablir l’ordre d’origine"
+  },
+  "ytPlaylistReverseOffTitle": {
+    "message": "Lecture dans l’ordre d’origine. Cliquez pour l’inverser"
+  },
+  "ytPlaylistReversePlay": {
+    "message": "Lire à l’envers"
+  },
+  "feat_sf_gameCrop_label": {
+    "message": "Afficher le bouton de zoom sur l’écran de jeu"
+  },
+  "feat_sf_gameCrop_desc": {
+    "message": "Ce réglage contrôle uniquement l’affichage du bouton. Activé, la barre d’outils du lecteur reçoit une puce « Écran de jeu ». Pour les directs où le streamer recadre l’image du jeu dans une partie de la vidéo et l’entoure de cadres ou d’un avatar, faites glisser sur la zone de jeu pour zoomer le lecteur sur cette seule zone. La zone est enregistrée sur cet appareil pour chaque chaîne et réutilisée automatiquement pour les vidéos de cette chaîne. Désactiver ce réglage supprime la puce et le zoom (les zones enregistrées sont conservées)."
+  },
+  "gcLabel": {
+    "message": "Écran de jeu"
+  },
+  "gcToggleOn": {
+    "message": "Zoom : ON"
+  },
+  "gcToggleOff": {
+    "message": "Zoom : OFF"
+  },
+  "gcToggleOnTitle": {
+    "message": "Zoom sur l’écran de jeu. Cliquez pour afficher toute la vidéo"
+  },
+  "gcToggleOffTitle": {
+    "message": "Vidéo entière affichée. Cliquez pour zoomer sur l’écran de jeu enregistré"
+  },
+  "gcSelect": {
+    "message": "Choisir la zone"
+  },
+  "gcReselect": {
+    "message": "Modifier la zone"
+  },
+  "gcSelectTitle": {
+    "message": "Faites glisser sur la vidéo pour choisir l’écran de jeu"
+  },
+  "gcRemove": {
+    "message": "Supprimer"
+  },
+  "gcRemoveTitle": {
+    "message": "Supprimer la zone d’écran de jeu enregistrée pour cette chaîne"
+  },
+  "gcHint": {
+    "message": "Faites glisser pour choisir l’écran de jeu (Échap pour annuler)"
+  },
+  "ytPlaylistReversePlayTitle": {
+    "message": "Commencer par la dernière vidéo et lire jusqu’à la première"
+  },
+  "feat_sf_searchGrid_label": {
+    "message": "Afficher les résultats de recherche en grille"
+  },
+  "feat_sf_searchGrid_desc": {
+    "message": "Transforme la liste des résultats sur une colonne en grille à plusieurs colonnes (le nombre de colonnes suit le réglage de la grille ; Auto reprend celui de l’accueil)."
+  },
+  "feat_sf_removeShortsChip_label": {
+    "message": "Puce de filtre Shorts"
+  },
+  "feat_sf_removeShortsChip_desc": {
+    "message": "Supprime uniquement la puce « Shorts » de la ligne de filtres (« Tous / Vidéos / Shorts / Playlists … ») en haut de la page de recherche."
+  },
+  "feat_sf_removeShortsSidebar_label": {
+    "message": "Entrée Shorts de la barre latérale"
+  },
+  "feat_sf_removeShortsSidebar_desc": {
+    "message": "Supprime l’entrée « Shorts » de la barre latérale gauche (formes développée et réduite)."
+  },
+  "feat_sf_subsLeftnavInjectAll_label": {
+    "message": "Afficher tous les abonnements dans le menu de gauche"
+  },
+  "feat_sf_subsLeftnavInjectAll_desc": {
+    "message": "Insère dans la section Abonnements de la barre latérale gauche tous les abonnements masqués par la limite d’affichage de YouTube (récupérés sur la même origine depuis /feed/channels, en cache 24 h)."
+  },
+  "feat_sf_subsAllShortcut_label": {
+    "message": "Raccourci « Tous les abonnements »"
+  },
+  "feat_sf_subsAllShortcut_desc": {
+    "message": "Ajoute en haut de la section Abonnements de la barre latérale gauche une entrée vers /feed/channels en un clic, au style d’un élément de menu natif."
+  },
+  "feat_sf_subsChannelsGrid_label": {
+    "message": "Page des abonnements en grille (avec recherche et tri)"
+  },
+  "feat_sf_subsChannelsGrid_desc": {
+    "message": "Transforme /feed/channels en grille adaptable et permet de chercher par nom ou identifiant de chaîne. Le tri utilise les commandes propres à YouTube. Chaque carte récupère la miniature de sa dernière vidéo à l’approche de la zone visible (en cache 24 heures)."
+  },
+  "feat_sf_homeGrid_label": {
+    "message": "Aligner l’accueil et les flux en grille"
+  },
+  "feat_sf_homeGrid_desc": {
+    "message": "Dispose l’accueil et les flux d’abonnements en grille sans espaces (répartit les vidéos entre les étagères comme les Shorts). Aligne aussi quand les colonnes sont en Auto (avec 4/5/6 colonnes, la grille s’applique toujours, même interrupteur désactivé)."
+  },
+  "feat_ig_reels_label": {
+    "message": "Supprimer Reels"
+  },
+  "feat_ig_reels_desc": {
+    "message": "Masque l’entrée Reels de la barre latérale/navigation et redirige de force les URL /reels/ vers l’accueil."
+  },
+  "feat_ig_explore_label": {
+    "message": "Supprimer Explorer"
+  },
+  "feat_ig_explore_desc": {
+    "message": "Masque l’entrée Explorer de la barre latérale/navigation et redirige de force les URL /explore/ vers l’accueil."
+  },
+  "feat_ig_stories_label": {
+    "message": "Masquer le bandeau Stories (accueil)"
+  },
+  "feat_ig_stories_desc": {
+    "message": "Masque par CSS le bandeau Stories (courtes vidéos éphémères de 24 h) en haut du fil d’accueil."
+  },
+  "feat_ig_storiesAll_label": {
+    "message": "Rediriger les URL Stories vers l’accueil"
+  },
+  "feat_ig_storiesAll_desc": {
+    "message": "Redirige toute visite de /stories/ vers l’accueil (évite les clics accidentels sur des liens partagés)."
+  },
+  "feat_ig_threads_label": {
+    "message": "Masquer la promotion de Threads"
+  },
+  "feat_ig_threads_desc": {
+    "message": "Masque la bannière, l’entrée de la barre latérale et le lien de pied de page qui promeuvent l’application Threads."
+  },
+  "feat_ig_vanity_label": {
+    "message": "Masquer les compteurs de J’aime et d’abonnés"
+  },
+  "feat_ig_vanity_desc": {
+    "message": "Détecte les boutons numériques (virgules, k, M, etc.) dans <article> et les masque pour limiter la fatigue de la comparaison."
+  },
+  "feat_ig_blockVideos_label": {
+    "message": "Bloquer les vidéos des publications"
+  },
+  "feat_ig_blockVideos_desc": {
+    "message": "Repère les éléments <video> dans les <article> du fil et les remplace par une miniature via CSS pour empêcher la lecture automatique."
+  },
+  "feat_ig_comments_label": {
+    "message": "Masquer les commentaires"
+  },
+  "feat_ig_comments_desc": {
+    "message": "Masque par CSS la liste des commentaires, le formulaire de saisie et le lien « Voir les N commentaires »."
+  },
+  "feat_ig_notes_label": {
+    "message": "Masquer les Notes"
+  },
+  "feat_ig_notes_desc": {
+    "message": "Masque la ligne des Notes (courts messages d’état au-dessus des photos de profil) en haut de l’écran des messages privés."
+  },
+  "feat_ig_msgCounters_label": {
+    "message": "Masquer le badge de messages privés non lus"
+  },
+  "feat_ig_msgCounters_desc": {
+    "message": "Masque le badge du nombre de messages privés non lus (pastille rouge numérotée) dans la navigation pour réduire la pression des notifications."
+  },
+  "feat_ig_videoControls_label": {
+    "message": "Afficher la barre de progression des vidéos"
+  },
+  "feat_ig_videoControls_desc": {
+    "message": "Affiche une barre de progression pour changer la position de la vidéo et permet d’utiliser Espace hors des champs de texte pour mettre en pause ou reprendre la lecture."
+  },
+  "instagramVideoControlsAria": {
+    "message": "Commandes de lecture vidéo"
+  },
+  "instagramVideoSeekAria": {
+    "message": "Position de la vidéo"
+  },
+  "feat_ig_imageDownload_label": {
+    "message": "Afficher un bouton de téléchargement sur les images"
+  },
+  "feat_ig_imageDownload_desc": {
+    "message": "Superpose au survol un bouton de téléchargement en haut à gauche des photos de publications (fil / grille de profil / détail d’une publication). Choisit la plus grande variante de srcset."
+  },
+  "feat_tt_hideComments_label": {
+    "message": "Masquer les commentaires"
+  },
+  "feat_tt_hideComments_desc": {
+    "message": "Masque par CSS le panneau des commentaires (la liste affichée à côté du lecteur), le bouton d’icône de commentaires et le nombre de commentaires."
+  },
+  "feat_tt_hideSuggested_label": {
+    "message": "Masquer les comptes suggérés"
+  },
+  "feat_tt_hideSuggested_desc": {
+    "message": "Masque par CSS la section « Comptes suggérés » insérée dans les fils Pour toi / Abonnements et les profils."
+  },
+  "feat_tt_imageDownload_label": {
+    "message": "Afficher un bouton de téléchargement sur les images"
+  },
+  "feat_tt_imageDownload_desc": {
+    "message": "Superpose au survol un bouton de téléchargement en haut à gauche des publications photo et des miniatures de vidéos."
+  },
+  "categoryXExtra": {
+    "message": "Extras"
+  },
+  "feat_x_imageDownload_label": {
+    "message": "Afficher un bouton de téléchargement sur les images"
+  },
+  "feat_x_imageDownload_desc": {
+    "message": "Survolez l’image d’un post pour afficher un bouton dans son coin supérieur gauche ; cliquez pour l’enregistrer en qualité d’origine"
+  },
+  "feat_x_hideRightPane_label": {
+    "message": "Masquer la colonne de droite"
+  },
+  "feat_x_hideRightPane_desc": {
+    "message": "Masque toute la colonne de droite de la mise en page à trois colonnes (recherche, tendances, comptes à suivre, offres payantes) et élargit le fil dans l’espace libéré."
+  },
+  "feat_x_hideTrends_label": {
+    "message": "Masquer les tendances"
+  },
+  "feat_x_hideTrends_desc": {
+    "message": "Conserve la colonne de droite mais masque uniquement le bloc des tendances."
+  },
+  "feat_x_hideWhoToFollow_label": {
+    "message": "Masquer les comptes à suivre"
+  },
+  "feat_x_hideWhoToFollow_desc": {
+    "message": "Masque le bloc de suggestions « Qui suivre » de la colonne de droite."
+  },
+  "feat_x_hideMessagesDock_label": {
+    "message": "Masquer le dock des messages"
+  },
+  "feat_x_hideMessagesDock_desc": {
+    "message": "Masque le panneau de messages / chat ancré dans le coin inférieur droit (la page Messages fonctionne toujours normalement)."
+  },
+  "feat_x_hidePromoted_label": {
+    "message": "Masquer les posts sponsorisés"
+  },
+  "feat_x_hidePromoted_desc": {
+    "message": "Masque les posts publicitaires (sponsorisés) insérés dans le fil, en supprimant toute la cellule pour ne laisser aucun vide."
+  },
+  "feat_x_hidePremiumUpsell_label": {
+    "message": "Masquer les offres Premium"
+  },
+  "feat_x_hidePremiumUpsell_desc": {
+    "message": "Masque la carte d’offre d’abonnement de la colonne de droite et l’entrée Premium du menu de gauche."
+  },
+  "feat_x_hideGrok_label": {
+    "message": "Masquer Grok"
+  },
+  "feat_x_hideGrok_desc": {
+    "message": "Masque l’entrée Grok du menu de gauche, le tiroir Grok du coin inférieur droit et les boutons Grok dans les posts."
+  },
+  "feat_x_hideEngagementCounts_label": {
+    "message": "Masquer les compteurs d’interactions"
+  },
+  "feat_x_hideEngagementCounts_desc": {
+    "message": "Masque uniquement les compteurs de réponses / reposts / J’aime / vues. Les boutons restent, les interactions fonctionnent comme avant."
+  },
+  "feat_x_followingTabDefault_label": {
+    "message": "Ouvrir l’accueil sur « Abonnements »"
+  },
+  "feat_x_followingTabDefault_desc": {
+    "message": "Passe l’accueil de « Pour vous » à « Abonnements » (une fois par affichage de page ; si vous revenez vous-même sur « Pour vous », l’extension n’intervient plus)."
+  },
+  "tabSettings": {
+    "message": "Paramètres"
+  },
+  "settingsBackupTitle": {
+    "message": "Enregistrer et charger les réglages"
+  },
+  "settingsBackupDescription": {
+    "message": "Enregistre dans un fichier JSON tous les réglages des fonctions, l’égaliseur, les chaînes bloquées, l’historique des couleurs et les onglets choisis, pour un autre PC ou navigateur. L’importation écrase les éléments inclus dans le fichier. L’activation de la synchro, les comptes de destination, l’authentification, les caches et la position des incrustations sur les sites sont exclus. Quand la synchro est activée, les réglages de fonctions importés se synchronisent aussi vers vos autres PC."
+  },
+  "settingsExport": {
+    "message": "Exporter"
+  },
+  "settingsImport": {
+    "message": "Importer"
+  },
+  "settingsExportSuccess": {
+    "message": "Téléchargement des réglages lancé."
+  },
+  "settingsExportError": {
+    "message": "Échec de l’exportation. Vérifiez vos réglages et la destination du téléchargement, puis réessayez."
+  },
+  "settingsImportSuccess": {
+    "message": "Réglages importés."
+  },
+  "settingsImportError": {
+    "message": "Échec de l’importation. Choisissez un fichier JSON de réglages Vuora valide (5 Mo maximum)."
+  },
+  "feat_sf_liveLatency_label": {
+    "message": "Contrôle de la latence des directs"
+  },
+  "feat_sf_liveLatency_desc": {
+    "message": "Choisissez comment rattraper un direct et quelles informations afficher."
+  },
+  "feat_sf_playbackQuality_label": {
+    "message": "Sélecteur de qualité"
+  },
+  "feat_sf_playbackQuality_desc": {
+    "message": "Ajoute un sélecteur pour changer la qualité du lecteur."
+  },
+  "feat_sf_playbackRate_label": {
+    "message": "Sélecteur de vitesse de lecture"
+  },
+  "feat_sf_playbackRate_desc": {
+    "message": "Ajoute un sélecteur de vitesse de lecture de 0,25x à 2x."
+  },
+  "feat_sf_playerVolume_label": {
+    "message": "Sélecteur de volume du lecteur"
+  },
+  "feat_sf_playerVolume_desc": {
+    "message": "Ajoute un sélecteur de volume du lecteur et personnalise les commandes de volume natives."
+  },
+  "ypcWatchSettings": {
+    "message": "Réglages de la page vidéo"
+  },
+  "yp_details": {
+    "message": "Détails"
+  },
+  "yp_auto": {
+    "message": "Auto"
+  },
+  "yp_enabled": {
+    "message": "Ajuster la vitesse automatiquement pour rattraper le direct"
+  },
+  "yp_playbackRate": {
+    "message": "Vitesse du rattrapage automatique"
+  },
+  "yp_showPlaybackRate": {
+    "message": "Afficher la vitesse de lecture actuelle"
+  },
+  "yp_showLatency": {
+    "message": "Afficher le retard sur le direct"
+  },
+  "yp_showHealth": {
+    "message": "Afficher la durée mise en mémoire tampon d’avance"
+  },
+  "yp_showEstimation": {
+    "message": "Afficher le temps estimé pour rejoindre le direct"
+  },
+  "yp_showCurrent": {
+    "message": "Afficher la position de lecture (cliquer pour copier l’URL horodatée)"
+  },
+  "yp_smooth": {
+    "message": "Ajuster la vitesse quand assez de vidéo est en mémoire tampon"
+  },
+  "yp_smoothThreshold": {
+    "message": "Durée de tampon requise pour ajuster la vitesse (secondes)"
+  },
+  "yp_smoothAuto": {
+    "message": "Définir automatiquement le seuil de tampon"
+  },
+  "yp_skip": {
+    "message": "Sauter à la position la plus récente en cas de gros retard"
+  },
+  "yp_skipThreshold": {
+    "message": "Sauter quand la lecture a ce retard (secondes)"
+  },
+  "yp_hideSlider": {
+    "message": "Masquer le curseur de volume natif"
+  },
+  "yp_hideVolumeIcon": {
+    "message": "Masquer l’icône de volume native"
+  },
+  "yp_latencyNote": {
+    "message": "Les informations peuvent s’afficher même avec l’ajustement automatique de la vitesse désactivé. L’ajustement de la vitesse ne s’applique que pendant la lecture d’un direct."
+  },
+  "yp_buttonNote": {
+    "message": "Change la qualité, le volume et la vitesse de lecture depuis une rangée de sélecteurs en incrustation. Les vitesses vont de 0,25x à 2x. Attribuez des raccourcis dans les paramètres des extensions de votre navigateur."
+  },
+  "ypcQuality": {
+    "message": "Qualité"
+  },
+  "ypcRate": {
+    "message": "Vitesse de lecture"
+  },
+  "ypcVolume": {
+    "message": "Volume"
+  },
+  "ypcCopied": {
+    "message": "Copié"
+  },
+  "ypcSaveError": {
+    "message": "Impossible d’enregistrer le réglage. Veuillez réessayer."
+  },
+  "ypcCommand_quality_1": {
+    "message": "Bouton de qualité YouTube 1"
+  },
+  "ypcCommand_quality_2": {
+    "message": "Bouton de qualité YouTube 2"
+  },
+  "ypcCommand_quality_3": {
+    "message": "Bouton de qualité YouTube 3"
+  },
+  "ypcCommand_quality_4": {
+    "message": "Bouton de qualité YouTube 4"
+  },
+  "ypcCommand_quality_5": {
+    "message": "Bouton de qualité YouTube 5"
+  },
+  "ypcCommand_quality_6": {
+    "message": "Bouton de qualité YouTube 6"
+  },
+  "ypcCommand_quality_7": {
+    "message": "Bouton de qualité YouTube 7"
+  },
+  "ypcCommand_quality_8": {
+    "message": "Bouton de qualité YouTube 8"
+  },
+  "ypcCommand_quality_9": {
+    "message": "Bouton de qualité YouTube 9"
+  },
+  "ypcCommand_rate_1": {
+    "message": "Bouton de vitesse de lecture YouTube 1"
+  },
+  "ypcCommand_rate_2": {
+    "message": "Bouton de vitesse de lecture YouTube 2"
+  },
+  "ypcCommand_rate_3": {
+    "message": "Bouton de vitesse de lecture YouTube 3"
+  },
+  "ypcCommand_rate_4": {
+    "message": "Bouton de vitesse de lecture YouTube 4"
+  },
+  "ypcCommand_rate_5": {
+    "message": "Bouton de vitesse de lecture YouTube 5"
+  },
+  "ypcCommand_rate_6": {
+    "message": "Bouton de vitesse de lecture YouTube 6"
+  },
+  "ypcCommand_rate_7": {
+    "message": "Bouton de vitesse de lecture YouTube 7"
+  },
+  "ypcCommand_rate_8": {
+    "message": "Bouton de vitesse de lecture YouTube 8"
+  },
+  "ypcCommand_volume_1": {
+    "message": "Bouton de volume YouTube 1"
+  },
+  "ypcCommand_volume_2": {
+    "message": "Bouton de volume YouTube 2"
+  },
+  "ypcCommand_volume_3": {
+    "message": "Bouton de volume YouTube 3"
+  },
+  "ypcCommand_volume_4": {
+    "message": "Bouton de volume YouTube 4"
+  },
+  "ypcCommand_volume_5": {
+    "message": "Bouton de volume YouTube 5"
+  },
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Réglages de lecture Wikipedia"
+  },
+  "wikipediaMasterDesc": {
+    "message": "Ajuste la mise en page, le texte et les couleurs des articles Wikipedia."
+  },
+  "wikipediaOptions": {
+    "message": "Options de lecture Wikipedia"
+  },
+  "wikipedia_theme": {
+    "message": "Couleurs"
+  },
+  "wikipedia_noto_sans_jp": {
+    "message": "Noto Sans JP"
+  },
+  "wikipedia_ibm_plex_sans_jp": {
+    "message": "IBM Plex Sans JP"
+  },
+  "wikipedia_m_plus_2": {
+    "message": "M PLUS 2"
+  },
+  "wikipedia_m_plus_rounded_1c": {
+    "message": "M PLUS Rounded 1c"
+  },
+  "wikipedia_murecho": {
+    "message": "Murecho"
+  },
+  "wikipedia_zen_kaku_gothic_new": {
+    "message": "Zen Kaku Gothic New"
+  },
+  "wikipedia_line_seed_jp": {
+    "message": "LINE Seed JP"
+  },
+  "wikipedia_font": {
+    "message": "Police du texte"
+  },
+  "wikipedia_fontSize": {
+    "message": "Taille du texte"
+  },
+  "wikipedia_contentWidth": {
+    "message": "Largeur de l’article"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "Largeur de base de l’article. Masquer le panneau Apparence ajoute l’espace libéré. Activez « Garder l’article dans la largeur définie » pour conserver cette largeur."
+  },
+  "wikipedia_lineHeight": {
+    "message": "Interligne"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1×"
+  },
+  "wikipedia_original": {
+    "message": "Couleurs du site"
+  },
+  "wikipedia_light": {
+    "message": "Clair"
+  },
+  "wikipedia_sepia": {
+    "message": "Sépia"
+  },
+  "wikipedia_dark": {
+    "message": "Sombre"
+  },
+  "wikipedia_sans": {
+    "message": "Sans empattement du système"
+  },
+  "wikipedia_serif": {
+    "message": "Avec empattement du système"
+  },
+  "wikipediaContents": {
+    "message": "Sommaire"
+  },
+  "wikipediaClose": {
+    "message": "Fermer"
+  },
+  "wikipediaImage": {
+    "message": "Agrandir l’image"
+  },
+  "wikipediaReference": {
+    "message": "Aperçu de la référence"
+  },
+  "wikipediaSiteMenu": {
+    "message": "Menu Wikipedia"
+  },
+  "wikipediaDisplaySettings": {
+    "message": "Réglages d’affichage"
+  },
+  "wikipediaArticleInfo": {
+    "message": "Informations sur l’article"
+  },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "Mise en page d’article moderne"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "Masquer le panneau Apparence"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "Masque le panneau Apparence de Wikipedia à droite des articles et utilise l’espace libéré pour l’article."
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "Garder l’article dans la largeur définie"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "Garde l’article dans la « Largeur de l’article » ci-dessous, sans l’étendre dans l’espace libéré par le masquage du panneau Apparence. Modifiez la largeur avec « Largeur de l’article »."
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "Reconstruit la page autour de la recherche, du sommaire, de l’article et de ses informations. Désactivez pour rétablir la mise en page d’origine."
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "Sommaire fixe"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "Garde le sommaire visible pour naviguer rapidement."
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "Visionneuse d’images"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "Agrandit les images de l’article."
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "Aperçus des liens et références"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "Met en forme les aperçus d’articles standard de Wikipedia et affiche le texte des références sur place. Les aperçus d’articles apparaissent s’ils sont activés sur Wikipedia."
+  },
+  "wikipedia_headingFont": {
+    "message": "Police des titres"
+  },
+  "wikipedia_inherit": {
+    "message": "Identique au texte"
+  },
+  "wikipedia_linkStyle": {
+    "message": "Style des liens"
+  },
+  "wikipedia_underline": {
+    "message": "Souligné"
+  },
+  "wikipedia_color": {
+    "message": "Couleur"
+  },
+  "wikipedia_coverImage": {
+    "message": "Image de couverture"
+  },
+  "wikipedia_show": {
+    "message": "Afficher"
+  },
+  "wikipedia_hide": {
+    "message": "Masquer"
+  },
+  "wikipedia_articleStyle": {
+    "message": "Vue de l’article"
+  },
+  "wikipedia_full": {
+    "message": "Complète"
+  },
+  "wikipedia_pictures": {
+    "message": "Texte et images"
+  },
+  "wikipedia_text": {
+    "message": "Texte seul"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "Complète inclut les tableaux et autres contenus. Texte et images omet les tableaux et éléments similaires. Texte seul omet aussi les images."
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "Souligné utilise la couleur du texte jusqu’au survol d’un lien. Couleur utilise toujours la couleur des liens."
+  },
+  "wikipedia_group_typography": {
+    "message": "Texte et couleurs"
+  },
+  "wikipedia_group_layout": {
+    "message": "Mise en page"
+  },
+  "wikipedia_group_display": {
+    "message": "Affichage"
+  },
+  "wikipedia_small": {
+    "message": "S"
+  },
+  "wikipedia_medium": {
+    "message": "M"
+  },
+  "wikipedia_large": {
+    "message": "L"
+  },
+  "wikipedia_auto": {
+    "message": "Auto"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$ (ancien thème)",
+    "placeholders": {
+      "theme": {
+        "content": "$1"
+      }
+    }
+  },
+  "wikipedia_one_dark": {
+    "message": "One Dark"
+  },
+  "wikipedia_one_light": {
+    "message": "One Light"
+  },
+  "wikipedia_dracula": {
+    "message": "Dracula"
+  },
+  "wikipedia_nord": {
+    "message": "Nord"
+  },
+  "wikipedia_monokai": {
+    "message": "Monokai"
+  },
+  "wikipedia_solarized_dark": {
+    "message": "Solarized Dark"
+  },
+  "wikipedia_solarized_light": {
+    "message": "Solarized Light"
+  },
+  "wikipedia_github_dark": {
+    "message": "GitHub Dark"
+  },
+  "wikipedia_github_light": {
+    "message": "GitHub Light"
+  },
+  "wikipedia_deep_ocean": {
+    "message": "Océan profond"
+  },
+  "wikipedia_algae": {
+    "message": "Algues"
+  },
+  "wikipedia_calmness": {
+    "message": "Sérénité"
+  },
+  "wikipedia_desert": {
+    "message": "Désert"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "Poussière de fée"
+  },
+  "wikipedia_grey": {
+    "message": "Gris"
+  },
+  "wikipedia_nature": {
+    "message": "Nature"
+  },
+  "languageAuto": { "message": "Automatique (navigateur)" },
+  "languageSelectLabel": { "message": "Langue" },
+  "languageSelectTitle": { "message": "Langue (les pages ouvertes se mettent à jour au rechargement)" }
+}

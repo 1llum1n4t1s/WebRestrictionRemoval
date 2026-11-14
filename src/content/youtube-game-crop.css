@@ -1,0 +1,59 @@
+/*
+ * YouTube ゲーム画面拡大（youtube-game-crop.js が付けるクラスだけを対象にする）
+ *   - __cpa-gc-section: プレーヤーのオーバーレイ内の「ゲーム画面」チップ（外観は __cpa-ypc-group を共有）
+ *   - __cpa-gc-layer:   範囲を指定するときにプレーヤー全体を覆う透明レイヤー
+ * 配色はオーバーレイと同じ暗い面に白文字で、テーマに関係なく動画の上で読める。
+ */
+.__cpa-gc-section { gap: 4px; padding: 0 4px 0 12px; }
+
+.__cpa-gc-button {
+  flex: none;
+  height: calc(var(--ypc-chip-height) - 8px);
+  padding: 0 10px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #ffffff;
+  font: 500 13px / 1 Roboto, "YouTube Sans", system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.__cpa-gc-button:hover { background-color: var(--ypc-hover); }
+/* ON は塗りつぶしで、拡大中であることを一目で分かるようにする。 */
+.__cpa-gc-toggle[aria-pressed="true"] { background-color: #ffffff; color: #0f0f0f; }
+.__cpa-gc-toggle[aria-pressed="true"]:hover { background-color: rgba(255, 255, 255, 0.88); }
+.__cpa-gc-remove { color: var(--ypc-muted); }
+
+/* 範囲の指定: 動画全体の上に半透明のレイヤーを重ね、囲んだ範囲だけを明るく見せる。 */
+.__cpa-gc-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  cursor: crosshair;
+  background: rgba(0, 0, 0, 0.35);
+  touch-action: none;
+  user-select: none;
+}
+.__cpa-gc-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: rgba(18, 18, 18, 0.88);
+  color: #ffffff;
+  font: 500 14px / 1.4 Roboto, "YouTube Sans", system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+.__cpa-gc-rect {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #3ea6ff;
+  background: rgba(62, 166, 255, 0.12);
+  /* 範囲の外側を暗くする（レイヤーの背景と合わせて、囲んだ範囲が浮き上がって見える）。 */
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}

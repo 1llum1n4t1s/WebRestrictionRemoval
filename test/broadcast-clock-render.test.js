@@ -88,3 +88,43 @@ test("配信時刻: 撤去時に追従描画の予約を取り消し、撤去後
   assert.equal(clock.timers.size, 0, "撤去で予約を取り消す");
   assert.equal(clock.text, null, "撤去後は表示先を持たない");
 });
+
+// rescan（配信情報の取得判定）を本番ソースから実行する。fetch・sessionStorage・DOM は差し替える。
+const createRescanHarness = ({ html, setItemThrows }) => {
+  const counts = { fetch: 0, getItem: 0 };
+  class FakeVideo { addEventListener() {} removeEventListener() {} }
+  const video = new FakeVideo();
+  const context = vm.createContext({
+    BroadcastClock,
+    AbortController, AbortSignal, Date, JSON, encodeURIComponent,
+    HTMLVideoElement: FakeVideo,
+    chrome: { runtime: { id: "test" } },
+    location: { pathname: "/watch", search: "?v=abcdefghijk" },
+    document: { querySelector: () => video },
+    window: {
+      __cpaYouTubeOverlay: { mount() {}, remove() {} },
+      sessionStorage: {
+        getItem() { counts.getItem++; return null; },
+        setItem() { if (setItemThrows) throw new Error("QuotaExceededError"); },
+      },
+    },
+    performance: { now: () => 0 },
+    requestAnimationFrame() { return 0; },
+    setTimeout() { return 0; },
+    clearTimeout() {},
+    async fetch() { counts.fetch++; return { ok: true, text: async () => html }; },
+  });
+  const from = source.indexOf("  // ---------- 状態 ----------");
+  const to = source.indexOf("  // ---------- activate / deactivate ----------");
+  assert.ok(from >= 0 && to > from, "本番ソースに rescan までの区間がある");
+  vm.runInContext(source.slice(from, to), context);
+  vm.runInContext("active = true", context);
+  return { counts, rescan: () => vm.runInContext("rescan()", context) };
+};
+
+test("配信時刻: 通常動画は sessionStorage への保存に失敗しても /watch を1回しか取得しない", async () => {
+  const harness = createRescanHarness({ html: "<html>配信情報なしの通常動画</html>", setItemThrows: true });
+  for (let i = 0; i < 4; i++) await harness.rescan();
+  assert.equal(harness.counts.fetch, 1, "通常動画の判定はメモリに保持して再取得しない");
+  assert.equal(harness.counts.getItem, 1, "確定後は sessionStorage も読み直さない");
+});

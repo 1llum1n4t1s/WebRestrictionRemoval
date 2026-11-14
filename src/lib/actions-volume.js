@@ -10,11 +10,11 @@
  *
  * Chrome の標準 API（`chrome.tabCapture.getMediaStreamId` + `getUserMedia` + AudioContext +
  * GainNode）のみを使ってタブ音声を増幅する。`tabCapture` で取得した MediaStream を offscreen
- * の AudioContext に流し込み、単純な GainNode で増幅して `destination` に再出力するパイプライン
- * （音質変更などの追加処理は持たない）。
+ * の AudioContext に流し込み、GainNode による増幅に加えて EQ・ナイトモード・低音カット・
+ * クリップ防止・出力上限の処理を通して `destination` に再出力する（段構成は audio-pipeline.js）。
  *
- * master トグルなしのスライダーのみ構成。UNITY (100%) のときは AudioContext を解放、
- * それ以外の値が設定された時点でブーストを起動する。
+ * master トグル（`VOLUME_BOOSTER_ENABLED`）が ON のとき、サブトグルと音量スライダーを有効にする。
+ * 100% かつ全サブトグル OFF かつミュート OFF のときは AudioContext を解放し、それ以外の状態でブーストを起動する。
  */
 const VolumeBooster = Object.freeze({
   // EQ preset は表示用で、実行時は gains を使用する。
@@ -135,7 +135,6 @@ const VolumeBooster = Object.freeze({
       VolumeBooster.UNITY + t * (VolumeBooster.MAX - VolumeBooster.UNITY)
     );
   },
-  /** 実音量 percent (0..MAX) から UI スライダー位置 (0..200) を復元する。 */
   /**
    * 現在の音量 (%) を `delta` だけ動かして範囲内へ収める（純粋関数）。
    * ± ボタン用。端では clamp されるだけで、範囲外へは出ない。
@@ -151,6 +150,7 @@ const VolumeBooster = Object.freeze({
     return VolumeBooster.clampValue(Math.round(base + d));
   },
 
+  /** 実音量 percent (0..MAX) から UI スライダー位置 (0..200) を復元する。 */
   percentToSliderPosition(percent) {
     const p = VolumeBooster.clampValue(percent);
     if (p <= VolumeBooster.UNITY) return p;
@@ -264,8 +264,10 @@ const VolumeBooster = Object.freeze({
    * これらのサイトでは音量ブースターは効かない (動画の音は普通に出る)。
    *
    * このリストにないサイトでも runtime で EME を検出した場合 (`mediaKeys` / `encrypted` event) は
-   * volume-booster-mes.js が attach 回避 / detach する fallback がある。完璧な保護は
-   * ホスト名ブラックリストのみなので、追加要望があったら hostname を確認して RegExp を追加すること。
+   * volume-booster-mes.js が attach を回避し、attach 済みなら graph を生かしたまま bypass する
+   * (Firefox では一度 capture した要素は `ctx.close()` しても直接出力に復帰しないため、detach で
+   * 音を戻す回復手段はない)。完璧な保護はホスト名ブラックリストのみなので、追加要望があったら
+   * hostname を確認して RegExp を追加すること。
    *
    * 履歴: v1.0.33 の MES 経路 (Chrome + Firefox 両対応、URL 分岐あり) 用に導入 → v1.0.35 で
    * MES 経路ごと撤去 → 2026-07-02 に Firefox 専用パイプラインとして復活 (Chrome は tabCapture 一本のまま)。
@@ -321,7 +323,7 @@ const VolumeBooster = Object.freeze({
    * - `"probe"`: same-origin http(s) かつ crossorigin 属性なし。URL 上は安全に見えるが、HTML 仕様上
    *   `currentSrc` は**リダイレクト前の URL** を返すため、same-origin → cross-origin redirect 配信
    *   (メディアプロキシ / presigned CDN 等) だと opaque taint で無音化する。caller が
-   *   `redirect: "manual"` の same-origin HEAD probe で opaqueredirect でないことを確認してから
+   *   `redirect: "manual"` の same-origin Range GET (1 バイト) probe で opaqueredirect でないことを確認してから
    *   attach する (probe 失敗 / redirect 検出時は attach しない = 音は普通に出る fail-safe)
    * - `"pending"`: ソース未確定 (currentSrc が空)。loadedmetadata / loadstart で再評価する
    * - `"unsafe"`: cross-origin かつ CORS 未検証。attach すると無音化するため skip

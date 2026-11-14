@@ -211,11 +211,11 @@ html.__cpa-wiki-contents :is(#mw-panel-toc, #toc) { display: none !important; }
 html.__cpa-wiki-hide-appearance nav.vector-appearance-landmark { display: none !important; }
 /* ページツールが右列に残っている場合は、その表示場所を保つ。 */
 html.__cpa-wiki-hide-appearance .vector-column-end:has(#vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) { display: none !important; }
-html.__cpa-wiki-hide-appearance #content:has(.vector-column-end #vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) {
+html.__cpa-wiki-hide-appearance:not(.__cpa-wiki-modern) #content:has(.vector-column-end #vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) {
   grid-template-columns: minmax(0, 1fr) 0 !important;
   column-gap: 0 !important;
 }
-html.__cpa-wiki-hide-appearance.__cpa-wiki-narrow #content:has(.vector-column-end #vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) {
+html.__cpa-wiki-hide-appearance.__cpa-wiki-narrow:not(.__cpa-wiki-modern) #content:has(.vector-column-end #vector-page-tools-pinned-container):not(:has(#vector-page-tools-pinned-container > *)) {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -332,10 +332,34 @@ html.__cpa-wiki-previews .mwe-popups .mwe-popups-extract {
   .__cpa-wiki-toc, .__cpa-wiki-reference, .__cpa-wiki-image-dialog { display: none !important; }
 }
 
-/* 元のノードを移した閲覧シェル。クラス撤去後は Wikipedia の配置へ戻る。 */
+/* ============================================================
+   新しい閲覧構造（readableLayout）。
+   Wikipedia の実ノードを移した「上部バー → 左レール（目次）＋記事（題名・説明・操作行・本文）＋右の表示パネル」。
+   クラス撤去後は Wikipedia の配置へ戻るため、サイト所有ノードには装飾だけを当てる（属性・インライン style は触らない）。
+   色は --cpa-wiki-panel / ink / link / border / soft の5トークンから color-mix で導き、固定色を持たない。
+   ============================================================ */
 html.__cpa-wiki-modern {
   --cpa-wiki-page-padding: 32px;
+  --cpa-wiki-rail-width: 208px;
+  --cpa-wiki-rail-gap: 40px;
+  /* 右の列 = 本文との間隔 24px + カード幅 288px。表示設定カードも基本情報カードも同じカード幅で右端を揃える。
+     hideAppearance で解放される幅（列 + 間隔）もこの合計値になる。 */
+  --cpa-wiki-aside-gap: 24px;
+  --cpa-wiki-aside-card: 288px;
+  --cpa-wiki-aside-width: calc(var(--cpa-wiki-aside-gap) + var(--cpa-wiki-aside-card));
+  /* 題名の大きさ。左レールの「目次」見出しの高さ合わせにも使うので変数にする。 */
+  --cpa-wiki-title-size: clamp(34px, 3.8vw, 54px);
   --cpa-wiki-content-padding: 0px;
+  --cpa-wiki-radius: 14px;
+  /* 補助色。original（Wikipedia の配色）でも Vector のトークンから同じ式で導く。 */
+  --cpa-wiki-muted: color-mix(in srgb, var(--cpa-wiki-ink) 72%, var(--cpa-wiki-panel));
+  --cpa-wiki-faint: color-mix(in srgb, var(--cpa-wiki-ink) 56%, var(--cpa-wiki-panel));
+  --cpa-wiki-line: color-mix(in srgb, var(--cpa-wiki-border) 58%, var(--cpa-wiki-panel));
+  --cpa-wiki-card: color-mix(in srgb, var(--cpa-wiki-soft) 58%, var(--cpa-wiki-panel));
+  --cpa-wiki-tint: color-mix(in srgb, var(--cpa-wiki-link) 11%, var(--cpa-wiki-panel));
+  --cpa-wiki-tint-strong: color-mix(in srgb, var(--cpa-wiki-link) 20%, var(--cpa-wiki-panel));
+  /* 上部バー・通知・本文グリッド・フッターが共有する外枠。左右端をここで一括して揃える。 */
+  --cpa-wiki-frame: calc(var(--cpa-wiki-width) + var(--cpa-wiki-rail-width) + var(--cpa-wiki-rail-gap) + var(--cpa-wiki-aside-width) + var(--cpa-wiki-page-padding) * 2);
 }
 html.__cpa-wiki-modern:not([data-cpa-wiki-theme="original"]) {
   --background-color-interactive: var(--cpa-wiki-soft);
@@ -356,6 +380,8 @@ html.__cpa-wiki-modern body > .mw-page-container .mw-content-container:not(:has(
 html.__cpa-wiki-modern body > .mw-page-container .mw-footer-container:not(:has(> *)) { display: none; }
 html.__cpa-wiki-modern.__cpa-wiki-contents .__cpa-wiki-site-menu:not(:has(#vector-main-menu-pinned-container > *)) { display: none; }
 html.__cpa-wiki-modern .__cpa-wiki-site-menu:has(#vector-main-menu-pinned-container > *) > summary { display: none; }
+/* 独自目次が左レールにあるので、題名バーの標準目次ボタンは常に隠す（独自目次 OFF でも標準目次は左レールのメニューに残る）。 */
+html.__cpa-wiki-modern .vector-page-titlebar > nav.vector-toc-landmark { display: none !important; }
 html.__cpa-wiki-modern.__cpa-wiki-contents :is(#mw-panel-toc, .vector-page-titlebar-toc, #vector-toc-collapsed-button) { display: none !important; }
 html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-rail { position: static; max-height: none; overflow: visible; }
 html.__cpa-wiki-modern .__cpa-wiki-site-menu :is(#mw-panel-toc, #vector-toc-pinned-container, .vector-toc) { position: static; width: auto; margin: 0; max-height: none; }
@@ -365,252 +391,501 @@ html.__cpa-wiki-modern .__cpa-wiki-shell {
   min-width: 0;
   min-height: 100vh;
 }
-html.__cpa-wiki-modern .__cpa-wiki-topbar {
-  border-bottom: 1px solid var(--cpa-wiki-border);
-  padding-inline: var(--cpa-wiki-page-padding);
-}
-html.__cpa-wiki-modern .__cpa-wiki-topbar :is(.vector-header-container, .vector-header, .mw-header) {
+
+/* ---------- 上部バー ---------- */
+/* ドロップダウン（検索候補・ユーザーメニュー・主メニュー）が、後続の sticky 要素より前面に出るよう層を上げる。
+   backdrop-filter / transform は包含ブロックを作り候補の配置を壊すため使わない。 */
+html.__cpa-wiki-modern .__cpa-wiki-topbar { position: relative; z-index: 20; border-bottom: 1px solid var(--cpa-wiki-line); }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-container {
   box-sizing: border-box;
   width: 100%;
-  max-width: calc(var(--cpa-wiki-width) + 576px);
+  max-width: var(--cpa-wiki-frame);
   margin-inline: auto;
-  padding-block: 12px;
-  padding-inline: 0;
+  padding: 0 var(--cpa-wiki-page-padding);
   background: var(--cpa-wiki-panel);
 }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-header { gap: clamp(20px, 4vw, 64px); min-height: 76px; padding-block: 14px; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-start { flex: 0 0 auto; gap: 16px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar :is(.vector-header, .mw-header) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 68px;
+  gap: clamp(16px, 3vw, 48px);
+  background: var(--cpa-wiki-panel);
+}
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-start { flex: 0 0 auto; gap: 14px; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { flex: 1; min-width: 0; gap: 24px; justify-content: space-between; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-main-menu-dropdown { margin-inline: 0; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-main-menu-dropdown > label { border-radius: 10px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-main-menu-dropdown > label { border-radius: 999px; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo { gap: 10px; margin: 0; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-icon { width: 32px; height: auto; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-wordmark { height: 19px; width: auto; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-icon { width: 30px; height: auto; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-wordmark { height: 18px; width: auto; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-tagline { display: none; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-container { padding-block: 0; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box { flex: 1; min-width: 0; max-width: 600px; margin: 0; }
+/* 検索は角丸のピル。入力と送信ボタンを1つの面にまとめる。 */
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box { flex: 1; min-width: 0; max-width: 560px; margin: 0; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box :is(.vector-typeahead-search-container, .cdx-typeahead-search) { width: 100%; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input { display: flex; width: 100%; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input__input-wrapper { flex: 1 1 0; min-width: 0; width: 0; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input__text-input { width: 100%; min-width: 0; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-text-input__input {
-  min-height: 44px;
-  background: var(--cpa-wiki-soft);
+  min-height: 42px;
+  background: var(--cpa-wiki-card);
   color: var(--cpa-wiki-ink);
   border-color: transparent;
-  border-start-start-radius: 12px;
-  border-end-start-radius: 12px;
+  border-start-start-radius: 999px;
+  border-end-start-radius: 999px;
+  padding-inline-start: 44px;
 }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box .cdx-search-input__end-button {
   position: static;
   flex: 0 0 auto;
   margin-inline-start: 0;
-  padding-inline: 16px;
-  background: var(--cpa-wiki-soft);
+  padding-inline: 18px;
+  background: var(--cpa-wiki-card);
   color: var(--cpa-wiki-ink);
   border-color: transparent;
-  border-inline-start-color: var(--cpa-wiki-border);
-  border-start-end-radius: 12px;
-  border-end-end-radius: 12px;
+  border-start-end-radius: 999px;
+  border-end-end-radius: 999px;
 }
-html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box form { border-radius: 12px; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box form { border-radius: 999px; }
 html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-search-box form:focus-within { outline: 2px solid var(--cpa-wiki-link); outline-offset: 3px; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar :is(#pt-donate-2, #pt-createaccount-2, #pt-login-2) > a { display: inline-flex; padding: 7px 10px; border-radius: 8px; color: var(--cpa-wiki-ink); font: 500 13px/1.4 system-ui, sans-serif; }
-html.__cpa-wiki-modern .__cpa-wiki-topbar #pt-login-2 > a { border: 1px solid var(--cpa-wiki-border); }
-html.__cpa-wiki-modern .__cpa-wiki-topbar :is(#pt-donate-2, #pt-createaccount-2, #pt-login-2) > a:hover { background: var(--cpa-wiki-soft); color: var(--cpa-wiki-link); text-decoration: none; }
-@media (max-width: 1100px) {
-  html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-header { gap: 16px; min-height: 64px; }
-  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { gap: 12px; }
-}
-@media (max-width: 760px) {
-  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-start { gap: 10px; }
-  html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-wordmark { height: 17px; }
-  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { flex: 1; margin-inline-start: auto; }
-}
+html.__cpa-wiki-modern .__cpa-wiki-topbar :is(#pt-donate-2, #pt-createaccount-2, #pt-login-2) > a { display: inline-flex; padding: 7px 12px; border-radius: 999px; color: var(--cpa-wiki-ink); font: 500 13px/1.4 system-ui, sans-serif; }
+html.__cpa-wiki-modern .__cpa-wiki-topbar #pt-login-2 > a { border: 1px solid var(--cpa-wiki-line); }
+html.__cpa-wiki-modern .__cpa-wiki-topbar :is(#pt-donate-2, #pt-createaccount-2, #pt-login-2) > a:hover { background: var(--cpa-wiki-card); color: var(--cpa-wiki-link); text-decoration: none; }
 html.__cpa-wiki-modern .__cpa-wiki-notices {
-  max-width: 1512px;
+  box-sizing: border-box;
+  max-width: var(--cpa-wiki-frame);
   margin-inline: auto;
   padding-inline: var(--cpa-wiki-page-padding);
 }
+
+/* ---------- 本文グリッド（左レール + 記事） ---------- */
 html.__cpa-wiki-modern .__cpa-wiki-reading-grid {
   display: grid;
-  grid-template-columns: 208px minmax(0, calc(var(--cpa-wiki-width) + 272px));
-  gap: 32px;
+  grid-template-columns: var(--cpa-wiki-rail-width) minmax(0, 1fr);
+  column-gap: var(--cpa-wiki-rail-gap);
   box-sizing: border-box;
   width: 100%;
-  max-width: calc(var(--cpa-wiki-width) + 576px);
+  max-width: var(--cpa-wiki-frame);
   margin-inline: auto;
-  padding: 40px var(--cpa-wiki-page-padding) 64px;
+  /* 下の余白に、右列へ張り出した基本情報が記事本文より長い分（JS が測る）を足し、フッターへ重ねない。 */
+  padding: 24px var(--cpa-wiki-page-padding) calc(80px + var(--cpa-wiki-facts-overflow, 0px));
   align-items: start;
 }
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-reading-grid:not(:has(#vector-main-menu-pinned-container > *, #mw-panel-toc)) { grid-template-columns: minmax(0, 1fr); max-width: calc(var(--cpa-wiki-frame) - var(--cpa-wiki-rail-width) - var(--cpa-wiki-rail-gap)); }
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-reading-grid:not(:has(#vector-main-menu-pinned-container > *, #mw-panel-toc)) > #content { grid-column: 1; }
 html.__cpa-wiki-modern .__cpa-wiki-rail {
   position: sticky;
   top: 24px;
   min-width: 0;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  /* つまみは細く、通常は本文色の薄い影程度にとどめる（常時濃いバーが目立たないように）。
+     レールへポインターを載せた時・キーボード操作中だけ少し濃くする。色は本文色から導く。 */
   scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cpa-wiki-ink) 14%, transparent) transparent;
   overscroll-behavior: contain;
   font: 13px/1.6 system-ui, sans-serif;
 }
-html.__cpa-wiki-modern .__cpa-wiki-rail :is(.__cpa-wiki-toc, .__cpa-wiki-site-menu) {
-  position: static;
-  max-width: none;
-  margin: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  color: var(--cpa-wiki-ink);
-  font: inherit;
-}
-html.__cpa-wiki-modern .__cpa-wiki-rail summary {
-  padding: 10px 8px;
-  cursor: pointer;
-  font-weight: 650;
-}
+html.__cpa-wiki-modern .__cpa-wiki-rail:is(:hover, :focus-within) { scrollbar-color: color-mix(in srgb, var(--cpa-wiki-ink) 34%, transparent) transparent; }
+/* Vector の固定ヘッダー（ログイン時のみ）が出ている間は、その下からレールを始める。表示クラスは html ではなく body に付く。
+   固定ヘッダーの表示判定は #firstHeading の交差を見るため、題名バーを display: contents にしても影響しない。 */
+html.__cpa-wiki-modern body.vector-sticky-header-visible .__cpa-wiki-rail { top: 72px; max-height: calc(100vh - 96px); }
+html.__cpa-wiki-modern body.vector-sticky-header-visible #content > .vector-column-end { top: 72px; }
 html.__cpa-wiki-modern .__cpa-wiki-site-menu {
-  border-bottom: 1px solid var(--cpa-wiki-border) !important;
-  margin-bottom: 16px !important;
-}
-html.__cpa-wiki-modern .__cpa-wiki-site-menu .vector-column-start {
-  display: block;
-  position: static;
-  width: auto;
-  margin: 0;
-  padding: 0 8px 16px;
-}
-html.__cpa-wiki-modern .__cpa-wiki-site-menu :is(.vector-sticky-pinned-container, #vector-main-menu-pinned-container) {
-  position: static;
-  width: auto;
-  padding: 0;
-  max-height: none;
-}
-html.__cpa-wiki-modern .__cpa-wiki-toc nav { max-height: none; padding: 0 0 12px; overflow: visible; }
-html.__cpa-wiki-modern .__cpa-wiki-toc a {
-  padding: 6px 8px;
-  border-inline-start: 2px solid transparent;
+  margin-bottom: 20px;
+  border: 1px solid var(--cpa-wiki-line);
+  border-radius: 14px;
+  background: var(--cpa-wiki-card);
   color: var(--cpa-wiki-ink);
-  border-start-end-radius: var(--cpa-wiki-radius-small);
-  border-end-end-radius: var(--cpa-wiki-radius-small);
 }
-html.__cpa-wiki-modern .__cpa-wiki-toc a:is(:hover, :focus-visible) {
-  background: var(--cpa-wiki-soft);
-  border-inline-start-color: var(--cpa-wiki-link);
-  color: var(--cpa-wiki-link);
+html.__cpa-wiki-modern .__cpa-wiki-site-menu:has(#vector-main-menu-pinned-container > *) { border: 0; background: transparent; }
+html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-site-menu { margin-bottom: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-site-menu > summary { padding: 10px 14px; cursor: pointer; font-weight: 650; }
+html.__cpa-wiki-modern .__cpa-wiki-site-menu .vector-column-start { display: block; position: static; width: auto; margin: 0; padding: 0 14px 14px; }
+html.__cpa-wiki-modern .__cpa-wiki-site-menu:has(#vector-main-menu-pinned-container > *) .vector-column-start { padding: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-site-menu :is(.vector-sticky-pinned-container, #vector-main-menu-pinned-container) { position: static; width: auto; padding: 0; max-height: none; }
+
+/* ---------- 目次 ---------- */
+/* 字下げは項目のリンク自体の padding で行う（li にも付けると現在位置の線がガイドラインからずれる）。 */
+html.__cpa-wiki-modern .__cpa-wiki-toc li.__cpa-wiki-toc-sub { padding-inline-start: 0; }
+/* 広い画面: 左レールに常設。マーカー無し・小見出し「目次」・縦のガイドライン・現在位置はアクセント線＋太字。 */
+@media (min-width: 1000px) {
+  html.__cpa-wiki-modern .__cpa-wiki-rail .__cpa-wiki-toc {
+    position: static;
+    max-width: none;
+    margin: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    color: var(--cpa-wiki-ink);
+    font: inherit;
+  }
+  /* 上の余白は、見出し「目次」の字の上端を題名（h1）の字の上端へ揃えるための補正（題名の大きさに比例）。 */
+  html.__cpa-wiki-modern .__cpa-wiki-toc > summary {
+    padding: calc(var(--cpa-wiki-title-size) * .13) 0 10px 14px;
+    list-style: none;
+    cursor: default;
+    color: var(--cpa-wiki-faint);
+    font: 650 11.5px/1.4 system-ui, sans-serif;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  html.__cpa-wiki-modern .__cpa-wiki-toc > summary::-webkit-details-marker { display: none; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc > summary::marker { content: ""; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc nav { max-height: none; overflow: visible; padding: 0 0 12px; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc ol { border-inline-start: 1px solid var(--cpa-wiki-line); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc a {
+    padding: 5px 10px 5px 13px;
+    margin-inline-start: -1px;
+    border-inline-start: 2px solid transparent;
+    color: color-mix(in srgb, var(--cpa-wiki-ink) 84%, var(--cpa-wiki-panel));
+    font-size: 13px;
+    line-height: 1.5;
+    border-start-end-radius: 8px;
+    border-end-end-radius: 8px;
+  }
+  html.__cpa-wiki-modern .__cpa-wiki-toc li.__cpa-wiki-toc-sub a { padding-inline-start: 27px; font-size: 12.5px; color: var(--cpa-wiki-muted); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc a:is(:hover, :focus-visible) { color: var(--cpa-wiki-link); background: var(--cpa-wiki-card); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc a:hover { text-decoration: none; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc a[aria-current="location"] {
+    background: var(--cpa-wiki-tint);
+    border-inline-start-color: var(--cpa-wiki-link);
+    color: var(--cpa-wiki-link);
+    font-weight: 700;
+  }
 }
-html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-site-menu { margin-bottom: 0 !important; }
-html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-reading-grid:not(:has(#vector-main-menu-pinned-container > *, #mw-panel-toc)) { grid-template-columns: minmax(0, calc(var(--cpa-wiki-width) + 272px)); max-width: calc(var(--cpa-wiki-width) + 336px); }
-html.__cpa-wiki-modern:not(.__cpa-wiki-contents) .__cpa-wiki-reading-grid:not(:has(#vector-main-menu-pinned-container > *, #mw-panel-toc)) > #content { grid-column: 1; }
+/* 狭い画面: 画面端の丸い「目次」ボタン。押すと一覧のカードが開く（本文の前に積まない）。 */
+@media (max-width: 999.98px) {
+  html.__cpa-wiki-modern .__cpa-wiki-toc { inset-inline-start: auto; inset-inline-end: 16px; bottom: 16px; max-width: none; border-radius: 22px; box-shadow: 0 8px 28px color-mix(in srgb, var(--cpa-wiki-ink) 22%, transparent); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc:not([open]) { border-radius: 999px; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc[open] { width: min(340px, calc(100vw - 32px)); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc > summary { display: flex; align-items: center; gap: 10px; padding: 11px 18px; list-style: none; cursor: pointer; font: 650 14px/1.4 system-ui, sans-serif; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc > summary::-webkit-details-marker { display: none; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc > summary::before {
+    content: "";
+    width: 14px;
+    height: 12px;
+    background: linear-gradient(currentColor 0 0) 0 0 / 100% 2px no-repeat, linear-gradient(currentColor 0 0) 0 50% / 70% 2px no-repeat, linear-gradient(currentColor 0 0) 0 100% / 100% 2px no-repeat;
+  }
+  html.__cpa-wiki-modern .__cpa-wiki-toc[open] > summary { border-bottom: 1px solid var(--cpa-wiki-line); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc nav { max-height: min(60vh, 460px); padding: 8px 8px 10px; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc a { padding: 8px 10px; border-radius: 8px; color: var(--cpa-wiki-ink); font-size: 14px; }
+  html.__cpa-wiki-modern .__cpa-wiki-toc li.__cpa-wiki-toc-sub a { padding-inline-start: 24px; font-size: 13px; color: var(--cpa-wiki-muted); }
+  html.__cpa-wiki-modern .__cpa-wiki-toc a:hover { text-decoration: none; background: var(--cpa-wiki-card); }
+  /* レールには（固定したメニューなどが無ければ）何も残らないので、枠ごと外して余白を作らない。 */
+  html.__cpa-wiki-modern .__cpa-wiki-rail { display: contents; }
+}
+
+/* ---------- 記事ヒーロー（題名・説明・操作行） ---------- */
+/* 題名バーは DOM を動かさず display: contents にして、題名と言語ボタンを #content の grid の区画へ直接置く。 */
 html.__cpa-wiki-modern #content {
   display: grid;
   grid-area: auto;
   grid-column: 2;
   grid-row: 1;
-  grid-template-areas: "articleTitle articleTitle" "articleHeader articleHeader" "bodyContent columnEnd";
-  grid-template-columns: minmax(0, 1fr) 248px !important;
-  column-gap: 24px;
-  row-gap: 28px;
+  grid-template-columns: minmax(0, 1fr) auto var(--cpa-wiki-aside-width) !important;
+  grid-template-areas: "title title title" "desc desc desc" "tools lang aside" "body body aside";
+  grid-template-rows: auto auto auto 1fr;
+  column-gap: 0 !important;
+  row-gap: 0;
   width: 100%;
-  max-width: calc(var(--cpa-wiki-width) + 272px) !important;
+  max-width: calc(var(--cpa-wiki-width) + var(--cpa-wiki-aside-width)) !important;
   margin: 0 !important;
   padding: 0 !important;
   border: 0;
   background: var(--cpa-wiki-panel);
 }
-html.__cpa-wiki-modern .__cpa-wiki-article-header {
-  grid-area: articleHeader;
-  min-width: 0;
-  border-bottom: 1px solid var(--cpa-wiki-border);
-  padding-bottom: 20px;
-}
-html.__cpa-wiki-modern #content > .vector-page-titlebar {
-  grid-area: articleTitle;
-  border: 0;
-  margin: 0;
-  padding: 0;
-  align-items: center;
-  gap: 16px;
-}
-html.__cpa-wiki-modern #firstHeading {
+html.__cpa-wiki-modern #content > .vector-page-titlebar { display: contents; }
+html.__cpa-wiki-modern #content #firstHeading {
+  grid-area: title;
   margin: 0;
   padding: 0;
   border: 0;
-  font-size: clamp(30px, 3.2vw, 48px);
+  font-size: var(--cpa-wiki-title-size);
   font-weight: 700;
-  line-height: 1.22;
-  letter-spacing: -.025em;
+  line-height: 1.18;
+  letter-spacing: -.02em;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
+html.__cpa-wiki-modern .__cpa-wiki-article-header { grid-area: desc; min-width: 0; }
 html.__cpa-wiki-modern .__cpa-wiki-description {
   margin: 12px 0 0;
-  max-width: 70ch;
-  font: 16px/1.65 var(--cpa-wiki-font);
-  color: color-mix(in srgb, var(--cpa-wiki-ink) 76%, var(--cpa-wiki-panel));
+  max-width: 62ch;
+  font: 17px/1.6 var(--cpa-wiki-font);
+  color: var(--cpa-wiki-muted);
 }
-html.__cpa-wiki-modern .__cpa-wiki-actions { margin-top: 16px; font: 13px/1.5 system-ui, sans-serif; }
-html.__cpa-wiki-modern .__cpa-wiki-actions > summary {
+/* 操作行: 閲覧・編集・履歴などの既存ツールバーを、題名の下に1行のセグメントとして見せる。 */
+html.__cpa-wiki-modern #content > .vector-page-toolbar {
+  grid-area: tools;
+  position: relative;
+  z-index: 5;
+  min-width: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: 13px/1.4 system-ui, sans-serif;
+}
+html.__cpa-wiki-modern .vector-page-toolbar-container { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 0; margin: 0; }
+html.__cpa-wiki-modern .vector-page-toolbar :is(#left-navigation, #right-navigation) { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0; float: none; }
+html.__cpa-wiki-modern .vector-page-toolbar :is(#left-navigation, #right-navigation) > nav { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0; }
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: fit-content;
-  padding: 8px 12px;
-  border: 1px solid var(--cpa-wiki-border);
-  border-radius: var(--cpa-wiki-radius-small);
-  background: var(--cpa-wiki-soft);
-  color: var(--cpa-wiki-ink);
+  margin: 0;
+  padding: 3px;
+  background: var(--cpa-wiki-card);
+  border: 0;
+  border-radius: 999px;
+}
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs :is(.vector-menu-content, ul) { display: flex; align-items: center; gap: 2px; margin: 0; padding: 0; background: none; }
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li { float: none; height: auto; margin: 0; padding: 0; background: none; border: 0; }
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li::before,
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li::after,
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li a::before,
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li a::after { display: none; }
+html.__cpa-wiki-modern .vector-page-toolbar :is(.vector-page-toolbar-container, #left-navigation, #right-navigation) { background: none; box-shadow: none; border: 0; }
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li a {
+  display: block;
+  height: auto;
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  box-shadow: none;
+  color: var(--cpa-wiki-muted);
+  font: 500 13px/1.5 system-ui, sans-serif;
+  white-space: nowrap;
+}
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li a:hover { background: var(--cpa-wiki-tint); color: var(--cpa-wiki-link); text-decoration: none; }
+html.__cpa-wiki-modern .vector-page-toolbar .vector-menu-tabs li.selected a { background: var(--cpa-wiki-panel); color: var(--cpa-wiki-link); font-weight: 650; box-shadow: 0 0 0 1px var(--cpa-wiki-line); }
+html.__cpa-wiki-modern .vector-page-toolbar .vector-dropdown > .vector-dropdown-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 6px 14px;
+  border: 1px solid var(--cpa-wiki-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cpa-wiki-muted);
+  font: 500 13px/1.5 system-ui, sans-serif;
+}
+html.__cpa-wiki-modern .vector-page-toolbar .vector-dropdown > .vector-dropdown-label:hover { background: var(--cpa-wiki-tint); color: var(--cpa-wiki-link); }
+/* 言語ボタンは題名バーの中にあるまま、操作行の右端へ置く。ULS の初期化が参照する親子関係は変えない。 */
+html.__cpa-wiki-modern #content > .vector-page-titlebar > #p-lang-btn { grid-area: lang; position: relative; z-index: 5; align-self: center; justify-self: end; margin: 22px 0 0; }
+html.__cpa-wiki-modern #p-lang-btn > .vector-dropdown-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 6px 14px;
+  border: 1px solid var(--cpa-wiki-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cpa-wiki-link);
+  font: 500 13px/1.5 system-ui, sans-serif;
+}
+html.__cpa-wiki-modern #p-lang-btn > .vector-dropdown-label:hover { background: var(--cpa-wiki-tint); }
+html.__cpa-wiki-modern #p-lang-btn .vector-dropdown-content { border-radius: 14px; border: 1px solid var(--cpa-wiki-line); box-shadow: 0 12px 36px color-mix(in srgb, var(--cpa-wiki-ink) 18%, transparent); }
+html.__cpa-wiki-modern #bodyContent { grid-area: body; min-width: 0; margin-top: 28px; }
+html.__cpa-wiki-modern #content > #mw-content-text { grid-area: body; min-width: 0; }
+/* 出典行は小さく控えめに。ロックなどの編集状態アイコンは右へ寄せる。 */
+html.__cpa-wiki-modern #bodyContent .vector-body-before-content { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 14px; padding: 0; }
+html.__cpa-wiki-modern #bodyContent #siteSub { margin: 0; color: var(--cpa-wiki-faint); font: 12.5px/1.5 system-ui, sans-serif; }
+html.__cpa-wiki-modern #bodyContent .mw-indicators { order: 2; margin-inline-start: auto; }
+html.__cpa-wiki-modern #bodyContent #contentSub:empty,
+html.__cpa-wiki-modern #bodyContent #contentSub:not(:has(*:not(:empty))) { display: none; }
+
+/* ---------- 右の表示パネル（Vector の外観メニュー・ピン留めしたページツール） ---------- */
+html.__cpa-wiki-modern #content > .vector-column-end {
+  grid-area: aside;
+  box-sizing: border-box;
+  /* 列幅いっぱい（カード 288px + 本文との間隔 24px）。解放される幅の計算がこの値に一致する。 */
+  width: var(--cpa-wiki-aside-width);
+  max-width: none;
+  min-width: 0;
+  /* 操作行（閲覧・編集・履歴／言語ボタン）の高さの中央へ揃える。操作行の margin-top 22px に、
+     行の高さ 48px と言語ボタン 35px の差の半分（約 5px）を足した値で、閉じたカードが言語ボタンと同じ高さに並ぶ。
+     スクロールには追従させない（基本情報カードが同じ列へ張り出すため、sticky だと重なる）。 */
+  margin: 27px 0 0;
+  padding-inline-start: var(--cpa-wiki-aside-gap);
+  /* ページツールなどを右列に置く構成では、従来どおりスクロールに追従させる（基本情報の張り出し時だけ static にする。下の @media 内）。 */
+  position: sticky;
+  top: 24px;
+  align-self: start;
+}
+html.__cpa-wiki-modern .vector-column-end .vector-sticky-pinned-container { position: static; display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; max-height: none; }
+/* 外観パネルは閉じた折りたたみカードにする。カードの枠は details、中の nav は枠なしで受ける。 */
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display {
+  border: 1px solid var(--cpa-wiki-line);
+  border-radius: 14px;
+  background: var(--cpa-wiki-card);
+  font: 13px/1.5 system-ui, sans-serif;
+}
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display:not(:has(.vector-pinned-container > *)) { display: none; }
+/* 「表示パネルを隠す」が ON のときは、ページツールのピン留めで右列が残っていても空の「表示設定」見出しを出さない。 */
+html.__cpa-wiki-modern.__cpa-wiki-hide-appearance .vector-column-end .__cpa-wiki-display { display: none !important; }
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px;
+  color: var(--cpa-wiki-faint);
+  font-weight: 600;
   cursor: pointer;
   list-style: none;
 }
-html.__cpa-wiki-modern :is(.__cpa-wiki-actions, .__cpa-wiki-facts) > summary::-webkit-details-marker { display: none; }
-html.__cpa-wiki-modern :is(.__cpa-wiki-actions, .__cpa-wiki-facts) > summary::after {
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display > summary::-webkit-details-marker { display: none; }
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display > summary::after {
   content: "";
-  display: inline-block;
   width: 6px;
   height: 6px;
-  margin-inline-start: auto;
   border-inline-end: 1.5px solid currentColor;
   border-block-end: 1.5px solid currentColor;
   transform: rotate(45deg);
 }
-html.__cpa-wiki-modern :is(.__cpa-wiki-actions, .__cpa-wiki-facts)[open] > summary::after { transform: rotate(225deg); }
-html.__cpa-wiki-modern .__cpa-wiki-actions .vector-page-toolbar { margin-top: 8px; border-color: var(--cpa-wiki-border); }
-html.__cpa-wiki-modern #bodyContent { grid-area: bodyContent; min-width: 0; }
-html.__cpa-wiki-modern #content > #mw-content-text { grid-area: bodyContent; min-width: 0; }
-html.__cpa-wiki-modern #content > .vector-column-end { grid-area: columnEnd; min-width: 0; margin: 0; }
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display[open] > summary { color: var(--cpa-wiki-ink); }
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display[open] > summary::after { transform: rotate(225deg); }
+html.__cpa-wiki-modern .vector-column-end .__cpa-wiki-display > nav { padding: 0 16px 14px; }
+html.__cpa-wiki-modern .vector-column-end :is(#vector-appearance, .vector-pinnable-element, .vector-pinned-container, .vector-menu-content) { background-color: transparent; border: 0; padding-inline: 0; box-shadow: none; }
+html.__cpa-wiki-modern .vector-column-end .vector-pinned-container { margin: 0; }
+/* ラジオ（テキスト・幅・色）は項目ごとに横へ並べ、パネル全体の高さを抑える。 */
+html.__cpa-wiki-modern .vector-column-end .vector-menu-content form { display: flex; flex-wrap: wrap; gap: 2px 16px; padding: 4px 0 2px; }
+html.__cpa-wiki-modern .vector-column-end .cdx-radio { min-height: 0; }
+html.__cpa-wiki-modern .vector-column-end .cdx-radio__label { padding-bottom: 0; }
+html.__cpa-wiki-modern .vector-column-end :is(.vector-pinnable-header, .vector-pinnable-header-label) { color: var(--cpa-wiki-ink); font-weight: 650; }
+html.__cpa-wiki-modern .vector-column-end .vector-pinnable-header { margin-bottom: 8px; padding: 0; border: 0; }
+html.__cpa-wiki-modern .vector-column-end .vector-menu-heading { padding-inline: 0; color: var(--cpa-wiki-faint); font-size: 12px; }
+html.__cpa-wiki-modern .vector-column-end .vector-menu-content-list { margin: 0; }
+html.__cpa-wiki-modern .vector-column-end .vector-pinnable-header-unpin-button { color: var(--cpa-wiki-link); border-radius: 999px; }
+/* 表示パネルを隠し、右列にほかのページツールも無いときは列を畳んで本文へ幅を返す（解放幅 = 列 + 間隔）。 */
 html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) {
-  grid-template-columns: minmax(0, 1fr) 0 !important;
-  column-gap: 0 !important;
+  grid-template-columns: minmax(0, 1fr) auto 0 !important;
 }
 html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) > .vector-column-end { display: none !important; }
+/* 本文を指定幅に収める設定では、解放した幅を使わない。 */
 html.__cpa-wiki-modern.__cpa-wiki-hide-appearance.__cpa-wiki-narrow #content:not(:has(#vector-page-tools-pinned-container > *)) {
   max-width: var(--cpa-wiki-width) !important;
-  padding: 0 !important;
-  margin: 0 !important;
 }
+
+/* ---------- 本文 ---------- */
+html.__cpa-wiki-modern #mw-content-text { font-size: var(--cpa-wiki-size); container: cpa-wiki-body / inline-size; }
+/* 本文列が狭いとき（1280px 前後など）は、右寄せの図版を小さくして、導入段落が図版の横で細い列に押し込まれないようにする。
+   画面幅ではなく本文列の幅で判定する（記事幅の設定や右列の有無で本文列の幅が変わるため）。基本情報カードは対象外。 */
+@container cpa-wiki-body (max-width: 719.98px) {
+  html.__cpa-wiki-modern .mw-parser-output :is(figure[typeof~="mw:File/Thumb"], figure[typeof~="mw:File/Frame"], .thumb .thumbinner):not(.__cpa-wiki-facts) { max-width: 220px; }
+  html.__cpa-wiki-modern .mw-parser-output :is(figure[typeof~="mw:File/Thumb"], figure[typeof~="mw:File/Frame"], .thumbinner) img:not(.mwe-math-fallback-image-inline) { max-width: 100%; height: auto; }
+}
+html.__cpa-wiki-modern #mw-content-text .mw-parser-output > :is(p, ul, ol, dl) { margin-block-end: 1em; }
+/* 見出しは下罫線ではなく、余白と大きさで区切る。 */
+html.__cpa-wiki-modern #mw-content-text .mw-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 2.4em 0 .7em; padding: 0; border: 0; }
+html.__cpa-wiki-modern #mw-content-text :is(h2, h3, h4) { margin: 0; padding: 0; border: 0; font-weight: 700; letter-spacing: -.01em; }
+html.__cpa-wiki-modern #mw-content-text h2 { font-size: 1.62em; line-height: 1.32; }
+html.__cpa-wiki-modern #mw-content-text h3 { font-size: 1.24em; line-height: 1.4; }
+html.__cpa-wiki-modern #mw-content-text h4 { font-size: 1.06em; line-height: 1.45; }
+html.__cpa-wiki-modern #mw-content-text :is(.mw-parser-output > h2, section > h2, .mw-parser-output > h3, section > h3) { margin-block: 2em .6em; }
+html.__cpa-wiki-modern #mw-content-text .mw-heading3 { margin-block-start: 1.9em; }
+html.__cpa-wiki-modern #mw-content-text .mw-heading4 { margin-block-start: 1.6em; }
+/* [編集] は控えめな小さな丸いリンクにする。括弧は付けず、見出しの横で薄く表示する。 */
+html.__cpa-wiki-modern #mw-content-text .mw-editsection { margin: 0; font: 500 11.5px/1.4 system-ui, sans-serif; color: var(--cpa-wiki-faint); }
+html.__cpa-wiki-modern #mw-content-text .mw-editsection :is(.mw-editsection-bracket, .mw-editsection-divider) { display: none; }
+html.__cpa-wiki-modern #mw-content-text .mw-editsection a::before,
+html.__cpa-wiki-modern #mw-content-text .mw-editsection a::after { content: none; }
+html.__cpa-wiki-modern #mw-content-text .mw-editsection a { display: inline-block; padding: 2px 9px; border: 1px solid var(--cpa-wiki-line); border-radius: 999px; color: var(--cpa-wiki-muted); text-decoration: none; }
+html.__cpa-wiki-modern #mw-content-text .mw-editsection a:is(:hover, :focus-visible) { background: var(--cpa-wiki-tint); border-color: transparent; color: var(--cpa-wiki-link); }
+/* 冒頭の案内（他用途の hatnote）は面のある小さな注記にする。 */
+html.__cpa-wiki-modern #mw-content-text .hatnote { margin: 0 0 18px; padding: 10px 16px; border: 1px solid var(--cpa-wiki-line); border-radius: 12px; background: var(--cpa-wiki-card); color: var(--cpa-wiki-muted); font-size: .88em; font-style: normal; line-height: 1.6; }
+html.__cpa-wiki-modern #mw-content-text :is(.pathnavbox, .ambox, .side-box, .tmbox, .ombox, .cmbox) { border-radius: 12px; }
+/* 姉妹プロジェクト等の小さな案内箱は固定の白背景なので、独自テーマでは淡い面にそろえる（元の配色では触らない）。 */
+html.__cpa-wiki-modern:not([data-cpa-wiki-theme="original"]) #mw-content-text :is(.side-box, .tmbox, .ombox, .cmbox) {
+  background-color: var(--cpa-wiki-card) !important;
+  color: var(--cpa-wiki-ink) !important;
+  border-color: var(--cpa-wiki-line) !important;
+}
+/* 図版: 灰色の枠と背景を外し、角丸の画像＋控えめなキャプションにする。 */
+html.__cpa-wiki-modern #mw-content-text :is(.thumbinner, figure[typeof~="mw:File/Thumb"], figure[typeof~="mw:File/Frame"]) {
+  border: 0;
+  background: transparent !important;
+  padding: 0;
+  font-size: 1em;
+}
+html.__cpa-wiki-modern #mw-content-text :is(figure, .thumbinner) img:not(.mwe-math-fallback-image-inline) { border: 0; border-radius: 12px; }
+html.__cpa-wiki-modern #mw-content-text :is(figure, .thumbinner) :is(figcaption, .thumbcaption) { padding: 8px 2px 0; border: 0; background: transparent; color: var(--cpa-wiki-muted); font-size: .82em; line-height: 1.55; text-align: start; }
+html.__cpa-wiki-modern #mw-content-text :is(figure, .thumb) .magnify { display: none; }
+/* 表: 角丸の枠、見出しは淡色。罫線は内側の区切りだけにして軽くする。 */
+html.__cpa-wiki-modern #mw-content-text table.wikitable {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--cpa-wiki-line);
+  border-radius: 12px;
+  overflow: clip;
+  background: var(--cpa-wiki-panel);
+  font-size: .92em;
+}
+/* 本文列より広い表は列からはみ出さず、表の中で横スクロールする（右の基本情報カードや横スクロールバーへ重ねない）。 */
+html.__cpa-wiki-modern #mw-content-text table.wikitable:not(table table) { display: block; width: max-content; max-width: 100%; overflow-x: auto; }
+html.__cpa-wiki-modern #mw-content-text table.wikitable > :is(thead, tbody, tfoot) > tr > :is(th, td) {
+  padding: .55em .85em;
+  border: 0;
+  border-inline-end: 1px solid var(--cpa-wiki-line);
+  border-block-end: 1px solid var(--cpa-wiki-line);
+}
+html.__cpa-wiki-modern #mw-content-text table.wikitable > :is(thead, tbody, tfoot) > tr > :last-child { border-inline-end: 0; }
+html.__cpa-wiki-modern #mw-content-text table.wikitable > :last-child > tr:last-child > :is(th, td) { border-block-end: 0; }
+html.__cpa-wiki-modern #mw-content-text table.wikitable > :is(thead, tbody, tfoot) > tr > th { background-color: var(--cpa-wiki-card); font-weight: 650; }
+/* 関連記事・カテゴリ・脚注一覧も同じ言語（角丸・淡い面・細い線）にそろえる。 */
+html.__cpa-wiki-modern #mw-content-text .navbox { margin-block: 2.2em 0; padding: 0; border: 1px solid var(--cpa-wiki-line); border-radius: 14px; overflow: clip; }
+html.__cpa-wiki-modern #mw-content-text .navbox-inner { border: 0; }
+html.__cpa-wiki-modern #mw-content-text .navbox + .navbox { margin-block-start: 12px; }
+html.__cpa-wiki-modern #catlinks { margin: 28px 0 0; padding: 12px 18px; border: 1px solid var(--cpa-wiki-line); border-radius: 14px; background: var(--cpa-wiki-card); font-size: 13px; }
+html.__cpa-wiki-modern #mw-content-text :is(.references, .reflist) { color: var(--cpa-wiki-muted); }
+
+/* ---------- 基本情報カード ---------- */
+/* 広い画面では導入部の右へ浮かぶカード。元の infobox の位置にあるので、本文列の中に置く構成では導入文が横へ回り込む
+   （右列へ張り出す構成は「画面幅ごとの配置」の手前の @media (min-width: 1280px) を参照）。 */
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts {
   box-sizing: border-box;
-  float: none;
-  clear: both;
-  width: 100%;
-  max-width: 100%;
-  margin: 24px 0;
-  border: 1px solid var(--cpa-wiki-border);
-  border-radius: var(--cpa-wiki-radius);
-  background: var(--cpa-wiki-soft);
+  float: inline-end;
+  clear: inline-end;
+  width: clamp(268px, 38%, 340px);
+  margin: 4px 0 24px 32px;
+  margin-inline: 32px 0;
+  border: 1px solid var(--cpa-wiki-line);
+  border-radius: 16px;
+  background: var(--cpa-wiki-card);
   overflow: clip;
   font-size: .875em;
+  line-height: 1.55;
 }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > summary {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  font-weight: 650;
-  cursor: pointer;
+  padding: 13px 16px;
   list-style: none;
-  border-bottom: 1px solid var(--cpa-wiki-border);
+  cursor: pointer;
+  color: var(--cpa-wiki-ink);
+  font: 650 14px/1.4 system-ui, sans-serif;
 }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts[open] > summary { border-bottom: 1px solid var(--cpa-wiki-line); }
+html.__cpa-wiki-modern .__cpa-wiki-facts > summary::-webkit-details-marker { display: none; }
+html.__cpa-wiki-modern .__cpa-wiki-facts > summary::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: auto;
+  border-inline-end: 1.5px solid currentColor;
+  border-block-end: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+html.__cpa-wiki-modern .__cpa-wiki-facts[open] > summary::after { transform: rotate(225deg); }
+html.__cpa-wiki-modern .__cpa-wiki-facts > summary:hover { background: var(--cpa-wiki-tint); }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox {
   float: none !important;
   box-sizing: border-box;
@@ -618,78 +893,170 @@ html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox {
   max-width: 100% !important;
   margin: 0 !important;
   border: 0;
+  border-radius: 0;
   border-spacing: 0;
   background: transparent;
   color: var(--cpa-wiki-ink);
   font-size: 1em;
-  line-height: 1.6;
+  line-height: 1.55;
 }
-html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox > tbody > tr > :is(th, td) { padding: 7px 12px; }
-html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox > tbody > tr > th {
-  background-color: var(--cpa-wiki-soft) !important;
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox > caption { padding: 14px 16px 6px; font-size: 1.12em; font-weight: 700; text-align: start; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox > tbody > tr > :is(th, td) { padding: 7px 14px; border-color: var(--cpa-wiki-line); overflow-wrap: anywhere; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox img { max-width: 100%; height: auto; }
+/* 区分見出し（背景色の付いた行）は、テーマのアクセント色の淡い面にそろえる。画像・グラフの色は触らない。 */
+html.__cpa-wiki-modern:not([data-cpa-wiki-theme="original"]) #mw-content-text .__cpa-wiki-facts > table.infobox > tbody > tr > :is(th, td):only-child[style*="background"] {
+  background-color: var(--cpa-wiki-tint) !important;
   color: var(--cpa-wiki-ink) !important;
 }
 html.__cpa-wiki-modern[data-cpa-wiki-article-style="text"] #mw-content-text .__cpa-wiki-facts { display: none !important; }
-/* 項目を読み順のまま段組みにし、長い値の横にも次の項目を詰めて表示する。 */
+/* 通常の項目／値の表は、行ごとに「ラベル｜値」の2列にして余白を抑える。 */
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox { display: block; }
-html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > caption {
-  display: block; text-align: start; padding: 14px 16px 0; font-size: 1.1em;
-}
-html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody {
-  display: block; columns: 2 280px; column-gap: 24px; padding: 12px 16px 16px;
-}
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > caption { display: block; }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody { display: block; padding: 4px 16px 12px; }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr {
-  display: grid; grid-template-columns: minmax(80px, 30%) minmax(0, 1fr);
-  gap: 12px; break-inside: avoid; padding: 8px 0; border-bottom: 1px solid var(--cpa-wiki-border);
+  display: grid;
+  grid-template-columns: minmax(70px, 34%) minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--cpa-wiki-line);
 }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr:last-child { border-bottom: 0; }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > :is(th, td) {
-  display: block; min-width: 0; width: auto !important; padding: 0; white-space: normal !important; overflow-wrap: anywhere;
+  display: block; min-width: 0; width: auto !important; padding: 0; border: 0; white-space: normal !important; overflow-wrap: anywhere;
 }
+html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > th { background: none !important; color: var(--cpa-wiki-muted) !important; font-weight: 600; text-align: start; }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > :only-child { grid-column: 1 / -1; text-align: start !important; }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr:has(> td > hr) { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr > td > :is(p, ul, ol, dl) { margin-block: 0 6px; }
 html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox hr { margin-block: 6px; }
-html.__cpa-wiki-modern .__cpa-wiki-footer {
-  border-top: 1px solid var(--cpa-wiki-border);
-  padding: 24px var(--cpa-wiki-page-padding);
+
+/* 広い画面（右列がある幅）: 基本情報カードを導入部の位置のまま右列へ張り出す。
+   本文列は基本情報の分だけ狭めない。カードは右列の幅（288px）で、右端は上部バー・操作行の右端と揃う。
+   カードは float ではなく position: absolute にする（縦位置は top: auto で元の位置＝導入部の高さ、横位置は本文の右端から右列へ）。
+   float のままだと右寄せ図版の clear や並びに干渉して本文列を食い潰すため、流れから完全に外して図版は従来どおり縦に積む。
+   導入文は回り込まず、本文列いっぱいに流れる。
+   次の場合は従来どおり本文列の中へ浮かべる: 表示パネルを隠して列を畳んだ時（hideAppearance）、
+   本文を指定幅に収める設定（narrowContent）、右列にピン留めしたページツールがある時、1280px 未満（列自体が本文の下へ移る）。
+   下のブロックは、その「張り出す」状態（右列に表示設定カードだけがある状態）にだけ適用する。 */
+@media (min-width: 1280px) {
+  html.__cpa-wiki-modern:not(.__cpa-wiki-hide-appearance, .__cpa-wiki-narrow) #content:not(:has(#vector-page-tools-pinned-container > *)) #mw-content-text { position: relative; }
+  html.__cpa-wiki-modern:not(.__cpa-wiki-hide-appearance, .__cpa-wiki-narrow) #content:not(:has(#vector-page-tools-pinned-container > *)) #mw-content-text .__cpa-wiki-facts {
+    position: absolute;
+    inset-inline-end: calc(var(--cpa-wiki-aside-width) * -1);
+    top: auto;
+    width: var(--cpa-wiki-aside-card);
+    margin: 4px 0 24px;
+  }
+  /* 右列は表示設定カードを閉じたまま最上段に置き、スクロールには追従させない（基本情報が同じ列へ張り出すため、sticky だと重なる）。
+     開いたパネルは下の基本情報を押し下げず、重ねて表示する。 */
+  html.__cpa-wiki-modern:not(.__cpa-wiki-hide-appearance, .__cpa-wiki-narrow) #content:not(:has(#vector-page-tools-pinned-container > *)) > .vector-column-end { position: static; contain: none; }
+  /* Vector は右列に contain: paint、固定コンテナに overflow を付けており、重ねて開くパネルが列の高さで切れてしまう。 */
+  html.__cpa-wiki-modern:not(.__cpa-wiki-hide-appearance, .__cpa-wiki-narrow) #content:not(:has(#vector-page-tools-pinned-container > *)) .vector-sticky-pinned-container { overflow: visible; }
+  html.__cpa-wiki-modern:not(.__cpa-wiki-hide-appearance, .__cpa-wiki-narrow) #content:not(:has(#vector-page-tools-pinned-container > *)) .vector-column-end .__cpa-wiki-display { position: relative; }
+  html.__cpa-wiki-modern:not(.__cpa-wiki-hide-appearance, .__cpa-wiki-narrow) #content:not(:has(#vector-page-tools-pinned-container > *)) .vector-column-end .__cpa-wiki-display[open] > nav {
+    position: absolute;
+    inset-inline: -1px;
+    top: calc(100% + 8px);
+    z-index: 10;
+    box-sizing: border-box;
+    padding: 14px 16px 16px;
+    border: 1px solid var(--cpa-wiki-line);
+    border-radius: 14px;
+    background: var(--cpa-wiki-panel);
+    box-shadow: 0 12px 36px color-mix(in srgb, var(--cpa-wiki-ink) 16%, transparent);
+  }
 }
-html.__cpa-wiki-modern .__cpa-wiki-footer #footer { max-width: 1512px; margin-inline: auto; padding: 0; color: var(--cpa-wiki-ink); }
+
+/* ---------- フッター（帰属・ライセンス） ---------- */
+html.__cpa-wiki-modern .__cpa-wiki-footer { border-top: 1px solid var(--cpa-wiki-line); }
+html.__cpa-wiki-modern .__cpa-wiki-footer #footer { border-top: 0; }
+html.__cpa-wiki-modern .__cpa-wiki-footer #footer li { font-size: 13px; line-height: 1.8; }
+html.__cpa-wiki-modern .__cpa-wiki-footer #footer {
+  box-sizing: border-box;
+  max-width: var(--cpa-wiki-frame);
+  margin-inline: auto;
+  padding: 32px var(--cpa-wiki-page-padding) 56px;
+  color: var(--cpa-wiki-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
 /* ネイティブ検索・言語・編集の操作欄も、記事と同じテーマへ追従させる。 */
 html.__cpa-wiki-modern .__cpa-wiki-shell :is(.vector-menu-content, .vector-dropdown-content, .vector-main-menu, .vector-appearance, .vector-page-tools) {
   background-color: var(--cpa-wiki-panel);
   color: var(--cpa-wiki-ink);
-  border-color: var(--cpa-wiki-border);
+  border-color: var(--cpa-wiki-line);
 }
 html.__cpa-wiki-modern .__cpa-wiki-shell :is(.vector-menu-content, .vector-page-titlebar, .vector-page-toolbar, .__cpa-wiki-footer) a:not(.new) { color: var(--cpa-wiki-link); }
+html.__cpa-wiki-modern .__cpa-wiki-shell .vector-page-toolbar .vector-menu-tabs li a { color: var(--cpa-wiki-muted); }
+html.__cpa-wiki-modern .__cpa-wiki-shell .vector-page-toolbar .vector-menu-tabs li.selected a { color: var(--cpa-wiki-link); }
+html.__cpa-wiki-modern .__cpa-wiki-shell .vector-page-toolbar .vector-menu-tabs li a:hover { color: var(--cpa-wiki-link); }
 html.__cpa-wiki-modern .__cpa-wiki-shell :is(summary, button, input, a):focus-visible { outline: 2px solid var(--cpa-wiki-link); outline-offset: 3px; }
-@media (max-width: 1100px) {
-  html.__cpa-wiki-modern { --cpa-wiki-page-padding: 24px; }
-  html.__cpa-wiki-modern .__cpa-wiki-reading-grid { grid-template-columns: 176px minmax(0, 1fr); gap: 24px; }
-  html.__cpa-wiki-modern #content { grid-template-columns: minmax(0, 1fr) !important; grid-template-areas: "articleTitle" "articleHeader" "bodyContent" "columnEnd"; }
-  html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) { grid-template-columns: minmax(0, 1fr) !important; }
+
+/* ---------- 画面幅ごとの配置 ---------- */
+/* 1280px 未満: 表示パネルの列を持たず、本文の下へ置く（本文が狭くなりすぎないように）。 */
+@media (max-width: 1279.98px) {
+  html.__cpa-wiki-modern #content,
+  html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas: "title title" "desc desc" "tools lang" "body body" "aside aside";
+    max-width: calc(var(--cpa-wiki-width) + var(--cpa-wiki-aside-width)) !important;
+  }
+  html.__cpa-wiki-modern.__cpa-wiki-narrow #content { max-width: var(--cpa-wiki-width) !important; }
+  html.__cpa-wiki-modern #content > .vector-column-end { position: static; width: auto; padding: 0; margin-top: 40px; }
+  html.__cpa-wiki-modern .vector-column-end .vector-sticky-pinned-container { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+  html.__cpa-wiki-modern .vector-column-end nav:has(.vector-pinned-container > *) { flex: 1 1 240px; max-width: 360px; }
 }
-@media (max-width: 760px) {
-  html.__cpa-wiki-modern { --cpa-wiki-page-padding: 16px; }
-  html.__cpa-wiki-modern .__cpa-wiki-reading-grid { grid-template-columns: minmax(0, 1fr); padding-block: 16px 32px; gap: 20px; }
-  html.__cpa-wiki-modern .__cpa-wiki-rail { position: static; max-height: none; overflow: visible; }
-  html.__cpa-wiki-modern .__cpa-wiki-site-menu { margin-bottom: 0 !important; }
-  html.__cpa-wiki-modern .__cpa-wiki-toc nav { max-height: 40vh; overflow-y: auto; }
-  html.__cpa-wiki-modern #content { grid-column: 1; grid-row: 2; padding: 0 !important; row-gap: 20px; }
-  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts { margin: 16px 0 24px; }
+/* 1000px 未満: 左レールが無くなり1列。目次は右下のボタンになる。 */
+@media (max-width: 999.98px) {
+  html.__cpa-wiki-modern { --cpa-wiki-page-padding: 20px; }
+  html.__cpa-wiki-modern .__cpa-wiki-topbar :is(.vector-header, .mw-header) { min-height: 60px; gap: 12px; }
+  html.__cpa-wiki-modern .__cpa-wiki-reading-grid { grid-template-columns: minmax(0, 1fr); padding-block: 22px 96px; }
+  html.__cpa-wiki-modern .__cpa-wiki-site-menu { margin-bottom: 20px; }
+  html.__cpa-wiki-modern #content { grid-column: 1; grid-row: auto; }
+  html.__cpa-wiki-modern { --cpa-wiki-title-size: clamp(30px, 8.4vw, 40px); }
+  html.__cpa-wiki-modern .__cpa-wiki-description { font-size: 16px; }
+  html.__cpa-wiki-modern #bodyContent { margin-top: 24px; }
+  /* 基本情報は閉じたカードとして本文の流れに入れる（開くと全幅）。 */
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts { float: none; clear: both; width: auto; margin: 4px 0 24px; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody { columns: 2 260px; column-gap: 28px; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody > tr { break-inside: avoid; }
+}
+/* Vector は 640px 未満で閲覧・編集・履歴を「ツール」メニューへ移す。空になった枠は出さない。 */
+@media (max-width: 639.98px) {
+  html.__cpa-wiki-modern .vector-page-toolbar #p-views { display: none; }
+  html.__cpa-wiki-modern .vector-page-toolbar-container { justify-content: flex-start; }
+}
+@media (max-width: 759.98px) {
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-start { gap: 8px; }
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .mw-logo-wordmark { height: 16px; }
+  html.__cpa-wiki-modern .__cpa-wiki-topbar .vector-header-end { flex: 1; margin-inline-start: auto; gap: 12px; }
+  /* 操作行と言語ボタンは横に並べる幅が無いので、1列に積む（操作行 → 言語）。 */
+  html.__cpa-wiki-modern #content,
+  html.__cpa-wiki-modern.__cpa-wiki-hide-appearance #content:not(:has(#vector-page-tools-pinned-container > *)) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "title" "desc" "tools" "lang" "body" "aside";
+  }
+  html.__cpa-wiki-modern #content > .vector-page-titlebar > #p-lang-btn { margin-top: 12px; justify-self: start; }
+  /* 言語ボタンを左端へ置くので、一覧もボタンの始端から開き、画面外へはみ出さないようにする。 */
+  html.__cpa-wiki-modern #p-lang-btn .vector-dropdown-content { inset-inline-start: 0; inset-inline-end: auto; }
+  html.__cpa-wiki-modern #content > .vector-page-toolbar { margin-top: 16px; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox > tbody { columns: auto; padding-inline: 14px; }
   html.__cpa-wiki-modern #mw-content-text :is(table, .clade-gallery, .navbox, .gallery):not(table table) { display: block; max-width: 100% !important; overflow-x: auto; }
   html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts > table.infobox { display: table; }
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts-compact > table.infobox { display: block; }
 }
 @media (prefers-reduced-motion: reduce) {
   html.__cpa-wiki-modern { scroll-behavior: auto !important; }
   html.__cpa-wiki-modern .__cpa-wiki-shell { animation: none; transition: none; }
 }
 @media print {
-  html.__cpa-wiki-modern .__cpa-wiki-shell :is(.__cpa-wiki-topbar, .__cpa-wiki-rail, .__cpa-wiki-actions, .vector-column-end) { display: none !important; }
+  html.__cpa-wiki-modern .__cpa-wiki-shell :is(.__cpa-wiki-topbar, .__cpa-wiki-rail, .vector-page-toolbar, .vector-column-end) { display: none !important; }
   html.__cpa-wiki-modern .__cpa-wiki-reading-grid,
   html.__cpa-wiki-modern #content { display: block; max-width: none !important; padding: 0 !important; }
   html.__cpa-wiki-modern .__cpa-wiki-shell { min-height: 0; }
-  html.__cpa-wiki-modern .__cpa-wiki-footer { padding-inline: 0; }
-  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts { break-inside: avoid; }
+  html.__cpa-wiki-modern .__cpa-wiki-footer #footer { padding-inline: 0; }
+  /* 張り出し用の負のマージンも含め、印刷では本文の流れへ戻す。 */
+  html.__cpa-wiki-modern #mw-content-text .__cpa-wiki-facts { position: static !important; float: none !important; width: auto !important; margin-inline: 0 !important; break-inside: avoid; }
 }
 
 /* 旧テーマは、保存済み設定とバックアップを表示するために残す。 */

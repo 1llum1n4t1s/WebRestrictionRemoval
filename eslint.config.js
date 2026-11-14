@@ -22,6 +22,7 @@ const ACTIONS_GLOBALS = {
   SenderCheck: "readonly",
   Offscreen: "readonly",
   StorageKeys: "readonly",
+  Localizer: "readonly",
   YouTubeShorts: "readonly",
   SearchFixer: "readonly",
   AmazonDeliveryTotal: "readonly",

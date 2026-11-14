@@ -1,0 +1,1699 @@
+{
+  "settingsSyncTitle": {
+    "message": "在多台电脑间同步设置"
+  },
+  "settingsSyncDescription": {
+    "message": "在每台电脑上，请在同一浏览器中登录同一账号，在浏览器中启用扩展同步，并开启此选项。启用时以已同步的设置为准；之后发生冲突时，每项设置以更新信息较新者为准。Chrome 与 Firefox 之间无法互相同步。认证信息、目标账号、颜色历史和面板位置仅保留在本机。关闭此选项不会删除云端数据。"
+  },
+  "settingsSyncOff": {
+    "message": "同步已关闭。设置保存在本机。"
+  },
+  "settingsSyncWorking": {
+    "message": "正在检查已同步的设置…"
+  },
+  "settingsSyncReady": {
+    "message": "已保存到浏览器同步存储。其他电脑可能需要一些时间才能收到更改。"
+  },
+  "settingsSyncError": {
+    "message": "同步失败。本地设置已保留。请检查浏览器同步与存储限制后重试。设置和保留的删除记录可能超出同步配额。"
+  },
+  "settingsSyncRetry": {
+    "message": "重试同步"
+  },
+  "appName": {
+    "message": "Vuora",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
+  },
+  "appDescription": {
+    "message": "为 YouTube、Wikipedia、社交媒体和购物页面提供本地阅读与音频工具。",
+    "description": "Short description (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "Vuora",
+    "description": "Hover tooltip on the toolbar icon"
+  },
+  "headerTitle": {
+    "message": "Vuora",
+    "description": "h1 in the popup header"
+  },
+  "headerTagline": {
+    "message": "增强、精简、持久——一个面板全搞定",
+    "description": "Tagline shown beneath the popup header"
+  },
+  "categorySelectorLabel": {
+    "message": "分类"
+  },
+  "tabbarAriaLabel": {
+    "message": "要显示的分类"
+  },
+  "tabTune": {
+    "message": "调整"
+  },
+  "tabYoutube": {
+    "message": "YouTube"
+  },
+  "tabInstagram": {
+    "message": "Instagram"
+  },
+  "tabTiktok": {
+    "message": "TikTok"
+  },
+  "tabX": {
+    "message": "X"
+  },
+  "tabPicker": {
+    "message": "取色器"
+  },
+  "groupAudio": {
+    "message": "音频"
+  },
+  "groupVideo": {
+    "message": "视频"
+  },
+  "groupAmazon": {
+    "message": "Amazon"
+  },
+  "volumeBoosterMaster": {
+    "message": "音量增强器"
+  },
+  "volumeBoosterMasterDesc": {
+    "message": "放大并调节标签页音频。切换标签页时自动应用设置。"
+  },
+  "volumeSubLabel": {
+    "message": "音量增强器"
+  },
+  "volumeSubDesc": {
+    "message": "请将播放器音量设为 100%，再在此处调节，效果最佳。"
+  },
+  "volumeMesFirefoxNote": {
+    "message": "Firefox 版通过页面内处理（MediaElementSource）增强音频，设置会自动应用于所有标签页。不支持受 DRM 保护的视频（Netflix、Prime Video 等）。"
+  },
+  "volumeReset100Btn": {
+    "message": "重置为 100%"
+  },
+  "volumeReset100Aria": {
+    "message": "将音量重置为 100%"
+  },
+  "volumeStepDownAria": {
+    "message": "音量减小 10%"
+  },
+  "volumeStepDownTitle": {
+    "message": "音量减小 10%"
+  },
+  "volumeStepUpAria": {
+    "message": "音量增大 10%"
+  },
+  "volumeStepUpTitle": {
+    "message": "音量增大 10%"
+  },
+  "volumeMuteAriaOff": {
+    "message": "静音"
+  },
+  "volumeMuteAriaOn": {
+    "message": "取消静音"
+  },
+  "volumeMuteTitleOff": {
+    "message": "静音（保留音量）"
+  },
+  "volumeMuteTitleOn": {
+    "message": "取消静音（恢复音量）"
+  },
+  "volumeAntiClipLabel": {
+    "message": "自动失真防护"
+  },
+  "volumeAntiClipDesc": {
+    "message": "抑制突然的喊叫声和音效峰值，减少增强音量时的削波。"
+  },
+  "volumeNightModeLabel": {
+    "message": "夜间模式"
+  },
+  "volumeNightModeDesc": {
+    "message": "适度压缩大声的人声和爆炸声，避免安静的游戏音频被淹没。"
+  },
+  "volumeBassCutLabel": {
+    "message": "防扰邻低音"
+  },
+  "volumeBassCutDesc": {
+    "message": "削减深沉低音，避免低频穿墙透地打扰邻居。"
+  },
+  "volumeEqLabel": {
+    "message": "均衡器"
+  },
+  "volumeEqDesc": {
+    "message": "通过 10 段均衡器调节各频段。可增强低音或高音，也可选择预设。"
+  },
+  "volumeEqPresetLabel": {
+    "message": "预设"
+  },
+  "volumeEqPreamp": {
+    "message": "前置放大"
+  },
+  "volumeEqPresetFlat": {
+    "message": "平直"
+  },
+  "volumeEqPresetBass": {
+    "message": "低音增强"
+  },
+  "volumeEqPresetTreble": {
+    "message": "高音增强"
+  },
+  "volumeEqPresetVocal": {
+    "message": "人声"
+  },
+  "volumeEqPresetLoudness": {
+    "message": "响度"
+  },
+  "volumeEqPresetEargasm": {
+    "message": "耳朵高潮爆发"
+  },
+  "volumeEqPresetEargasmKai": {
+    "message": "耳朵高潮爆发 改"
+  },
+  "volumeEqPresetPerfect": {
+    "message": "完美"
+  },
+  "volumeEqPresetPerfectKai": {
+    "message": "完美 改"
+  },
+  "volumeEqPresetCustom": {
+    "message": "自定义"
+  },
+  "videoGammaMaster": {
+    "message": "视频伽马"
+  },
+  "videoGammaMasterDescPre": {
+    "message": "对页面中的 "
+  },
+  "videoGammaMasterDescPost": {
+    "message": " 元素应用伽马校正。可提亮较暗的视频，柔化过亮的视频。"
+  },
+  "videoGammaSubLabel": {
+    "message": "伽马值"
+  },
+  "videoGammaSubDesc": {
+    "message": "1.0 表示不校正。低于 1.0 提亮暗部（更亮）；高于 1.0 增强对比度（更暗）。"
+  },
+  "videoGammaResetBtn": {
+    "message": "重置为 1.0"
+  },
+  "videoGammaResetAria": {
+    "message": "将伽马重置为 1.0"
+  },
+  "videoFillMaster": {
+    "message": "去除视频黑边"
+  },
+  "videoFillMasterDesc": {
+    "message": "通过缩放或拉伸视频以填满屏幕，去除超宽屏上的上下/左右黑边。"
+  },
+  "videoFillModeLabel": {
+    "message": "显示模式"
+  },
+  "videoFillModeAriaLabel": {
+    "message": "选择显示模式"
+  },
+  "videoFillModeZoom": {
+    "message": "缩放"
+  },
+  "videoFillModeStretch": {
+    "message": "拉伸"
+  },
+  "videoFillTargetLabel": {
+    "message": "你的显示器"
+  },
+  "videoFillTargetDesc": {
+    "message": "选择屏幕的宽高比或分辨率；会自动检测每个视频的画面比例并去除黑边。"
+  },
+  "videoFillGroupAspect": {
+    "message": "宽高比"
+  },
+  "videoFillGroupResolution": {
+    "message": "分辨率"
+  },
+  "loupeMaster": {
+    "message": "放大镜"
+  },
+  "loupeMasterDesc": {
+    "message": "用圆形镜头放大当前画面。建议在暂停视频后使用。左键单击可关闭。"
+  },
+  "loupeZoomLabel": {
+    "message": "缩放"
+  },
+  "loupeZoomAriaLabel": {
+    "message": "选择缩放级别"
+  },
+  "loupeSizeLabel": {
+    "message": "镜头大小"
+  },
+  "loupeSizeDesc": {
+    "message": "在 150 至 1000 px 之间调整镜头直径。"
+  },
+  "loupeErrorInvalidTab": {
+    "message": "⚠ 无法读取标签页"
+  },
+  "loupeErrorUnsupportedPage": {
+    "message": "⚠ 此页面无法使用放大镜"
+  },
+  "loupeErrorPermission": {
+    "message": "⚠ 权限错误"
+  },
+  "loupeErrorQuota": {
+    "message": "⚠ 已超出截取频率限制"
+  },
+  "loupeErrorUnknown": {
+    "message": "⚠ 无法启动放大镜"
+  },
+  "amazonDeliveryMaster": {
+    "message": "Subscribe & Save 月度合计"
+  },
+  "amazonDeliveryMasterDescPre": {
+    "message": "在 "
+  },
+  "amazonDeliveryMasterDescPost": {
+    "message": " 页面显示按月合计。价格缺失时，从 Amazon 获取当前 Subscribe & Save 价格；无法获取时使用上次配送的单价。"
+  },
+  "amazonRankingJumpMaster": {
+    "message": "跳转排名按钮"
+  },
+  "amazonRankingJumpMasterDesc": {
+    "message": "在商品页顶部显示“前往该商品排名”按钮。",
+    "description": "Master toggle description for the Amazon jump-to-ranking button"
+  },
+  "amazonRankingJumpButton": {
+    "message": "前往该商品排名"
+  },
+  "amazonRankingJumpAriaLabel": {
+    "message": "前往该商品排名"
+  },
+  "amazonMerchantInfoMaster": {
+    "message": "卖家/发货方标识"
+  },
+  "amazonMerchantInfoMasterDesc": {
+    "message": "在商品页顶部显示卖家/发货方标识（亚马逊自营发货 = 绿色 / 第三方卖家 = 橙色警告）。",
+    "description": "Master toggle description for the Amazon seller / shipper badge"
+  },
+  "amazonMerchantInfoSoldBy": {
+    "message": "销售"
+  },
+  "amazonMerchantInfoShipsFrom": {
+    "message": "发货"
+  },
+  "amazonMerchantInfoAriaAmazon": {
+    "message": "亚马逊自营发货"
+  },
+  "amazonMerchantInfoAriaMarketplace": {
+    "message": "第三方卖家商品"
+  },
+  "amazonMerchantInfoAriaUnknown": {
+    "message": "卖家未确认"
+  },
+  "searchFixerMaster": {
+    "message": "YouTube 增强"
+  },
+  "searchFixerMasterDesc": {
+    "message": "一次管理 40 项子功能：移除 Shorts、过滤搜索干扰、清理观看页、隐藏评论、隐藏直播聊天、订阅增强、将视频发送到 Gemini Notebook 等。"
+  },
+  "instagramCleanerMaster": {
+    "message": "Instagram 清理器"
+  },
+  "instagramCleanerMasterDesc": {
+    "message": "一键隐藏 Reels、探索、快拍等冗余界面。"
+  },
+  "tiktokCleanerMaster": {
+    "message": "TikTok 清理器"
+  },
+  "tiktokCleanerMasterDesc": {
+    "message": "一键隐藏评论面板、推荐账号栏等冗余界面。"
+  },
+  "xCleanerMaster": {
+    "message": "X 清理器"
+  },
+  "xCleanerMasterDesc": {
+    "message": "一键隐藏右侧栏、广告、升级推广等干扰界面。"
+  },
+  "cleanerHint": {
+    "message": "仅在总开关（清理器）开启时生效。请选择需要的子功能。"
+  },
+  "pickerActivateJp": {
+    "message": "从屏幕上取色"
+  },
+  "pickerActivateEn": {
+    "message": "启动取色吸管"
+  },
+  "pickerNoteIdle": {
+    "message": "点击按钮即可拾取屏幕上的任意颜色（按 Esc 取消）。"
+  },
+  "specimenTitle": {
+    "message": "当前颜色"
+  },
+  "specimenPillEmpty": {
+    "message": "无"
+  },
+  "specimenNoEmpty": {
+    "message": "未保存"
+  },
+  "specimenNoSaved": {
+    "message": "历史 $NO$",
+    "placeholders": {
+      "no": {
+        "content": "$1",
+        "example": "01"
+      }
+    }
+  },
+  "specimenTimeEmpty": {
+    "message": "—"
+  },
+  "specimenTimeSaved": {
+    "message": "保存于 $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "12:34"
+      }
+    }
+  },
+  "copyBtnLabel": {
+    "message": "复制"
+  },
+  "copyBtnDone": {
+    "message": "已复制"
+  },
+  "copyHexAria": {
+    "message": "复制 HEX"
+  },
+  "copyRgbAria": {
+    "message": "复制 RGB"
+  },
+  "copyHslAria": {
+    "message": "复制 HSL"
+  },
+  "editHexAria": {
+    "message": "HEX 值（可编辑）"
+  },
+  "editRgbAria": {
+    "message": "RGB 值（可编辑）"
+  },
+  "editHslAria": {
+    "message": "HSL 值（可编辑）"
+  },
+  "valueEditHint": {
+    "message": "三个字段均可编辑。粘贴颜色代码即可立即预览，按 Enter 可保存到历史记录。"
+  },
+  "paletteTitle": {
+    "message": "调整颜色"
+  },
+  "paletteAreaAria": {
+    "message": "调整鲜艳度和亮度（方向键微调，Shift 加大步长）"
+  },
+  "paletteAxisHint": {
+    "message": "拖动调整——横向 = 鲜艳度 / 纵向 = 亮度"
+  },
+  "paletteSaturationLabel": {
+    "message": "鲜艳度"
+  },
+  "paletteBrightnessLabel": {
+    "message": "亮度"
+  },
+  "palettePercentValue": {
+    "message": "$VALUE$%",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "paletteHueLabel": {
+    "message": "色相"
+  },
+  "paletteHueAria": {
+    "message": "色相"
+  },
+  "palettePillValue": {
+    "message": "色相 $H$° / 鲜艳度 $S$% / 亮度 $V$%",
+    "placeholders": {
+      "h": {
+        "content": "$1",
+        "example": "213"
+      },
+      "s": {
+        "content": "$2",
+        "example": "45"
+      },
+      "v": {
+        "content": "$3",
+        "example": "55"
+      }
+    }
+  },
+  "paletteAddBtn": {
+    "message": "将此颜色保存到历史记录"
+  },
+  "paletteResetBtn": {
+    "message": "撤销调整"
+  },
+  "formatTitle": {
+    "message": "复制设置"
+  },
+  "formatLegend": {
+    "message": "自动复制使用的格式"
+  },
+  "formatRowAria": {
+    "message": "自动复制使用的格式"
+  },
+  "formatHashLabel": {
+    "message": "HEX 包含 #"
+  },
+  "formatNote": {
+    "message": "使用吸管取色或点击历史记录时，会按所选格式自动复制颜色。"
+  },
+  "historyTitle": {
+    "message": "历史记录"
+  },
+  "historyHint": {
+    "message": "点击颜色可将其设为当前颜色，并按下方设置的格式复制。"
+  },
+  "historyEmpty": {
+    "message": "暂无颜色。请用吸管取色，或粘贴颜色代码后按 Enter。"
+  },
+  "historyClearBtn": {
+    "message": "清空全部历史"
+  },
+  "extVersionAriaLabel": {
+    "message": "扩展版本"
+  },
+  "eyedropperUnsupported": {
+    "message": "不支持 EyeDropper API。请使用 Chrome 95 或更高版本。"
+  },
+  "pickerNoteActive": {
+    "message": "吸管已启动——点击屏幕任意位置（按 Esc 取消）"
+  },
+  "pickerNoteRetake": {
+    "message": "再次按下可继续取色。"
+  },
+  "pickerNoteCancelled": {
+    "message": "已取消取色。"
+  },
+  "pickerNoteFailed": {
+    "message": "取色失败，请重试。"
+  },
+  "pickerCopyOk": {
+    "message": "已取色——已复制 $FORMAT$：$TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "已取色——$FORMAT$：$TEXT$（复制失败）",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerInputInvalid": {
+    "message": "无法识别为颜色（例如 #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%)）。"
+  },
+  "pickerInputAdded": {
+    "message": "已将 $HEX$ 保存到历史记录",
+    "placeholders": {
+      "hex": {
+        "content": "$1",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "historyClearedToast": {
+    "message": "历史记录已清空。"
+  },
+  "pickerHistorySaveFailed": {
+    "message": "无法保存历史记录，请重试。"
+  },
+  "copyOkToast": {
+    "message": "已复制 $FORMAT$：$TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "copyFailToast": {
+    "message": "复制失败。"
+  },
+  "copyToast": {
+    "message": "$FORMAT$：$TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipAria": {
+    "message": "将 $HEX$ 设为当前颜色并复制",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      }
+    }
+  },
+  "pillTemplate": {
+    "message": "$ON$/$TOTAL$ 已启用",
+    "placeholders": {
+      "on": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "gridItemsLabel": {
+    "message": "首页列数"
+  },
+  "gridItemsDesc": {
+    "message": "固定首页和搜索结果网格每行显示的视频数（“自动”保持 YouTube 默认列数）。"
+  },
+  "gridAuto": {
+    "message": "自动（YouTube 默认）"
+  },
+  "grid4Cols": {
+    "message": "4 列"
+  },
+  "grid5Cols": {
+    "message": "5 列"
+  },
+  "grid6Cols": {
+    "message": "6 列"
+  },
+  "categoryMenuUi": {
+    "message": "菜单 / 界面"
+  },
+  "categoryVideoFilter": {
+    "message": "视频过滤"
+  },
+  "categoryWatchPage": {
+    "message": "观看页"
+  },
+  "categorySearchOnly": {
+    "message": "搜索结果"
+  },
+  "categoryIntegration": {
+    "message": "集成"
+  },
+  "nlmSendLabel": {
+    "message": "Gemini Notebook"
+  },
+  "nlmAccount": {
+    "message": "Google 账号"
+  },
+  "nlmAccountDefault": {
+    "message": "默认 (0)"
+  },
+  "nlmAccountNth": {
+    "message": "账号 {0}"
+  },
+  "nlmPickNotebook": {
+    "message": "目标笔记本"
+  },
+  "nlmNewNotebook": {
+    "message": "+ 新建笔记本"
+  },
+  "nlmLoading": {
+    "message": "正在加载笔记本…"
+  },
+  "nlmEmpty": {
+    "message": "没有现有笔记本"
+  },
+  "nlmSending": {
+    "message": "正在发送…"
+  },
+  "nlmSkipped": {
+    "message": "已跳过 {0} 项（来源数量上限）"
+  },
+  "nlmOpenNotebookLm": {
+    "message": "打开 Gemini Notebook"
+  },
+  "nlmErrorNetwork": {
+    "message": "无法连接 Gemini Notebook"
+  },
+  "nlmErrorProtocol": {
+    "message": "无法连接——Gemini Notebook 的界面已更改"
+  },
+  "nlmOpenNotebook": {
+    "message": "打开已创建的笔记本"
+  },
+  "nlmErrorFull": {
+    "message": "此笔记本已达到来源数量上限"
+  },
+  "nlmErrorAuth": {
+    "message": "请登录 Gemini Notebook"
+  },
+  "nlmErrorNoUrls": {
+    "message": "未找到可发送的视频"
+  },
+  "nlmErrorRpc": {
+    "message": "发送到 Gemini Notebook 失败"
+  },
+  "nlmErrorUnknown": {
+    "message": "发送到 Gemini Notebook 失败"
+  },
+  "ytCleanerSubtabsAria": {
+    "message": "YouTube 增强分类"
+  },
+  "igCleanerSubtabsAria": {
+    "message": "Instagram 清理器分类"
+  },
+  "tuneSubtabsAria": {
+    "message": "调整分类"
+  },
+  "categoryIgMain": {
+    "message": "主要"
+  },
+  "categoryIgExtra": {
+    "message": "附加"
+  },
+  "categoryTtMain": {
+    "message": "主要"
+  },
+  "categoryXLayout": {
+    "message": "布局"
+  },
+  "categoryXNoise": {
+    "message": "干扰"
+  },
+  "categoryXTimeline": {
+    "message": "时间线"
+  },
+  "applyOkSearchFixer": {
+    "message": "YT 增强"
+  },
+  "applyOkAmazon": {
+    "message": "Amazon"
+  },
+  "applyOkAmazonRanking": {
+    "message": "排名跳转"
+  },
+  "applyOkAmazonMerchantInfo": {
+    "message": "卖家标识"
+  },
+  "applyOkInstagram": {
+    "message": "Instagram"
+  },
+  "applyOkTiktok": {
+    "message": "TikTok"
+  },
+  "applyOkX": {
+    "message": "X"
+  },
+  "applyOkVideoGamma": {
+    "message": "视频伽马"
+  },
+  "applyOkVideoFill": {
+    "message": "去除黑边"
+  },
+  "applyOkLoupe": {
+    "message": "放大镜"
+  },
+  "applyOkAllStopped": {
+    "message": "⏹  已全部停止"
+  },
+  "applyOkPrefix": {
+    "message": "✓  "
+  },
+  "applyOkSeparator": {
+    "message": "  /  "
+  },
+  "applyError": {
+    "message": "⚠️ 无法保存或应用设置"
+  },
+  "volumeErrorInvalidTab": {
+    "message": "⚠ 无法读取标签页"
+  },
+  "volumeErrorOffscreenUnavailable": {
+    "message": "⚠ 无法启动内部处理器"
+  },
+  "volumeErrorInvalidStream": {
+    "message": "⚠ 无法捕获音频"
+  },
+  "volumeErrorTabClosed": {
+    "message": "⚠ 标签页已关闭"
+  },
+  "volumeErrorUserGesture": {
+    "message": "⚠ 仅在弹出窗口打开时可更改"
+  },
+  "volumeErrorUnsupportedPage": {
+    "message": "⚠ 此页面不支持"
+  },
+  "volumeErrorPermission": {
+    "message": "⚠ 权限错误"
+  },
+  "volumeErrorUnknown": {
+    "message": "⚠ 无法更新音量"
+  },
+  "volumeErrorCommunication": {
+    "message": "⚠ 通信错误"
+  },
+  "amazonTotalText": {
+    "message": "合计"
+  },
+  "amazonTotalReference": {
+    "message": "预估合计（当前价格）"
+  },
+  "amazonTotalPreviousReference": {
+    "message": "预估合计（含上次价格）"
+  },
+  "amazonTotalReferenceNote": {
+    "message": "实际扣款金额可能变动"
+  },
+  "amazonTotalLoading": {
+    "message": "正在加载合计…"
+  },
+  "amazonTotalUnavailable": {
+    "message": "无法获取合计"
+  },
+  "subsAllShortcutLabel": {
+    "message": "全部订阅"
+  },
+  "subsSearchPlaceholder": {
+    "message": "按频道名称或 @用户名筛选"
+  },
+  "imageDownloadButtonLabel": {
+    "message": "下载图片"
+  },
+  "feat_sf_playlist_label": {
+    "message": "播放列表"
+  },
+  "feat_sf_playlist_desc": {
+    "message": "移除播放列表条目（playlist?list= 链接 / “N 个视频”标记）。"
+  },
+  "feat_sf_mix_label": {
+    "message": "合辑"
+  },
+  "feat_sf_mix_desc": {
+    "message": "移除 YouTube 自动生成的合辑（&list=RD&start_radio=1 / “合辑”标记）。"
+  },
+  "feat_sf_shortsBtn_label": {
+    "message": "Shorts（单个）"
+  },
+  "feat_sf_shortsBtn_desc": {
+    "message": "移除混在视频网格中的独立 Shorts 卡片（缩略图 URL 为 /shorts/ 的竖屏视频）。"
+  },
+  "feat_sf_removeShortsShelf_label": {
+    "message": "Shorts 栏"
+  },
+  "feat_sf_removeShortsShelf_desc": {
+    "message": "彻底移除首页的 Shorts 栏（ytd-rich-shelf-renderer[is-shorts]）和搜索结果中的 Shorts 横向栏（ytd-reel-shelf-renderer）。"
+  },
+  "feat_sf_live_label": {
+    "message": "直播 / 首播 / 电台"
+  },
+  "feat_sf_live_desc": {
+    "message": "移除带有 LIVE / 首播 / 电台缩略图标记的视频。“电台” = YouTube 自动生成的无限循环背景音乐直播。"
+  },
+  "feat_sf_membersOnly_label": {
+    "message": "仅限会员"
+  },
+  "feat_sf_membersOnly_desc": {
+    "message": "移除带有“仅限会员”缩略图标记、需要频道会员资格才能观看的视频。"
+  },
+  "feat_sf_watched_label": {
+    "message": "已观看"
+  },
+  "feat_sf_watched_desc": {
+    "message": "移除显示继续播放覆盖层（已观看）的视频。"
+  },
+  "feat_sf_hideSubscriptionsRelevant_label": {
+    "message": "隐藏订阅中的“最相关”"
+  },
+  "feat_sf_hideSubscriptionsRelevant_desc": {
+    "message": "隐藏订阅页中的“最相关”区块，包括标题、视频和“显示更多”按钮。保留常规的最新视频。"
+  },
+  "feat_sf_removeFeedSections_label": {
+    "message": "区块"
+  },
+  "feat_sf_removeFeedSections_desc": {
+    "message": "移除首页上的“为你推荐的主题”“突发新闻”和“游戏室”推荐区块（ytd-rich-section-renderer）（仅限信息流页面）。"
+  },
+  "feat_sf_shelf_label": {
+    "message": "视频栏"
+  },
+  "feat_sf_shelf_desc": {
+    "message": "移除“热门”或“新闻”等视频分组区块（ytd-shelf-renderer）。"
+  },
+  "feat_sf_cardList_label": {
+    "message": "卡片列表"
+  },
+  "feat_sf_cardList_desc": {
+    "message": "移除相关主题横向卡片列表（ytd-horizontal-card-list-renderer，第二个及之后）。"
+  },
+  "feat_sf_course_label": {
+    "message": "课程"
+  },
+  "feat_sf_course_desc": {
+    "message": "移除带有“课程”标记的学习内容卡片（.yt-lockup-view-model--wrapper）。"
+  },
+  "feat_sf_channel_label": {
+    "message": "频道简介卡片"
+  },
+  "feat_sf_channel_desc": {
+    "message": "移除插入搜索结果中的“此频道”简介卡片（ytd-channel-renderer）。"
+  },
+  "feat_sf_hideForeignChannels_label": {
+    "message": "隐藏其他国家的频道"
+  },
+  "feat_sf_hideForeignChannels_desc": {
+    "message": "在搜索结果和信息流中移除你所在国家以外频道的视频（YouTube 的搜索筛选没有国家条件，因此为自定义实现）。先按文字系统对标题和频道名称分类；只有无法判定的才会查看频道的“简介”页。未公开国家的频道仍会显示。"
+  },
+  "feat_sf_notebookLmSend_label": {
+    "message": "发送到 Gemini Notebook"
+  },
+  "feat_sf_notebookLmSend_desc": {
+    "message": "将正在观看的视频，或搜索结果 / 播放列表 / 频道页上的视频，作为来源添加到你自己的 Google Gemini Notebook。可通过页面内按钮选择目标笔记本（观看页位于点赞/分享旁，搜索结果页位于搜索筛选旁，播放列表位于“全部播放”下方，频道位于标题行）；也可以新建笔记本。仅在你按下按钮时才会发送视频 URL——不收集观看历史，也不在后台传输。需要已登录 Gemini Notebook。"
+  },
+  "feat_sf_channelBlocklist_label": {
+    "message": "频道屏蔽列表"
+  },
+  "feat_sf_channelBlocklist_desc": {
+    "message": "在整个 YouTube（搜索结果、首页、订阅、热门等）移除被屏蔽频道的视频（相当于首页官方“不推荐此频道”的扩展版）。使用搜索结果中频道名称旁的 🚫 按钮添加；可在下方列表中取消屏蔽。"
+  },
+  "sfBlockChannelBtnTitle": {
+    "message": "在搜索结果中隐藏此频道"
+  },
+  "sfShowCommentsButton": {
+    "message": "显示评论"
+  },
+  "sfHideCommentsButton": {
+    "message": "隐藏评论"
+  },
+  "sfBlockedChannelsTitle": {
+    "message": "已屏蔽的频道"
+  },
+  "sfBlockedChannelsEmpty": {
+    "message": "尚无已屏蔽的频道。请使用 YouTube 搜索结果中频道名称旁的 🚫 按钮进行屏蔽。"
+  },
+  "sfBlockedChannelRemove": {
+    "message": "取消屏蔽"
+  },
+  "feat_sf_reel_label": {
+    "message": "Shorts 横向栏"
+  },
+  "feat_sf_reel_desc": {
+    "message": "移除 Shorts 横向栏（grid-shelf-view-model）。首页的 Shorts 栏由“视频过滤”中的 removeShortsShelf 移除；左侧边栏条目由“菜单 / 界面”中的 removeShortsSidebar 移除。"
+  },
+  "feat_sf_secondary_label": {
+    "message": "相关搜索区块"
+  },
+  "feat_sf_secondary_desc": {
+    "message": "移除底部的“相关搜索关键词”推荐区块（ytd-secondary-search-container-renderer）。"
+  },
+  "feat_sf_verified_label": {
+    "message": "已认证频道的视频"
+  },
+  "feat_sf_verified_desc": {
+    "message": "移除带有认证标识的频道（官方账号、新闻）的视频。信息流页面支持即将推出。"
+  },
+  "feat_sf_artist_label": {
+    "message": "艺人频道的视频"
+  },
+  "feat_sf_artist_desc": {
+    "message": "移除带有官方艺人频道标识的视频（如官方 MV）。信息流页面支持即将推出。"
+  },
+  "feat_sf_chapter_label": {
+    "message": "带章节的视频"
+  },
+  "feat_sf_chapter_desc": {
+    "message": "移除显示可展开章节信息的视频（expandable-metadata-renderer）。"
+  },
+  "feat_sf_demoteUnmatched_label": {
+    "message": "将不匹配关键词的视频置灰"
+  },
+  "feat_sf_demoteUnmatched_desc": {
+    "message": "将标题/简介中不含搜索关键词的视频半透明并转为灰度（悬停时恢复）。"
+  },
+  "feat_sf_highlightThumb_label": {
+    "message": "缩略图描边"
+  },
+  "feat_sf_highlightThumb_desc": {
+    "message": "为每个缩略图添加茜红色描边和投影，便于浏览（深色和浅色主题均适用）。"
+  },
+  "feat_sf_hideComments_label": {
+    "message": "隐藏评论"
+  },
+  "feat_sf_hideComments_desc": {
+    "message": "在观看页默认隐藏评论，并提供显示/隐藏按钮。不影响直播聊天。"
+  },
+  "feat_sf_hideLiveChat_label": {
+    "message": "隐藏直播聊天"
+  },
+  "feat_sf_hideLiveChat_desc": {
+    "message": "使用 YouTube 自带的折叠操作，在直播回放中折叠聊天面板。不影响普通视频。"
+  },
+  "feat_sf_broadcastClock_label": {
+    "message": "在直播回放中显示播出时间"
+  },
+  "feat_sf_broadcastClock_desc": {
+    "message": "回放直播存档时，在共用的画质、播放速度和音量覆盖层中显示每一刻最初播出的实际时间（yyyy/MM/dd hh:mm:ss）。普通视频和正在进行的直播不显示。对于中途中断或经过剪辑的存档，精度可能出现偏差。"
+  },
+  "bcOverlayLabel": {
+    "message": "播出"
+  },
+  "feat_sf_redirectShortsUrl_label": {
+    "message": "将 Shorts URL 重定向到 /watch"
+  },
+  "feat_sf_redirectShortsUrl_desc": {
+    "message": "强制将 /shorts/<ID> 竖屏视频页面跳转到常规的 /watch?v=<ID> 播放器。"
+  },
+  "feat_sf_playlistReverse_label": {
+    "message": "在播放列表中显示逆序按钮"
+  },
+  "feat_sf_playlistReverse_desc": {
+    "message": "此设置仅控制是否显示逆序按钮，不会改变顺序。开启后，播放列表面板会出现“逆序：ON/OFF”按钮，播放列表页会出现“逆序播放”按钮。是否逆序按每个播放列表通过按钮选择（仅保留在当前标签页）；开启时，将从最后一个视频向第一个视频播放。关闭此设置会移除按钮并恢复原始顺序。"
+  },
+  "ytPlaylistReverseStateOn": {
+    "message": "逆序：ON"
+  },
+  "ytPlaylistReverseStateOff": {
+    "message": "逆序：OFF"
+  },
+  "ytPlaylistReverseOnTitle": {
+    "message": "此播放列表正在逆序播放。点击恢复原始顺序"
+  },
+  "ytPlaylistReverseOffTitle": {
+    "message": "正在按原始顺序播放。点击改为逆序"
+  },
+  "ytPlaylistReversePlay": {
+    "message": "逆序播放"
+  },
+  "feat_sf_gameCrop_label": {
+    "message": "显示游戏画面放大按钮"
+  },
+  "feat_sf_gameCrop_desc": {
+    "message": "此设置仅控制是否显示按钮。开启后，播放器工具栏会出现“游戏画面”标签。对于主播将游戏画面裁剪到视频一部分、周围放置边框或头像的直播，拖选游戏区域即可将播放器放大到仅显示该区域。该区域按频道保存在本设备上，并自动用于该频道的视频。关闭此设置会移除标签和放大效果（已保存的区域会保留）。"
+  },
+  "gcLabel": {
+    "message": "游戏画面"
+  },
+  "gcToggleOn": {
+    "message": "放大：ON"
+  },
+  "gcToggleOff": {
+    "message": "放大：OFF"
+  },
+  "gcToggleOnTitle": {
+    "message": "已放大到游戏画面。点击显示完整视频"
+  },
+  "gcToggleOffTitle": {
+    "message": "正在显示完整视频。点击放大到已保存的游戏画面"
+  },
+  "gcSelect": {
+    "message": "选择区域"
+  },
+  "gcReselect": {
+    "message": "更改区域"
+  },
+  "gcSelectTitle": {
+    "message": "在视频上拖动以选择游戏画面"
+  },
+  "gcRemove": {
+    "message": "删除"
+  },
+  "gcRemoveTitle": {
+    "message": "删除此频道已保存的游戏画面区域"
+  },
+  "gcHint": {
+    "message": "拖动选择游戏画面（按 Esc 取消）"
+  },
+  "ytPlaylistReversePlayTitle": {
+    "message": "从最后一个视频开始，向第一个视频播放"
+  },
+  "feat_sf_searchGrid_label": {
+    "message": "以网格显示搜索结果"
+  },
+  "feat_sf_searchGrid_desc": {
+    "message": "将搜索结果从单列列表转换为多列网格（列数跟随网格设置；“自动”与首页列数一致）。"
+  },
+  "feat_sf_removeShortsChip_label": {
+    "message": "Shorts 筛选标签"
+  },
+  "feat_sf_removeShortsChip_desc": {
+    "message": "仅移除搜索页顶部筛选行（“全部 / 视频 / Shorts / 播放列表 …”）中的“Shorts”标签。"
+  },
+  "feat_sf_removeShortsSidebar_label": {
+    "message": "Shorts 侧边栏条目"
+  },
+  "feat_sf_removeShortsSidebar_desc": {
+    "message": "移除左侧边栏中的“Shorts”条目（展开和收起两种形态）。"
+  },
+  "feat_sf_subsLeftnavInjectAll_label": {
+    "message": "在左侧菜单显示全部订阅"
+  },
+  "feat_sf_subsLeftnavInjectAll_desc": {
+    "message": "将被 YouTube 显示上限隐藏的全部订阅添加到左侧边栏的“订阅”区块（从 /feed/channels 同源获取，缓存 24 小时）。"
+  },
+  "feat_sf_subsAllShortcut_label": {
+    "message": "“全部订阅”快捷入口"
+  },
+  "feat_sf_subsAllShortcut_desc": {
+    "message": "在左侧边栏“订阅”区块顶部添加一个一键进入 /feed/channels 的入口，样式与原生菜单项一致。"
+  },
+  "feat_sf_subsChannelsGrid_label": {
+    "message": "订阅页网格化（含搜索与排序）"
+  },
+  "feat_sf_subsChannelsGrid_desc": {
+    "message": "将 /feed/channels 改为自适应网格，并支持按频道名称或 @用户名搜索。排序使用 YouTube 自带控件。每张卡片会在接近视口时获取其最新视频缩略图（缓存 24 小时）。"
+  },
+  "feat_sf_homeGrid_label": {
+    "message": "将首页/信息流对齐为网格"
+  },
+  "feat_sf_homeGrid_desc": {
+    "message": "将首页和订阅信息流排成无间隙的网格（像 Shorts 一样跨栏位紧凑排列视频）。列数为“自动”时也会对齐（选择 4/5/6 列时始终为网格，即使关闭此开关）。"
+  },
+  "feat_ig_reels_label": {
+    "message": "移除 Reels"
+  },
+  "feat_ig_reels_desc": {
+    "message": "隐藏侧边栏/导航中的 Reels 入口，并将 /reels/ URL 强制跳转到首页。"
+  },
+  "feat_ig_explore_label": {
+    "message": "移除探索"
+  },
+  "feat_ig_explore_desc": {
+    "message": "隐藏侧边栏/导航中的探索入口，并将 /explore/ URL 强制跳转到首页。"
+  },
+  "feat_ig_stories_label": {
+    "message": "隐藏快拍栏（首页）"
+  },
+  "feat_ig_stories_desc": {
+    "message": "通过 CSS 隐藏首页动态顶部的快拍栏（24 小时后消失的短视频）。"
+  },
+  "feat_ig_storiesAll_label": {
+    "message": "将快拍 URL 重定向到首页"
+  },
+  "feat_ig_storiesAll_desc": {
+    "message": "将任何 /stories/ 访问重定向到首页（防止误点分享链接）。"
+  },
+  "feat_ig_threads_label": {
+    "message": "隐藏 Threads 推广"
+  },
+  "feat_ig_threads_desc": {
+    "message": "隐藏推广 Threads 应用的横幅、侧边栏入口和页脚链接。"
+  },
+  "feat_ig_vanity_label": {
+    "message": "隐藏点赞数和粉丝数"
+  },
+  "feat_ig_vanity_desc": {
+    "message": "检测 <article> 内的数字按钮（逗号、k、M 等）并将其隐藏，减轻攀比疲劳。"
+  },
+  "feat_ig_blockVideos_label": {
+    "message": "阻止帖子中的视频"
+  },
+  "feat_ig_blockVideos_desc": {
+    "message": "标记信息流 <article> 中的 <video> 元素，并通过 CSS 替换为缩略图以防止自动播放。"
+  },
+  "feat_ig_comments_label": {
+    "message": "隐藏评论"
+  },
+  "feat_ig_comments_desc": {
+    "message": "通过 CSS 隐藏评论列表、输入框和“查看 N 条评论”链接。"
+  },
+  "feat_ig_notes_label": {
+    "message": "隐藏便签"
+  },
+  "feat_ig_notes_desc": {
+    "message": "隐藏私信界面顶部的便签行（显示在头像上方的简短状态消息）。"
+  },
+  "feat_ig_msgCounters_label": {
+    "message": "隐藏未读私信角标"
+  },
+  "feat_ig_msgCounters_desc": {
+    "message": "隐藏导航栏上的未读私信数量角标（带数字的红色圆圈），减轻通知压力。"
+  },
+  "feat_ig_videoControls_label": {
+    "message": "显示视频进度条"
+  },
+  "feat_ig_videoControls_desc": {
+    "message": "显示用于调整视频位置的进度条，并可在文本框之外按空格键暂停或继续播放。"
+  },
+  "instagramVideoControlsAria": {
+    "message": "视频播放控制"
+  },
+  "instagramVideoSeekAria": {
+    "message": "视频位置"
+  },
+  "feat_ig_imageDownload_label": {
+    "message": "在图片上显示下载按钮"
+  },
+  "feat_ig_imageDownload_desc": {
+    "message": "悬停时在帖子照片（信息流 / 个人主页网格 / 帖子详情）左上角叠加下载按钮。从 srcset 中选取最大的版本。"
+  },
+  "feat_tt_hideComments_label": {
+    "message": "隐藏评论"
+  },
+  "feat_tt_hideComments_desc": {
+    "message": "通过 CSS 隐藏评论面板（与播放器并排显示的评论列表）、评论图标按钮和评论数。"
+  },
+  "feat_tt_hideSuggested_label": {
+    "message": "隐藏推荐账号"
+  },
+  "feat_tt_hideSuggested_desc": {
+    "message": "通过 CSS 隐藏插入“推荐 / 关注”信息流和个人主页中的“推荐账号”区块。"
+  },
+  "feat_tt_imageDownload_label": {
+    "message": "在图片上显示下载按钮"
+  },
+  "feat_tt_imageDownload_desc": {
+    "message": "悬停时在图片帖子和视频缩略图左上角叠加下载按钮。"
+  },
+  "categoryXExtra": {
+    "message": "附加"
+  },
+  "feat_x_imageDownload_label": {
+    "message": "在图片上显示下载按钮"
+  },
+  "feat_x_imageDownload_desc": {
+    "message": "悬停在帖子图片上时，左上角会显示一个按钮；点击即可保存原画质图片"
+  },
+  "feat_x_hideRightPane_label": {
+    "message": "隐藏右侧栏"
+  },
+  "feat_x_hideRightPane_desc": {
+    "message": "隐藏三栏布局中的整个右栏（搜索、趋势、推荐关注、升级推广），并将时间线扩展到腾出的空间。"
+  },
+  "feat_x_hideTrends_label": {
+    "message": "隐藏趋势"
+  },
+  "feat_x_hideTrends_desc": {
+    "message": "保留右侧栏，仅隐藏趋势区块。"
+  },
+  "feat_x_hideWhoToFollow_label": {
+    "message": "隐藏推荐关注"
+  },
+  "feat_x_hideWhoToFollow_desc": {
+    "message": "隐藏右侧栏中的“推荐关注”区块。"
+  },
+  "feat_x_hideMessagesDock_label": {
+    "message": "隐藏私信停靠栏"
+  },
+  "feat_x_hideMessagesDock_desc": {
+    "message": "隐藏固定在右下角的私信/聊天停靠面板（私信页面仍可正常使用）。"
+  },
+  "feat_x_hidePromoted_label": {
+    "message": "隐藏推广帖子"
+  },
+  "feat_x_hidePromoted_desc": {
+    "message": "隐藏插入时间线的广告（推广）帖子，并移除整个单元格，不留空隙。"
+  },
+  "feat_x_hidePremiumUpsell_label": {
+    "message": "隐藏 Premium 推广"
+  },
+  "feat_x_hidePremiumUpsell_desc": {
+    "message": "隐藏右侧栏中的订阅推广卡片和左侧菜单中的 Premium 入口。"
+  },
+  "feat_x_hideGrok_label": {
+    "message": "隐藏 Grok"
+  },
+  "feat_x_hideGrok_desc": {
+    "message": "隐藏左侧菜单中的 Grok 入口、右下角的 Grok 抽屉以及帖子内的 Grok 按钮。"
+  },
+  "feat_x_hideEngagementCounts_label": {
+    "message": "隐藏互动数"
+  },
+  "feat_x_hideEngagementCounts_desc": {
+    "message": "仅隐藏回复 / 转帖 / 点赞 / 查看数。按钮保留，互动操作照常使用。"
+  },
+  "feat_x_followingTabDefault_label": {
+    "message": "首页默认打开“正在关注”"
+  },
+  "feat_x_followingTabDefault_desc": {
+    "message": "将首页从“为你推荐”切换到“正在关注”（每次页面浏览仅切换一次；如果你自己切回“为你推荐”，则不再干预）。"
+  },
+  "tabSettings": {
+    "message": "设置"
+  },
+  "settingsBackupTitle": {
+    "message": "保存和读取设置"
+  },
+  "settingsBackupDescription": {
+    "message": "将所有功能设置、均衡器、已屏蔽频道、颜色历史和所选标签页保存为 JSON，以便用于其他电脑或浏览器。导入会覆盖文件中包含的项目。同步开关、目标账号、认证信息、缓存和页面内覆盖层位置不包含在内。同步开启时，导入的功能设置也会同步到你的其他电脑。"
+  },
+  "settingsExport": {
+    "message": "导出"
+  },
+  "settingsImport": {
+    "message": "导入"
+  },
+  "settingsExportSuccess": {
+    "message": "已开始下载设置。"
+  },
+  "settingsExportError": {
+    "message": "导出失败。请检查设置和下载位置后重试。"
+  },
+  "settingsImportSuccess": {
+    "message": "设置已导入。"
+  },
+  "settingsImportError": {
+    "message": "导入失败。请选择有效的 Vuora 设置 JSON 文件（最大 5 MB）。"
+  },
+  "feat_sf_liveLatency_label": {
+    "message": "直播延迟控制"
+  },
+  "feat_sf_liveLatency_desc": {
+    "message": "选择追赶直播的方式以及要显示的信息。"
+  },
+  "feat_sf_playbackQuality_label": {
+    "message": "画质选择器"
+  },
+  "feat_sf_playbackQuality_desc": {
+    "message": "添加用于切换播放器画质的选择器。"
+  },
+  "feat_sf_playbackRate_label": {
+    "message": "播放速度选择器"
+  },
+  "feat_sf_playbackRate_desc": {
+    "message": "添加 0.25x 至 2x 的播放速度选择器。"
+  },
+  "feat_sf_playerVolume_label": {
+    "message": "播放器音量选择器"
+  },
+  "feat_sf_playerVolume_desc": {
+    "message": "添加播放器音量选择器，并自定义原生音量控件。"
+  },
+  "ypcWatchSettings": {
+    "message": "视频页设置"
+  },
+  "yp_details": {
+    "message": "详细设置"
+  },
+  "yp_auto": {
+    "message": "自动"
+  },
+  "yp_enabled": {
+    "message": "自动调整速度以追赶直播"
+  },
+  "yp_playbackRate": {
+    "message": "自动追赶时的速度"
+  },
+  "yp_showPlaybackRate": {
+    "message": "显示当前播放速度"
+  },
+  "yp_showLatency": {
+    "message": "显示落后直播的延迟"
+  },
+  "yp_showHealth": {
+    "message": "显示已缓冲的剩余时间"
+  },
+  "yp_showEstimation": {
+    "message": "显示追上直播的预计时间"
+  },
+  "yp_showCurrent": {
+    "message": "显示播放位置（点击可复制时间戳 URL）"
+  },
+  "yp_smooth": {
+    "message": "缓冲充足时调整速度"
+  },
+  "yp_smoothThreshold": {
+    "message": "调整速度所需的缓冲时间（秒）"
+  },
+  "yp_smoothAuto": {
+    "message": "自动设置缓冲时间阈值"
+  },
+  "yp_skip": {
+    "message": "落后过多时跳转到最新位置"
+  },
+  "yp_skipThreshold": {
+    "message": "落后达到此时长时跳转（秒）"
+  },
+  "yp_hideSlider": {
+    "message": "隐藏原生音量滑块"
+  },
+  "yp_hideVolumeIcon": {
+    "message": "隐藏原生音量图标"
+  },
+  "yp_latencyNote": {
+    "message": "关闭自动调速时仍可显示信息。速度调整仅在直播播放期间生效。"
+  },
+  "yp_buttonNote": {
+    "message": "在一行覆盖层选择器中调整画质、音量和播放速度。播放速度范围为 0.25x 至 2x。请在浏览器的扩展设置中分配快捷键。"
+  },
+  "ypcQuality": {
+    "message": "画质"
+  },
+  "ypcRate": {
+    "message": "播放速度"
+  },
+  "ypcVolume": {
+    "message": "音量"
+  },
+  "ypcCopied": {
+    "message": "已复制"
+  },
+  "ypcSaveError": {
+    "message": "无法保存设置，请重试。"
+  },
+  "ypcCommand_quality_1": {
+    "message": "YouTube 画质按钮 1"
+  },
+  "ypcCommand_quality_2": {
+    "message": "YouTube 画质按钮 2"
+  },
+  "ypcCommand_quality_3": {
+    "message": "YouTube 画质按钮 3"
+  },
+  "ypcCommand_quality_4": {
+    "message": "YouTube 画质按钮 4"
+  },
+  "ypcCommand_quality_5": {
+    "message": "YouTube 画质按钮 5"
+  },
+  "ypcCommand_quality_6": {
+    "message": "YouTube 画质按钮 6"
+  },
+  "ypcCommand_quality_7": {
+    "message": "YouTube 画质按钮 7"
+  },
+  "ypcCommand_quality_8": {
+    "message": "YouTube 画质按钮 8"
+  },
+  "ypcCommand_quality_9": {
+    "message": "YouTube 画质按钮 9"
+  },
+  "ypcCommand_rate_1": {
+    "message": "YouTube 播放速度按钮 1"
+  },
+  "ypcCommand_rate_2": {
+    "message": "YouTube 播放速度按钮 2"
+  },
+  "ypcCommand_rate_3": {
+    "message": "YouTube 播放速度按钮 3"
+  },
+  "ypcCommand_rate_4": {
+    "message": "YouTube 播放速度按钮 4"
+  },
+  "ypcCommand_rate_5": {
+    "message": "YouTube 播放速度按钮 5"
+  },
+  "ypcCommand_rate_6": {
+    "message": "YouTube 播放速度按钮 6"
+  },
+  "ypcCommand_rate_7": {
+    "message": "YouTube 播放速度按钮 7"
+  },
+  "ypcCommand_rate_8": {
+    "message": "YouTube 播放速度按钮 8"
+  },
+  "ypcCommand_volume_1": {
+    "message": "YouTube 音量按钮 1"
+  },
+  "ypcCommand_volume_2": {
+    "message": "YouTube 音量按钮 2"
+  },
+  "ypcCommand_volume_3": {
+    "message": "YouTube 音量按钮 3"
+  },
+  "ypcCommand_volume_4": {
+    "message": "YouTube 音量按钮 4"
+  },
+  "ypcCommand_volume_5": {
+    "message": "YouTube 音量按钮 5"
+  },
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Wikipedia 阅读设置"
+  },
+  "wikipediaMasterDesc": {
+    "message": "调整 Wikipedia 条目的布局、文字和颜色。"
+  },
+  "wikipediaOptions": {
+    "message": "Wikipedia 阅读选项"
+  },
+  "wikipedia_theme": {
+    "message": "配色"
+  },
+  "wikipedia_noto_sans_jp": {
+    "message": "Noto Sans JP"
+  },
+  "wikipedia_ibm_plex_sans_jp": {
+    "message": "IBM Plex Sans JP"
+  },
+  "wikipedia_m_plus_2": {
+    "message": "M PLUS 2"
+  },
+  "wikipedia_m_plus_rounded_1c": {
+    "message": "M PLUS Rounded 1c"
+  },
+  "wikipedia_murecho": {
+    "message": "Murecho"
+  },
+  "wikipedia_zen_kaku_gothic_new": {
+    "message": "Zen Kaku Gothic New"
+  },
+  "wikipedia_line_seed_jp": {
+    "message": "LINE Seed JP"
+  },
+  "wikipedia_font": {
+    "message": "正文字体"
+  },
+  "wikipedia_fontSize": {
+    "message": "文字大小"
+  },
+  "wikipedia_contentWidth": {
+    "message": "条目宽度"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "条目的基准宽度。隐藏“外观”面板后会增加其腾出的空间。开启“将条目限制在设定宽度内”则保持此宽度。"
+  },
+  "wikipedia_lineHeight": {
+    "message": "行距"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1×"
+  },
+  "wikipedia_original": {
+    "message": "网站配色"
+  },
+  "wikipedia_light": {
+    "message": "浅色"
+  },
+  "wikipedia_sepia": {
+    "message": "棕褐色"
+  },
+  "wikipedia_dark": {
+    "message": "深色"
+  },
+  "wikipedia_sans": {
+    "message": "系统无衬线体"
+  },
+  "wikipedia_serif": {
+    "message": "系统衬线体"
+  },
+  "wikipediaContents": {
+    "message": "目录"
+  },
+  "wikipediaClose": {
+    "message": "关闭"
+  },
+  "wikipediaImage": {
+    "message": "放大图片"
+  },
+  "wikipediaReference": {
+    "message": "参考资料预览"
+  },
+  "wikipediaSiteMenu": {
+    "message": "Wikipedia 菜单"
+  },
+  "wikipediaDisplaySettings": {
+    "message": "显示设置"
+  },
+  "wikipediaArticleInfo": {
+    "message": "条目信息"
+  },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "现代条目布局"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "隐藏“外观”面板"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "隐藏条目右侧的 Wikipedia“外观”面板，并将腾出的空间用于条目正文。"
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "将条目限制在设定宽度内"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "将条目保持在下方“条目宽度”之内，不扩展到隐藏“外观”面板后腾出的空间。可通过“条目宽度”更改宽度。"
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "围绕搜索、目录、条目正文及其信息重构页面。关闭可恢复原始布局。"
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "固定目录"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "让目录始终可见，方便快速跳转。"
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "图片查看器"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "放大条目中的图片。"
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "链接与参考资料预览"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "美化 Wikipedia 标准的条目预览，并就地显示参考资料文本。在 Wikipedia 上启用后才会显示条目预览。"
+  },
+  "wikipedia_headingFont": {
+    "message": "标题字体"
+  },
+  "wikipedia_inherit": {
+    "message": "与正文相同"
+  },
+  "wikipedia_linkStyle": {
+    "message": "链接样式"
+  },
+  "wikipedia_underline": {
+    "message": "下划线"
+  },
+  "wikipedia_color": {
+    "message": "颜色"
+  },
+  "wikipedia_coverImage": {
+    "message": "封面图片"
+  },
+  "wikipedia_show": {
+    "message": "显示"
+  },
+  "wikipedia_hide": {
+    "message": "隐藏"
+  },
+  "wikipedia_articleStyle": {
+    "message": "条目视图"
+  },
+  "wikipedia_full": {
+    "message": "完整"
+  },
+  "wikipedia_pictures": {
+    "message": "文字和图片"
+  },
+  "wikipedia_text": {
+    "message": "仅文字"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "“完整”包含表格等内容。“文字和图片”省略表格等元素。“仅文字”还会省略图片。"
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "“下划线”在悬停链接前使用文字颜色。“颜色”始终使用链接颜色。"
+  },
+  "wikipedia_group_typography": {
+    "message": "文字和颜色"
+  },
+  "wikipedia_group_layout": {
+    "message": "布局"
+  },
+  "wikipedia_group_display": {
+    "message": "显示"
+  },
+  "wikipedia_small": {
+    "message": "小"
+  },
+  "wikipedia_medium": {
+    "message": "中"
+  },
+  "wikipedia_large": {
+    "message": "大"
+  },
+  "wikipedia_auto": {
+    "message": "自动"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$（旧版主题）",
+    "placeholders": {
+      "theme": {
+        "content": "$1"
+      }
+    }
+  },
+  "wikipedia_one_dark": {
+    "message": "One Dark"
+  },
+  "wikipedia_one_light": {
+    "message": "One Light"
+  },
+  "wikipedia_dracula": {
+    "message": "Dracula"
+  },
+  "wikipedia_nord": {
+    "message": "Nord"
+  },
+  "wikipedia_monokai": {
+    "message": "Monokai"
+  },
+  "wikipedia_solarized_dark": {
+    "message": "Solarized Dark"
+  },
+  "wikipedia_solarized_light": {
+    "message": "Solarized Light"
+  },
+  "wikipedia_github_dark": {
+    "message": "GitHub Dark"
+  },
+  "wikipedia_github_light": {
+    "message": "GitHub Light"
+  },
+  "wikipedia_deep_ocean": {
+    "message": "深海"
+  },
+  "wikipedia_algae": {
+    "message": "海藻"
+  },
+  "wikipedia_calmness": {
+    "message": "宁静"
+  },
+  "wikipedia_desert": {
+    "message": "沙漠"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "仙尘"
+  },
+  "wikipedia_grey": {
+    "message": "灰色"
+  },
+  "wikipedia_nature": {
+    "message": "自然"
+  },
+  "languageAuto": { "message": "自动（跟随浏览器）" },
+  "languageSelectLabel": { "message": "语言" },
+  "languageSelectTitle": { "message": "语言（已打开的页面需刷新后生效）" }
+}

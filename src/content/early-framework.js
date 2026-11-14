@@ -39,6 +39,8 @@
    *   3. storage.local.get で初期評価 → onEvaluate(stored) 呼び出し
    *   4. storage.onChanged で監視対象キーが変化したら再評価
    *      (両キーが newValue を持つときは直読みで IPC 1 回節約)
+   *   5. pre クラスが付いている間だけ visibilitychange / focus / pageshow で context 失効を確認し、
+   *      失効していればクラスを撤去する（失効後は 4 の chrome イベントが届かないため）
    */
   function setup(config) {
     const {
@@ -57,14 +59,49 @@
       document.documentElement.appendChild(style);
     }
 
+    // ---- context 失効（拡張機能の無効化・更新）後の撤去 ----
+    // 失効後の content script には chrome.* のイベント（storage.onChanged 等）が届かないため、
+    // 下の evaluate の失効分岐は設定通知では到達しない。MutationObserver を持たない early script
+    // （TikTok / X）は、pre クラスが付いたままページに残り、非表示が解除されなくなる。
+    // そこで pre クラスが実際に付いている間だけ、chrome に依存しない DOM 側のイベント
+    // （タブ復帰・フォーカス・bfcache 復帰）で失効を確認する。
+    //   - OFF のユーザーはクラスを付けないので、監視は張らず常時コストはゼロ。
+    //   - 常時 subtree の MutationObserver は張らない（Instagram の C-#3 と同じ理由）。
+    //   - 撤去後はクラスが無くなるので監視を自ら外す。
+    // <style> はクラス条件付きのため、クラスが無ければ効果を持たず、他サイトと同様に残す
+    // （失効後に再注入された新しい script と共有しうる要素を、失効側が消さないため）。
+    const RESUME_EVENTS = [
+      [document, "visibilitychange"],
+      [window, "focus"],
+      [window, "pageshow"],
+    ];
+    let watchingOrphan = false;
+    const isOrphaned = () => {
+      try { return !chrome.runtime?.id; } catch { return true; }
+    };
+    const onResume = () => {
+      // 有効な間は何もしない。失効していれば evaluate が撤去し、監視も外す。
+      if (isOrphaned()) evaluate({});
+    };
+    const syncOrphanWatch = () => {
+      const applied = preClasses.some((cls) => document.documentElement.classList.contains(cls));
+      if (applied === watchingOrphan) return;
+      watchingOrphan = applied;
+      for (const [target, type] of RESUME_EVENTS) {
+        if (applied) target.addEventListener(type, onResume);
+        else target.removeEventListener(type, onResume);
+      }
+    };
+
     // 非表示は各 onEvaluate が明示的な ON を確認してから適用する。
     const evaluate = (stored) => {
-      if (!chrome.runtime?.id) {
+      if (isOrphaned()) {
         for (const cls of preClasses) document.documentElement.classList.remove(cls);
         onEvaluate({});
-        return;
+      } else {
+        onEvaluate(stored);
       }
-      onEvaluate(stored);
+      syncOrphanWatch();
     };
 
     const stored = {};

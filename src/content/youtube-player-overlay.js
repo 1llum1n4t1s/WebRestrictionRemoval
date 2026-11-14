@@ -1,9 +1,9 @@
-// プレイヤー操作・配信時刻が共有する表示先。データと設定は各機能が所有する。
+// プレイヤー操作・ゲーム画面拡大・配信時刻が共有する表示先。データと設定は各機能が所有する。
 (() => {
   "use strict";
   if (window.__cpaYouTubeOverlay) return;
 
-  const order = ["player", "broadcast"];
+  const order = ["player", "crop", "broadcast"];
   const sections = new Map();
   let root = null;
   let observer = null;

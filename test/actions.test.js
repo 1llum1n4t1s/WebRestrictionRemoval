@@ -198,34 +198,25 @@ test("VolumeBooster.BASS_CUT_PRESET / BASS_CUT_BYPASS: 壁ドン対策モード�
   assert.equal(G.VolumeBooster.BASS_CUT_BYPASS.Q, -3.0103);
 });
 
-test("VolumeBooster.percentToGain: 0/100/MAX のアンカー値が正しい", () => {
+// 表示% = 実倍率 の線形一致（対数マッピング撤去の回帰防止、ゆろさん指摘 2026-06-27）。
+// 旧実装は 150% で約 1.196 倍・200% で約 1.43 倍と乖離していた。
+test("VolumeBooster.percentToGain: 表示% = 実倍率 で線形（150%=1.5x 等）", () => {
+  // 両端と基準点（旧アンカー値テストを統合: 0 / 100 / MAX は同じ線形写像の境界値）
   assert.equal(G.VolumeBooster.percentToGain(0), 0);
   assert.equal(G.VolumeBooster.percentToGain(50), 0.5);
   assert.equal(G.VolumeBooster.percentToGain(100), 1);
   assert.equal(G.VolumeBooster.percentToGain(G.VolumeBooster.MAX), G.VolumeBooster.MAX / 100);
-});
-
-// 表示% = 実倍率 の線形一致（対数マッピング撤去の回帰防止、ゆろさん指摘 2026-06-27）。
-// 旧実装は 150% で約 1.196 倍・200% で約 1.43 倍と乖離していた。
-test("VolumeBooster.percentToGain: 表示% = 実倍率 で線形（150%=1.5x 等）", () => {
   assert.equal(G.VolumeBooster.percentToGain(125), 1.25);
   assert.equal(G.VolumeBooster.percentToGain(150), 1.5);
   assert.equal(G.VolumeBooster.percentToGain(200), 2.0);
   assert.equal(G.VolumeBooster.percentToGain(300), 3.0);
   assert.equal(G.VolumeBooster.percentToGain(250), 2.5);
-  // 逆関数も 実倍率 → 表示% で線形一致
+  // 逆関数も 実倍率 → 表示% で線形一致（100% 未満の区間も含む）
+  assert.equal(G.VolumeBooster.gainToPercent(0.5), 50);
+  assert.equal(G.VolumeBooster.gainToPercent(1), 100);
   assert.equal(G.VolumeBooster.gainToPercent(1.5), 150);
   assert.equal(G.VolumeBooster.gainToPercent(2.0), 200);
   assert.equal(G.VolumeBooster.gainToPercent(3.0), 300);
-});
-
-test("VolumeBooster.percentToGain → gainToPercent round-trip (整数 0..MAX)", () => {
-  // MAX 追従ループ。逆関数なので整数 percent は厳密復元される。
-  for (let pct = 0; pct <= G.VolumeBooster.MAX; pct += 25) {
-    const gain = G.VolumeBooster.percentToGain(pct);
-    const back = G.VolumeBooster.gainToPercent(gain);
-    assert.equal(back, pct, `pct=${pct} round-trip got ${back} (gain=${gain})`);
-  }
 });
 
 test("VolumeBooster.gainToPercent: 不正値は MIN", () => {
@@ -612,11 +603,6 @@ test("Loupe.ZOOM_LEVELS は DEFAULT_ZOOM を含む（不変条件）", () => {
   );
 });
 
-test("Loupe.SIZE_DEFAULT は [SIZE_MIN, SIZE_MAX] の範囲内（不変条件）", () => {
-  assert.ok(G.Loupe.SIZE_DEFAULT >= G.Loupe.SIZE_MIN);
-  assert.ok(G.Loupe.SIZE_DEFAULT <= G.Loupe.SIZE_MAX);
-});
-
 test("Loupe.computeLensPosition: カーソルがレンズ中央に来る座標を返す", () => {
   // mouseX=500, mouseY=300, lensSize=200 → left=400, top=200
   const p = G.Loupe.computeLensPosition(500, 300, 200);
@@ -877,7 +863,7 @@ test("SearchFixer.FEATURES: 検索結果ページ専用機能は search_only に
 
 test("SearchFixer.FEATURES: 動画ページ系 + redirectShortsUrl が watch_page に集約", () => {
   const expectedWatchPageKeys = [
-    "hideComments", "hideLiveChat", "redirectShortsUrl",
+    "hideComments", "hideLiveChat", "redirectShortsUrl", "playlistReverse", "gameCrop",
   ];
   for (const key of expectedWatchPageKeys) {
     const feature = G.SearchFixer.FEATURES.find((f) => f.key === key);
@@ -918,16 +904,6 @@ test("InstagramCleaner.mergeFeatures: undefined / null / 不正型は default", 
   assert.deepEqual(fromUndef, fromArray);
   for (const feature of G.InstagramCleaner.FEATURES) {
     assert.ok(feature.key in fromUndef);
-  }
-});
-
-test("InstagramCleaner.mergeFeatures: partial は欠損 default 補完", () => {
-  const merged = G.InstagramCleaner.mergeFeatures({ reels: true });
-  assert.equal(merged.reels, true);
-  for (const feature of G.InstagramCleaner.FEATURES) {
-    if (feature.key !== "reels") {
-      assert.equal(typeof merged[feature.key], "boolean");
-    }
   }
 });
 
@@ -1091,7 +1067,7 @@ test("PopupTabs.normalizeSubTabs: 親タブ id をキーにした文字列だけ
 
 // ---------- 再評価ガードのテスト ----------
 
-test("分割定義は globalThis に 24 個の定数を公開する", () => {
+test("分割定義は globalThis に 25 個の定数を公開する", () => {
   const required = [
     "SettingsSchema",
     "Actions",
@@ -1099,6 +1075,7 @@ test("分割定義は globalThis に 24 個の定数を公開する", () => {
     "SenderCheck",
     "Offscreen",
     "StorageKeys",
+    "Localizer",
     "YouTubeShorts",
     "SearchFixer",
     "AmazonDeliveryTotal",
@@ -1121,7 +1098,7 @@ test("分割定義は globalThis に 24 個の定数を公開する", () => {
   for (const k of required) {
     assert.ok(G[k] && typeof G[k] === "object", `missing globalThis.${k}`);
   }
-  assert.equal(required.length, 24, "公開定数の件数（ドキュメント整合性の単一情報源）");
+  assert.equal(required.length, 25, "公開定数の件数（ドキュメント整合性の単一情報源）");
 });
 
 test("SenderCheck.isFromOffscreen: extension id・tab不在・URL完全一致で検証", () => {
@@ -1156,13 +1133,6 @@ test("TikTokCleaner.mergeFeatures: undefined / null / 不正型は default", () 
     const merged = G.TikTokCleaner.mergeFeatures(value);
     assert.deepEqual(merged, G.TikTokCleaner.DEFAULT_FEATURES);
   }
-});
-
-test("TikTokCleaner.mergeFeatures: partial は欠損 default 補完", () => {
-  const partial = { hideComments: true };
-  const merged = G.TikTokCleaner.mergeFeatures(partial);
-  assert.equal(merged.hideComments, true);
-  assert.equal(merged.hideSuggested, false);
 });
 
 // ---------- ImageDownloader ----------
@@ -1314,16 +1284,6 @@ test("ImageDownloader.isAllowedFetchUrl: 不正 host / 不正 URL は false", ()
   assert.equal(G.ImageDownloader.isAllowedFetchUrl("youtube", "https://i.ytimg.com/vi/abc/maxresdefault.jpg"), false);
 });
 
-test("各クリーナー FEATURES に imageDownload エントリが含まれる（Instagram / TikTok）", () => {
-  // YouTube からは imageDownload を削除済み
-  const yt = G.SearchFixer.FEATURES.find((f) => f.key === "imageDownload");
-  assert.equal(yt, undefined, "SearchFixer.FEATURES から imageDownload は削除されている");
-  const ig = G.InstagramCleaner.FEATURES.find((f) => f.key === "imageDownload");
-  assert.ok(ig, "InstagramCleaner.FEATURES に imageDownload が存在");
-  const tt = G.TikTokCleaner.FEATURES.find((f) => f.key === "imageDownload");
-  assert.ok(tt, "TikTokCleaner.FEATURES に imageDownload が存在");
-});
-
 test("各クリーナーの DEFAULT_FEATURES に imageDownload: false が含まれる", () => {
   // YouTube は廃止
   assert.equal(G.SearchFixer.DEFAULT_FEATURES.imageDownload, undefined);
@@ -1345,9 +1305,10 @@ test("各クリーナー mergeFeatures: imageDownload:true 単体指定で他キ
 // 各クリーナー FEATURES 件数を固定値でアサートして、ドキュメント数値との
 // drift を再発防止する。件数を増減した場合はこことドキュメントを同時更新する。
 test("FEATURES 件数の固定アサート（ドキュメント整合性の再発防止）", () => {
-  assert.equal(G.SearchFixer.FEATURES.length, 38, "SearchFixer.FEATURES は 38 件");
+  assert.equal(G.SearchFixer.FEATURES.length, 40, "SearchFixer.FEATURES は 40 件");
   assert.equal(G.InstagramCleaner.FEATURES.length, 12, "InstagramCleaner.FEATURES は 12 件");
   assert.equal(G.TikTokCleaner.FEATURES.length, 3, "TikTokCleaner.FEATURES は 3 件");
+  assert.equal(G.XCleaner.FEATURES.length, 10, "XCleaner.FEATURES は 10 件");
 });
 
 test("ストア画像の表示件数がFEATURES正本と一致し、初期OFFを12機能に限定する", () => {

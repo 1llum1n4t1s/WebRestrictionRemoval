@@ -158,6 +158,8 @@
         <h1 class="hdr-title" data-i18n="headerTitle">Vuora</h1>
         <p class="hdr-tag" data-i18n="headerTagline">増幅 / 整理 / 維持 を 1 つのパネルから</p>
       </div>
+      <!-- 表示言語の切り替え（選択肢は popup.js が Localizer.LANGUAGES から作る） -->
+      <select id="uiLanguage" class="hdr-lang" data-i18n-attr="aria-label:languageSelectLabel;title:languageSelectTitle" aria-label="言語"></select>
     </header>
 
     <!-- ===== Category selector ===== -->
@@ -506,7 +508,7 @@
 
     </div><!-- /panel.tune -->
 
-    <!-- ===== Panel: YouTube (機能拡張 38 機能 + ホーム列数。配信時刻表示は watch_page カテゴリの
+    <!-- ===== Panel: YouTube (機能拡張 40 機能 + ホーム列数。配信時刻表示は watch_page カテゴリの
          サブ機能としてアコーディオン内に FEATURES 駆動で自動描画される) ===== -->
     <div class="panel panel--youtube" id="panelYoutube"
          role="region" aria-labelledby="tabYoutube" hidden>
@@ -521,7 +523,7 @@
           <svg class="tr-icon ic" aria-hidden="true" focusable="false"><use href="#ic-broom"></use></svg>
           <span class="tr-text">
             <span class="tr-name" data-i18n="searchFixerMaster">YouTube 機能拡張</span>
-            <span class="tr-desc" data-i18n="searchFixerMasterDesc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・Gemini Notebook 送信など 38 サブ機能を一括管理</span>
+            <span class="tr-desc" data-i18n="searchFixerMasterDesc">Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・Gemini Notebook 送信など 40 サブ機能を一括管理</span>
           </span>
           <span class="switch">
             <input type="checkbox" id="searchFixerToggle" />
@@ -543,7 +545,7 @@
 
     </div><!-- /panel.youtube -->
 
-    <!-- ===== Panel: X (クリーナー 9 機能) ===== -->
+    <!-- ===== Panel: X (クリーナー 10 機能) ===== -->
     <div class="panel panel--x" id="panelX"
          role="region" aria-labelledby="tabX" hidden>
 

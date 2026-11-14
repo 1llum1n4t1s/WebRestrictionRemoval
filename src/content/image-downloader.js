@@ -17,7 +17,7 @@
  *   - `__cpaImageDownloaderRunning` で同一フレーム二重実行防止
  *   - fetch 先は ImageDownloader.ALLOWED_HOSTS の CDN のみ（任意オリジンへの代理 fetch 防止）
  *   - fetch は `credentials: "omit"` + `redirect: "manual"` + `referrerPolicy: "no-referrer"` で
- *     クロスオリジン認証情報送信を回避（既存 keepalive のパターンに揃える）
+ *     クロスオリジン認証情報送信を回避する
  */
 (function () {
   if (window.__cpaImageDownloaderRunning === true) return;
@@ -61,8 +61,7 @@
    *  低スペック環境や高負荷時の DL 失敗対策。 */
   const BLOB_CLEANUP_DELAY_MS = 200;
   /** 個別 fetch のタイムアウト。CDN 遅延 / ネットワーク不通時にボタンが永久 BUSY になるのを防ぐ。
-   *  keepalive.js の `AbortSignal.timeout(5000)` パターンに揃え、画像取得は HEAD/GET より重いので
-   *  10 秒を採用。AbortSignal.any は Chrome 116+ サポート、minimum_chrome_version 140 で問題なし。 */
+   *  `AbortSignal.timeout` で打ち切る。画像取得は軽い確認用リクエストより重いので 10 秒を採用。AbortSignal.any は Chrome 116+ サポート、minimum_chrome_version 140 で問題なし。 */
   const FETCH_TIMEOUT_MS = 10_000;
 
   /** 同一画像への click 多重押下防止用の WeakSet（busy class とは独立） */
@@ -880,7 +879,8 @@
     });
   }
 
-  readSettings();
+  // 選んだ表示言語の読み込みを待ってから初期設定を適用し、最初のボタンから同じ言語で表示する。
+  Promise.resolve(globalThis.Localizer?.ready).catch(() => {}).then(() => readSettings());
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;

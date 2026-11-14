@@ -46,8 +46,7 @@ html.__cpa-tt-comments [data-e2e="video-comment-icon"] {
 /* (2) コメント数バッジ（ボタン横の数字）
  *     modal viewer 用 `browse-comment-count` も併記 */
 html.__cpa-tt-comments [data-e2e="comment-count"],
-html.__cpa-tt-comments [data-e2e="browse-comment-count"],
-html.__cpa-tt-comments strong[data-e2e="comment-count"] {
+html.__cpa-tt-comments [data-e2e="browse-comment-count"] {
   display: none !important;
 }
 

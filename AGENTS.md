@@ -8,18 +8,18 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 
 ### 機能カウント早見表（単一情報源）
 
-本文で出てくる「N 機能」「N サブ機能」「N マスタートグル」の数字はすべて以下の単一情報源を参照する。CI で drift 検知される値のみここに書く（AGENTS.md 内 drift 防止）。
+本文で出てくる「N 機能」「N サブ機能」「N マスタートグル」の数字はすべて以下の単一情報源を参照する。各値は下表の単一情報源から数え直せる。SearchFixer / Instagram / TikTok / X の FEATURES 件数、popup タブ数、YouTube 機能拡張のカテゴリ数、`globalThis` 公開定数 25 名は `test/actions.test.js` が固定アサートするので CI で drift 検知される。それ以外（マスタートグル数・機能カテゴリ数 13・履歴上限・テストが列挙しない公開定数名など）は CI では検知されないため、変更時に情報源（実装・`rg`）を数え直して本表と照合する（AGENTS.md 内 drift 防止）。
 
 | カウント名 | 値 | 単一情報源（drift 検知元） |
 |---|---|---|
 | 機能カテゴリ | 13 | `SettingsSchema` + `test/actions.test.js` |
 | マスタートグル | 12 | popup.html の独立 toggle-row 数（`toggle-row` クラスを持つ要素数 − `toggle-row--sub` クラスを持つ要素数。内訳の実数は `rg -c` で数え直す）。カラーピッカー除く 12 機能すべてが独立マスタートグル（独自 storage key + 独立 checkbox + SettingsSchema 独立エントリを持つ）。Shorts のみ YouTube 機能拡張配下サブ機能で独立トグルを持たない |
-| YouTube 機能拡張 サブ機能 | 38 | `SearchFixer.FEATURES`（内訳: 検索ノイズ除去 + Shorts 5 + 動画ページ整形 + 登録チャンネル拡張 3 + 配信時刻オーバーレイ 1 + 海外チャンネル除外 1 等） |
+| YouTube 機能拡張 サブ機能 | 40 | `SearchFixer.FEATURES`（内訳: 検索ノイズ除去 + Shorts 5 + 動画ページ整形 + 登録チャンネル拡張 3 + 配信時刻オーバーレイ 1 + 海外チャンネル除外 1 + 再生リスト逆順再生 1 + ゲーム画面拡大 1 等） |
 | Instagram クリーナー サブ機能 | 12 | `InstagramCleaner.FEATURES` |
 | TikTok クリーナー サブ機能 | 3 | `TikTokCleaner.FEATURES` |
 | X クリーナー サブ機能 | 10 | `XCleaner.FEATURES`（レイアウト 4 + ノイズ除去 4 + タイムライン 1 + 追加機能 1） |
 | Firefox 提供機能 | 13 | 全 13 機能（音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js`。EME_HOSTS の DRM サイトでは無効） |
-| `globalThis` 公開定数 | 28 | `actions-core.js` / `actions-video.js` / `actions-loupe.js` / `actions-volume.js` / `actions.js` の合計 24 名前空間（`test/actions.test.js` の `required` 配列が単一情報源）+ ScanRunner + AudioPipeline + CleanerCore + SettingsBackup。※ `rg "globalThis\.\w+ = "` は二重ロード防止フラグ（`__cpaActionsLoaded` / `__cpaActionsCoreLoaded` / `__cpaActionsVideoLoaded` / `__cpaActionsLoupeLoaded` / `__cpaActionsVolumeLoaded` / `__cpaAudioPipelineLoaded`）も拾うので、素の grep 件数は名前空間数と一致しない |
+| `globalThis` 公開定数 | 29 | `actions-core.js` / `actions-video.js` / `actions-loupe.js` / `actions-volume.js` / `actions.js` の合計 25 名前空間（`test/actions.test.js` の `required` 配列が単一情報源）+ ScanRunner + AudioPipeline + CleanerCore + SettingsBackup。※ `rg "globalThis\.\w+ = "` は二重ロード防止フラグ（`__cpaActionsLoaded` / `__cpaActionsCoreLoaded` / `__cpaActionsVideoLoaded` / `__cpaActionsLoupeLoaded` / `__cpaActionsVolumeLoaded` / `__cpaAudioPipelineLoaded`）も拾うので、素の grep 件数は名前空間数と一致しない |
 | カラーピッカー履歴上限 | 20 件 | `ColorPicker.HISTORY_LIMIT` |
 | popup タブ数 | 8 | `PopupTabs.ALL`（調整 / YouTube / X / Instagram / TikTok / Wikipedia / カラーピッカー / 設定） |
 | YouTube 機能拡張 カテゴリ数 | 5 | `SearchFixer.CATEGORIES`（menu_ui / video_filter / watch_page / search_only / integration） |
@@ -50,7 +50,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 
 popup は **8 カテゴリをカスタムドロップダウンで切り替える構成** (`調整 / YouTube / X / Instagram / TikTok / Wikipedia / カラーピッカー / 設定`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。**サブタブ（調整タブの オーディオ / 映像 / Amazon、YouTube / Instagram のカテゴリ）も `POPUP_LAST_SUBTAB`（親タブ id → サブタブ id のレコード）に永続化**する（`PopupTabs.normalizeSubTabs` で形だけ正規化し、保存済み id が現存しないときは先頭サブタブにフォールバック。1 キーに複数タブ分が相乗りするので書き戻し前に storage 現在値を再取得してマージする）。
 
-設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（ブラウザ UI 言語が `ja` → 日本語 / それ以外 → 英語にフォールバック）。`manifest.json` の `default_locale: "en"` + `_locales/{en,ja}/messages.json` を単一情報源とし、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。
+設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（9 言語: 英語・日本語・簡体字中国語 `zh_CN`・繁体字中国語 `zh_TW`・韓国語 `ko`・スペイン語 `es`・フランス語 `fr`・ドイツ語 `de`・ブラジルポルトガル語 `pt_BR`。ブラウザ UI 言語に合う言語、無ければ英語にフォールバック。構成は Toolport と同じ）。`manifest.json` の `default_locale: "en"` + `_locales/<9 言語>/messages.json`（`en` を正本）を単一情報源とし、popup ヘッダーの言語選択は `Localizer`（`actions-core.js`）が `chrome.i18n` を差し替えて実現し、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。
 
 ## Build Commands
 
@@ -85,13 +85,22 @@ Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-fir
 | `test/image-downloader.test.js` | TikTok の安全な挿入先、共有コンテナ内の画像別ボタン所有・URL・位置・撤去 |
 | `test/instagram-video-controls.test.js` | Instagram 動画コントロールの Space 抑止・再生切替・入力除外・repeat・OFF cleanup |
 | `test/actions-loading.test.js` | popup / offscreen / 両 background と各注入エントリの分割定義の読み込み順・依存閉包・再評価時の参照同一性 |
+| `test/youtube-playlist-reverse.test.js` | 再生リスト逆順再生の MAIN 側判定（自動の次へ・次へ / 前への入れ替え、最後の動画の終了、1 本 1 回の移動、ループ折り返し、通過させる操作、heartbeat 途絶時の撤去） |
+| `test/localizer.test.js` | 表示言語の切り替え（`Localizer`）の文言の差し込み・圧縮・標準 `chrome.i18n` への差し替えとフォールバック・storage 変更の反映 |
+| `test/locales.test.js` | 全ロケールが英語と同じキー・順序・差し込み・placeholders を持ち、空文言がないこと、appName 45 / appDescription 132 文字以内、popup.html の data-i18n が英語に存在すること。言語を足すときは EXPECTED を更新 |
+| `test/youtube-game-crop.test.js` | ゲーム画面拡大の純粋な計算（範囲の正規化・保存データの上限・チャンネル識別子・拡大の倍率と中心合わせ・レターボックス時の clip）。DOM 描画は実ブラウザで確認 |
 | `test/broadcast-clock-render.test.js` | 配信時刻オーバーレイの描画間引き中の最終位置の追従描画（一時停止直前の時刻を残さない）と撤去時の予約取消 |
 | `test/live-chat-collapse.test.js` | ライブチャット折りたたみの再生リスト遷移後の再適用と手動再表示の維持、遷移中 OFF・失効時の解除と遅延通知の扱い |
 | `test/search-fixer-blocked-channels.test.js` | チャンネル除外リストの storage 通知反映・500件上限・初期取得より新しい通知の優先 |
 | `test/video-adjustments.test.js` | ガンマ補正 / 黒帯除去の OFF 時非接触・元の inline style 復元・metadata 待機の解除 |
+| `test/background-installed.test.js` | onInstalled の storage 読み取り失敗時も sentinel まで進み、既存設定を既定値で上書きしない |
+| `test/offscreen-audio-init.test.js` | 音量ブースター初期化失敗時の track 停止 → AudioContext close の解放順 |
+| `test/loupe-bodyless.test.js` | body の無い文書でルーペが起動状態に固着せず、body 取得後に起動する |
+| `test/early-orphan.test.js` | TikTok / X の early で context 失効後に pre クラスを撤去する |
 | `scripts/Install-Dependencies.test.mjs` | `bun run deps` の固定復元入口が版不一致・lock 欠落・不正を拒否すること |
 | `scripts/dependency-security.test.cjs` | deepmerge patch の prototype 汚染防止と通常 API の維持、minimatch / multimatch override・ESLint 設定経路の import patch・web-ext FileFilter の除外維持（`bun run test:dependencies` でも単独実行） |
 | `test/_load-actions.js` | 上記から共有する分割定義ロード用ヘルパー。Bun の探索規則に従うため、総件数は `bun --bun run test` の出力を正とする |
+| `scripts/verify-*.js` | 実ブラウザ（Puppeteer）の手動 E2E。`bun --bun run test` の対象外で、未使用の絶対パスを環境変数 `VUORA_BROWSER_TEST_DIR` に渡して `bun test ./scripts/verify-popup-settings.js` のように個別実行する（popup の保存・復元、Amazon 合計、NotebookLM フォーカス、X 画像保存、Wikipedia の確認） |
 
 ### 依存パッケージの運用
 
@@ -153,6 +162,8 @@ bun --bun run lint
 | Instagram / TikTok / X のクリーナー | 各クリーナー節 |
 | Gemini Notebook 送信 | Gemini Notebook 送信 |
 | 配信時刻オーバーレイ | 配信時刻オーバーレイ |
+| 再生リスト逆順再生 | 再生リスト逆順再生 |
+| ゲーム画面拡大 | ゲーム画面拡大 |
 
 Instagram の非表示・動画操作・画像保存を変更するときは、[DESIGN.md のサイト内 DOM と操作 UI の所有境界](DESIGN.md#サイト内-dom-と操作-ui-の所有境界)を確認する。`bun --bun run test` に加え、実ブラウザで投稿詳細・モーダル・SPA 遷移、入力中の Space、機能 OFF 時の復元を確認する。DOM fixture の成功だけで実サイトの操作性を検証済みとしない。
 

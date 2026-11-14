@@ -1,0 +1,107 @@
+/*
+ * YouTube 再生リスト逆順再生（youtube-playlist-reverse.js が付けるクラスだけを対象にする）
+ *   - __cpa-ypr-reversed: 再生リスト欄の並びを見た目だけ逆にする（DOM 順は変えない）
+ *   - __cpa-ypr-toggle:   再生リスト欄のループ・シャッフルの隣の「逆順」切り替え
+ *   - __cpa-ypr-play:     再生リストページの「すべて再生」の隣の「逆順で再生」
+ * 色はライト / ダークの両テーマに合わせて明示する（再生リストページのボタンは見出しの
+ * サムネイル色の背景に重ねるため、テーマに関係なく白文字の半透明）。
+ */
+
+ytd-playlist-panel-renderer.__cpa-ypr-reversed #items {
+  display: flex !important;
+  flex-direction: column-reverse !important;
+}
+
+.__cpa-ypr-toggle,
+.__cpa-ypr-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 36px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.__cpa-ypr-toggle svg,
+.__cpa-ypr-play svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.__cpa-ypr-toggle:focus-visible,
+.__cpa-ypr-play:focus-visible {
+  outline: 2px solid var(--yt-spec-call-to-action, #065fd4);
+  outline-offset: 2px;
+}
+
+/*
+ * 再生リスト欄: ループ・シャッフルのアイコンボタンと並ぶため、通常時は背景なし。
+ * 配色は YouTube の変数に頼らず、ライト / ダークそれぞれの組を明示する（変数が無いと
+ * ダークで白地に白文字になるため）。ダークは html[dark] と、再生リスト欄自身の is-dark-theme で判定する。
+ */
+.__cpa-ypr-toggle {
+  --cpa-ypr-text: #0f0f0f;
+  --cpa-ypr-hover: rgba(0, 0, 0, 0.08);
+  --cpa-ypr-on-bg: #0f0f0f;
+  --cpa-ypr-on-text: #ffffff;
+  margin-left: 4px;
+  padding: 0 12px 0 8px;
+  background: transparent;
+  color: var(--cpa-ypr-text);
+}
+
+html[dark] .__cpa-ypr-toggle,
+ytd-playlist-panel-renderer[is-dark-theme] .__cpa-ypr-toggle {
+  --cpa-ypr-text: #f1f1f1;
+  --cpa-ypr-hover: rgba(255, 255, 255, 0.14);
+  --cpa-ypr-on-bg: #f1f1f1;
+  --cpa-ypr-on-text: #0f0f0f;
+}
+
+.__cpa-ypr-toggle:hover {
+  background: var(--cpa-ypr-hover);
+}
+
+/* ON は塗りつぶしで、逆順中であることを一目で分かるようにする。 */
+.__cpa-ypr-toggle[aria-pressed="true"] {
+  background: var(--cpa-ypr-on-bg);
+  color: var(--cpa-ypr-on-text);
+}
+
+.__cpa-ypr-toggle[aria-pressed="true"]:hover {
+  background: var(--cpa-ypr-on-bg);
+  opacity: 0.88;
+}
+
+/*
+ * 再生リストページ: 見出しの操作列（「すべて再生」など）と同じ並びに置く。
+ * YouTube の各操作は右側に 8px の余白を含む箱になっているため、同じ余白を右に持たせて
+ * ボタン間の間隔をそろえる（左に余白を足すと、前のボタンとの間だけ広がって右に寄って見える）。
+ */
+.__cpa-ypr-play-wrap {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding-right: 8px;
+}
+
+.__cpa-ypr-play {
+  padding: 0 16px 0 12px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.__cpa-ypr-play:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

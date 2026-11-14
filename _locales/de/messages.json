@@ -1,0 +1,1699 @@
+{
+  "settingsSyncTitle": {
+    "message": "Einstellungen zwischen PCs synchronisieren"
+  },
+  "settingsSyncDescription": {
+    "message": "Auf jedem PC im selben Browser mit demselben Konto anmelden, die Erweiterungssynchronisierung im Browser aktivieren und diese Option einschalten. Beim Aktivieren haben bereits synchronisierte Einstellungen Vorrang; spätere Konflikte werden pro Einstellung anhand der neueren Änderung gelöst. Chrome und Firefox können nicht miteinander synchronisieren. Authentifizierung, Zielkonten, Farbverlauf und Panelpositionen bleiben auf diesem PC. Beim Ausschalten werden keine Cloud-Daten gelöscht."
+  },
+  "settingsSyncOff": {
+    "message": "Synchronisierung aus. Einstellungen werden auf diesem PC gespeichert."
+  },
+  "settingsSyncWorking": {
+    "message": "Synchronisierte Einstellungen werden geprüft…"
+  },
+  "settingsSyncReady": {
+    "message": "Im Browser-Sync-Speicher gesichert. Andere PCs erhalten Änderungen ggf. verzögert."
+  },
+  "settingsSyncError": {
+    "message": "Synchronisierung fehlgeschlagen. Lokale Einstellungen bleiben erhalten. Browser-Synchronisierung und Speicherlimits prüfen, dann erneut versuchen. Einstellungen und gespeicherte Löschvermerke können das Sync-Kontingent überschreiten."
+  },
+  "settingsSyncRetry": {
+    "message": "Erneut synchronisieren"
+  },
+  "appName": {
+    "message": "Vuora",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
+  },
+  "appDescription": {
+    "message": "Lokale Lese- und Audiotools für YouTube, Wikipedia, soziale Medien und Shopping-Seiten.",
+    "description": "Short description (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "Vuora",
+    "description": "Hover tooltip on the toolbar icon"
+  },
+  "headerTitle": {
+    "message": "Vuora",
+    "description": "h1 in the popup header"
+  },
+  "headerTagline": {
+    "message": "Verstärken, entrümpeln, durchhalten – in einem Panel",
+    "description": "Tagline shown beneath the popup header"
+  },
+  "categorySelectorLabel": {
+    "message": "Kategorie"
+  },
+  "tabbarAriaLabel": {
+    "message": "Anzuzeigende Kategorie"
+  },
+  "tabTune": {
+    "message": "Anpassen"
+  },
+  "tabYoutube": {
+    "message": "YouTube"
+  },
+  "tabInstagram": {
+    "message": "Instagram"
+  },
+  "tabTiktok": {
+    "message": "TikTok"
+  },
+  "tabX": {
+    "message": "X"
+  },
+  "tabPicker": {
+    "message": "Farbwähler"
+  },
+  "groupAudio": {
+    "message": "Audio"
+  },
+  "groupVideo": {
+    "message": "Video"
+  },
+  "groupAmazon": {
+    "message": "Amazon"
+  },
+  "volumeBoosterMaster": {
+    "message": "Lautstärkeverstärker"
+  },
+  "volumeBoosterMasterDesc": {
+    "message": "Tab-Audio verstärken und formen. Einstellungen gelten beim Tabwechsel automatisch."
+  },
+  "volumeSubLabel": {
+    "message": "Lautstärkeverstärker"
+  },
+  "volumeSubDesc": {
+    "message": "Für das beste Ergebnis die Player-Lautstärke auf 100 % stellen und hier anpassen."
+  },
+  "volumeMesFirefoxNote": {
+    "message": "Die Firefox-Version verstärkt Audio per Verarbeitung in der Seite (MediaElementSource); Einstellungen gelten automatisch für alle Tabs. DRM-geschützte Videos (Netflix, Prime Video usw.) werden nicht unterstützt."
+  },
+  "volumeReset100Btn": {
+    "message": "Auf 100 % zurücksetzen"
+  },
+  "volumeReset100Aria": {
+    "message": "Lautstärke auf 100 % zurücksetzen"
+  },
+  "volumeStepDownAria": {
+    "message": "Lautstärke um 10 % verringern"
+  },
+  "volumeStepDownTitle": {
+    "message": "Lautstärke um 10 % verringern"
+  },
+  "volumeStepUpAria": {
+    "message": "Lautstärke um 10 % erhöhen"
+  },
+  "volumeStepUpTitle": {
+    "message": "Lautstärke um 10 % erhöhen"
+  },
+  "volumeMuteAriaOff": {
+    "message": "Stummschalten"
+  },
+  "volumeMuteAriaOn": {
+    "message": "Stummschaltung aufheben"
+  },
+  "volumeMuteTitleOff": {
+    "message": "Stummschalten (Lautstärke bleibt erhalten)"
+  },
+  "volumeMuteTitleOn": {
+    "message": "Stummschaltung aufheben (Lautstärke wiederherstellen)"
+  },
+  "volumeAntiClipLabel": {
+    "message": "Auto-Verzerrungsschutz"
+  },
+  "volumeAntiClipDesc": {
+    "message": "Dämpft plötzliche Schreie und Effektspitzen, um Übersteuern beim Verstärken zu verringern."
+  },
+  "volumeNightModeLabel": {
+    "message": "Nachtmodus"
+  },
+  "volumeNightModeDesc": {
+    "message": "Komprimiert laute Stimmen und Explosionen sanft, damit leiser Spielsound nicht untergeht."
+  },
+  "volumeBassCutLabel": {
+    "message": "Nachbarschutz"
+  },
+  "volumeBassCutDesc": {
+    "message": "Schneidet tiefe Bässe ab, damit sie nicht durch Wände und Decken dröhnen und Nachbarn stören."
+  },
+  "volumeEqLabel": {
+    "message": "Equalizer"
+  },
+  "volumeEqDesc": {
+    "message": "Jedes Frequenzband mit einem 10-Band-EQ anpassen. Bässe oder Höhen anheben oder ein Preset wählen."
+  },
+  "volumeEqPresetLabel": {
+    "message": "Preset"
+  },
+  "volumeEqPreamp": {
+    "message": "Vorverstärkung"
+  },
+  "volumeEqPresetFlat": {
+    "message": "Linear"
+  },
+  "volumeEqPresetBass": {
+    "message": "Bassanhebung"
+  },
+  "volumeEqPresetTreble": {
+    "message": "Höhenanhebung"
+  },
+  "volumeEqPresetVocal": {
+    "message": "Gesang"
+  },
+  "volumeEqPresetLoudness": {
+    "message": "Loudness"
+  },
+  "volumeEqPresetEargasm": {
+    "message": "Eargasm Explosion"
+  },
+  "volumeEqPresetEargasmKai": {
+    "message": "Eargasm Explosion Kai"
+  },
+  "volumeEqPresetPerfect": {
+    "message": "Perfect"
+  },
+  "volumeEqPresetPerfectKai": {
+    "message": "Perfect Kai"
+  },
+  "volumeEqPresetCustom": {
+    "message": "Benutzerdefiniert"
+  },
+  "videoGammaMaster": {
+    "message": "Videogamma"
+  },
+  "videoGammaMasterDescPre": {
+    "message": "Gammakorrektur auf alle "
+  },
+  "videoGammaMasterDescPost": {
+    "message": "-Elemente der Seite anwenden. Hellt dunkle Videos auf und dämpft zu helle."
+  },
+  "videoGammaSubLabel": {
+    "message": "Gammawert"
+  },
+  "videoGammaSubDesc": {
+    "message": "1,0 bedeutet keine Korrektur. Unter 1,0 werden Schatten aufgehellt (heller); über 1,0 steigt der Kontrast (dunkler)."
+  },
+  "videoGammaResetBtn": {
+    "message": "Auf 1,0 zurücksetzen"
+  },
+  "videoGammaResetAria": {
+    "message": "Gamma auf 1,0 zurücksetzen"
+  },
+  "videoFillMaster": {
+    "message": "Schwarze Videoränder entfernen"
+  },
+  "videoFillMasterDesc": {
+    "message": "Entfernt Letterbox- und Pillarbox-Ränder auf Ultrawide-Monitoren, indem das Video zoomt oder gedehnt den Bildschirm füllt."
+  },
+  "videoFillModeLabel": {
+    "message": "Anzeigemodus"
+  },
+  "videoFillModeAriaLabel": {
+    "message": "Anzeigemodus wählen"
+  },
+  "videoFillModeZoom": {
+    "message": "Zoomen"
+  },
+  "videoFillModeStretch": {
+    "message": "Dehnen"
+  },
+  "videoFillTargetLabel": {
+    "message": "Monitor"
+  },
+  "videoFillTargetDesc": {
+    "message": "Seitenverhältnis oder Auflösung des Bildschirms wählen; die Form jedes Videos wird automatisch erkannt, um schwarze Ränder zu entfernen."
+  },
+  "videoFillGroupAspect": {
+    "message": "Seitenverhältnis"
+  },
+  "videoFillGroupResolution": {
+    "message": "Auflösung"
+  },
+  "loupeMaster": {
+    "message": "Lupe"
+  },
+  "loupeMasterDesc": {
+    "message": "Den aktuellen Bildausschnitt mit einer runden Linse vergrößern. Am besten nach dem Pausieren von Videos. Linksklick zum Ausschalten."
+  },
+  "loupeZoomLabel": {
+    "message": "Zoom"
+  },
+  "loupeZoomAriaLabel": {
+    "message": "Zoomstufe wählen"
+  },
+  "loupeSizeLabel": {
+    "message": "Linsengröße"
+  },
+  "loupeSizeDesc": {
+    "message": "Linsendurchmesser zwischen 150 und 1000 px einstellen."
+  },
+  "loupeErrorInvalidTab": {
+    "message": "⚠ Tab nicht lesbar"
+  },
+  "loupeErrorUnsupportedPage": {
+    "message": "⚠ Lupe auf dieser Seite nicht verfügbar"
+  },
+  "loupeErrorPermission": {
+    "message": "⚠ Berechtigungsfehler"
+  },
+  "loupeErrorQuota": {
+    "message": "⚠ Aufnahmelimit überschritten"
+  },
+  "loupeErrorUnknown": {
+    "message": "⚠ Lupe konnte nicht gestartet werden"
+  },
+  "amazonDeliveryMaster": {
+    "message": "Monatssumme Sparabo"
+  },
+  "amazonDeliveryMasterDescPre": {
+    "message": "Monatssumme auf der Seite "
+  },
+  "amazonDeliveryMasterDescPost": {
+    "message": " anzeigen. Fehlende Preise werden mit aktuellen Sparabo-Preisen von Amazon ergänzt, ersatzweise mit dem Stückpreis der letzten Lieferung."
+  },
+  "amazonRankingJumpMaster": {
+    "message": "Button „Zum Ranking“"
+  },
+  "amazonRankingJumpMasterDesc": {
+    "message": "Oben auf Produktseiten den Button „Zum Ranking dieses Produkts“ anzeigen.",
+    "description": "Master toggle description for the Amazon jump-to-ranking button"
+  },
+  "amazonRankingJumpButton": {
+    "message": "Zum Ranking dieses Produkts"
+  },
+  "amazonRankingJumpAriaLabel": {
+    "message": "Zum Ranking dieses Produkts"
+  },
+  "amazonMerchantInfoMaster": {
+    "message": "Badge Verkäufer / Versender"
+  },
+  "amazonMerchantInfoMasterDesc": {
+    "message": "Oben auf Produktseiten ein Badge für Verkäufer / Versender anzeigen (Versand durch Amazon = grün / Marktplatz = oranger Hinweis).",
+    "description": "Master toggle description for the Amazon seller / shipper badge"
+  },
+  "amazonMerchantInfoSoldBy": {
+    "message": "Verkauf"
+  },
+  "amazonMerchantInfoShipsFrom": {
+    "message": "Versand"
+  },
+  "amazonMerchantInfoAriaAmazon": {
+    "message": "Versand durch Amazon"
+  },
+  "amazonMerchantInfoAriaMarketplace": {
+    "message": "Marktplatz-Angebot"
+  },
+  "amazonMerchantInfoAriaUnknown": {
+    "message": "Verkäufer nicht geprüft"
+  },
+  "searchFixerMaster": {
+    "message": "YouTube-Erweiterungen"
+  },
+  "searchFixerMasterDesc": {
+    "message": "40 Unterfunktionen gesammelt verwalten: Shorts entfernen, Suchrauschen filtern, Wiedergabeseite aufräumen, Kommentare und Live-Chat ausblenden, Abo-Erweiterungen, Videos an Gemini Notebook senden und mehr."
+  },
+  "instagramCleanerMaster": {
+    "message": "Instagram-Aufräumer"
+  },
+  "instagramCleanerMasterDesc": {
+    "message": "Überflüssige Oberfläche wie Reels, Entdecken und Stories mit einem Schalter ausblenden."
+  },
+  "tiktokCleanerMaster": {
+    "message": "TikTok-Aufräumer"
+  },
+  "tiktokCleanerMasterDesc": {
+    "message": "Überflüssige Oberfläche wie Kommentarbereich und vorgeschlagene Konten mit einem Schalter ausblenden."
+  },
+  "xCleanerMaster": {
+    "message": "X-Aufräumer"
+  },
+  "xCleanerMasterDesc": {
+    "message": "Ablenkende Oberfläche wie rechte Spalte, Werbung und Upsells mit einem Schalter ausblenden."
+  },
+  "cleanerHint": {
+    "message": "Nur aktiv, solange der Hauptschalter (Aufräumer) eingeschaltet ist. Einzelne Unterfunktionen nach Bedarf wählen."
+  },
+  "pickerActivateJp": {
+    "message": "Farbe vom Bildschirm wählen"
+  },
+  "pickerActivateEn": {
+    "message": "Pipette aktivieren"
+  },
+  "pickerNoteIdle": {
+    "message": "Button drücken, um eine beliebige Farbe auf dem Bildschirm zu wählen (Esc bricht ab)."
+  },
+  "specimenTitle": {
+    "message": "Aktuelle Farbe"
+  },
+  "specimenPillEmpty": {
+    "message": "Keine"
+  },
+  "specimenNoEmpty": {
+    "message": "Nicht gespeichert"
+  },
+  "specimenNoSaved": {
+    "message": "Verlauf $NO$",
+    "placeholders": {
+      "no": {
+        "content": "$1",
+        "example": "01"
+      }
+    }
+  },
+  "specimenTimeEmpty": {
+    "message": "—"
+  },
+  "specimenTimeSaved": {
+    "message": "Gespeichert $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "12:34"
+      }
+    }
+  },
+  "copyBtnLabel": {
+    "message": "Kopieren"
+  },
+  "copyBtnDone": {
+    "message": "Kopiert"
+  },
+  "copyHexAria": {
+    "message": "HEX kopieren"
+  },
+  "copyRgbAria": {
+    "message": "RGB kopieren"
+  },
+  "copyHslAria": {
+    "message": "HSL kopieren"
+  },
+  "editHexAria": {
+    "message": "HEX-Wert (bearbeitbar)"
+  },
+  "editRgbAria": {
+    "message": "RGB-Wert (bearbeitbar)"
+  },
+  "editHslAria": {
+    "message": "HSL-Wert (bearbeitbar)"
+  },
+  "valueEditHint": {
+    "message": "Alle drei Felder sind bearbeitbar. Farbcode einfügen, um ihn sofort zu sehen, oder Enter drücken, um ihn im Verlauf zu speichern."
+  },
+  "paletteTitle": {
+    "message": "Farbe anpassen"
+  },
+  "paletteAreaAria": {
+    "message": "Sättigung und Helligkeit anpassen (Pfeiltasten zum Verschieben, Umschalt für größere Schritte)"
+  },
+  "paletteAxisHint": {
+    "message": "Ziehen zum Anpassen – horizontal = Sättigung / vertikal = Helligkeit"
+  },
+  "paletteSaturationLabel": {
+    "message": "Sättigung"
+  },
+  "paletteBrightnessLabel": {
+    "message": "Helligkeit"
+  },
+  "palettePercentValue": {
+    "message": "$VALUE$ %",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "paletteHueLabel": {
+    "message": "Farbton"
+  },
+  "paletteHueAria": {
+    "message": "Farbton"
+  },
+  "palettePillValue": {
+    "message": "Farbton $H$° / Sättigung $S$ % / Helligkeit $V$ %",
+    "placeholders": {
+      "h": {
+        "content": "$1",
+        "example": "213"
+      },
+      "s": {
+        "content": "$2",
+        "example": "45"
+      },
+      "v": {
+        "content": "$3",
+        "example": "55"
+      }
+    }
+  },
+  "paletteAddBtn": {
+    "message": "Farbe im Verlauf speichern"
+  },
+  "paletteResetBtn": {
+    "message": "Anpassungen zurücksetzen"
+  },
+  "formatTitle": {
+    "message": "Kopiereinstellungen"
+  },
+  "formatLegend": {
+    "message": "Format für automatisches Kopieren"
+  },
+  "formatRowAria": {
+    "message": "Format für automatisches Kopieren"
+  },
+  "formatHashLabel": {
+    "message": "# bei HEX einschließen"
+  },
+  "formatNote": {
+    "message": "Farben werden im gewählten Format automatisch kopiert, sobald sie mit der Pipette gewählt oder ein Verlaufseintrag angeklickt wird."
+  },
+  "historyTitle": {
+    "message": "Verlauf"
+  },
+  "historyHint": {
+    "message": "Auf eine Farbe klicken, um sie zur aktuellen Farbe zu machen und im unten eingestellten Format zu kopieren."
+  },
+  "historyEmpty": {
+    "message": "Noch keine Farben. Mit der Pipette wählen oder einen Farbcode einfügen und Enter drücken."
+  },
+  "historyClearBtn": {
+    "message": "Gesamten Verlauf löschen"
+  },
+  "extVersionAriaLabel": {
+    "message": "Erweiterungsversion"
+  },
+  "eyedropperUnsupported": {
+    "message": "Die EyeDropper-API wird nicht unterstützt. Bitte Chrome 95 oder neuer verwenden."
+  },
+  "pickerNoteActive": {
+    "message": "Pipette aktiv – irgendwo auf den Bildschirm klicken (Esc bricht ab)"
+  },
+  "pickerNoteRetake": {
+    "message": "Erneut drücken, um weiter zu wählen."
+  },
+  "pickerNoteCancelled": {
+    "message": "Auswahl abgebrochen."
+  },
+  "pickerNoteFailed": {
+    "message": "Farbauswahl fehlgeschlagen. Bitte erneut versuchen."
+  },
+  "pickerCopyOk": {
+    "message": "Gewählt – $FORMAT$ kopiert: $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "Gewählt – $FORMAT$: $TEXT$ (Kopieren fehlgeschlagen)",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerInputInvalid": {
+    "message": "Das ließ sich nicht als Farbe lesen (z. B. #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%))."
+  },
+  "pickerInputAdded": {
+    "message": "$HEX$ im Verlauf gespeichert",
+    "placeholders": {
+      "hex": {
+        "content": "$1",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "historyClearedToast": {
+    "message": "Verlauf gelöscht."
+  },
+  "pickerHistorySaveFailed": {
+    "message": "Verlauf konnte nicht gespeichert werden. Bitte erneut versuchen."
+  },
+  "copyOkToast": {
+    "message": "$FORMAT$ kopiert: $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "copyFailToast": {
+    "message": "Kopieren fehlgeschlagen."
+  },
+  "copyToast": {
+    "message": "$FORMAT$: $TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipAria": {
+    "message": "$HEX$ zur aktuellen Farbe machen und kopieren",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      }
+    }
+  },
+  "pillTemplate": {
+    "message": "$ON$/$TOTAL$ aktiv",
+    "placeholders": {
+      "on": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "gridItemsLabel": {
+    "message": "Spalten auf Startseite"
+  },
+  "gridItemsDesc": {
+    "message": "Legt fest, wie viele Videos pro Zeile in den Rastern von Startseite und Suchergebnissen stehen (Auto behält die Standardspaltenzahl von YouTube)."
+  },
+  "gridAuto": {
+    "message": "Auto (YouTube-Standard)"
+  },
+  "grid4Cols": {
+    "message": "4 Sp."
+  },
+  "grid5Cols": {
+    "message": "5 Sp."
+  },
+  "grid6Cols": {
+    "message": "6 Sp."
+  },
+  "categoryMenuUi": {
+    "message": "Menü / UI"
+  },
+  "categoryVideoFilter": {
+    "message": "Videofilter"
+  },
+  "categoryWatchPage": {
+    "message": "Wiedergabeseite"
+  },
+  "categorySearchOnly": {
+    "message": "Suchergebnisse"
+  },
+  "categoryIntegration": {
+    "message": "Integrationen"
+  },
+  "nlmSendLabel": {
+    "message": "Gemini Notebook"
+  },
+  "nlmAccount": {
+    "message": "Google-Konto"
+  },
+  "nlmAccountDefault": {
+    "message": "Standard (0)"
+  },
+  "nlmAccountNth": {
+    "message": "Konto {0}"
+  },
+  "nlmPickNotebook": {
+    "message": "Ziel-Notebook"
+  },
+  "nlmNewNotebook": {
+    "message": "+ Neues Notebook erstellen"
+  },
+  "nlmLoading": {
+    "message": "Notebooks werden geladen…"
+  },
+  "nlmEmpty": {
+    "message": "Keine vorhandenen Notebooks"
+  },
+  "nlmSending": {
+    "message": "Wird gesendet…"
+  },
+  "nlmSkipped": {
+    "message": "{0} Element(e) übersprungen (Quellenlimit)"
+  },
+  "nlmOpenNotebookLm": {
+    "message": "Gemini Notebook öffnen"
+  },
+  "nlmErrorNetwork": {
+    "message": "Gemini Notebook nicht erreichbar"
+  },
+  "nlmErrorProtocol": {
+    "message": "Verbindung nicht möglich – Gemini Notebook hat seine Schnittstelle geändert"
+  },
+  "nlmOpenNotebook": {
+    "message": "Erstelltes Notebook öffnen"
+  },
+  "nlmErrorFull": {
+    "message": "Dieses Notebook hat sein Quellenlimit erreicht"
+  },
+  "nlmErrorAuth": {
+    "message": "Bitte bei Gemini Notebook anmelden"
+  },
+  "nlmErrorNoUrls": {
+    "message": "Keine Videos zum Senden gefunden"
+  },
+  "nlmErrorRpc": {
+    "message": "Senden an Gemini Notebook fehlgeschlagen"
+  },
+  "nlmErrorUnknown": {
+    "message": "Senden an Gemini Notebook fehlgeschlagen"
+  },
+  "ytCleanerSubtabsAria": {
+    "message": "Kategorien der YouTube-Erweiterungen"
+  },
+  "igCleanerSubtabsAria": {
+    "message": "Kategorien des Instagram-Aufräumers"
+  },
+  "tuneSubtabsAria": {
+    "message": "Kategorien von Anpassen"
+  },
+  "categoryIgMain": {
+    "message": "Haupt"
+  },
+  "categoryIgExtra": {
+    "message": "Extras"
+  },
+  "categoryTtMain": {
+    "message": "Haupt"
+  },
+  "categoryXLayout": {
+    "message": "Layout"
+  },
+  "categoryXNoise": {
+    "message": "Störendes"
+  },
+  "categoryXTimeline": {
+    "message": "Timeline"
+  },
+  "applyOkSearchFixer": {
+    "message": "YT-Erweiterungen"
+  },
+  "applyOkAmazon": {
+    "message": "Amazon"
+  },
+  "applyOkAmazonRanking": {
+    "message": "Ranking-Sprung"
+  },
+  "applyOkAmazonMerchantInfo": {
+    "message": "Verkäufer-Badge"
+  },
+  "applyOkInstagram": {
+    "message": "Instagram"
+  },
+  "applyOkTiktok": {
+    "message": "TikTok"
+  },
+  "applyOkX": {
+    "message": "X"
+  },
+  "applyOkVideoGamma": {
+    "message": "Videogamma"
+  },
+  "applyOkVideoFill": {
+    "message": "Ränder entfernen"
+  },
+  "applyOkLoupe": {
+    "message": "Lupe"
+  },
+  "applyOkAllStopped": {
+    "message": "⏹  Alles gestoppt"
+  },
+  "applyOkPrefix": {
+    "message": "✓  "
+  },
+  "applyOkSeparator": {
+    "message": "  /  "
+  },
+  "applyError": {
+    "message": "⚠️ Einstellungen konnten nicht gespeichert oder angewendet werden"
+  },
+  "volumeErrorInvalidTab": {
+    "message": "⚠ Tab nicht lesbar"
+  },
+  "volumeErrorOffscreenUnavailable": {
+    "message": "⚠ Interner Prozessor nicht startbar"
+  },
+  "volumeErrorInvalidStream": {
+    "message": "⚠ Audio nicht aufnehmbar"
+  },
+  "volumeErrorTabClosed": {
+    "message": "⚠ Tab wurde geschlossen"
+  },
+  "volumeErrorUserGesture": {
+    "message": "⚠ Nur änderbar, solange das Popup geöffnet ist"
+  },
+  "volumeErrorUnsupportedPage": {
+    "message": "⚠ Auf dieser Seite nicht unterstützt"
+  },
+  "volumeErrorPermission": {
+    "message": "⚠ Berechtigungsfehler"
+  },
+  "volumeErrorUnknown": {
+    "message": "⚠ Lautstärke konnte nicht geändert werden"
+  },
+  "volumeErrorCommunication": {
+    "message": "⚠ Kommunikationsfehler"
+  },
+  "amazonTotalText": {
+    "message": "Summe"
+  },
+  "amazonTotalReference": {
+    "message": "Geschätzte Summe (aktuelle Preise)"
+  },
+  "amazonTotalPreviousReference": {
+    "message": "Geschätzte Summe (inkl. früherer Preise)"
+  },
+  "amazonTotalReferenceNote": {
+    "message": "Der abgerechnete Betrag kann abweichen"
+  },
+  "amazonTotalLoading": {
+    "message": "Summe wird geladen…"
+  },
+  "amazonTotalUnavailable": {
+    "message": "Summe konnte nicht abgerufen werden"
+  },
+  "subsAllShortcutLabel": {
+    "message": "Alle Abos"
+  },
+  "subsSearchPlaceholder": {
+    "message": "Nach Kanalname oder Handle filtern"
+  },
+  "imageDownloadButtonLabel": {
+    "message": "Bild herunterladen"
+  },
+  "feat_sf_playlist_label": {
+    "message": "Playlists"
+  },
+  "feat_sf_playlist_desc": {
+    "message": "Playlist-Einträge entfernen (Links mit playlist?list= / Badges „N Videos“)."
+  },
+  "feat_sf_mix_label": {
+    "message": "Mix"
+  },
+  "feat_sf_mix_desc": {
+    "message": "Automatisch erzeugte YouTube-Mixe entfernen (&list=RD&start_radio=1 / Badge „Mix“)."
+  },
+  "feat_sf_shortsBtn_label": {
+    "message": "Shorts (einzeln)"
+  },
+  "feat_sf_shortsBtn_desc": {
+    "message": "Einzelne Shorts-Karten in Video-Rastern entfernen (Hochformat-Einträge, deren Vorschaubild-URL /shorts/ enthält)."
+  },
+  "feat_sf_removeShortsShelf_label": {
+    "message": "Shorts-Regal"
+  },
+  "feat_sf_removeShortsShelf_desc": {
+    "message": "Das Shorts-Regal der Startseite (ytd-rich-shelf-renderer[is-shorts]) und das horizontale Shorts-Regal in Suchergebnissen (ytd-reel-shelf-renderer) vollständig entfernen."
+  },
+  "feat_sf_live_label": {
+    "message": "Live / Premiere / Station"
+  },
+  "feat_sf_live_desc": {
+    "message": "Videos mit den Vorschau-Badges LIVE / Premiere / Station entfernen. „Station“ = von YouTube automatisch erzeugte endlose BGM-Streams."
+  },
+  "feat_sf_membersOnly_label": {
+    "message": "Nur für Mitglieder"
+  },
+  "feat_sf_membersOnly_desc": {
+    "message": "Videos mit dem Vorschau-Badge „Nur für Mitglieder“ entfernen, die eine Kanalmitgliedschaft erfordern."
+  },
+  "feat_sf_watched_label": {
+    "message": "Bereits angesehen"
+  },
+  "feat_sf_watched_desc": {
+    "message": "Videos entfernen, die ein Overlay zum Fortsetzen der Wiedergabe zeigen (bereits angesehen)."
+  },
+  "feat_sf_hideSubscriptionsRelevant_label": {
+    "message": "„Am relevantesten“ in Abos ausblenden"
+  },
+  "feat_sf_hideSubscriptionsRelevant_desc": {
+    "message": "Den Bereich „Am relevantesten“ in den Abos samt Überschrift, Videos und Button „Mehr anzeigen“ ausblenden. Die regulären neuesten Videos bleiben."
+  },
+  "feat_sf_removeFeedSections_label": {
+    "message": "Bereiche"
+  },
+  "feat_sf_removeFeedSections_desc": {
+    "message": "Die Empfehlungsbereiche „Themen für dich“, „Eilmeldungen“ und „Game Room“ (ytd-rich-section-renderer) auf der Startseite entfernen (nur Feed-Seiten)."
+  },
+  "feat_sf_shelf_label": {
+    "message": "Video-Regal"
+  },
+  "feat_sf_shelf_desc": {
+    "message": "Videogruppen-Bereiche (ytd-shelf-renderer) wie „Trends“ oder „Nachrichten“ entfernen."
+  },
+  "feat_sf_cardList_label": {
+    "message": "Kartenliste"
+  },
+  "feat_sf_cardList_desc": {
+    "message": "Die horizontale Kartenliste mit verwandten Themen (ytd-horizontal-card-list-renderer, ab der zweiten) entfernen."
+  },
+  "feat_sf_course_label": {
+    "message": "Kurse"
+  },
+  "feat_sf_course_desc": {
+    "message": "Lerninhalts-Karten mit dem Badge „Kurs“ (.yt-lockup-view-model--wrapper) entfernen."
+  },
+  "feat_sf_channel_label": {
+    "message": "Kanal-Vorstellungskarte"
+  },
+  "feat_sf_channel_desc": {
+    "message": "Die in Suchergebnisse eingefügten Vorstellungskarten „Dieser Kanal“ (ytd-channel-renderer) entfernen."
+  },
+  "feat_sf_hideForeignChannels_label": {
+    "message": "Kanäle aus anderen Ländern ausblenden"
+  },
+  "feat_sf_hideForeignChannels_desc": {
+    "message": "Videos von Kanälen außerhalb des eigenen Landes in Suchergebnissen und Feeds entfernen (YouTubes Suchfilter kennen keine Länderbedingung, daher eine eigene Umsetzung). Titel und Kanalnamen werden zuerst nach Schriftsystem eingeordnet; nur unklare Fälle lösen einen Blick auf die Infoseite des Kanals aus. Kanäle ohne Länderangabe bleiben sichtbar."
+  },
+  "feat_sf_notebookLmSend_label": {
+    "message": "An Gemini Notebook senden"
+  },
+  "feat_sf_notebookLmSend_desc": {
+    "message": "Das angesehene Video oder die Videos einer Suchergebnis-, Playlist- oder Kanalseite als Quellen zum eigenen Google Gemini Notebook hinzufügen. Das Ziel-Notebook wird über den Button auf der Seite gewählt (auf Wiedergabeseiten neben Gefällt mir/Teilen, auf Suchseiten neben dem Suchfilter, bei Playlists unter „Alle abspielen“, bei Kanälen in der Titelzeile); auch ein neues Notebook ist möglich. Video-URLs werden nur gesendet, wenn der Button gedrückt wird – keine Erfassung des Wiedergabeverlaufs, keine Übertragung im Hintergrund. Erfordert Anmeldung bei Gemini Notebook."
+  },
+  "feat_sf_channelBlocklist_label": {
+    "message": "Kanal-Sperrliste"
+  },
+  "feat_sf_channelBlocklist_desc": {
+    "message": "Videos gesperrter Kanäle auf ganz YouTube entfernen – Suchergebnisse, Startseite, Abos, Trends und mehr (erweiterte Version des offiziellen „Kanal nicht empfehlen“ der Startseite). Eintragen über den 🚫-Button neben dem Kanalnamen in Suchergebnissen; Sperren in der Liste unten aufheben."
+  },
+  "sfBlockChannelBtnTitle": {
+    "message": "Diesen Kanal in Suchergebnissen ausblenden"
+  },
+  "sfShowCommentsButton": {
+    "message": "Kommentare anzeigen"
+  },
+  "sfHideCommentsButton": {
+    "message": "Kommentare ausblenden"
+  },
+  "sfBlockedChannelsTitle": {
+    "message": "Gesperrte Kanäle"
+  },
+  "sfBlockedChannelsEmpty": {
+    "message": "Noch keine gesperrten Kanäle. Zum Sperren in den YouTube-Suchergebnissen den 🚫-Button neben dem Kanalnamen verwenden."
+  },
+  "sfBlockedChannelRemove": {
+    "message": "Entsperren"
+  },
+  "feat_sf_reel_label": {
+    "message": "Horizontales Shorts-Regal"
+  },
+  "feat_sf_reel_desc": {
+    "message": "Das horizontale Shorts-Regal (grid-shelf-view-model) entfernen. Das Shorts-Regal der Startseite entfernt removeShortsShelf unter „Videofilter“, den Eintrag in der linken Seitenleiste removeShortsSidebar unter „Menü / UI“."
+  },
+  "feat_sf_secondary_label": {
+    "message": "Block „Ähnliche Suchen“"
+  },
+  "feat_sf_secondary_desc": {
+    "message": "Den Vorschlagsblock „Ähnliche Suchbegriffe“ am Seitenende (ytd-secondary-search-container-renderer) entfernen."
+  },
+  "feat_sf_verified_label": {
+    "message": "Videos verifizierter Kanäle"
+  },
+  "feat_sf_verified_desc": {
+    "message": "Videos von Kanälen mit Verifizierungs-Badge (offizielle Konten, Nachrichten) entfernen. Unterstützung für Feed-Seiten folgt."
+  },
+  "feat_sf_artist_label": {
+    "message": "Videos von Künstlerkanälen"
+  },
+  "feat_sf_artist_desc": {
+    "message": "Videos mit dem Badge „Offizieller Künstlerkanal“ (z. B. offizielle MVs) entfernen. Unterstützung für Feed-Seiten folgt."
+  },
+  "feat_sf_chapter_label": {
+    "message": "Videos mit Kapiteln"
+  },
+  "feat_sf_chapter_desc": {
+    "message": "Videos entfernen, die aufklappbare Kapitelinfos zeigen (expandable-metadata-renderer)."
+  },
+  "feat_sf_demoteUnmatched_label": {
+    "message": "Treffer ohne Suchbegriff abdunkeln"
+  },
+  "feat_sf_demoteUnmatched_desc": {
+    "message": "Videos, deren Titel/Beschreibung den Suchbegriff nicht enthält, halb ausblenden und in Graustufen darstellen (beim Darüberfahren wiederhergestellt)."
+  },
+  "feat_sf_highlightThumb_label": {
+    "message": "Vorschaubild-Umriss"
+  },
+  "feat_sf_highlightThumb_desc": {
+    "message": "Jedem Vorschaubild einen akane-roten Umriss und Schlagschatten für bessere Übersicht hinzufügen (funktioniert in dunklem und hellem Design)."
+  },
+  "feat_sf_hideComments_label": {
+    "message": "Kommentare ausblenden"
+  },
+  "feat_sf_hideComments_desc": {
+    "message": "Kommentare auf der Wiedergabeseite zunächst ausblenden, mit einem Button zum Ein- und Ausblenden. Der Chat von Livestreams bleibt unberührt."
+  },
+  "feat_sf_hideLiveChat_label": {
+    "message": "Live-Chat ausblenden"
+  },
+  "feat_sf_hideLiveChat_desc": {
+    "message": "Das Live-Chat-Panel bei archivierten Livestreams mit YouTubes eigener Einklappen-Funktion einklappen. Normale Videos bleiben unberührt."
+  },
+  "feat_sf_broadcastClock_label": {
+    "message": "Sendezeit bei Stream-Archiven anzeigen"
+  },
+  "feat_sf_broadcastClock_desc": {
+    "message": "Beim Abspielen eines Livestream-Archivs die reale Uhrzeit der ursprünglichen Ausstrahlung (yyyy/MM/dd hh:mm:ss) im gemeinsamen Overlay für Qualität, Wiedergabegeschwindigkeit und Lautstärke anzeigen. Nicht bei normalen Videos oder laufenden Livestreams. Die Genauigkeit kann bei Archiven mit Unterbrechungen oder Schnitten abweichen."
+  },
+  "bcOverlayLabel": {
+    "message": "Sendezeit"
+  },
+  "feat_sf_redirectShortsUrl_label": {
+    "message": "Shorts-URL auf /watch umleiten"
+  },
+  "feat_sf_redirectShortsUrl_desc": {
+    "message": "Eine Hochformatseite /shorts/<ID> auf den normalen Player /watch?v=<ID> umleiten."
+  },
+  "feat_sf_playlistReverse_label": {
+    "message": "Umkehr-Button bei Playlists anzeigen"
+  },
+  "feat_sf_playlistReverse_desc": {
+    "message": "Diese Einstellung steuert nur, ob der Umkehr-Button angezeigt wird; die Reihenfolge ändert sie nicht. Bei EIN erhält das Playlist-Panel einen Button „Umgekehrt: EIN/AUS“ und Playlist-Seiten einen Button „Umgekehrt abspielen“. Die Umkehr wird pro Playlist per Button gewählt (nur im aktuellen Tab gespeichert); solange sie EIN ist, läuft die Wiedergabe vom letzten Video zum ersten. Bei AUS dieser Einstellung verschwinden die Buttons und die ursprüngliche Reihenfolge wird wiederhergestellt."
+  },
+  "ytPlaylistReverseStateOn": {
+    "message": "Umgekehrt: EIN"
+  },
+  "ytPlaylistReverseStateOff": {
+    "message": "Umgekehrt: AUS"
+  },
+  "ytPlaylistReverseOnTitle": {
+    "message": "Diese Playlist läuft umgekehrt. Klicken, um die ursprüngliche Reihenfolge wiederherzustellen"
+  },
+  "ytPlaylistReverseOffTitle": {
+    "message": "Wiedergabe in ursprünglicher Reihenfolge. Klicken zum Umkehren"
+  },
+  "ytPlaylistReversePlay": {
+    "message": "Umgekehrt abspielen"
+  },
+  "feat_sf_gameCrop_label": {
+    "message": "Button für Spielbild-Zoom anzeigen"
+  },
+  "feat_sf_gameCrop_desc": {
+    "message": "Diese Einstellung steuert nur, ob der Button angezeigt wird. Bei EIN erhält die Player-Leiste einen Chip „Spielbild“. Bei Streams, in denen das Spielmaterial in einen Teil des Videos eingepasst und von Rahmen oder einem Avatar umgeben ist, über den Spielbereich ziehen, um den Player auf genau diesen Bereich zu zoomen. Der Bereich wird pro Kanal auf diesem Gerät gespeichert und für Videos dieses Kanals automatisch wiederverwendet. Bei AUS dieser Einstellung verschwinden Chip und Zoom (gespeicherte Bereiche bleiben erhalten)."
+  },
+  "gcLabel": {
+    "message": "Spielbild"
+  },
+  "gcToggleOn": {
+    "message": "Zoom: EIN"
+  },
+  "gcToggleOff": {
+    "message": "Zoom: AUS"
+  },
+  "gcToggleOnTitle": {
+    "message": "Auf das Spielbild gezoomt. Klicken, um das ganze Video zu zeigen"
+  },
+  "gcToggleOffTitle": {
+    "message": "Ganzes Video wird gezeigt. Klicken, um auf das gespeicherte Spielbild zu zoomen"
+  },
+  "gcSelect": {
+    "message": "Bereich wählen"
+  },
+  "gcReselect": {
+    "message": "Bereich ändern"
+  },
+  "gcSelectTitle": {
+    "message": "Auf dem Video ziehen, um das Spielbild zu wählen"
+  },
+  "gcRemove": {
+    "message": "Löschen"
+  },
+  "gcRemoveTitle": {
+    "message": "Den gespeicherten Spielbild-Bereich für diesen Kanal löschen"
+  },
+  "gcHint": {
+    "message": "Zum Wählen des Spielbilds ziehen (Esc bricht ab)"
+  },
+  "ytPlaylistReversePlayTitle": {
+    "message": "Beim letzten Video beginnen und bis zum ersten abspielen"
+  },
+  "feat_sf_searchGrid_label": {
+    "message": "Suchergebnisse als Raster anzeigen"
+  },
+  "feat_sf_searchGrid_desc": {
+    "message": "Suchergebnisse von einer einspaltigen Liste in ein mehrspaltiges Raster umwandeln (die Spaltenzahl folgt der Raster-Einstellung; Auto entspricht der Spaltenzahl der Startseite)."
+  },
+  "feat_sf_removeShortsChip_label": {
+    "message": "Shorts-Filter-Chip"
+  },
+  "feat_sf_removeShortsChip_desc": {
+    "message": "Nur den Chip „Shorts“ aus der Filterzeile („Alle / Videos / Shorts / Playlists …“) oben auf der Suchseite entfernen."
+  },
+  "feat_sf_removeShortsSidebar_label": {
+    "message": "Shorts-Eintrag in Seitenleiste"
+  },
+  "feat_sf_removeShortsSidebar_desc": {
+    "message": "Den Eintrag „Shorts“ aus der linken Seitenleiste entfernen (ausgeklappt und eingeklappt)."
+  },
+  "feat_sf_subsLeftnavInjectAll_label": {
+    "message": "Alle Abos im linken Menü anzeigen"
+  },
+  "feat_sf_subsLeftnavInjectAll_desc": {
+    "message": "Alle Abos, die YouTube wegen seiner Anzeigegrenze verbirgt, in den Bereich „Abos“ der linken Seitenleiste einfügen (same-origin von /feed/channels geladen, 24 Std. zwischengespeichert)."
+  },
+  "feat_sf_subsAllShortcut_label": {
+    "message": "Verknüpfung „Alle Abos“"
+  },
+  "feat_sf_subsAllShortcut_desc": {
+    "message": "Oben im Bereich „Abos“ der linken Seitenleiste einen Ein-Klick-Eintrag zu /feed/channels hinzufügen, gestaltet wie ein natives Menüelement."
+  },
+  "feat_sf_subsChannelsGrid_label": {
+    "message": "Abo-Seite als Raster (mit Suche und Sortierung)"
+  },
+  "feat_sf_subsChannelsGrid_desc": {
+    "message": "/feed/channels in ein responsives Raster umbauen und nach Kanalname oder Handle suchen. Sortiert wird mit YouTubes eigenen Bedienelementen. Jede Karte lädt ihr neuestes Video-Vorschaubild, sobald sie sich dem Sichtbereich nähert (24 Stunden zwischengespeichert)."
+  },
+  "feat_sf_homeGrid_label": {
+    "message": "Startseite/Feeds als Raster ausrichten"
+  },
+  "feat_sf_homeGrid_desc": {
+    "message": "Startseite und Abo-Feeds als lückenloses Raster anordnen (Videos werden regalübergreifend wie bei Shorts gepackt). Richtet auch bei Spaltenzahl Auto aus (bei 4/5/6 Spalten immer als Raster, auch wenn dieser Schalter aus ist)."
+  },
+  "feat_ig_reels_label": {
+    "message": "Reels entfernen"
+  },
+  "feat_ig_reels_desc": {
+    "message": "Den Reels-Eintrag in Seitenleiste/Navigation ausblenden und /reels/-URLs zwangsweise auf die Startseite umleiten."
+  },
+  "feat_ig_explore_label": {
+    "message": "Entdecken entfernen"
+  },
+  "feat_ig_explore_desc": {
+    "message": "Den Eintrag „Entdecken“ in Seitenleiste/Navigation ausblenden und /explore/-URLs zwangsweise auf die Startseite umleiten."
+  },
+  "feat_ig_stories_label": {
+    "message": "Stories-Leiste ausblenden (Startseite)"
+  },
+  "feat_ig_stories_desc": {
+    "message": "Die Stories-Leiste (nach 24 Std. verschwindende Kurzvideos) oben im Startseiten-Feed per CSS ausblenden."
+  },
+  "feat_ig_storiesAll_label": {
+    "message": "Stories-URLs auf Startseite umleiten"
+  },
+  "feat_ig_storiesAll_desc": {
+    "message": "Jeden Aufruf von /stories/ auf die Startseite umleiten (verhindert versehentliche Klicks auf geteilte Links)."
+  },
+  "feat_ig_threads_label": {
+    "message": "Threads-Werbung ausblenden"
+  },
+  "feat_ig_threads_desc": {
+    "message": "Banner, Seitenleisteneintrag und Fußzeilenlink zur Threads-App ausblenden."
+  },
+  "feat_ig_vanity_label": {
+    "message": "Anzahl von Likes und Followern ausblenden"
+  },
+  "feat_ig_vanity_desc": {
+    "message": "Numerische Buttons (Kommas, k, M usw.) in <article> erkennen und ausblenden, um Vergleichsstress zu verringern."
+  },
+  "feat_ig_blockVideos_label": {
+    "message": "Videos in Beiträgen blockieren"
+  },
+  "feat_ig_blockVideos_desc": {
+    "message": "<video>-Elemente in Feed-<article>-Elementen markieren und per CSS durch ein Vorschaubild ersetzen, um Autoplay zu verhindern."
+  },
+  "feat_ig_comments_label": {
+    "message": "Kommentare ausblenden"
+  },
+  "feat_ig_comments_desc": {
+    "message": "Kommentarliste, Eingabeformular und Link „N Kommentare ansehen“ per CSS ausblenden."
+  },
+  "feat_ig_notes_label": {
+    "message": "Notizen ausblenden"
+  },
+  "feat_ig_notes_desc": {
+    "message": "Die Notizen-Zeile (kurze Statusnachrichten über Profilbildern) oben im DM-Bereich ausblenden."
+  },
+  "feat_ig_msgCounters_label": {
+    "message": "Badge für ungelesene DMs ausblenden"
+  },
+  "feat_ig_msgCounters_desc": {
+    "message": "Das Badge mit der Zahl ungelesener DMs (roter Kreis mit Ziffer) in der Navigation ausblenden, um den Benachrichtigungsdruck zu senken."
+  },
+  "feat_ig_videoControls_label": {
+    "message": "Videofortschrittsleiste anzeigen"
+  },
+  "feat_ig_videoControls_desc": {
+    "message": "Eine Leiste zum Ändern der Videoposition anzeigen und außerhalb von Textfeldern mit der Leertaste die Wiedergabe pausieren oder fortsetzen."
+  },
+  "instagramVideoControlsAria": {
+    "message": "Videowiedergabe-Steuerung"
+  },
+  "instagramVideoSeekAria": {
+    "message": "Videoposition"
+  },
+  "feat_ig_imageDownload_label": {
+    "message": "Download-Button auf Bildern anzeigen"
+  },
+  "feat_ig_imageDownload_desc": {
+    "message": "Beim Darüberfahren einen Download-Button oben links auf Beitragsfotos einblenden (Feed / Profilraster / Beitragsdetail). Wählt die größte Variante aus srcset."
+  },
+  "feat_tt_hideComments_label": {
+    "message": "Kommentare ausblenden"
+  },
+  "feat_tt_hideComments_desc": {
+    "message": "Das Kommentarpanel (die Kommentarliste neben dem Player), den Kommentar-Button und die Kommentaranzahl per CSS ausblenden."
+  },
+  "feat_tt_hideSuggested_label": {
+    "message": "Vorgeschlagene Konten ausblenden"
+  },
+  "feat_tt_hideSuggested_desc": {
+    "message": "Den in „Für dich“- und „Folge ich“-Feeds und Profile eingefügten Bereich „Vorgeschlagene Konten“ per CSS ausblenden."
+  },
+  "feat_tt_imageDownload_label": {
+    "message": "Download-Button auf Bildern anzeigen"
+  },
+  "feat_tt_imageDownload_desc": {
+    "message": "Beim Darüberfahren einen Download-Button oben links auf Fotobeiträgen und Video-Vorschaubildern einblenden."
+  },
+  "categoryXExtra": {
+    "message": "Extras"
+  },
+  "feat_x_imageDownload_label": {
+    "message": "Download-Button auf Bildern anzeigen"
+  },
+  "feat_x_imageDownload_desc": {
+    "message": "Über einem Beitragsbild den Button in der oberen linken Ecke einblenden; per Klick in Originalqualität speichern"
+  },
+  "feat_x_hideRightPane_label": {
+    "message": "Rechte Spalte ausblenden"
+  },
+  "feat_x_hideRightPane_desc": {
+    "message": "Die gesamte rechte Spalte des Dreispalten-Layouts (Suche, Trends, Wem folgen, Upsells) ausblenden und die Timeline in den frei gewordenen Platz verbreitern."
+  },
+  "feat_x_hideTrends_label": {
+    "message": "Trends ausblenden"
+  },
+  "feat_x_hideTrends_desc": {
+    "message": "Die rechte Spalte behalten, aber nur den Trends-Block ausblenden."
+  },
+  "feat_x_hideWhoToFollow_label": {
+    "message": "„Wem folgen“ ausblenden"
+  },
+  "feat_x_hideWhoToFollow_desc": {
+    "message": "Den Vorschlagsblock „Wem folgen“ in der rechten Spalte ausblenden."
+  },
+  "feat_x_hideMessagesDock_label": {
+    "message": "Nachrichten-Dock ausblenden"
+  },
+  "feat_x_hideMessagesDock_desc": {
+    "message": "Das unten rechts angeheftete Nachrichten-/Chat-Panel ausblenden (die Seite „Nachrichten“ funktioniert weiter wie gewohnt)."
+  },
+  "feat_x_hidePromoted_label": {
+    "message": "Gesponserte Beiträge ausblenden"
+  },
+  "feat_x_hidePromoted_desc": {
+    "message": "In die Timeline eingefügte Werbebeiträge (gesponsert) ausblenden und die ganze Zelle entfernen, damit keine Lücke bleibt."
+  },
+  "feat_x_hidePremiumUpsell_label": {
+    "message": "Premium-Upsells ausblenden"
+  },
+  "feat_x_hidePremiumUpsell_desc": {
+    "message": "Die Abo-Upsell-Karte in der rechten Spalte und den Premium-Eintrag im linken Menü ausblenden."
+  },
+  "feat_x_hideGrok_label": {
+    "message": "Grok ausblenden"
+  },
+  "feat_x_hideGrok_desc": {
+    "message": "Den Grok-Eintrag im linken Menü, die Grok-Schublade unten rechts und Grok-Buttons in Beiträgen ausblenden."
+  },
+  "feat_x_hideEngagementCounts_label": {
+    "message": "Interaktionszahlen ausblenden"
+  },
+  "feat_x_hideEngagementCounts_desc": {
+    "message": "Nur die Zahlen für Antworten, Reposts, Likes und Aufrufe ausblenden. Die Buttons bleiben, Interaktionen funktionieren wie zuvor."
+  },
+  "feat_x_followingTabDefault_label": {
+    "message": "Startseite bei „Folge ich“ öffnen"
+  },
+  "feat_x_followingTabDefault_desc": {
+    "message": "Die Startseite von „Für dich“ auf „Folge ich“ umstellen (einmal pro Seitenaufruf; wer selbst zu „Für dich“ zurückwechselt, wird nicht mehr gestört)."
+  },
+  "tabSettings": {
+    "message": "Einstellungen"
+  },
+  "settingsBackupTitle": {
+    "message": "Einstellungen speichern und laden"
+  },
+  "settingsBackupDescription": {
+    "message": "Alle Funktionseinstellungen, EQ, gesperrte Kanäle, Farbverlauf und gewählte Tabs für einen anderen PC oder Browser als JSON speichern. Der Import überschreibt die in der Datei enthaltenen Einträge. Ausgenommen sind Sync ein/aus, Zielkonten, Authentifizierung, Caches und Overlay-Positionen auf Websites. Ist die Synchronisierung an, werden importierte Funktionseinstellungen auch auf andere PCs synchronisiert."
+  },
+  "settingsExport": {
+    "message": "Exportieren"
+  },
+  "settingsImport": {
+    "message": "Importieren"
+  },
+  "settingsExportSuccess": {
+    "message": "Download der Einstellungen gestartet."
+  },
+  "settingsExportError": {
+    "message": "Export fehlgeschlagen. Einstellungen und Download-Ziel prüfen, dann erneut versuchen."
+  },
+  "settingsImportSuccess": {
+    "message": "Einstellungen importiert."
+  },
+  "settingsImportError": {
+    "message": "Import fehlgeschlagen. Eine gültige Vuora-Einstellungs-JSON-Datei wählen (bis 5 MB)."
+  },
+  "feat_sf_liveLatency_label": {
+    "message": "Live-Latenzsteuerung"
+  },
+  "feat_sf_liveLatency_desc": {
+    "message": "Festlegen, wie zum Livestream aufgeholt wird und welche Informationen angezeigt werden."
+  },
+  "feat_sf_playbackQuality_label": {
+    "message": "Qualitätsauswahl"
+  },
+  "feat_sf_playbackQuality_desc": {
+    "message": "Eine Auswahl zum Ändern der Player-Qualität hinzufügen."
+  },
+  "feat_sf_playbackRate_label": {
+    "message": "Geschwindigkeitsauswahl"
+  },
+  "feat_sf_playbackRate_desc": {
+    "message": "Eine Auswahl für Wiedergabegeschwindigkeiten von 0,25x bis 2x hinzufügen."
+  },
+  "feat_sf_playerVolume_label": {
+    "message": "Lautstärkeauswahl des Players"
+  },
+  "feat_sf_playerVolume_desc": {
+    "message": "Eine Lautstärkeauswahl für den Player hinzufügen und die nativen Lautstärkeregler anpassen."
+  },
+  "ypcWatchSettings": {
+    "message": "Einstellungen der Videoseite"
+  },
+  "yp_details": {
+    "message": "Details"
+  },
+  "yp_auto": {
+    "message": "Auto"
+  },
+  "yp_enabled": {
+    "message": "Geschwindigkeit zum Aufholen automatisch anpassen"
+  },
+  "yp_playbackRate": {
+    "message": "Geschwindigkeit beim automatischen Aufholen"
+  },
+  "yp_showPlaybackRate": {
+    "message": "Aktuelle Wiedergabegeschwindigkeit anzeigen"
+  },
+  "yp_showLatency": {
+    "message": "Rückstand zum Livestream anzeigen"
+  },
+  "yp_showHealth": {
+    "message": "Vorgepufferte Zeit anzeigen"
+  },
+  "yp_showEstimation": {
+    "message": "Geschätzte Zeit bis zum Live-Punkt anzeigen"
+  },
+  "yp_showCurrent": {
+    "message": "Wiedergabeposition anzeigen (Klick kopiert die Zeitstempel-URL)"
+  },
+  "yp_smooth": {
+    "message": "Geschwindigkeit anpassen, wenn genug Video gepuffert ist"
+  },
+  "yp_smoothThreshold": {
+    "message": "Nötige Pufferzeit zur Geschwindigkeitsanpassung (Sekunden)"
+  },
+  "yp_smoothAuto": {
+    "message": "Schwellwert der Pufferzeit automatisch festlegen"
+  },
+  "yp_skip": {
+    "message": "Bei großem Rückstand zur neuesten Position springen"
+  },
+  "yp_skipThreshold": {
+    "message": "Springen, wenn die Wiedergabe so weit zurückliegt (Sekunden)"
+  },
+  "yp_hideSlider": {
+    "message": "Nativen Lautstärkeregler ausblenden"
+  },
+  "yp_hideVolumeIcon": {
+    "message": "Natives Lautstärkesymbol ausblenden"
+  },
+  "yp_latencyNote": {
+    "message": "Informationen lassen sich auch ohne automatische Geschwindigkeitsanpassung anzeigen. Die Geschwindigkeitsanpassung gilt nur während der Live-Wiedergabe."
+  },
+  "yp_buttonNote": {
+    "message": "Qualität, Lautstärke und Wiedergabegeschwindigkeit in einer Reihe von Overlay-Auswahlen ändern. Geschwindigkeiten reichen von 0,25x bis 2x. Tastenkürzel in den Erweiterungseinstellungen des Browsers zuweisen."
+  },
+  "ypcQuality": {
+    "message": "Qualität"
+  },
+  "ypcRate": {
+    "message": "Wiedergabegeschwindigkeit"
+  },
+  "ypcVolume": {
+    "message": "Lautstärke"
+  },
+  "ypcCopied": {
+    "message": "Kopiert"
+  },
+  "ypcSaveError": {
+    "message": "Einstellung konnte nicht gespeichert werden. Bitte erneut versuchen."
+  },
+  "ypcCommand_quality_1": {
+    "message": "YouTube-Qualitätsbutton 1"
+  },
+  "ypcCommand_quality_2": {
+    "message": "YouTube-Qualitätsbutton 2"
+  },
+  "ypcCommand_quality_3": {
+    "message": "YouTube-Qualitätsbutton 3"
+  },
+  "ypcCommand_quality_4": {
+    "message": "YouTube-Qualitätsbutton 4"
+  },
+  "ypcCommand_quality_5": {
+    "message": "YouTube-Qualitätsbutton 5"
+  },
+  "ypcCommand_quality_6": {
+    "message": "YouTube-Qualitätsbutton 6"
+  },
+  "ypcCommand_quality_7": {
+    "message": "YouTube-Qualitätsbutton 7"
+  },
+  "ypcCommand_quality_8": {
+    "message": "YouTube-Qualitätsbutton 8"
+  },
+  "ypcCommand_quality_9": {
+    "message": "YouTube-Qualitätsbutton 9"
+  },
+  "ypcCommand_rate_1": {
+    "message": "YouTube-Geschwindigkeitsbutton 1"
+  },
+  "ypcCommand_rate_2": {
+    "message": "YouTube-Geschwindigkeitsbutton 2"
+  },
+  "ypcCommand_rate_3": {
+    "message": "YouTube-Geschwindigkeitsbutton 3"
+  },
+  "ypcCommand_rate_4": {
+    "message": "YouTube-Geschwindigkeitsbutton 4"
+  },
+  "ypcCommand_rate_5": {
+    "message": "YouTube-Geschwindigkeitsbutton 5"
+  },
+  "ypcCommand_rate_6": {
+    "message": "YouTube-Geschwindigkeitsbutton 6"
+  },
+  "ypcCommand_rate_7": {
+    "message": "YouTube-Geschwindigkeitsbutton 7"
+  },
+  "ypcCommand_rate_8": {
+    "message": "YouTube-Geschwindigkeitsbutton 8"
+  },
+  "ypcCommand_volume_1": {
+    "message": "YouTube-Lautstärkebutton 1"
+  },
+  "ypcCommand_volume_2": {
+    "message": "YouTube-Lautstärkebutton 2"
+  },
+  "ypcCommand_volume_3": {
+    "message": "YouTube-Lautstärkebutton 3"
+  },
+  "ypcCommand_volume_4": {
+    "message": "YouTube-Lautstärkebutton 4"
+  },
+  "ypcCommand_volume_5": {
+    "message": "YouTube-Lautstärkebutton 5"
+  },
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Wikipedia-Leseeinstellungen"
+  },
+  "wikipediaMasterDesc": {
+    "message": "Layout, Text und Farben von Wikipedia-Artikeln anpassen."
+  },
+  "wikipediaOptions": {
+    "message": "Wikipedia-Leseoptionen"
+  },
+  "wikipedia_theme": {
+    "message": "Farben"
+  },
+  "wikipedia_noto_sans_jp": {
+    "message": "Noto Sans JP"
+  },
+  "wikipedia_ibm_plex_sans_jp": {
+    "message": "IBM Plex Sans JP"
+  },
+  "wikipedia_m_plus_2": {
+    "message": "M PLUS 2"
+  },
+  "wikipedia_m_plus_rounded_1c": {
+    "message": "M PLUS Rounded 1c"
+  },
+  "wikipedia_murecho": {
+    "message": "Murecho"
+  },
+  "wikipedia_zen_kaku_gothic_new": {
+    "message": "Zen Kaku Gothic New"
+  },
+  "wikipedia_line_seed_jp": {
+    "message": "LINE Seed JP"
+  },
+  "wikipedia_font": {
+    "message": "Textschrift"
+  },
+  "wikipedia_fontSize": {
+    "message": "Textgröße"
+  },
+  "wikipedia_contentWidth": {
+    "message": "Artikelbreite"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "Grundbreite des Artikels. Beim Ausblenden des Panels „Darstellung“ kommt dessen frei gewordener Platz hinzu. „Artikel innerhalb der Breite halten“ aktivieren, um stattdessen diese Breite beizubehalten."
+  },
+  "wikipedia_lineHeight": {
+    "message": "Zeilenabstand"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1×"
+  },
+  "wikipedia_original": {
+    "message": "Website-Farben"
+  },
+  "wikipedia_light": {
+    "message": "Hell"
+  },
+  "wikipedia_sepia": {
+    "message": "Sepia"
+  },
+  "wikipedia_dark": {
+    "message": "Dunkel"
+  },
+  "wikipedia_sans": {
+    "message": "System-Serifenlos"
+  },
+  "wikipedia_serif": {
+    "message": "System-Serif"
+  },
+  "wikipediaContents": {
+    "message": "Inhalt"
+  },
+  "wikipediaClose": {
+    "message": "Schließen"
+  },
+  "wikipediaImage": {
+    "message": "Bild vergrößern"
+  },
+  "wikipediaReference": {
+    "message": "Vorschau der Quelle"
+  },
+  "wikipediaSiteMenu": {
+    "message": "Wikipedia-Menü"
+  },
+  "wikipediaDisplaySettings": {
+    "message": "Anzeigeeinstellungen"
+  },
+  "wikipediaArticleInfo": {
+    "message": "Artikelinformationen"
+  },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "Modernes Artikellayout"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "Panel „Darstellung“ ausblenden"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "Das Wikipedia-Panel „Darstellung“ rechts neben Artikeln ausblenden und den frei gewordenen Platz für den Artikel nutzen."
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "Artikel innerhalb der Breite halten"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "Den Artikel innerhalb der unten eingestellten „Artikelbreite“ halten, ohne in den durch das Ausblenden des Panels „Darstellung“ frei gewordenen Platz zu wachsen. Die Breite wird über „Artikelbreite“ geändert."
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "Die Seite um Suche, Inhaltsverzeichnis, Artikel und Artikelinformationen neu aufbauen. Ausschalten stellt das ursprüngliche Layout wieder her."
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "Fixiertes Inhaltsverzeichnis"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "Das Inhaltsverzeichnis für schnelle Navigation sichtbar halten."
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "Bildbetrachter"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "Bilder im Artikel vergrößern."
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "Link- und Quellenvorschau"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "Die Standard-Artikelvorschauen von Wikipedia gestalten und Quellentext direkt anzeigen. Artikelvorschauen erscheinen, wenn sie in Wikipedia aktiviert sind."
+  },
+  "wikipedia_headingFont": {
+    "message": "Überschriftenschrift"
+  },
+  "wikipedia_inherit": {
+    "message": "Wie Text"
+  },
+  "wikipedia_linkStyle": {
+    "message": "Linkstil"
+  },
+  "wikipedia_underline": {
+    "message": "Unterstrichen"
+  },
+  "wikipedia_color": {
+    "message": "Farbig"
+  },
+  "wikipedia_coverImage": {
+    "message": "Titelbild"
+  },
+  "wikipedia_show": {
+    "message": "Anzeigen"
+  },
+  "wikipedia_hide": {
+    "message": "Ausblenden"
+  },
+  "wikipedia_articleStyle": {
+    "message": "Artikelansicht"
+  },
+  "wikipedia_full": {
+    "message": "Vollständig"
+  },
+  "wikipedia_pictures": {
+    "message": "Text & Bilder"
+  },
+  "wikipedia_text": {
+    "message": "Nur Text"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "„Vollständig“ enthält Tabellen und weitere Inhalte. „Text & Bilder“ lässt Tabellen und ähnliche Elemente weg. „Nur Text“ lässt zusätzlich Bilder weg."
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "„Unterstrichen“ nutzt die Textfarbe, bis die Maus über einen Link fährt. „Farbig“ nutzt immer die Linkfarbe."
+  },
+  "wikipedia_group_typography": {
+    "message": "Text und Farben"
+  },
+  "wikipedia_group_layout": {
+    "message": "Layout"
+  },
+  "wikipedia_group_display": {
+    "message": "Anzeige"
+  },
+  "wikipedia_small": {
+    "message": "S"
+  },
+  "wikipedia_medium": {
+    "message": "M"
+  },
+  "wikipedia_large": {
+    "message": "L"
+  },
+  "wikipedia_auto": {
+    "message": "Auto"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$ (altes Design)",
+    "placeholders": {
+      "theme": {
+        "content": "$1"
+      }
+    }
+  },
+  "wikipedia_one_dark": {
+    "message": "One Dark"
+  },
+  "wikipedia_one_light": {
+    "message": "One Light"
+  },
+  "wikipedia_dracula": {
+    "message": "Dracula"
+  },
+  "wikipedia_nord": {
+    "message": "Nord"
+  },
+  "wikipedia_monokai": {
+    "message": "Monokai"
+  },
+  "wikipedia_solarized_dark": {
+    "message": "Solarized Dark"
+  },
+  "wikipedia_solarized_light": {
+    "message": "Solarized Light"
+  },
+  "wikipedia_github_dark": {
+    "message": "GitHub Dark"
+  },
+  "wikipedia_github_light": {
+    "message": "GitHub Light"
+  },
+  "wikipedia_deep_ocean": {
+    "message": "Tiefsee"
+  },
+  "wikipedia_algae": {
+    "message": "Algen"
+  },
+  "wikipedia_calmness": {
+    "message": "Ruhe"
+  },
+  "wikipedia_desert": {
+    "message": "Wüste"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "Feenstaub"
+  },
+  "wikipedia_grey": {
+    "message": "Grau"
+  },
+  "wikipedia_nature": {
+    "message": "Natur"
+  },
+  "languageAuto": { "message": "Automatisch (Browser)" },
+  "languageSelectLabel": { "message": "Sprache" },
+  "languageSelectTitle": { "message": "Sprache (geöffnete Seiten übernehmen sie nach dem Neuladen)" }
+}

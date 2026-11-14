@@ -63,6 +63,11 @@
   --font-sans: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
   --font-mono: "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", Consolas, ui-monospace, monospace;
 }
+/* 表示言語に合う書体を先頭にする。日本語書体（IBM Plex Sans JP）を先頭のままだと、中国語で漢字の字形が日本語のものになり、
+   同梱サブセットに無い字は別書体で描かれて同じ文の中で混ざる。韓国語もシステムの韓国語書体を明示する。 */
+:root:lang(zh-CN) { --font-sans: "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", "Noto Sans CJK SC", "Segoe UI", system-ui, sans-serif; }
+:root:lang(zh-TW) { --font-sans: "Microsoft JhengHei UI", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Segoe UI", system-ui, sans-serif; }
+:root:lang(ko) { --font-sans: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", "Segoe UI", system-ui, sans-serif; }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-deep: #1d171c;
@@ -152,6 +157,25 @@ body {
   flex: 1;
   min-width: 0;
 }
+
+/* 表示言語の選択: タイトルの横に置く小さな選択欄。枠と配色は他の入力欄と揃える。 */
+.hdr-lang {
+  flex: none;
+  max-width: 116px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hdr-lang:hover { border-color: var(--rule-strong); }
+.hdr-lang:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.hdr-lang:disabled { opacity: 0.55; cursor: wait; }
 
 .hdr-title {
   font-family: var(--font-sans);

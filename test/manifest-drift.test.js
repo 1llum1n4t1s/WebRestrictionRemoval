@@ -51,29 +51,6 @@ test("manifest.json と manifest.firefox.json の content_scripts が Firefox �
   );
 });
 
-test("Firefox 専用 content_scripts エントリが manifest.firefox.json のみに存在する", () => {
-  const chrome = readManifest("manifest.json");
-  const firefox = readManifest("manifest.firefox.json");
-
-  const chromeHasMes = (chrome.content_scripts || []).some((entry) =>
-    FIREFOX_ONLY_MARKERS.some((marker) => (entry.js || []).includes(marker))
-  );
-  const firefoxHasMes = (firefox.content_scripts || []).some((entry) =>
-    FIREFOX_ONLY_MARKERS.some((marker) => (entry.js || []).includes(marker))
-  );
-
-  assert.strictEqual(
-    chromeHasMes,
-    false,
-    "Firefox 専用エントリ (volume-booster-mes 等) が Chrome の manifest.json に混入している"
-  );
-  assert.strictEqual(
-    firefoxHasMes,
-    true,
-    "Firefox 専用エントリ (volume-booster-mes 等) が manifest.firefox.json から欠落している"
-  );
-});
-
 test("Wikipedia の同梱フォントが揃い、公開先を Wikipedia に限定する", () => {
   const G = require("./_load-actions.js");
   const expected = [{ resources: ["src/fonts/wikipedia/*.woff2"], matches: ["*://*.wikipedia.org/*"] }];

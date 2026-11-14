@@ -19,7 +19,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 
 2. **`importScripts` ガード** — Chrome background は `typeof importScripts === "function"` の場合だけ共通→映像→ルーペ→音量→サイト定義を依存順に読み込む。Firefox event page は manifest の `background.scripts` が同じ順で読み込む。各 content_scripts エントリも共通→必要な定義を独立して列挙し、他エントリの実行順に依存しない。
 
-3. **`HAS_VOLUME_BOOSTER` ランタイム検知** — `const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";` を background.js で定義し、`VOLUME_BOOSTER_SET_GAIN` / `VOLUME_BOOSTER_RELEASE_TAB` メッセージ handler、`chrome.tabs.onActivated` / `chrome.tabs.onRemoved` / `chrome.storage.onChanged` の音量関連経路で早期 return する。
+3. **`HAS_VOLUME_BOOSTER` ランタイム検知** — `const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";` を background.js で定義し、`VOLUME_BOOSTER_SET_GAIN` メッセージ handler、`chrome.tabs.onActivated` / `chrome.tabs.onRemoved` / `chrome.storage.onChanged` の音量関連経路で早期 return する。
 
 4. **popup の MES 分岐** — `popup.js` の `VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER` で Firefox を検知し、(a) audio section は Firefox でも**表示したまま** `#volumeMesNote`（DRM サイト非対応の注記、i18n キー `volumeMesFirefoxNote`）の hidden を外す、(b) `pushVolumeNow` は storage 書き込み（MES では EQ 3 キーも同梱して live 反映）だけで early return し `VOLUME_BOOSTER_SET_GAIN` メッセージを送らない。旧「audio section 全体を display:none」方式は 2026-07-02 の MES 経路追加で廃止。
 
@@ -51,7 +51,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 - **sender 検証必須** — background の各ハンドラ冒頭で `SenderCheck.isFromPopup()` / `isFromContentScript()` を呼ぶ。新メッセージ追加時はどちらの由来を許可するか明示。
 - **content_scripts の二重ロード許容** — 共有定義が必要な各エントリの配列先頭に `actions-core.js` と必要な定義ファイルを依存順に含める。各ファイル固有の再評価ガードが同じ isolated world でのオブジェクト参照を維持するため、他エントリの実行順や `run_at` に依存しない。サイト用は共通→`actions.js`、全サイト映像は共通→映像、ルーペは共通→ルーペ、Firefox 音量は共通→音量→`audio-pipeline.js` の順。`document_start` の early-framework / 各サイト early script と MAIN world の youtube-player-controls-main は共有定義に依存せず、これらを読み込まない。early script は生の storage key を用いて最小限の注入を行う。
 - **early script は共通フレームワーク経由** — `src/content/early-framework.js` がクラス条件付き `<style>` 注入・`chrome.storage.local.get`・`storage.onChanged` 購読を集約する (`window.__cpaEarlyFramework.setup(config)`)。各 document_start エントリの `js` 配列で `early-framework.js` を **先頭** に置き、4 サイトの early script (`youtube-early.js` / `instagram-early.js` / `tiktok-early.js` / `x-early.js`) が config を渡して setup を呼ぶ。クラス・inline 非表示は master と該当 feature の明示的な ON を確認してから適用し、未取得・未設定・OFF・初回取得失敗時は表示を変えない。読取前の FOUC は許容する。新サイトの early script もこのパターンに乗せ、サイト固有の MutationObserver / force-hide / URL redirect は各 early script に残す。
-- **二重実行防止** — `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__cpaAmazonRankingJumpRunning` / `window.__cpaAmazonMerchantInfoRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaVideoFillRunning` / `window.__cpaLoupeRunning` / `window.__cpaBroadcastClockRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
+- **二重実行防止** — `window.__cpaSearchFixerRunning` / `window.__amazonDeliveryTotalRunning` / `window.__cpaAmazonRankingJumpRunning` / `window.__cpaAmazonMerchantInfoRunning` / `window.__ytShortsRemoverRunning` / `window.__cpaInstagramCleanerRunning` / `window.__cpaTikTokCleanerRunning` / `window.__cpaXCleanerRunning` / `window.__cpaImageDownloaderRunning` / `window.__cpaVideoGammaRunning` / `window.__cpaVideoFillRunning` / `window.__cpaLoupeRunning` / `window.__cpaBroadcastClockRunning` / `window.__cpaYtEarlyRunning` / `window.__cpaIgEarlyRunning` / `window.__cpaTtEarlyRunning` / `window.__cpaXEarlyRunning` のグローバルフラグで同一フレーム内の二重実行を防ぐ。新 content script を足すときも同じ命名で揃える。`__amazonDeliveryTotalRunning` と `__ytShortsRemoverRunning` のみ `__cpa` プレフィックスなしの歴史的命名（互換性のため変更しない、/rere レビュー B1-003）。
 
 ### MutationObserver 取り扱い
 - **DOM 書き戻しは observer guard 必須** — `subtree: true` 監視中に自身が DOM を書き戻すと再帰発火 → 無限ループでフリーズ。Amazon 月別合計の修正で確立した **`disconnect → render → takeRecords → observe` ガード + `requestAnimationFrame` coalesce** の二重防御を新規 DOM 書き込みロジックでも踏襲する。
@@ -60,7 +60,7 @@ WebRestrictionRemoval は Chrome + Firefox 両対応。**音量ブースター�
 ### Extension context invalidation guard PATTERN SYNC (/rere v1.0.28+ 確立)
 拡張機能リロード / 自動更新後、既存タブの content script は **orphan 化** する。`chrome.runtime.id` が `undefined` になり、`chrome.i18n.getMessage` / `chrome.runtime.sendMessage` 等が "Extension context invalidated" で throw する。MutationObserver / setInterval は orphan でも止まらないため、自前で停止する必要がある。
 
-**実装済みファイル (12 ファイル + early 3 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `amazon-ranking-jump.js` / `amazon-merchant-info.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `video-gamma.js` / `video-fill.js` / `loupe.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` / `youtube-broadcast-clock.js` (instagram-early.js / tiktok-early.js / youtube-early.js も同パターン: early-framework の `storage.onChanged` guard に加え、各 early script 自身の MutationObserver callback 冒頭に `chrome.runtime?.id` guard + OFF 時 `disconnect` を持つ。/rere F-1 で youtube-early.js の frameObserver の guard 欠落を修正し instagram-early.js と統一)
+**実装済みファイル (12 ファイル + early 3 ファイル)**: `image-downloader.js` / `amazon-delivery-total.js` / `amazon-ranking-jump.js` / `amazon-merchant-info.js` / `search-fixer.js` (5 つの MO callback + pagehide + 共通 `cleanupAllSearchFixerStateForOrphan` で集約、/rere B2-012+B2-018 で v1.0.30 に追加) / `video-gamma.js` / `video-fill.js` / `loupe.js` / `tiktok-cleaner.js` / `youtube-shorts.js` / `instagram-cleaner.js` / `youtube-broadcast-clock.js` (instagram-early.js / youtube-early.js も同パターン: early-framework の `storage.onChanged` guard に加え、各 early script 自身の MutationObserver callback 冒頭に `chrome.runtime?.id` guard + OFF 時 `disconnect` を持つ。tiktok-early.js / x-early.js は自前の MutationObserver を持たないため、early-framework が pre クラス付与中だけ `visibilitychange` / `focus` / `pageshow` で失効を確認し、失効時に pre クラスを撤去する。/rere F-1 で youtube-early.js の frameObserver の guard 欠落を修正し instagram-early.js と統一)
 
 **実装パターン** (PATTERN SYNC):
 - 主要 timer / observer callback / 高頻度発火関数の入口で `if (!chrome.runtime?.id)` チェック
@@ -223,9 +223,9 @@ video element に視覚エフェクト (filter / transform) を inline style で
 ### image-downloader 並列化のセマンティクス維持
 `fetchFirstAvailable` は srcset の最大解像度から順に並んだ候補配列を受け取り、**「最初に 200 OK を返した最大解像度」** を採用する。
 - 旧逐次実装: `for...of` で順次 fetch、最悪 N × RTT (体感 1-3 秒遅延)
-- 新並列実装 (/rere C-#4 で確立): `Promise.allSettled` で全候補同時発射 → 全結果待ってから **配列順 (=解像度降順) で先頭 fulfilled を採用**
+- 新並列実装 (/rere C-#4 で確立): 全候補を同時発射し、**配列順 (=解像度降順) で、より高優先の候補がすべて失敗済みになった時点で先頭 fulfilled を確定**する。成功候補より低優先の fetch は個別の `AbortController` で中止する（全結果を待たない）
 - `Promise.any` だと「最速応答」になり CDN のキャッシュヒット状況で低解像度が混入する罠 → **採用してはいけない**
-- `signal.aborted` (ユーザー OFF) の検知は全 fetch 完了後の最終チェックで AbortError を throw する設計
+- `signal.aborted` (ユーザー OFF) は各候補の完了時と abort イベントで検知し、全候補を中止して AbortError で reject する設計
 
 ### Observer / async の罠
 - **MutationObserver / IntersectionObserver の callback は stale の前提で書く** — `disconnect()` を呼んでも **既に queue 入りした notification は cancel されない** (IO/MO 共通仕様)。observer インスタンスは **closure に capture** + callback 冒頭で **state null guard** を入れる。
@@ -261,28 +261,28 @@ popup の `apply()` が popup load 時のスナップショット変数を元に
 
 **経路 C: handleApplySettings の partial payload による上書き**
 `normalizeSettings(settings)` は `settings?.X === true` で正規化するため、popup が送らないキーは `undefined` → `false` に化けて全キー一括 storage 書き込みで既存 true が wipe される。
-- 対策: `handleApplySettings` で **storage 既存値とマージしてから** normalize する。`APPLY_SETTINGS_KEYS` 配列で対象キーをホワイトリスト化:
+- 対策: `handleApplySettings`（`applySettingsInner`）で **storage 既存値とマージしてから** normalize し、popup が送ったキー（`SettingsSchema` の field）だけを書き戻す。`APPLY_SETTINGS_KEYS` は `SettingsSchema` から自動生成されるホワイトリスト:
   ```js
-  const existing = await chrome.storage.local.get(APPLY_SETTINGS_KEYS).catch(() => ({}));
-  const merged = { ...existing, ...(settings ?? {}) };
-  const normalized = normalizeSettings(merged);
-  await chrome.storage.local.set(toStorageRecord(normalized));
+  const existing = await chrome.storage.local.get([...APPLY_SETTINGS_KEYS, StorageKeys.SETTINGS_SYNC_APPLIED]);
+  const changed = SettingsSchema.filter(({ field }) => Object.hasOwn(settings ?? {}, field));
+  // features 系は既存値へ重ね、その他は上書きしてから normalizeSettings → toStorageRecord
+  await chrome.storage.local.set(Object.fromEntries(changed.map(({ storageKey }) => [storageKey, record[storageKey]])));
   ```
-- popup の `apply()` が全キーを送る現行設計と組み合わせて二重防御。新規 storage key を追加したら `APPLY_SETTINGS_KEYS` にも追加すること
+- 部分更新に対応しているため、popup の `apply()` は変更したキーだけ送ればよい。新規 storage key は `SettingsSchema` に追加すれば `APPLY_SETTINGS_KEYS` / `toStorageRecord` へ自動で反映される
 
 **経路 D: popup の stored get リスト欠落 (致命バグパターン、過去 RTX 動画強化機能で発覚)**
 popup load 時の `stored = await chrome.storage.local.get([...keys])` リストと、stored 参照箇所 (`stored[KEY]`) は完全に対応している必要がある。**get リストに無いキーを参照すると `undefined` → UI で常に false 表示 → apply() で false 上書き → storage の既存 true が破壊**される。
 - 対策: 新規 master トグル / 設定キー追加時の **6 ポイントチェックリスト** を必ず通す
   1. `StorageKeys.<KEY>` を `src/lib/actions-core.js` に追加（設定項目の `SettingsSchema` は `src/lib/actions.js`）
   2. `onInstalled` の defaults 初期化リスト (`background.js`) に `<KEY>` を追加
-  3. `APPLY_SETTINGS_KEYS` / `normalizeSettings` / `toStorageRecord` の 3 関数全てに `<KEY>` を追加 (drift 防止)
+  3. `SettingsSchema` に追加する（`APPLY_SETTINGS_KEYS` / `toStorageRecord` は自動生成）。`normalizeSettings` と `notifyContentScripts` は手書きなので `<KEY>` を追加 (drift 防止)
   4. **popup の `stored = chrome.storage.local.get([...])` リストに `<KEY>` を追加** ⚠️
-  5. popup の `apply()` payload に `<KEY>` を含める
+  5. popup の `apply()` payload に `<KEY>` を含める（部分更新なので変更したキーだけで足りる）
   6. `test/actions.test.js` の `SettingsSchema` 整合アサートで件数を更新
 - 過去事例: v1.0.31 で当時の RTX 動画強化 master キーが #4 だけ漏れていて、popup 表示が常に OFF → 別トグル変更で storage 上書き → 永久 OFF 化する致命バグを修正 (RTX 動画強化機能自体は v1.0.39 で撤去済み、教訓だけ残置)
 
 ### 音量ブースター popup → storage 直書きの防御 (/rere v1.0.28 確立)
-**音量ブースター 10 キー** (`volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterBassCutEnabled` / `volumeBoosterMutedEnabled` + EQ 4 キー `volumeBoosterEqEnabled` / `volumeBoosterEqGains` / `volumeBoosterEqPreamp` / `volumeBoosterEqPreset`) のみ popup から直接 `chrome.storage.local.set` する設計で、background の `normalizeSettings` を経由しない。
+**音量ブースター 10 キー** (`volumeBoosterEnabled` / `volumeBoosterLastGain` / `volumeBoosterAntiClipEnabled` / `volumeBoosterNightModeEnabled` / `volumeBoosterBassCutEnabled` / `volumeBoosterMutedEnabled` + EQ 4 キー `volumeBoosterEqEnabled` / `volumeBoosterEqGains` / `volumeBoosterEqPreamp` / `volumeBoosterEqPreset`) のみ `APPLY_SETTINGS` / `normalizeSettings` を経由せず、popup が `SAVE_POPUP_STORAGE` で background の保存キューへ渡して保存する設計。
 - popup の `pushVolumeNow` は **必ず `VolumeBooster.clampValue(value)` を経由**して storage / `VOLUME_BOOSTER_SET_GAIN` 両方に渡す（範囲外値が storage に紛れ込むのを防ぐ二重防御）。EQ も同様に `clampEqGain` / `clampEqPreamp` / `normalizeEqPreset` で正規化済みの値だけ storage に書く。
 - **EQ_GAINS / EQ_PREAMP は `storage.onChanged` 同期から除外** (メイン音量スライダー `LAST_GAIN` と同じ非対称設計): EQ スライダードラッグ中、自身の `persistEq` 書き込みが onChanged で同 popup に戻ると `syncEqUi` がドラッグ中のスライダー値を clamp+整数化値で上書きしてカクつく self-write feedback を防ぐ。`EQ_PRESET` は離散値で連続性問題がないため select 表示のみ同期する。
 - popup クローズ後の orphan await から戻ったときは `document.body.isConnected` チェックで DOM 触らない（detached DOM 操作の no-op 化）

@@ -14,8 +14,8 @@ Except for a contact form you submit yourself, the Extension does not collect an
 
 The Extension stores the following settings on the user's device (`chrome.storage.local`). See Exception 4 for optional settings sync:
 
-- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 38 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
-- **`searchFixerFeatures`** (object): on/off state of each of the 38 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
+- **`searchFixerEnabled`** (boolean): master toggle for the YouTube Enhancements (parent of all 40 sub-features including Shorts removal, comment hiding, live-chat hiding, and subscriptions enhancements).
+- **`searchFixerFeatures`** (object): on/off state of each of the 40 YouTube Enhancements sub-features (Shorts removal / search-result noise / video-attribute filtering / highlight / watch-page cleanup including comment & live-chat hiding / layout / subscriptions enhancements).
 - **`searchFixerGridItems`** (number): YouTube home grid column count (0=auto / 4 / 5 / 6).
 - **`searchFixerBlockedChannels`** (array): the list of channels (handle or channel ID, plus display name) blocked via the channel-blocklist feature. Channels are registered with a button next to the channel name in search results; once blocked, their videos are removed from search results as well as YouTube feed pages (home, subscriptions, trending, etc.). Stored on-device by default; included in optional settings sync (Exception 4).
 - **`amazonDeliveryTotalEnabled`** (boolean): whether the Subscribe & Save monthly-total feature on the Amazon recurring-delivery page is enabled.
@@ -48,8 +48,13 @@ The Extension stores the following settings on the user's device (`chrome.storag
 - **`colorPickerDefaultFormat`** (string, one of `"hex"` / `"rgb"` / `"hsl"`): default clipboard format for picked colors.
 - **`colorPickerHexHash`** (boolean, default true): whether to include the leading `#` when copying in HEX format.
 - **`popupLastTab`** (string, one of `"tune"` / `"youtube"` / `"x"` / `"instagram"` / `"tiktok"` / `"picker"` / `"settings"`): the last tab the popup had open. Used to restore the popup state on next launch. Legacy value `"assist"` is auto-migrated to `"tune"`.
+- **`uiLanguage`** (string: `en` / `ja` / `zh_CN` / `zh_TW` / `ko` / `es` / `fr` / `de` / `pt_BR`) and **`uiMessages`** (object): the display language chosen in the popup header and that language's in-extension text (the bundled `_locales` content). Not stored while set to Auto. Kept on this device only and not included in settings sync or settings files. The popup's own `localStorage` also keeps a copy (`cpaUiLanguage`) so the language can be decided before rendering.
 
 These values are normally stored on the device. When settings sync is enabled, the settings described in Exception 4 are also saved to browser sync storage.
+
+When the YouTube Enhancements sub-feature "Show reverse button on playlists" (`playlistReverse`) is ON and you switch a playlist to reverse order with the button, its playlist ID (up to 50) is saved only in the `sessionStorage` of that tab. It is cleared when the tab is closed and is not included in settings sync, settings files, or anything sent to the developer. Reverse playback uses YouTube's in-page player API; the feature itself makes no network requests (switching videos is YouTube's own normal page loading).
+
+When the YouTube Enhancements sub-feature "Show game-screen zoom button" (`gameCrop`) is ON and you drag over the video to select the game-screen area, the area (four numbers as fractions of the video, and the zoom on/off state) is saved on this device only, in the `localStorage` of `youtube.com` (key `__cpa_yt_game_crop_v1`, up to 100 channels), keyed by the uploading channel's identifier (`@handle` or `channel/UC…`). Video URLs, footage, and screenshots are not stored or sent. It is not included in settings sync, settings files, or anything sent to the developer, and is removed when site data is cleared.
 
 **On Chrome**, the Volume Booster's current per-tab gain value is held only in the offscreen document's memory and is not persisted. It is released immediately when the tab is closed, when the slider is reset to 100% with all sub-toggles and the mute toggle OFF, or when the Extension is disabled. **On Firefox**, the current gain value is held only in the in-page audio pipeline's memory (see "Tab audio access" below) and is likewise never persisted.
 

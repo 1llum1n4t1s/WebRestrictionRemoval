@@ -9,11 +9,15 @@ if (typeof importScripts === "function") {
 // 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する
 // (Firefox MV3 未対応)。このフラグで「Chrome ベースで動いてるか」を判定し、Firefox 環境では
 // background の音量関連処理を全て skip する。Firefox では代わりに MES 経路
-// (manifest.firefox.json 専用の volume-booster-mes.js) が popup → storage 直書きを
-// storage.onChanged で購読して自動適用するため、background は音量ブースターに一切関与しない。
+// (manifest.firefox.json 専用の volume-booster-mes.js) が popup の保存（SAVE_POPUP_STORAGE 経由の
+// storage 更新）を storage.onChanged で購読して自動適用するため、background は音量ブースターに一切関与しない。
 const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chrome.tabCapture !== "undefined";
 
 // ---------- 初期化 ----------
+// 更新後に、選んだ表示言語の辞書が古い版のままなら作り直す（新しいキーが標準の言語で混ざらないように）。
+// 設定の保存キューとは無関係（端末内の表示言語だけ）なので、下の設定移行とは別に登録する。
+chrome.runtime.onInstalled.addListener(() => { globalThis.Localizer?.ensureFresh(); });
+
 // onInstalled: 初回インストール / アップデート時
 //   - 旧バージョンの設定キー（v1.0.x の copyPasteSettings、v1.0.17 の enabled / volumeBoosterEnabled /
 //     contextMenuAllowDomains）をクリーンアップ
@@ -96,7 +100,14 @@ chrome.runtime.onInstalled.addListener(() => globalThis.enqueueSettingsWrite(asy
   // POPUP_LAST_TAB の値マイグレーション: 旧 "assist" → 新 "tune"。
   // 4 タブ化（調整 / YouTube / Instagram / カラーピッカー）で識別子を変更したため、
   // 既存ユーザーの最後に開いていたタブが「不明値」扱いで TUNE に落ちないよう明示的に変換。
-  const lastTab = (await chrome.storage.local.get(StorageKeys.POPUP_LAST_TAB))[StorageKeys.POPUP_LAST_TAB];
+  // 読み取りが失敗しても後続（既定値の補完・INSTALL_SENTINEL の書込み）へ必ず進めるため、
+  // 失敗時は「移行対象なし」として扱う。旧値が残るので次回の install / update で再試行できる。
+  let lastTab;
+  try {
+    lastTab = (await chrome.storage.local.get(StorageKeys.POPUP_LAST_TAB))[StorageKeys.POPUP_LAST_TAB];
+  } catch (err) {
+    console.warn("[WebViewingAssist] onInstalled POPUP_LAST_TAB read failed:", err);
+  }
   if (lastTab === "assist") {
     await chrome.storage.local
       .set({ [StorageKeys.POPUP_LAST_TAB]: PopupTabs.TUNE })
@@ -162,9 +173,16 @@ chrome.runtime.onInstalled.addListener(() => globalThis.enqueueSettingsWrite(asy
     [StorageKeys.POPUP_LAST_TAB]: PopupTabs.TUNE,
     [StorageKeys.POPUP_LAST_SUBTAB]: {},
   };
-  const stored = await chrome.storage.local.get(Object.keys(initialDefaults));
+  // 読み取り失敗時は stored を null にして defaults の補完だけを見送る。{} で代用すると全キーが
+  // 「欠落」と判定され、保存済みの設定を既定値で上書きしてしまう。sentinel の書込みへは進める。
+  let stored = null;
+  try {
+    stored = await chrome.storage.local.get(Object.keys(initialDefaults));
+  } catch (err) {
+    console.warn("[WebViewingAssist] onInstalled defaults read failed:", err);
+  }
   const defaults = {};
-  for (const key of Object.keys(initialDefaults)) {
+  for (const key of stored ? Object.keys(initialDefaults) : []) {
     // 失敗後に false を seed すると、次回の移行が明示 OFF と誤認して回復不能になる。
     if (!youtubeMigrationComplete &&
         (key === StorageKeys.SEARCH_FIXER_ENABLED || key === StorageKeys.SEARCH_FIXER_FEATURES)) continue;
@@ -340,19 +358,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       await chrome.storage.local.set({ [K.YOUTUBE_PLAYER_SETTINGS]: value });
     }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
     return true;
-  } else if (request.action === "APPLY_YOUTUBE_LATENCY_SETTING") {
-    if (!isFromYouTubeContentScript(sender, false, true)) { sendResponse({ ok: false, error: "sender-rejected" }); return false; }
-    globalThis.enqueueSettingsWrite(async () => {
-      const K = StorageKeys;
-      const current = await chrome.storage.local.get([K.YOUTUBE_PLAYER_SETTINGS, K.SETTINGS_SYNC_APPLIED, K.SEARCH_FIXER_ENABLED, K.SEARCH_FIXER_FEATURES]);
-      if ((current[K.SETTINGS_SYNC_APPLIED] ?? null) !== request.syncGeneration) throw new Error("stale-settings");
-      if (!current[K.SEARCH_FIXER_ENABLED] || !current[K.SEARCH_FIXER_FEATURES]?.liveLatency) throw new Error("feature-disabled");
-      const defaults = SearchFixer.PLAYER_CONTROLS.DEFAULT_SETTINGS.latency;
-      if (!Object.hasOwn(defaults, request.key) || typeof request.value !== typeof defaults[request.key] || (typeof request.value === "number" && !Number.isFinite(request.value))) throw new Error("invalid-setting");
-      const value = SearchFixer.PLAYER_CONTROLS.mergeSettings(current[K.YOUTUBE_PLAYER_SETTINGS], { latency: { [request.key]: request.value } });
-      await chrome.storage.local.set({ [K.YOUTUBE_PLAYER_SETTINGS]: value });
-    }).then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: String(error.message) }));
-    return true;
   } else if (request.action === Actions.APPLY_SETTINGS) {
     if (!SenderCheck.isFromPopup(sender)) {
       sendResponse({ ok: false, error: "sender-rejected" });
@@ -394,19 +399,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     )
       .then((res) => sendResponse(res))
       .catch((err) => sendResponse({ ok: false, error: String(err?.message ?? err) }));
-    return true;
-  } else if (request.action === Actions.VOLUME_BOOSTER_RELEASE_TAB) {
-    if (!SenderCheck.isFromPopup(sender)) {
-      sendResponse({ ok: false, error: "sender-rejected" });
-      return false;
-    }
-    if (!HAS_VOLUME_BOOSTER) {
-      sendResponse({ ok: false, error: "volume-booster-unavailable" });
-      return true;
-    }
-    releaseVolumeBoosterTab(request.data?.tabId)
-      .then((res) => sendResponse(res))
-      .catch(() => sendResponse({ ok: false }));
     return true;
   } else if (request.action === Actions.LOUPE_REQUEST_CAPTURE) {
     // ルーペ content script からの captureVisibleTab 要求。
@@ -644,8 +636,8 @@ const notebookLmClient = (() => {
    *
    * 終了条件が要点: 存在しない `authuser` を指定しても Google はエラーにせず**既定アカウント
    * の HTML を返す**ので、「既出のメールアドレスが出たら打ち切り」でしか範囲を確定できない。
-   * 1 回の probe が数百 KB の HTML 取得になるため、結果は SW のメモリにキャッシュする
-   * （SW 再起動で消えるだけで、消えても再取得できる）。
+   * 1 回の probe が数百 KB の HTML 取得になるため、結果をキャッシュする
+   * （SW のメモリに加え storage.local にも TTL 付きで保存するので、SW 再起動後も使い回せる）。
    *
    * @returns {Promise<{ok: true, at: number, accounts: Array<{index: number, email: string}>}
    *                  | {ok: false, error: string}>}
@@ -1103,14 +1095,17 @@ async function applySettingsInner(settings, syncGeneration) {
  *
  * **音量ブースターサブトグル (volumeBoosterAntiClipEnabled / NightMode / BassCut / Muted) は
  * APPLY_SETTINGS の対象外**: popup が VOLUME_BOOSTER_SET_GAIN メッセージで gain と一緒に
- * 渡してくるため、storage.set は popup 側で直接行う。content script への配信も不要なので
- * normalizeSettings / toStorageRecord には含めない。新しい音量関連 storage key を増やすときは
- * この方針を維持するか、APPLY_SETTINGS 経路に統合するかを先に判断すること。
+ * 渡してくるため、保存は popup の SAVE_POPUP_STORAGE（background の保存キュー）側で行う。
+ * content script への配信も不要なので normalizeSettings / toStorageRecord には含めない。
+ * 新しい音量関連 storage key を増やすときは、この方針を維持するか APPLY_SETTINGS 経路に
+ * 統合するかを先に判断すること。
  *
  * **ルーペの zoom / size (loupeZoom / loupeSize) も APPLY_SETTINGS の対象外**: 同じく popup が
- * `chrome.storage.local.set` で直接保存し、content script は `storage.onChanged` で同期する。
+ * SAVE_POPUP_STORAGE 経由で保存し、content script は `storage.onChanged` で同期する。
  * loupeEnabled だけ APPLY_SETTINGS 経路に乗せて active tab への即時通知 (APPLY_LOUPE_CS) を担保する。
- * これは音量ブースター 6 キー直書きパターン (CLAUDE.md「Important Patterns」#23) と同型。
+ * popup から storage.local へ直接書き込むのは settings-sync.js の同期トグル・再試行と、popup.js の
+ * install センチネル復旧、および表示言語の選択（`Localizer.save`。端末内のみで同期・バックアップ対象外）だけで、
+ * それ以外は保存キュー・同期世代を素通りさせないこと。
  */
 function normalizeSettings(settings) {
   return {

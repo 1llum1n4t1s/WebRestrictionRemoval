@@ -46,8 +46,8 @@
  *     namespace 解釈で Chromium が filter を解決できないケースが報告されているが、XML
  *     パーサに名前空間ごと解釈させれば安定する（HTML5 パーサ + innerHTML 経路は AMO の
  *     UNSAFE_VAR_ASSIGNMENT 警告対象になるため不採用）。
- *   - `<svg>` は `<body>` 末尾に置き、SPA 等で body 配下が書き換わったら applyState の冪等性で
- *     再注入する。`<style>` 注入は廃止（per-video inline style に統一）。
+ *   - `<svg>` は `<body>` 末尾に置き、SPA 等で body 配下が書き換わったら、observer 起点の
+ *     再走査（scheduleScan）と applyState の冪等な ensureSvgFilter で再注入する（値が同じなら何もしない）。`<style>` 注入は廃止（per-video inline style に統一）。
  *
  * 二重実行防止: `window.__cpaVideoGammaRunning` フラグで同一フレーム内の重複起動を弾く。
  */
@@ -58,6 +58,10 @@
 
   let currentEnabled = false;
   let currentValue = VideoGamma.DEFAULT;
+  /** 現在の SVG filter ホストへ書き込み済みの exponent（ホストが無い / 未注入は null）。
+   *  同じ値の通知（他機能の設定変更でも background が全設定を配信する）や走査のたびに
+   *  filter を作り直すと、参照する全 video の描画が無効化されるため、値が変わったときだけ再構築する。 */
+  let appliedExponent = null;
 
   /** el → 退避した元の inline filter（撤去時に復元）。video-fill と同型: WeakMap 1 本で追跡、
    *  detach は MutationObserver の removedNodes で即 revertVideo するので strong ref を持たず、
@@ -115,7 +119,12 @@
    */
   function ensureSvgFilter(exponent) {
     let host = document.getElementById(VideoGamma.SVG_ID);
-    const svg = buildSvgFilter(exponent);
+    const clamped = VideoGamma.clampValue(exponent);
+    // ホストが残っていて値も同じなら何もしない。ホストをページ側の書き換えで失った場合は
+    // 下の経路で再注入する（走査時にも呼ぶので、body 差し替え後も補正が戻る）。
+    if (host && appliedExponent === clamped) return;
+    const svg = buildSvgFilter(clamped);
+    appliedExponent = clamped;
     if (host) {
       host.replaceChildren(svg);
       return;
@@ -139,6 +148,7 @@
   }
 
   function removeSvgFilter() {
+    appliedExponent = null;
     const host = document.getElementById(VideoGamma.SVG_ID);
     if (host) host.remove();
   }
@@ -213,7 +223,11 @@
     scanRaf = requestAnimationFrame(() => {
       scanRaf = 0;
       if (!chrome.runtime?.id) { teardownOrphan(); return; }
-      if (isActive()) scanAndApply();
+      if (isActive()) {
+        // ページが SVG ホストを消した場合（body の差し替え等）に補正が失われたままにならないよう再注入する。
+        ensureSvgFilter(currentValue);
+        scanAndApply();
+      }
     });
   }
 

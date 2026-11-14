@@ -442,6 +442,12 @@
       return;
     }
 
+    // 単体表示の SVG / XML 文書など <body> を持たない文書では、レンズ（HTML 要素 + closed Shadow DOM）の
+    // 置き場がなく buildLensDOM の appendChild が例外になる。isActive を立てた後に落ちると true のまま
+    // 固着し、後続の通知が「更新のみ」経路に流れて二度と起動できないため、状態を変える前に見送る。
+    // body が後から得られた場合は、次の設定通知・可視化復帰の readSettingsAndApply で通常どおり起動する。
+    if (!document.body) return;
+
     isActive = true;
     currentZoom = newZoom;
     currentSize = newSize;

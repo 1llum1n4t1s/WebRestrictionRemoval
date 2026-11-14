@@ -74,7 +74,7 @@
   //     (instagram-cleaner.js の checkUrlRedirect と同じ regex に揃える)
   // -----------------------------------------------------------------
   const path = location.pathname;
-  // ⚠️ MUST SYNC with `src/content/instagram-cleaner.js` checkUrlRedirect (line ~441-443):
+  // ⚠️ MUST SYNC with `src/content/instagram-cleaner.js` checkUrlRedirect の REELS_RE / EXPLORE_RE / STORIES_RE:
   // 同じ regex を使って document_start と document_idle の両経路で同じ URL を判定する。
   // 片方だけ書き換えると「early では redirect されたが cleaner では戻る」など整合性が崩れる。
   const REELS_RE = /^\/reels?(\/|$)/i;

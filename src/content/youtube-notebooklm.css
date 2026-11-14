@@ -4,7 +4,8 @@
  * ボタンは **YouTube のページ内** に挿し込む（参考にした拡張機能と同じ配置）。
  *   - /watch          … 高評価 / 共有の行 (`#actions`) の先頭、右寄せ
  *   - /results        … 検索フィルタボタンの隣、左寄せ
- *   - /playlist・チャンネル … タイトル見出しの行、右寄せ
+ *   - /playlist       … 「すべて再生」の行の直後に 1 行で置く
+ *   - チャンネル      … 「チャンネル登録」ボタンの直後
  * 見た目は YouTube 純正の tonal ボタンに寄せる。純正クラス名（`yt-spec-button-shape-next--tonal`
  * 等）に依存すると YouTube の内部変更で崩れるため、クラスは自前で持つ。
  *
@@ -41,10 +42,6 @@ html[dark] .__cpa-nlm-root {
   --cpa-nlm-fg: #f1f1f1;
   --cpa-nlm-bg: hsla(0, 0%, 100%, 0.1);
   --cpa-nlm-bg-hover: hsla(0, 0%, 100%, 0.2);
-}
-
-.__cpa-nlm-root[hidden] {
-  display: none;
 }
 
 /* アンカーの下に 1 行として置くレイアウト（プレイリストの「すべて再生」行の直下）。 */

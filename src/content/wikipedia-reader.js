@@ -29,6 +29,13 @@
     linkStyle: "data-cpa-wiki-links", articleStyle: "data-cpa-wiki-article-style",
   };
   const assignedIds = new Map();
+  // 新レイアウトで「左レールに目次を常時表示し、基本情報を導入部の右へ浮かべる」幅。
+  // CSS の @media (min-width: 1000px) と同じ値を保つこと（片方だけ変えると開閉の初期状態と見た目がずれる）。
+  const WIDE_LAYOUT = "(min-width: 1000px)";
+  // readableLayout OFF の浮動目次は従来どおり 1400px 以上で開く。
+  const FLOATING_CONTENTS = "(min-width: 1400px)";
+  // 目次を既定で開く画面幅か。新レイアウトでは左レールが出る幅、従来の浮動目次では 1400px 以上。
+  const contentsOpenByDefault = () => matchMedia(modern ? WIDE_LAYOUT : FLOATING_CONTENTS).matches;
 
   function moveInto(node, target) {
     if (!node?.parentNode || !target || target.contains(node)) return;
@@ -60,8 +67,11 @@
         anchor.remove();
       }
     }
+    state.factsObserver?.disconnect();
+    cancelAnimationFrame(state.factsFrame);
     state.header?.remove();
     state.facts?.remove();
+    state.display?.remove();
     state.shell.remove();
     document.documentElement.classList.remove(prefix + "modern");
     if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
@@ -85,7 +95,7 @@
     grid.append(rail); shell.append(topbar, notices, grid, footer);
     // Wikipedia の委任イベントが参照するページ祖先を維持する。
     (content.closest(".mw-page-container-inner") ?? document.body).append(shell);
-    modern = { shell, rail, article: source, content, sourceRoot: content.closest(".mw-page-container"), moves: [], owned: new Set([shell, topbar, notices, grid, rail, footer]) };
+    modern = { shell, rail, grid, article: source, content, sourceRoot: content.closest(".mw-page-container"), moves: [], owned: new Set([shell, topbar, notices, grid, rail, footer]) };
     moveInto(document.querySelector(".vector-header-container") ?? document.querySelector("body > header"), topbar);
     moveInto(document.querySelector(".vector-sitenotice-container"), notices);
     const nativeMenu = document.querySelector(".vector-column-start");
@@ -100,45 +110,84 @@
     modern.contentAnchor = modern.moves.find(item => item.node === content)?.anchor;
     moveInto(document.getElementById("footer"), footer);
 
-    const header = document.createElement("header"); header.className = prefix + "article-header";
-    modern.owned.add(header);
-    content.prepend(header);
-    // 言語メニューは標準タイトルバー直下の構造を参照して初期化される。
+    // 題名・言語ボタン・記事の操作（ツールバー）は Wikipedia の実ノードを元の場所に残し、CSS の grid だけで
+    // 「題名 → 説明 → 閲覧/編集/履歴＋言語」の順に並べる。移動しないので、言語メニューの初期化と復元に影響しない。
     const description = source.querySelector(".shortdescription")?.textContent.trim();
     if (description) {
+      // 説明文だけが独自ノード。題名バーの直後に置き、読み上げ順も「題名 → 説明」にする。
+      const header = document.createElement("header"); header.className = prefix + "article-header";
       const text = document.createElement("p"); text.className = prefix + "description";
-      modern.owned.add(text);
       text.textContent = description; header.append(text);
-    }
-    const toolbar = content.querySelector(".vector-page-toolbar");
-    if (toolbar) {
-      const actions = document.createElement("details"); actions.className = prefix + "actions";
-      const summary = document.createElement("summary"); summary.textContent = msg("wikipediaArticleActions");
-      modern.owned.add(actions).add(summary);
-      actions.append(summary); header.append(actions); moveInto(toolbar, actions);
+      modern.owned.add(header).add(text);
+      const titlebar = content.querySelector(":scope > .vector-page-titlebar");
+      if (titlebar) titlebar.after(header); else content.prepend(header);
+      modern.header = header;
     }
     const infobox = source.querySelector("table.infobox");
     if (infobox && !infobox.closest(".navbox, .metadata")) {
       const facts = document.createElement("details"); facts.className = prefix + "facts";
       const rows = [...infobox.tBodies].flatMap(body => [...body.rows]);
-      // 通常の項目／値の表だけを段組みにし、複雑な結合セルは元の表構造で表示する。
+      // 通常の項目／値の表だけを行ごとの2列に整え、複雑な結合セルは元の表構造で表示する。
       if (rows.some(row => row.cells.length === 2 && row.cells[0].tagName === "TH") && rows.every(row =>
         row.cells.length <= 2 && [...row.cells].every(cell => cell.rowSpan === 1)
         && (row.cells.length === 1 || [...row.cells].every(cell => cell.colSpan === 1)))) facts.classList.add(prefix + "facts-compact");
       const summary = document.createElement("summary"); summary.textContent = msg("wikipediaArticleInfo"); facts.append(summary);
       modern.owned.add(facts).add(summary);
-      const lead = infobox.closest('section[data-mw-section-id="0"]');
-      const firstSection = source.querySelector(':scope > section[data-mw-section-id]:not([data-mw-section-id="0"]), :scope > .mw-heading2, :scope > h2');
-      if (lead?.parentElement === source) lead.append(facts);
-      else if (firstSection) firstSection.before(facts);
-      else source.append(facts);
+      // 基本情報は元の位置（導入部の先頭）に置く。広い画面ではそこから右へ浮かべる（右列がある幅では CSS が右列へ張り出させ、
+      // それ以外では導入文が横に回り込む）。
+      // 位置を変えないので、節構造の違うパーサー出力でも同じ経路で動き、復元も元の位置コメントだけで済む。
+      infobox.before(facts);
       moveInto(infobox, facts);
       modern.facts = facts;
+      // 広い画面ではカードを開き、狭い画面では閉じた状態から始める。利用者が一度でも開閉したら画面幅の変更で上書きしない。
+      facts.open = matchMedia(WIDE_LAYOUT).matches;
+      summary.addEventListener("click", () => { modern.factsTouched = true; });
     }
-    modern.header = header;
+    // 右の「表示」パネル（文字サイズ・幅・色）は読書中のノイズになるため、閉じた折りたたみに入れる。
+    // 実ノード(nav)を移すだけで内容は複製しない。Vector の「非表示」操作で中身が無くなれば CSS で枠ごと消す。
+    const appearanceNav = content.querySelector(".vector-column-end nav.vector-appearance-landmark");
+    if (appearanceNav) {
+      const display = document.createElement("details"); display.className = prefix + "display";
+      const summary = document.createElement("summary"); summary.textContent = msg("wikipediaDisplaySettings");
+      modern.owned.add(display).add(summary);
+      display.append(summary);
+      appearanceNav.before(display);
+      moveInto(appearanceNav, display);
+      modern.display = display;
+    }
     document.documentElement.classList.add(prefix + "modern");
+    // 基本情報が右列へ張り出す配置（position: absolute）では、記事本文より長いカードがフッターへ重ならないよう、
+    // はみ出す高さを測って本文グリッドの下余白へ足す。カードや本文の大きさが変わるたびに測り直す（画像の読込・開閉・フォント）。
+    if (modern.facts && typeof ResizeObserver === "function") {
+      modern.factsObserver = new ResizeObserver(scheduleFactsOverflow);
+      modern.factsObserver.observe(modern.facts);
+      modern.factsObserver.observe(content);
+    }
     if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
     revealHashTarget();
+  }
+
+  function syncFactsOverflow() {
+    const state = modern;
+    if (!state?.grid) return;
+    let extra = 0;
+    const facts = state.facts;
+    // 張り出し配置（absolute）のときだけ測る。本文列内に浮かべる配置では、本文の高さにカードが含まれる。
+    if (facts?.isConnected && getComputedStyle(facts).position === "absolute") {
+      const overflow = facts.getBoundingClientRect().bottom + parseFloat(getComputedStyle(facts).marginBottom || "0") - state.content.getBoundingClientRect().bottom;
+      extra = Math.max(0, Math.ceil(overflow));
+    }
+    const value = extra + "px";
+    if (state.factsOverflow !== value) { state.factsOverflow = value; state.grid.style.setProperty("--cpa-wiki-facts-overflow", value); }
+  }
+
+  function scheduleFactsOverflow() {
+    const state = modern;
+    if (!state || state.factsFrame) return;
+    state.factsFrame = requestAnimationFrame(() => {
+      state.factsFrame = 0;
+      if (modern === state) syncFactsOverflow();
+    });
   }
 
   function revealHashTarget() {
@@ -292,7 +341,7 @@
       for (const [index, entry] of contentsEntries.entries()) entry.heading = headings[index];
       return;
     }
-    const wasOpen = contents?.open ?? matchMedia("(min-width: 1400px)").matches;
+    const wasOpen = contents?.open ?? contentsOpenByDefault();
     contents?.remove();
     contentsEntries = [];
     currentContentsLink = null;
@@ -318,7 +367,8 @@
       link.textContent = item.text;
       contentsEntries.push({ heading: headings[index], link });
       link.addEventListener("click", () => {
-        if (!matchMedia("(min-width: 1400px)").matches) contents.open = false;
+        // 左レールに常設できない幅では、項目を選んだら一覧を閉じて本文を見せる。
+        if (!contentsOpenByDefault()) contents.open = false;
       }, { signal: listeners.signal });
       li.append(link);
       list.append(li);
@@ -448,7 +498,7 @@
         }
       }, { signal });
       window.addEventListener("scroll", () => { closeReference(); scheduleContentsPosition(); }, { passive: true, signal });
-      window.addEventListener("resize", () => { positionReference(); scheduleContentsPosition(true); }, { signal });
+      window.addEventListener("resize", () => { positionReference(); scheduleContentsPosition(true); scheduleFactsOverflow(); }, { signal });
       window.addEventListener("hashchange", revealHashTarget, { signal });
       window.addEventListener("beforeprint", () => {
         if (modern?.facts) { modern.printFactsOpen = modern.facts.open; modern.facts.open = true; }
@@ -456,9 +506,15 @@
       window.addEventListener("afterprint", () => {
         if (modern?.facts && typeof modern.printFactsOpen === "boolean") modern.facts.open = modern.printFactsOpen;
       }, { signal });
-      matchMedia("(min-width: 1400px)").addEventListener("change", (event) => {
-        if (contents) contents.open = event.matches;
-      }, { signal });
+      // 画面幅の境界を跨いだら、目次と基本情報を「その幅の既定の開閉」へ合わせる。
+      // 基本情報は利用者が自分で開閉した後は触らない。境界は新レイアウト（WIDE_LAYOUT）と従来の浮動目次（FLOATING_CONTENTS）で別。
+      for (const query of [WIDE_LAYOUT, FLOATING_CONTENTS]) {
+        matchMedia(query).addEventListener("change", () => {
+          // 目次は、そのレイアウトの境界を跨いだときだけ既定へ戻す（もう一方の境界では利用者の開閉を保つ）。
+          if (contents && query === (modern ? WIDE_LAYOUT : FLOATING_CONTENTS)) contents.open = contentsOpenByDefault();
+          if (modern?.facts && !modern.factsTouched && query === WIDE_LAYOUT) modern.facts.open = matchMedia(WIDE_LAYOUT).matches;
+        }, { signal });
+      }
       matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
         if (appearance.theme === "auto") runner.scheduleRender();
       }, { signal });
@@ -495,6 +551,7 @@
       modern.menuPinned = pinned; modern.hasContents = !!contents;
     }
     if (!features.linkPreview) closeReference();
+    if (modern) { syncFactsOverflow(); scheduleFactsOverflow(); }
     scheduleContentsPosition();
     if (!features.imageViewer || appearance.articleStyle === "text") closeImage();
   }

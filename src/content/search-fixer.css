@@ -7,7 +7,7 @@
  * クラス命名:
  *   __cpa-sfx-thumb-{dark,light}  サムネ枠装飾（ダーク/ライト両対応）
  *   __cpa-sfx-hide-comments       動画ページのコメント欄非表示（`<html>` 駆動）
- *   __cpa-sfx-hide-live-chat      ライブチャット公式折りたたみ状態の補助（`<html>` 駆動）
+ *   __cpa-sfx-hide-live-chat-pre  ライブチャット先制非表示（`<html>` 駆動、youtube-early.js が付与）
  *   cpa-sfx-demoted               キーワード非マッチ動画（デモート）— JS 側で動的注入する CSS と二段構え
  */
 

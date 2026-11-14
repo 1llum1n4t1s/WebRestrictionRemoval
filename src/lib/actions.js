@@ -5,6 +5,23 @@
   if (globalThis.__cpaActionsLoaded === true) return;
   globalThis.__cpaActionsLoaded = true;
 
+/**
+ * 保存済みのサブ機能設定を既定値へ重ねる共通処理（YouTube / Instagram / TikTok / X 用）。
+ * 既定値に存在するキーのうち、保存値が真偽値のものだけを採用し、不明キー・非 boolean は捨てる。
+ * 戻り値は常に新しいオブジェクトで、入力（defaults / stored）は変更しない。
+ * （Wikipedia は既定値が true のキーを含み、判定も異なるため対象外。）
+ */
+function mergeBooleanFeatures(defaults, stored) {
+  const out = { ...defaults };
+  if (stored && typeof stored === "object") {
+    for (const key of Object.keys(defaults)) {
+      if (stored[key] === true) out[key] = true;
+      else if (stored[key] === false) out[key] = false;
+    }
+  }
+  return out;
+}
+
 /** @readonly Offscreen Document 関連定数（音量ブースター専用） */
 const Offscreen = Object.freeze({
   PATH: "src/offscreen/offscreen.html",
@@ -156,6 +173,14 @@ const SearchFixerFeatures = Object.freeze([
   Object.freeze({ key: "playbackRate", category: "watch_page" }),
   Object.freeze({ key: "playerVolume", category: "watch_page" }),
   Object.freeze({ key: "redirectShortsUrl", category: "watch_page" }),
+  // 再生リスト逆順再生: 登録ミスで逆向きに並んだ再生リスト（Part10 → Part1 等）を、再生リスト欄の
+  // 「逆順」ボタンで逆向きに再生する。実装は youtube-playlist-reverse.js（ボタン・状態）と
+  // youtube-playlist-reverse-main.js（MAIN world で YouTube の移動処理を横取り）。状態はタブ内のみ。
+  Object.freeze({ key: "playlistReverse", category: "watch_page" }),
+  // ゲーム画面拡大: ゲーム映像を動画の一部にクロップして外側に枠・立ち絵を置く配信で、利用者が指定した範囲
+  // だけをプレーヤー全体へ拡大する。ボタンはプレーヤーのオーバーレイに出し、範囲はチャンネルごとに
+  // youtube.com の localStorage（端末内・タブ間共有）へ保存する。実装は youtube-game-crop.js。
+  Object.freeze({ key: "gameCrop", category: "watch_page" }),
   Object.freeze({ key: "searchGrid", category: "search_only" }),
   Object.freeze({ key: "removeShortsChip", category: "search_only" }),
   // === カテゴリ "menu_ui": メニュー / UI（左サイドバーやレイアウト系）===
@@ -286,8 +311,101 @@ const YouTubePlayerControls = (() => {
   return Object.freeze({ DEFAULT_SETTINGS, QUALITY_VALUES, RATE_VALUES, NUMERIC_CHOICES, normalizeSettings, mergeSettings, getPlaybackSettings });
 })();
 
+/**
+ * ゲーム画面拡大の純粋な計算。配信者が動画の外側に枠・コメント欄・立ち絵を置き、ゲーム映像だけを
+ * 一部にクロップしている配信で、その範囲だけをプレーヤー全体に拡大して見せる。
+ *
+ * 範囲は動画フレームに対する割合（0〜1）で持つ。解像度・画質の切り替え・プレーヤーのサイズ変更で
+ * 範囲がずれないようにするため。DOM には触れず、content script（youtube-game-crop.js）が使う。
+ */
+const YouTubeGameCrop = (() => {
+  // 小さすぎる範囲は誤操作（クリックだけ）とみなして採用しない。
+  const MIN_SIZE = 0.1;
+  const MAX_ENTRIES = 100;
+  const STORAGE_KEY = "__cpa_yt_game_crop_v1";
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const round = (v) => Math.round(v * 10000) / 10000;
+
+  /** 保存・入力値を {x,y,w,h,on} に正規化する（不正は null）。範囲は 0〜1 に収め、最小サイズを満たすものだけ採用する。 */
+  function normalizeRegion(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const { x, y, w, h } = raw;
+    if (![x, y, w, h].every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+    const left = clamp01(x);
+    const top = clamp01(y);
+    const width = Math.min(clamp01(w), 1 - left);
+    const height = Math.min(clamp01(h), 1 - top);
+    if (width < MIN_SIZE || height < MIN_SIZE) return null;
+    return { x: round(left), y: round(top), w: round(width), h: round(height), on: raw.on !== false };
+  }
+
+  /** 2 点（動画フレーム内の割合）から範囲を作る。ドラッグの向きは問わない。 */
+  function regionFromPoints(a, b) {
+    return normalizeRegion({
+      x: Math.min(a.x, b.x), y: Math.min(a.y, b.y),
+      w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y),
+    });
+  }
+
+  /** 保存データ全体（チャンネルキー → 範囲）を正規化する。件数は MAX_ENTRIES まで（新しいものを残す）。 */
+  function normalizeStore(raw) {
+    const out = {};
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof key !== "string" || key.length === 0 || key.length > 120) continue;
+      const region = normalizeRegion(value);
+      if (region) out[key] = region;
+    }
+    const keys = Object.keys(out);
+    for (const key of keys.slice(0, Math.max(0, keys.length - MAX_ENTRIES))) delete out[key];
+    return out;
+  }
+
+  /** チャンネルの識別子（/@handle または /channel/UC…）。それ以外は null で、保存しない。 */
+  function channelKey(href) {
+    if (typeof href !== "string") return null;
+    let path;
+    try { path = new URL(href, "https://www.youtube.com").pathname; } catch { return null; }
+    const match = /^\/(@[^/]+|channel\/UC[\w-]{20,})/.exec(path);
+    return match ? decodeURIComponent(match[1]).toLowerCase() : null;
+  }
+
+  /**
+   * 範囲をプレーヤー全体へ拡大する変換を計算する（video 要素へ当てる translate / scale / clip-path）。
+   *   - content: 動画の映像部分の矩形（プレーヤー内の left/top と幅・高さ。変換前、CSS px）
+   *   - player: プレーヤーの幅・高さ
+   *   - box: video 要素自身の矩形（同じ座標系）。映像が要素より小さい（レターボックス）場合の clip 用。省略時は content と同じ
+   * 範囲の縦横比を保ったままプレーヤーに収まる最大の倍率を使い、範囲の中心をプレーヤーの中心に置く。
+   * 範囲の外側は clip-path で隠す（倍率が小さい軸では、枠の外の映像が見えないようにするため）。
+   * 呼び出し側は transform-origin を左上（0 0）にする前提。clip-path は変換前の要素座標（CSS px）。
+   */
+  function computeView(region, content, player, box = content) {
+    const r = normalizeRegion(region);
+    if (!r || !(content?.width > 0) || !(content?.height > 0) || !(player?.width > 0) || !(player?.height > 0)) return null;
+    const rw = r.w * content.width;
+    const rh = r.h * content.height;
+    const scale = Math.min(player.width / rw, player.height / rh);
+    // 範囲の中心（プレーヤー座標）
+    const cx = content.left + r.x * content.width + rw / 2;
+    const cy = content.top + r.y * content.height + rh / 2;
+    // 要素座標での範囲の端（clip-path inset 用）
+    const top = content.top - box.top + r.y * content.height;
+    const left = content.left - box.left + r.x * content.width;
+    return {
+      scale: round(scale),
+      // transform-origin が要素の左上なので、要素の左上が (box.left, box.top) にあるものとして平行移動量を出す
+      translateX: round(player.width / 2 - box.left - scale * (cx - box.left)),
+      translateY: round(player.height / 2 - box.top - scale * (cy - box.top)),
+      clip: `inset(${round(top)}px ${round(box.width - left - rw)}px ${round(box.height - top - rh)}px ${round(left)}px)`,
+    };
+  }
+
+  return Object.freeze({ MIN_SIZE, MAX_ENTRIES, STORAGE_KEY, normalizeRegion, regionFromPoints, normalizeStore, channelKey, computeView });
+})();
+
 const SearchFixer = Object.freeze({
   PLAYER_CONTROLS: YouTubePlayerControls,
+  GAME_CROP: YouTubeGameCrop,
   FEATURES: SearchFixerFeatures,
 
   // category.label は _locales/.../messages.json の `category<CamelId>` (例: categoryMenuUi)。
@@ -312,14 +430,7 @@ const SearchFixer = Object.freeze({
   ]),
 
   mergeFeatures(stored) {
-    const out = { ...SearchFixer.DEFAULT_FEATURES };
-    if (stored && typeof stored === "object") {
-      for (const key of Object.keys(SearchFixer.DEFAULT_FEATURES)) {
-        if (stored[key] === true) out[key] = true;
-        else if (stored[key] === false) out[key] = false;
-      }
-    }
-    return out;
+    return mergeBooleanFeatures(SearchFixer.DEFAULT_FEATURES, stored);
   },
 
   clampGridItems(value) {
@@ -866,14 +977,7 @@ const InstagramCleaner = Object.freeze({
   },
 
   mergeFeatures(stored) {
-    const out = { ...InstagramCleaner.DEFAULT_FEATURES };
-    if (stored && typeof stored === "object") {
-      for (const key of Object.keys(InstagramCleaner.DEFAULT_FEATURES)) {
-        if (stored[key] === true) out[key] = true;
-        else if (stored[key] === false) out[key] = false;
-      }
-    }
-    return out;
+    return mergeBooleanFeatures(InstagramCleaner.DEFAULT_FEATURES, stored);
   },
 });
 
@@ -917,14 +1021,7 @@ const TikTokCleaner = Object.freeze({
   }),
 
   mergeFeatures(stored) {
-    const out = { ...TikTokCleaner.DEFAULT_FEATURES };
-    if (stored && typeof stored === "object") {
-      for (const key of Object.keys(TikTokCleaner.DEFAULT_FEATURES)) {
-        if (stored[key] === true) out[key] = true;
-        else if (stored[key] === false) out[key] = false;
-      }
-    }
-    return out;
+    return mergeBooleanFeatures(TikTokCleaner.DEFAULT_FEATURES, stored);
   },
 });
 
@@ -1011,14 +1108,7 @@ const XCleaner = Object.freeze({
   },
 
   mergeFeatures(stored) {
-    const out = { ...XCleaner.DEFAULT_FEATURES };
-    if (stored && typeof stored === "object") {
-      for (const key of Object.keys(XCleaner.DEFAULT_FEATURES)) {
-        if (stored[key] === true) out[key] = true;
-        else if (stored[key] === false) out[key] = false;
-      }
-    }
-    return out;
+    return mergeBooleanFeatures(XCleaner.DEFAULT_FEATURES, stored);
   },
 });
 
@@ -1865,7 +1955,7 @@ const ColorPicker = Object.freeze({
  *
  * v1.0.x: タブを「アシスト / カラーピッカー」の 2 つから「調整 / YouTube /
  * Instagram / TikTok / カラーピッカー」の 5 つに再編。アコーディオンを廃止して
- * YouTube 機能拡張 (38 機能)・Instagram クリーナー (12 機能)・TikTok クリーナー (3 機能)
+ * YouTube 機能拡張 (40 機能)・Instagram クリーナー (12 機能)・TikTok クリーナー (3 機能)
  * を専用タブで直接表示する設計に移行した。
  *
  * 旧値 "assist" は `migrate()` で "tune" に変換する（POPUP_LAST_TAB の後方互換）。
@@ -1983,10 +2073,10 @@ const PopupTabs = Object.freeze({
 });
 
   /**
-   * /rere レビュー B1-002 修正 (簡易版): APPLY_SETTINGS 経路で popup → background → content script
-   * 間で同期される設定の **単一情報源**。background.js の `normalizeSettings` / `toStorageRecord` /
-   * `notifyContentScripts` の 3 関数を手書きで実装する現状の保険として、本配列を test/actions.test.js
-   * から照合し、新機能追加時に「StorageKey と Actions の整合は取れているか」「3 関数すべてで配線が
+   * APPLY_SETTINGS 経路で popup → background → content script 間で同期される設定の
+   * **単一情報源**。background.js の `toStorageRecord` は本配列から生成され、
+   * `normalizeSettings` / `notifyContentScripts` は手書きのため、本配列を test/actions.test.js
+   * から照合し、新機能追加時に「StorageKey と Actions の整合は取れているか」「各関数で配線が
    * 揃っているか」を CI 検知する。
    *
    * v1.0.29 で発覚した RTX 動画強化機能完全破壊バグ (A2-001) と同型の drift を再発防止する。
@@ -1997,7 +2087,7 @@ const PopupTabs = Object.freeze({
    *   - applyAction: background → content script の APPLY_*_CS メッセージ (Actions 参照、null = 配信なし)
    *
    * 将来 schema 駆動化する場合は本配列に normalize / urlPattern / frameId 関数を追加し、
-   * 3 関数を generated にする (中規模リファクタ、別 PR シリーズ)。
+   * normalizeSettings / notifyContentScripts も generated にする (中規模リファクタ、別 PR シリーズ)。
    */
   const SettingsSchema = Object.freeze([
     Object.freeze({ field: "wikipediaEnabled", storageKey: StorageKeys.WIKIPEDIA_ENABLED, applyAction: Actions.APPLY_WIKIPEDIA_CS }),

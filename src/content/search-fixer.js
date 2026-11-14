@@ -204,13 +204,15 @@
   // ---------- 状態購読 ----------
   // 通知で更新したキーだけ初回取得から保護し、残りの初期設定は取り込む。
   const updatedSettings = new Set();
-  chrome.storage.local
-    .get([
-      StorageKeys.SEARCH_FIXER_ENABLED,
-      StorageKeys.SEARCH_FIXER_FEATURES,
-      StorageKeys.SEARCH_FIXER_GRID_ITEMS,
-      StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
-    ])
+  // 選んだ表示言語の読み込みを待ってから初期設定を適用し、最初の描画から同じ言語で表示する。
+  const readInitialSettings = () => chrome.storage.local.get([
+    StorageKeys.SEARCH_FIXER_ENABLED,
+    StorageKeys.SEARCH_FIXER_FEATURES,
+    StorageKeys.SEARCH_FIXER_GRID_ITEMS,
+    StorageKeys.SEARCH_FIXER_BLOCKED_CHANNELS,
+  ]);
+  // 言語の読み込みがある環境だけ待つ（無ければ従来どおり即座に取得する）。
+  (globalThis.Localizer?.ready ? globalThis.Localizer.ready.catch(() => {}).then(readInitialSettings) : readInitialSettings())
     .then((stored) => {
       if (!updatedSettings.has(StorageKeys.SEARCH_FIXER_ENABLED)) {
         active = stored[StorageKeys.SEARCH_FIXER_ENABLED] === true;
@@ -500,12 +502,9 @@
     }
     cancelLiveChatCollapseRetry();
     // hideLiveChat OFF / 別ページ遷移時は先制非表示クラスも inline force-hide も
-    // 旧 force-hide クラスも剥がして元の表示状態に戻す。クラスを残したままだと、
+    // 剥がして元の表示状態に戻す。クラスを残したままだと、
     // 機能 OFF 後もライブチャット枠が表示されない / 先制非表示で見えないままになる。
     clearLiveChatPreHide();
-    document
-      .querySelectorAll("ytd-live-chat-frame." + LIVE_CHAT_FORCE_HIDE_CLASS)
-      .forEach((el) => el.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS));
     if (!liveChatObserverAttached) return;
     liveChatObserver?.disconnect();
     liveChatObserver = null;
@@ -619,11 +618,6 @@
       // contentDocument cross-origin で弾かれた場合は何もしない（フォールバック側で拾う）
     }
   }
-
-  // hideLiveChat: 「toggle 見つからない & frame 存在」のときに付与する強制非表示クラス。
-  // ライブ配信アーカイブで「チャットのリプレイを表示」ボタンしか出ない動画など、
-  // 公式トグルで閉じられない状態を CSS で frame ごと display:none する。
-  const LIVE_CHAT_FORCE_HIDE_CLASS = "__cpa-sfx-live-chat-force-hide";
 
   /**
    * ライブチャット panel の close button を探す。
@@ -768,12 +762,8 @@
     // 解決: frame に `collapsed` 属性が付くまで rAF polling、付いたら剥がす。
     // タイムアウト 30 フレーム (≈500ms) で fallback 剥がし。
     schedulePreHideRelease();
-
-    // 旧バージョン残骸の force-hide クラス cleanup（過去拡張機能で frame に付与された
-    // クラスが残っている場合のみ作用、新方式では二度と付与しない）。
-    document
-      .querySelectorAll("ytd-live-chat-frame." + LIVE_CHAT_FORCE_HIDE_CLASS)
-      .forEach((el) => el.classList.remove(LIVE_CHAT_FORCE_HIDE_CLASS));
+    // 過去版の永続 force-hide クラスは付与をやめており、更新後は content script の再注入が
+    // ページ再読込と同時に起きて DOM も新規になるため、残骸の掃除は不要。
   }
 
   let scanScheduled = false;
@@ -1770,8 +1760,7 @@
       stopCommentsControl();
       commentsRevealed = false;
     }
-    // ライブチャットは JS 側で公式トグルを押し、CSS は collapsed 状態の高さ補助だけを担う。
-    document.documentElement.classList.toggle("__cpa-sfx-hide-live-chat", f("hideLiveChat"));
+    // ライブチャットは JS 側で公式トグルを押し、先制非表示は youtube-early.js と pre クラスが担う。
   }
 
   // ---------- ホームのリッチグリッド列数 ----------

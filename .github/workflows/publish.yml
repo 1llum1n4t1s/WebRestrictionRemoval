@@ -122,6 +122,11 @@ jobs:
       - name: テスト実行
         run: bun --bun run test
 
+      # 依存更新 PR の検証（dependency-validation.yml）と同じ lint を、提出物の作成前にも実行する。
+      # no-undef は error 設定のため、未定義参照を含む成果物を提出しない。
+      - name: Lint
+        run: bun --bun run lint
+
       - name: アイコン生成
         run: bun scripts/generate-icons.js
 
@@ -279,8 +284,8 @@ jobs:
         shell: pwsh
         run: ./scripts/Initialize-BunBuild.ps1 -VersionFile package.json
 
-      - name: web-ext 依存インストール
-        # bun run deps で integrity 検証し、実行時に web-ext 10.8.0 を確認。
+      - name: 依存インストール
+        # bun run deps で integrity 検証する（web-ext の patch 検証は直後の test:dependencies）。
         # publish では screenshot 生成不要なので Puppeteer browser DL は skip。
         env:
           PUPPETEER_SKIP_DOWNLOAD: "1"

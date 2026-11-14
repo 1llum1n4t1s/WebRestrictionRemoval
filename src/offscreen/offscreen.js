@@ -136,6 +136,9 @@ async function volumeSetGain(tabId, streamId, gainPercent, antiClip, nightMode, 
 
 async function createAudioState(tabId, streamId, initGeneration) {
   let stream = null;
+  // catch で解放できるよう try の外で保持する。AudioContext は close するまで資源を握り続け、
+  // state 登録前に失敗すると volumeReleaseTab も届かず、30 秒のアイドル close まで残ってしまう。
+  let ctx = null;
   try {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -157,7 +160,7 @@ async function createAudioState(tabId, streamId, initGeneration) {
       });
     }
 
-    const ctx = new AudioContext();
+    ctx = new AudioContext();
     // Chrome の autoplay policy で AudioContext は "suspended" 状態で起動することがある。
     // suspended のままだと tabCapture stream は流れているのに destination から音が出ず、
     // タブ音実体がミュート状態に陥り YouTube プレイヤー側もそれを検出してミュート UI を出す。
@@ -230,7 +233,14 @@ async function createAudioState(tabId, streamId, initGeneration) {
   } catch (err) {
     // /rere F-001: DSP ノードチェーン構築失敗の可視化（getUserMedia / AudioContext / connect 失敗）
     console.warn("[WebViewingAssist] createAudioState failed for tab", tabId, ":", err);
-    stream?.getTracks().forEach((t) => t.stop());
+    // 解放の順序契約は他経路（disposeAudioState）と同じ「track stop → ctx.close」。
+    // 一方が失敗しても他方を必ず試す。
+    try { stream?.getTracks().forEach((t) => t.stop()); } catch {}
+    // 世代不一致・cleanup・終了済み stream の各経路は throw 前に close 済みなので、
+    // 閉じていない場合だけ閉じる（closed な ctx への close は InvalidStateError で reject する）。
+    if (ctx && ctx.state !== "closed") {
+      try { await ctx.close(); } catch {}
+    }
     throw err;
   }
 }

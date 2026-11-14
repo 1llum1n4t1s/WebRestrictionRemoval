@@ -1,0 +1,1699 @@
+{
+  "settingsSyncTitle": {
+    "message": "在多部電腦間同步設定"
+  },
+  "settingsSyncDescription": {
+    "message": "請在每部電腦上使用同一瀏覽器登入相同帳戶、在瀏覽器中啟用擴充功能同步，並開啟此選項。啟用時會優先採用已同步的設定；之後若發生衝突，則依各項設定的較新更新資訊為準。Chrome 與 Firefox 之間無法互相同步。驗證資訊、目標帳戶、色彩記錄與面板位置只保留在本機。關閉此選項不會刪除雲端資料。"
+  },
+  "settingsSyncOff": {
+    "message": "同步已關閉。設定儲存於本機。"
+  },
+  "settingsSyncWorking": {
+    "message": "正在檢查已同步的設定…"
+  },
+  "settingsSyncReady": {
+    "message": "已儲存至瀏覽器同步儲存空間。其他電腦可能需要一些時間才會收到變更。"
+  },
+  "settingsSyncError": {
+    "message": "同步失敗。本機設定已保留。請檢查瀏覽器同步與儲存空間上限後再試一次。設定與保留的刪除記錄可能超出同步配額。"
+  },
+  "settingsSyncRetry": {
+    "message": "重試同步"
+  },
+  "appName": {
+    "message": "Vuora",
+    "description": "Extension name shown in chrome://extensions and the Chrome Web Store"
+  },
+  "appDescription": {
+    "message": "適用於 YouTube、Wikipedia、社群媒體與購物頁面的本機閱讀與音訊工具。",
+    "description": "Short description (manifest.description)"
+  },
+  "defaultTitle": {
+    "message": "Vuora",
+    "description": "Hover tooltip on the toolbar icon"
+  },
+  "headerTitle": {
+    "message": "Vuora",
+    "description": "h1 in the popup header"
+  },
+  "headerTagline": {
+    "message": "增強、整理、持久——一個面板全搞定",
+    "description": "Tagline shown beneath the popup header"
+  },
+  "categorySelectorLabel": {
+    "message": "類別"
+  },
+  "tabbarAriaLabel": {
+    "message": "要顯示的類別"
+  },
+  "tabTune": {
+    "message": "調整"
+  },
+  "tabYoutube": {
+    "message": "YouTube"
+  },
+  "tabInstagram": {
+    "message": "Instagram"
+  },
+  "tabTiktok": {
+    "message": "TikTok"
+  },
+  "tabX": {
+    "message": "X"
+  },
+  "tabPicker": {
+    "message": "色彩選擇器"
+  },
+  "groupAudio": {
+    "message": "音訊"
+  },
+  "groupVideo": {
+    "message": "影片"
+  },
+  "groupAmazon": {
+    "message": "Amazon"
+  },
+  "volumeBoosterMaster": {
+    "message": "音量增強器"
+  },
+  "volumeBoosterMasterDesc": {
+    "message": "增強並調整分頁音訊。切換分頁時自動套用設定。"
+  },
+  "volumeSubLabel": {
+    "message": "音量增強器"
+  },
+  "volumeSubDesc": {
+    "message": "請先將播放器音量設為 100%，再於此處調整，效果最佳。"
+  },
+  "volumeMesFirefoxNote": {
+    "message": "Firefox 版透過頁面內處理（MediaElementSource）增強音訊，設定會自動套用至所有分頁。不支援受 DRM 保護的影片（Netflix、Prime Video 等）。"
+  },
+  "volumeReset100Btn": {
+    "message": "重設為 100%"
+  },
+  "volumeReset100Aria": {
+    "message": "將音量重設為 100%"
+  },
+  "volumeStepDownAria": {
+    "message": "音量降低 10%"
+  },
+  "volumeStepDownTitle": {
+    "message": "音量降低 10%"
+  },
+  "volumeStepUpAria": {
+    "message": "音量提高 10%"
+  },
+  "volumeStepUpTitle": {
+    "message": "音量提高 10%"
+  },
+  "volumeMuteAriaOff": {
+    "message": "靜音"
+  },
+  "volumeMuteAriaOn": {
+    "message": "取消靜音"
+  },
+  "volumeMuteTitleOff": {
+    "message": "靜音（保留音量）"
+  },
+  "volumeMuteTitleOn": {
+    "message": "取消靜音（還原音量）"
+  },
+  "volumeAntiClipLabel": {
+    "message": "自動破音防護"
+  },
+  "volumeAntiClipDesc": {
+    "message": "抑制突然的喊叫聲與音效峰值，降低增強音量時的破音。"
+  },
+  "volumeNightModeLabel": {
+    "message": "夜間模式"
+  },
+  "volumeNightModeDesc": {
+    "message": "適度壓縮大聲的人聲與爆炸聲，避免遊戲中的小聲音效被蓋過。"
+  },
+  "volumeBassCutLabel": {
+    "message": "防擾鄰低頻抑制"
+  },
+  "volumeBassCutDesc": {
+    "message": "削減深沉低頻，避免震動穿透牆壁或地板而打擾鄰居。"
+  },
+  "volumeEqLabel": {
+    "message": "等化器"
+  },
+  "volumeEqDesc": {
+    "message": "以 10 頻段等化器調整各頻段。可加強低音或高音，也可選擇預設組合。"
+  },
+  "volumeEqPresetLabel": {
+    "message": "預設組合"
+  },
+  "volumeEqPreamp": {
+    "message": "前置增益"
+  },
+  "volumeEqPresetFlat": {
+    "message": "平坦"
+  },
+  "volumeEqPresetBass": {
+    "message": "低音增強"
+  },
+  "volumeEqPresetTreble": {
+    "message": "高音增強"
+  },
+  "volumeEqPresetVocal": {
+    "message": "人聲"
+  },
+  "volumeEqPresetLoudness": {
+    "message": "響度"
+  },
+  "volumeEqPresetEargasm": {
+    "message": "耳朵高潮爆發"
+  },
+  "volumeEqPresetEargasmKai": {
+    "message": "耳朵高潮爆發 改"
+  },
+  "volumeEqPresetPerfect": {
+    "message": "完美"
+  },
+  "volumeEqPresetPerfectKai": {
+    "message": "完美 改"
+  },
+  "volumeEqPresetCustom": {
+    "message": "自訂"
+  },
+  "videoGammaMaster": {
+    "message": "影片 Gamma"
+  },
+  "videoGammaMasterDescPre": {
+    "message": "對頁面上的 "
+  },
+  "videoGammaMasterDescPost": {
+    "message": " 元素套用 Gamma 校正。讓偏暗的影片變亮，並柔化過亮的影片。"
+  },
+  "videoGammaSubLabel": {
+    "message": "Gamma 值"
+  },
+  "videoGammaSubDesc": {
+    "message": "1.0 表示不校正。低於 1.0 會提亮暗部（變亮）；高於 1.0 會加強對比（變暗）。"
+  },
+  "videoGammaResetBtn": {
+    "message": "重設為 1.0"
+  },
+  "videoGammaResetAria": {
+    "message": "將 Gamma 重設為 1.0"
+  },
+  "videoFillMaster": {
+    "message": "移除影片黑邊"
+  },
+  "videoFillMasterDesc": {
+    "message": "在超寬螢幕上，以縮放或拉伸方式讓影片填滿畫面，移除上下或左右的黑邊。"
+  },
+  "videoFillModeLabel": {
+    "message": "顯示模式"
+  },
+  "videoFillModeAriaLabel": {
+    "message": "選擇顯示模式"
+  },
+  "videoFillModeZoom": {
+    "message": "縮放"
+  },
+  "videoFillModeStretch": {
+    "message": "拉伸"
+  },
+  "videoFillTargetLabel": {
+    "message": "你的螢幕"
+  },
+  "videoFillTargetDesc": {
+    "message": "選擇螢幕的長寬比或解析度；系統會自動偵測每部影片的比例以移除黑邊。"
+  },
+  "videoFillGroupAspect": {
+    "message": "長寬比"
+  },
+  "videoFillGroupResolution": {
+    "message": "解析度"
+  },
+  "loupeMaster": {
+    "message": "放大鏡"
+  },
+  "loupeMasterDesc": {
+    "message": "以圓形鏡片放大目前畫面。建議在暫停影片後使用。按一下滑鼠左鍵即可關閉。"
+  },
+  "loupeZoomLabel": {
+    "message": "縮放"
+  },
+  "loupeZoomAriaLabel": {
+    "message": "選擇縮放倍率"
+  },
+  "loupeSizeLabel": {
+    "message": "鏡片大小"
+  },
+  "loupeSizeDesc": {
+    "message": "在 150 至 1000 px 之間調整鏡片直徑。"
+  },
+  "loupeErrorInvalidTab": {
+    "message": "⚠ 無法讀取分頁"
+  },
+  "loupeErrorUnsupportedPage": {
+    "message": "⚠ 此頁面無法使用放大鏡"
+  },
+  "loupeErrorPermission": {
+    "message": "⚠ 權限錯誤"
+  },
+  "loupeErrorQuota": {
+    "message": "⚠ 已超過擷取頻率上限"
+  },
+  "loupeErrorUnknown": {
+    "message": "⚠ 無法啟動放大鏡"
+  },
+  "amazonDeliveryMaster": {
+    "message": "定期配送每月合計"
+  },
+  "amazonDeliveryMasterDescPre": {
+    "message": "在 "
+  },
+  "amazonDeliveryMasterDescPost": {
+    "message": " 頁面顯示每月合計。缺少價格時，會從 Amazon 取得目前的定期配送價格；無法取得時，改用前次配送的單價。"
+  },
+  "amazonRankingJumpMaster": {
+    "message": "前往排行榜按鈕"
+  },
+  "amazonRankingJumpMasterDesc": {
+    "message": "在商品頁面頂端顯示「前往此商品的排行榜」按鈕。",
+    "description": "Master toggle description for the Amazon jump-to-ranking button"
+  },
+  "amazonRankingJumpButton": {
+    "message": "前往此商品的排行榜"
+  },
+  "amazonRankingJumpAriaLabel": {
+    "message": "前往此商品的排行榜"
+  },
+  "amazonMerchantInfoMaster": {
+    "message": "賣家／出貨方標章"
+  },
+  "amazonMerchantInfoMasterDesc": {
+    "message": "在商品頁面頂端顯示賣家／出貨方標章（Amazon 出貨為綠色／第三方賣家為橘色警示）。",
+    "description": "Master toggle description for the Amazon seller / shipper badge"
+  },
+  "amazonMerchantInfoSoldBy": {
+    "message": "賣家"
+  },
+  "amazonMerchantInfoShipsFrom": {
+    "message": "出貨"
+  },
+  "amazonMerchantInfoAriaAmazon": {
+    "message": "Amazon 出貨"
+  },
+  "amazonMerchantInfoAriaMarketplace": {
+    "message": "第三方賣家商品"
+  },
+  "amazonMerchantInfoAriaUnknown": {
+    "message": "賣家未確認"
+  },
+  "searchFixerMaster": {
+    "message": "YouTube 加強功能"
+  },
+  "searchFixerMasterDesc": {
+    "message": "一次管理 40 項子功能：移除 Shorts、過濾搜尋雜訊、整理觀看頁面、隱藏留言、隱藏即時聊天、加強訂閱內容、將影片傳送至 Gemini Notebook 等。"
+  },
+  "instagramCleanerMaster": {
+    "message": "Instagram 清理器"
+  },
+  "instagramCleanerMasterDesc": {
+    "message": "以單一開關隱藏 Reels、探索、限時動態等多餘的介面。"
+  },
+  "tiktokCleanerMaster": {
+    "message": "TikTok 清理器"
+  },
+  "tiktokCleanerMasterDesc": {
+    "message": "以單一開關隱藏留言面板、推薦帳號區塊等多餘的介面。"
+  },
+  "xCleanerMaster": {
+    "message": "X 清理器"
+  },
+  "xCleanerMasterDesc": {
+    "message": "以單一開關隱藏右側欄、廣告與升級推銷等干擾介面。"
+  },
+  "cleanerHint": {
+    "message": "僅在主開關（清理器）開啟時生效。請選擇你要的個別子功能。"
+  },
+  "pickerActivateJp": {
+    "message": "從畫面上選取顏色"
+  },
+  "pickerActivateEn": {
+    "message": "啟動吸管工具"
+  },
+  "pickerNoteIdle": {
+    "message": "按下按鈕即可選取畫面上的任何顏色（按 Esc 取消）。"
+  },
+  "specimenTitle": {
+    "message": "目前的顏色"
+  },
+  "specimenPillEmpty": {
+    "message": "無"
+  },
+  "specimenNoEmpty": {
+    "message": "尚未儲存"
+  },
+  "specimenNoSaved": {
+    "message": "記錄 $NO$",
+    "placeholders": {
+      "no": {
+        "content": "$1",
+        "example": "01"
+      }
+    }
+  },
+  "specimenTimeEmpty": {
+    "message": "—"
+  },
+  "specimenTimeSaved": {
+    "message": "儲存於 $TIME$",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "12:34"
+      }
+    }
+  },
+  "copyBtnLabel": {
+    "message": "複製"
+  },
+  "copyBtnDone": {
+    "message": "已複製"
+  },
+  "copyHexAria": {
+    "message": "複製 HEX"
+  },
+  "copyRgbAria": {
+    "message": "複製 RGB"
+  },
+  "copyHslAria": {
+    "message": "複製 HSL"
+  },
+  "editHexAria": {
+    "message": "HEX 值（可編輯）"
+  },
+  "editRgbAria": {
+    "message": "RGB 值（可編輯）"
+  },
+  "editHslAria": {
+    "message": "HSL 值（可編輯）"
+  },
+  "valueEditHint": {
+    "message": "三個欄位都能編輯。貼上色碼即可立即預覽，按 Enter 則會儲存到記錄。"
+  },
+  "paletteTitle": {
+    "message": "調整顏色"
+  },
+  "paletteAreaAria": {
+    "message": "調整鮮豔度與亮度（以方向鍵微調，按住 Shift 可加大幅度）"
+  },
+  "paletteAxisHint": {
+    "message": "拖曳調整——水平 = 鮮豔度／垂直 = 亮度"
+  },
+  "paletteSaturationLabel": {
+    "message": "鮮豔度"
+  },
+  "paletteBrightnessLabel": {
+    "message": "亮度"
+  },
+  "palettePercentValue": {
+    "message": "$VALUE$%",
+    "placeholders": {
+      "value": {
+        "content": "$1",
+        "example": "50"
+      }
+    }
+  },
+  "paletteHueLabel": {
+    "message": "色相"
+  },
+  "paletteHueAria": {
+    "message": "色相"
+  },
+  "palettePillValue": {
+    "message": "色相 $H$°／鮮豔度 $S$%／亮度 $V$%",
+    "placeholders": {
+      "h": {
+        "content": "$1",
+        "example": "213"
+      },
+      "s": {
+        "content": "$2",
+        "example": "45"
+      },
+      "v": {
+        "content": "$3",
+        "example": "55"
+      }
+    }
+  },
+  "paletteAddBtn": {
+    "message": "將此顏色儲存到記錄"
+  },
+  "paletteResetBtn": {
+    "message": "復原調整"
+  },
+  "formatTitle": {
+    "message": "複製設定"
+  },
+  "formatLegend": {
+    "message": "自動複製使用的格式"
+  },
+  "formatRowAria": {
+    "message": "自動複製使用的格式"
+  },
+  "formatHashLabel": {
+    "message": "HEX 包含 #"
+  },
+  "formatNote": {
+    "message": "使用吸管工具選色或點選記錄項目時，會以所選格式自動複製顏色。"
+  },
+  "historyTitle": {
+    "message": "記錄"
+  },
+  "historyHint": {
+    "message": "點選顏色即可設為目前的顏色，並以下方設定的格式複製。"
+  },
+  "historyEmpty": {
+    "message": "尚無顏色。請使用吸管工具選色，或貼上色碼後按 Enter。"
+  },
+  "historyClearBtn": {
+    "message": "刪除所有記錄"
+  },
+  "extVersionAriaLabel": {
+    "message": "擴充功能版本"
+  },
+  "eyedropperUnsupported": {
+    "message": "不支援 EyeDropper API。請使用 Chrome 95 或更新版本。"
+  },
+  "pickerNoteActive": {
+    "message": "吸管工具已啟動——請點選畫面上任一處（按 Esc 取消）"
+  },
+  "pickerNoteRetake": {
+    "message": "再按一次即可繼續選色。"
+  },
+  "pickerNoteCancelled": {
+    "message": "已取消選色。"
+  },
+  "pickerNoteFailed": {
+    "message": "選色失敗。請再試一次。"
+  },
+  "pickerCopyOk": {
+    "message": "已選取——已複製 $FORMAT$：$TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerCopyFail": {
+    "message": "已選取——$FORMAT$：$TEXT$（複製失敗）",
+    "placeholders": {
+      "format": {
+        "content": "$1",
+        "example": "HEX"
+      },
+      "text": {
+        "content": "$2",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "pickerInputInvalid": {
+    "message": "無法將其辨識為顏色（例如 #C0605A / rgb(192, 96, 90) / hsl(213, 40%, 30%)）。"
+  },
+  "pickerInputAdded": {
+    "message": "已將 $HEX$ 儲存到記錄",
+    "placeholders": {
+      "hex": {
+        "content": "$1",
+        "example": "#C0605A"
+      }
+    }
+  },
+  "historyClearedToast": {
+    "message": "記錄已刪除。"
+  },
+  "pickerHistorySaveFailed": {
+    "message": "無法儲存記錄。請再試一次。"
+  },
+  "copyOkToast": {
+    "message": "已複製 $FORMAT$：$TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "copyFailToast": {
+    "message": "複製失敗。"
+  },
+  "copyToast": {
+    "message": "$FORMAT$：$TEXT$",
+    "placeholders": {
+      "format": {
+        "content": "$1"
+      },
+      "text": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipTitle": {
+    "message": "$HEX$ — $TIME$",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      },
+      "time": {
+        "content": "$2"
+      }
+    }
+  },
+  "historyChipAria": {
+    "message": "將 $HEX$ 設為目前的顏色並複製",
+    "placeholders": {
+      "hex": {
+        "content": "$1"
+      }
+    }
+  },
+  "pillTemplate": {
+    "message": "已啟用 $ON$/$TOTAL$",
+    "placeholders": {
+      "on": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "gridItemsLabel": {
+    "message": "首頁欄數"
+  },
+  "gridItemsDesc": {
+    "message": "固定首頁與搜尋結果格狀版面每列顯示的影片數（自動則沿用 YouTube 預設欄數）。"
+  },
+  "gridAuto": {
+    "message": "自動（YouTube 預設）"
+  },
+  "grid4Cols": {
+    "message": "4 欄"
+  },
+  "grid5Cols": {
+    "message": "5 欄"
+  },
+  "grid6Cols": {
+    "message": "6 欄"
+  },
+  "categoryMenuUi": {
+    "message": "選單／介面"
+  },
+  "categoryVideoFilter": {
+    "message": "影片篩選"
+  },
+  "categoryWatchPage": {
+    "message": "觀看頁面"
+  },
+  "categorySearchOnly": {
+    "message": "搜尋結果"
+  },
+  "categoryIntegration": {
+    "message": "整合"
+  },
+  "nlmSendLabel": {
+    "message": "Gemini Notebook"
+  },
+  "nlmAccount": {
+    "message": "Google 帳戶"
+  },
+  "nlmAccountDefault": {
+    "message": "預設 (0)"
+  },
+  "nlmAccountNth": {
+    "message": "帳戶 {0}"
+  },
+  "nlmPickNotebook": {
+    "message": "目標筆記本"
+  },
+  "nlmNewNotebook": {
+    "message": "+ 建立新筆記本"
+  },
+  "nlmLoading": {
+    "message": "正在載入筆記本…"
+  },
+  "nlmEmpty": {
+    "message": "沒有現有的筆記本"
+  },
+  "nlmSending": {
+    "message": "傳送中…"
+  },
+  "nlmSkipped": {
+    "message": "已略過 {0} 個項目（來源數量上限）"
+  },
+  "nlmOpenNotebookLm": {
+    "message": "開啟 Gemini Notebook"
+  },
+  "nlmErrorNetwork": {
+    "message": "無法連線至 Gemini Notebook"
+  },
+  "nlmErrorProtocol": {
+    "message": "無法連線——Gemini Notebook 已變更其介面"
+  },
+  "nlmOpenNotebook": {
+    "message": "開啟剛建立的筆記本"
+  },
+  "nlmErrorFull": {
+    "message": "此筆記本已達來源數量上限"
+  },
+  "nlmErrorAuth": {
+    "message": "請登入 Gemini Notebook"
+  },
+  "nlmErrorNoUrls": {
+    "message": "找不到可傳送的影片"
+  },
+  "nlmErrorRpc": {
+    "message": "傳送至 Gemini Notebook 失敗"
+  },
+  "nlmErrorUnknown": {
+    "message": "傳送至 Gemini Notebook 失敗"
+  },
+  "ytCleanerSubtabsAria": {
+    "message": "YouTube 加強功能類別"
+  },
+  "igCleanerSubtabsAria": {
+    "message": "Instagram 清理器類別"
+  },
+  "tuneSubtabsAria": {
+    "message": "調整類別"
+  },
+  "categoryIgMain": {
+    "message": "主要"
+  },
+  "categoryIgExtra": {
+    "message": "其他"
+  },
+  "categoryTtMain": {
+    "message": "主要"
+  },
+  "categoryXLayout": {
+    "message": "版面"
+  },
+  "categoryXNoise": {
+    "message": "雜訊"
+  },
+  "categoryXTimeline": {
+    "message": "時間軸"
+  },
+  "applyOkSearchFixer": {
+    "message": "YT 加強功能"
+  },
+  "applyOkAmazon": {
+    "message": "Amazon"
+  },
+  "applyOkAmazonRanking": {
+    "message": "前往排行榜"
+  },
+  "applyOkAmazonMerchantInfo": {
+    "message": "賣家標章"
+  },
+  "applyOkInstagram": {
+    "message": "Instagram"
+  },
+  "applyOkTiktok": {
+    "message": "TikTok"
+  },
+  "applyOkX": {
+    "message": "X"
+  },
+  "applyOkVideoGamma": {
+    "message": "影片 Gamma"
+  },
+  "applyOkVideoFill": {
+    "message": "移除黑邊"
+  },
+  "applyOkLoupe": {
+    "message": "放大鏡"
+  },
+  "applyOkAllStopped": {
+    "message": "⏹  已全部停止"
+  },
+  "applyOkPrefix": {
+    "message": "✓  "
+  },
+  "applyOkSeparator": {
+    "message": "  /  "
+  },
+  "applyError": {
+    "message": "⚠️ 無法儲存或套用設定"
+  },
+  "volumeErrorInvalidTab": {
+    "message": "⚠ 無法讀取分頁"
+  },
+  "volumeErrorOffscreenUnavailable": {
+    "message": "⚠ 無法啟動內部處理器"
+  },
+  "volumeErrorInvalidStream": {
+    "message": "⚠ 無法擷取音訊"
+  },
+  "volumeErrorTabClosed": {
+    "message": "⚠ 分頁已關閉"
+  },
+  "volumeErrorUserGesture": {
+    "message": "⚠ 僅能在彈出視窗開啟時變更"
+  },
+  "volumeErrorUnsupportedPage": {
+    "message": "⚠ 此頁面不支援"
+  },
+  "volumeErrorPermission": {
+    "message": "⚠ 權限錯誤"
+  },
+  "volumeErrorUnknown": {
+    "message": "⚠ 無法更新音量"
+  },
+  "volumeErrorCommunication": {
+    "message": "⚠ 通訊錯誤"
+  },
+  "amazonTotalText": {
+    "message": "合計"
+  },
+  "amazonTotalReference": {
+    "message": "預估合計（目前價格）"
+  },
+  "amazonTotalPreviousReference": {
+    "message": "預估合計（含前次價格）"
+  },
+  "amazonTotalReferenceNote": {
+    "message": "實際請款金額可能不同"
+  },
+  "amazonTotalLoading": {
+    "message": "正在載入合計…"
+  },
+  "amazonTotalUnavailable": {
+    "message": "無法取得合計"
+  },
+  "subsAllShortcutLabel": {
+    "message": "所有訂閱內容"
+  },
+  "subsSearchPlaceholder": {
+    "message": "依頻道名稱或帳號代碼篩選"
+  },
+  "imageDownloadButtonLabel": {
+    "message": "下載圖片"
+  },
+  "feat_sf_playlist_label": {
+    "message": "播放清單"
+  },
+  "feat_sf_playlist_desc": {
+    "message": "移除播放清單項目（playlist?list= 連結／「N 部影片」標章）。"
+  },
+  "feat_sf_mix_label": {
+    "message": "合輯"
+  },
+  "feat_sf_mix_desc": {
+    "message": "移除 YouTube 自動產生的合輯（&list=RD&start_radio=1／「合輯」標章）。"
+  },
+  "feat_sf_shortsBtn_label": {
+    "message": "Shorts（單支）"
+  },
+  "feat_sf_shortsBtn_desc": {
+    "message": "移除混在影片格狀清單中的單支 Shorts 卡片（縮圖網址為 /shorts/ 的直式影片項目）。"
+  },
+  "feat_sf_removeShortsShelf_label": {
+    "message": "Shorts 區塊"
+  },
+  "feat_sf_removeShortsShelf_desc": {
+    "message": "徹底移除首頁的 Shorts 區塊（ytd-rich-shelf-renderer[is-shorts]）與搜尋結果中的 Shorts 橫向區塊（ytd-reel-shelf-renderer）。"
+  },
+  "feat_sf_live_label": {
+    "message": "直播／首播／電台"
+  },
+  "feat_sf_live_desc": {
+    "message": "移除縮圖帶有「直播」／「首播」／「電台」標章的影片。「電台」是指 YouTube 自動產生的無限背景音樂串流。"
+  },
+  "feat_sf_membersOnly_label": {
+    "message": "會員專屬"
+  },
+  "feat_sf_membersOnly_desc": {
+    "message": "移除縮圖帶有「會員專屬」標章、需加入頻道會員才能觀看的影片。"
+  },
+  "feat_sf_watched_label": {
+    "message": "已觀看"
+  },
+  "feat_sf_watched_desc": {
+    "message": "移除顯示續播覆蓋層（已觀看）的影片。"
+  },
+  "feat_sf_hideSubscriptionsRelevant_label": {
+    "message": "隱藏訂閱內容中的「最相關」"
+  },
+  "feat_sf_hideSubscriptionsRelevant_desc": {
+    "message": "隱藏訂閱內容中的「最相關」區塊，包含標題、影片與「顯示更多」按鈕。一般的最新影片會保留。"
+  },
+  "feat_sf_removeFeedSections_label": {
+    "message": "區段"
+  },
+  "feat_sf_removeFeedSections_desc": {
+    "message": "移除首頁上的「為你推薦的主題」、「最新消息」與「遊戲專區」推薦區段（ytd-rich-section-renderer，僅限動態消息頁面）。"
+  },
+  "feat_sf_shelf_label": {
+    "message": "影片區塊"
+  },
+  "feat_sf_shelf_desc": {
+    "message": "移除「發燒影片」或「新聞」等影片群組區段（ytd-shelf-renderer）。"
+  },
+  "feat_sf_cardList_label": {
+    "message": "卡片清單"
+  },
+  "feat_sf_cardList_desc": {
+    "message": "移除相關主題的橫向卡片清單（ytd-horizontal-card-list-renderer，第二個以後）。"
+  },
+  "feat_sf_course_label": {
+    "message": "課程"
+  },
+  "feat_sf_course_desc": {
+    "message": "移除帶有「課程」標章的學習內容卡片（.yt-lockup-view-model--wrapper）。"
+  },
+  "feat_sf_channel_label": {
+    "message": "頻道簡介卡片"
+  },
+  "feat_sf_channel_desc": {
+    "message": "移除插入搜尋結果中的「此頻道」簡介卡片（ytd-channel-renderer）。"
+  },
+  "feat_sf_hideForeignChannels_label": {
+    "message": "隱藏其他國家的頻道"
+  },
+  "feat_sf_hideForeignChannels_desc": {
+    "message": "在搜尋結果與動態消息中，移除來自你所在國家以外頻道的影片（YouTube 的搜尋篩選沒有國家條件，因此為自訂實作）。會先依文字系統分類標題與頻道名稱；只有無法判斷的才會查看頻道的「簡介」頁面。未公開國家的頻道仍會顯示。"
+  },
+  "feat_sf_notebookLmSend_label": {
+    "message": "傳送至 Gemini Notebook"
+  },
+  "feat_sf_notebookLmSend_desc": {
+    "message": "將你正在觀看的影片，或搜尋結果／播放清單／頻道頁面上的影片，作為來源加入你自己的 Google Gemini Notebook。可從頁面內的按鈕選擇目標筆記本（觀看頁面在「喜歡」／「分享」旁，搜尋結果頁面在搜尋篩選旁，播放清單在「全部播放」下方，頻道在標題列），也能建立新的筆記本。影片網址只會在你按下按鈕時傳送——不會收集觀看記錄，也不會在背景傳送。需要先登入 Gemini Notebook。"
+  },
+  "feat_sf_channelBlocklist_label": {
+    "message": "頻道封鎖清單"
+  },
+  "feat_sf_channelBlocklist_desc": {
+    "message": "在整個 YouTube（搜尋結果、首頁、訂閱內容、發燒影片等）移除已封鎖頻道的影片（這是首頁官方「不要推薦此頻道」的擴充版）。請使用搜尋結果中頻道名稱旁的 🚫 按鈕登錄，並在下方清單中解除封鎖。"
+  },
+  "sfBlockChannelBtnTitle": {
+    "message": "在搜尋結果中隱藏此頻道"
+  },
+  "sfShowCommentsButton": {
+    "message": "顯示留言"
+  },
+  "sfHideCommentsButton": {
+    "message": "隱藏留言"
+  },
+  "sfBlockedChannelsTitle": {
+    "message": "已封鎖的頻道"
+  },
+  "sfBlockedChannelsEmpty": {
+    "message": "尚未封鎖任何頻道。請使用 YouTube 搜尋結果中頻道名稱旁的 🚫 按鈕來封鎖。"
+  },
+  "sfBlockedChannelRemove": {
+    "message": "解除封鎖"
+  },
+  "feat_sf_reel_label": {
+    "message": "Shorts 橫向區塊"
+  },
+  "feat_sf_reel_desc": {
+    "message": "移除橫向的 Shorts 區塊（grid-shelf-view-model）。首頁的 Shorts 區塊由「影片篩選」中的 removeShortsShelf 移除；左側邊欄項目則由「選單／介面」中的 removeShortsSidebar 移除。"
+  },
+  "feat_sf_secondary_label": {
+    "message": "相關搜尋區塊"
+  },
+  "feat_sf_secondary_desc": {
+    "message": "移除底部的「相關搜尋關鍵字」建議區塊（ytd-secondary-search-container-renderer）。"
+  },
+  "feat_sf_verified_label": {
+    "message": "已驗證頻道的影片"
+  },
+  "feat_sf_verified_desc": {
+    "message": "移除帶有驗證標章的頻道（官方帳號、新聞）的影片。動態消息頁面的支援即將推出。"
+  },
+  "feat_sf_artist_label": {
+    "message": "藝人頻道的影片"
+  },
+  "feat_sf_artist_desc": {
+    "message": "移除帶有官方藝人頻道標章的影片（例如官方 MV）。動態消息頁面的支援即將推出。"
+  },
+  "feat_sf_chapter_label": {
+    "message": "含章節的影片"
+  },
+  "feat_sf_chapter_desc": {
+    "message": "移除可展開章節資訊的影片（expandable-metadata-renderer）。"
+  },
+  "feat_sf_demoteUnmatched_label": {
+    "message": "淡化未符合關鍵字的項目"
+  },
+  "feat_sf_demoteUnmatched_desc": {
+    "message": "將標題／說明中不含搜尋關鍵字的影片調成半透明並轉為灰階（滑鼠移上時還原）。"
+  },
+  "feat_sf_highlightThumb_label": {
+    "message": "縮圖外框"
+  },
+  "feat_sf_highlightThumb_desc": {
+    "message": "為每張縮圖加上茜紅色外框與陰影，更容易瀏覽（深色與淺色主題皆適用）。"
+  },
+  "feat_sf_hideComments_label": {
+    "message": "隱藏留言"
+  },
+  "feat_sf_hideComments_desc": {
+    "message": "在觀看頁面預設隱藏留言，並提供顯示或隱藏的按鈕。直播聊天室不受影響。"
+  },
+  "feat_sf_hideLiveChat_label": {
+    "message": "隱藏即時聊天"
+  },
+  "feat_sf_hideLiveChat_desc": {
+    "message": "使用 YouTube 內建的收合動作，收合直播存檔中的即時聊天面板。一般影片不受影響。"
+  },
+  "feat_sf_broadcastClock_label": {
+    "message": "在直播存檔顯示播出時間"
+  },
+  "feat_sf_broadcastClock_desc": {
+    "message": "回放直播存檔時，在共用的畫質、播放速度與音量覆蓋層中，顯示每個時間點當初實際播出的時間（yyyy/MM/dd hh:mm:ss）。一般影片或進行中的直播不會顯示。若存檔曾在直播中途中斷或經過剪輯，時間可能會有誤差。"
+  },
+  "bcOverlayLabel": {
+    "message": "播出"
+  },
+  "feat_sf_redirectShortsUrl_label": {
+    "message": "將 Shorts 網址重新導向至 /watch"
+  },
+  "feat_sf_redirectShortsUrl_desc": {
+    "message": "強制將 /shorts/<ID> 直式影片頁面改用一般的 /watch?v=<ID> 播放器開啟。"
+  },
+  "feat_sf_playlistReverse_label": {
+    "message": "在播放清單顯示反向按鈕"
+  },
+  "feat_sf_playlistReverse_desc": {
+    "message": "此設定只控制是否顯示反向按鈕，不會改變順序。開啟後，播放清單面板會出現「反向：開／關」按鈕，播放清單頁面則會出現「反向播放」按鈕。是否反向是依每個播放清單以按鈕決定（僅保留在目前分頁）；反向開啟時，會從最後一部影片往第一部播放。將此設定關閉會移除按鈕並還原原本的順序。"
+  },
+  "ytPlaylistReverseStateOn": {
+    "message": "反向：開"
+  },
+  "ytPlaylistReverseStateOff": {
+    "message": "反向：關"
+  },
+  "ytPlaylistReverseOnTitle": {
+    "message": "此播放清單正以反向播放。按一下即可還原原本的順序"
+  },
+  "ytPlaylistReverseOffTitle": {
+    "message": "目前以原本的順序播放。按一下即可反向"
+  },
+  "ytPlaylistReversePlay": {
+    "message": "反向播放"
+  },
+  "feat_sf_gameCrop_label": {
+    "message": "顯示遊戲畫面放大按鈕"
+  },
+  "feat_sf_gameCrop_desc": {
+    "message": "此設定只控制是否顯示按鈕。開啟後，播放器工具列會出現「遊戲畫面」標籤。對於實況主將遊戲畫面裁切成影片的一部分、並在周圍放置邊框或虛擬形象的直播，只要在遊戲區域上拖曳，播放器就會放大到僅顯示該區域。該區域會依頻道儲存在本裝置，並自動套用於該頻道的影片。將此設定關閉會移除標籤與放大效果（已儲存的區域會保留）。"
+  },
+  "gcLabel": {
+    "message": "遊戲畫面"
+  },
+  "gcToggleOn": {
+    "message": "放大：開"
+  },
+  "gcToggleOff": {
+    "message": "放大：關"
+  },
+  "gcToggleOnTitle": {
+    "message": "已放大至遊戲畫面。按一下即可顯示整個影片"
+  },
+  "gcToggleOffTitle": {
+    "message": "正在顯示整個影片。按一下即可放大至已儲存的遊戲畫面"
+  },
+  "gcSelect": {
+    "message": "選取區域"
+  },
+  "gcReselect": {
+    "message": "變更區域"
+  },
+  "gcSelectTitle": {
+    "message": "在影片上拖曳以選取遊戲畫面"
+  },
+  "gcRemove": {
+    "message": "刪除"
+  },
+  "gcRemoveTitle": {
+    "message": "刪除此頻道已儲存的遊戲畫面區域"
+  },
+  "gcHint": {
+    "message": "拖曳以選取遊戲畫面（按 Esc 取消）"
+  },
+  "ytPlaylistReversePlayTitle": {
+    "message": "從最後一部影片開始，往第一部播放"
+  },
+  "feat_sf_searchGrid_label": {
+    "message": "以格狀顯示搜尋結果"
+  },
+  "feat_sf_searchGrid_desc": {
+    "message": "將搜尋結果從單欄清單轉為多欄格狀版面（欄數依格狀設定；自動則與首頁欄數一致）。"
+  },
+  "feat_sf_removeShortsChip_label": {
+    "message": "Shorts 篩選標籤"
+  },
+  "feat_sf_removeShortsChip_desc": {
+    "message": "僅移除搜尋頁面頂端篩選列（「全部／影片／Shorts／播放清單…」）中的「Shorts」標籤。"
+  },
+  "feat_sf_removeShortsSidebar_label": {
+    "message": "Shorts 側邊欄項目"
+  },
+  "feat_sf_removeShortsSidebar_desc": {
+    "message": "移除左側邊欄中的「Shorts」項目（展開與收合兩種形式皆移除）。"
+  },
+  "feat_sf_subsLeftnavInjectAll_label": {
+    "message": "在左側選單顯示所有訂閱內容"
+  },
+  "feat_sf_subsLeftnavInjectAll_desc": {
+    "message": "將 YouTube 因顯示數量上限而隱藏的所有訂閱頻道，補入左側邊欄的「訂閱內容」區段（從 /feed/channels 以同源方式取得，快取 24 小時）。"
+  },
+  "feat_sf_subsAllShortcut_label": {
+    "message": "「所有訂閱內容」捷徑"
+  },
+  "feat_sf_subsAllShortcut_desc": {
+    "message": "在左側邊欄「訂閱內容」區段頂端新增通往 /feed/channels 的一鍵項目，樣式與原生選單項目相同。"
+  },
+  "feat_sf_subsChannelsGrid_label": {
+    "message": "以格狀顯示訂閱頁面（含搜尋與排序）"
+  },
+  "feat_sf_subsChannelsGrid_desc": {
+    "message": "將 /feed/channels 重新排列為自適應格狀版面，並可依頻道名稱或帳號代碼搜尋。排序使用 YouTube 內建的控制項。每張卡片在接近可視範圍時才會取得最新影片的縮圖（快取 24 小時）。"
+  },
+  "feat_sf_homeGrid_label": {
+    "message": "將首頁／動態消息對齊為格狀"
+  },
+  "feat_sf_homeGrid_desc": {
+    "message": "將首頁與訂閱動態消息排成無縫隙的格狀版面（像 Shorts 一樣跨區塊填滿影片）。欄數設為自動時也會對齊（設為 4／5／6 欄時，即使此開關關閉也一律使用格狀）。"
+  },
+  "feat_ig_reels_label": {
+    "message": "移除 Reels"
+  },
+  "feat_ig_reels_desc": {
+    "message": "隱藏側邊欄／導覽列中的 Reels 項目，並將 /reels/ 網址強制重新導向至首頁。"
+  },
+  "feat_ig_explore_label": {
+    "message": "移除探索"
+  },
+  "feat_ig_explore_desc": {
+    "message": "隱藏側邊欄／導覽列中的探索項目，並將 /explore/ 網址強制重新導向至首頁。"
+  },
+  "feat_ig_stories_label": {
+    "message": "隱藏限時動態列（首頁）"
+  },
+  "feat_ig_stories_desc": {
+    "message": "透過 CSS 隱藏首頁動態消息頂端的限時動態列（24 小時後消失的短影片）。"
+  },
+  "feat_ig_storiesAll_label": {
+    "message": "將限時動態網址重新導向至首頁"
+  },
+  "feat_ig_storiesAll_desc": {
+    "message": "將任何 /stories/ 的造訪重新導向至首頁（避免誤點分享的連結）。"
+  },
+  "feat_ig_threads_label": {
+    "message": "隱藏 Threads 推廣"
+  },
+  "feat_ig_threads_desc": {
+    "message": "隱藏推廣 Threads 應用程式的橫幅、側邊欄項目與頁尾連結。"
+  },
+  "feat_ig_vanity_label": {
+    "message": "隱藏按讚數與追蹤者人數"
+  },
+  "feat_ig_vanity_desc": {
+    "message": "偵測 <article> 內的數字按鈕（逗號、k、M 等）並將其隱藏，減少比較帶來的疲勞。"
+  },
+  "feat_ig_blockVideos_label": {
+    "message": "封鎖貼文中的影片"
+  },
+  "feat_ig_blockVideos_desc": {
+    "message": "標記動態消息 <article> 內的 <video> 元素，並透過 CSS 以縮圖取代，防止自動播放。"
+  },
+  "feat_ig_comments_label": {
+    "message": "隱藏留言"
+  },
+  "feat_ig_comments_desc": {
+    "message": "透過 CSS 隱藏留言清單、輸入表單與「查看 N 則留言」連結。"
+  },
+  "feat_ig_notes_label": {
+    "message": "隱藏便利貼"
+  },
+  "feat_ig_notes_desc": {
+    "message": "隱藏私訊畫面頂端的便利貼列（顯示在大頭貼上方的簡短狀態訊息）。"
+  },
+  "feat_ig_msgCounters_label": {
+    "message": "隱藏未讀私訊標記"
+  },
+  "feat_ig_msgCounters_desc": {
+    "message": "隱藏導覽列上的未讀私訊數量標記（帶有數字的紅色圓圈），減輕通知壓力。"
+  },
+  "feat_ig_videoControls_label": {
+    "message": "顯示影片進度列"
+  },
+  "feat_ig_videoControls_desc": {
+    "message": "顯示可調整影片位置的進度列，並可在文字欄位以外按空白鍵暫停或繼續播放。"
+  },
+  "instagramVideoControlsAria": {
+    "message": "影片播放控制項"
+  },
+  "instagramVideoSeekAria": {
+    "message": "影片位置"
+  },
+  "feat_ig_imageDownload_label": {
+    "message": "在圖片上顯示下載按鈕"
+  },
+  "feat_ig_imageDownload_desc": {
+    "message": "滑鼠移到貼文相片（動態消息／個人檔案格狀／貼文詳細頁）上時，在左上角覆蓋顯示下載按鈕。會從 srcset 中選用最大的版本。"
+  },
+  "feat_tt_hideComments_label": {
+    "message": "隱藏留言"
+  },
+  "feat_tt_hideComments_desc": {
+    "message": "透過 CSS 隱藏留言面板（顯示在播放器旁的留言清單）、留言圖示按鈕與留言數。"
+  },
+  "feat_tt_hideSuggested_label": {
+    "message": "隱藏推薦帳號"
+  },
+  "feat_tt_hideSuggested_desc": {
+    "message": "透過 CSS 隱藏插入「為你推薦」／「追蹤中」動態消息與個人檔案中的「推薦帳號」區塊。"
+  },
+  "feat_tt_imageDownload_label": {
+    "message": "在圖片上顯示下載按鈕"
+  },
+  "feat_tt_imageDownload_desc": {
+    "message": "滑鼠移到相片貼文與影片縮圖上時，在左上角覆蓋顯示下載按鈕。"
+  },
+  "categoryXExtra": {
+    "message": "其他"
+  },
+  "feat_x_imageDownload_label": {
+    "message": "在圖片上顯示下載按鈕"
+  },
+  "feat_x_imageDownload_desc": {
+    "message": "滑鼠移到貼文圖片上時，左上角會顯示按鈕；按一下即可以原始畫質儲存"
+  },
+  "feat_x_hideRightPane_label": {
+    "message": "隱藏右側欄"
+  },
+  "feat_x_hideRightPane_desc": {
+    "message": "隱藏三欄版面的整個右側欄（搜尋、趨勢、推薦追蹤、升級推銷），並將時間軸拓寬至空出的空間。"
+  },
+  "feat_x_hideTrends_label": {
+    "message": "隱藏趨勢"
+  },
+  "feat_x_hideTrends_desc": {
+    "message": "保留右側欄，但只隱藏趨勢區塊。"
+  },
+  "feat_x_hideWhoToFollow_label": {
+    "message": "隱藏推薦追蹤"
+  },
+  "feat_x_hideWhoToFollow_desc": {
+    "message": "隱藏右側欄中的「推薦追蹤」區塊。"
+  },
+  "feat_x_hideMessagesDock_label": {
+    "message": "隱藏訊息停駐列"
+  },
+  "feat_x_hideMessagesDock_desc": {
+    "message": "隱藏固定在右下角的訊息／聊天停駐面板（訊息頁面仍可照常使用）。"
+  },
+  "feat_x_hidePromoted_label": {
+    "message": "隱藏推廣貼文"
+  },
+  "feat_x_hidePromoted_desc": {
+    "message": "隱藏插入時間軸的廣告（推廣）貼文，並移除整個儲存格，不留空隙。"
+  },
+  "feat_x_hidePremiumUpsell_label": {
+    "message": "隱藏 Premium 推銷"
+  },
+  "feat_x_hidePremiumUpsell_desc": {
+    "message": "隱藏右側欄中的訂閱推銷卡片，以及左側選單中的 Premium 項目。"
+  },
+  "feat_x_hideGrok_label": {
+    "message": "隱藏 Grok"
+  },
+  "feat_x_hideGrok_desc": {
+    "message": "隱藏左側選單中的 Grok 項目、右下角的 Grok 抽屜，以及貼文內的 Grok 按鈕。"
+  },
+  "feat_x_hideEngagementCounts_label": {
+    "message": "隱藏互動數"
+  },
+  "feat_x_hideEngagementCounts_desc": {
+    "message": "僅隱藏回覆／轉發／喜歡／觀看次數。按鈕會保留，因此互動操作與先前相同。"
+  },
+  "feat_x_followingTabDefault_label": {
+    "message": "首頁預設開啟「追蹤中」"
+  },
+  "feat_x_followingTabDefault_desc": {
+    "message": "將首頁從「為你推薦」切換為「追蹤中」（每次載入頁面一次；若你自行切回「為你推薦」，就不會再介入）。"
+  },
+  "tabSettings": {
+    "message": "設定"
+  },
+  "settingsBackupTitle": {
+    "message": "儲存與載入設定"
+  },
+  "settingsBackupDescription": {
+    "message": "將所有功能設定、等化器、已封鎖頻道、色彩記錄與所選分頁儲存為 JSON，供其他電腦或瀏覽器使用。匯入時會覆寫檔案中包含的項目。同步開關、目標帳戶、驗證資訊、快取與網站上覆蓋層的位置不包含在內。同步開啟時，匯入的功能設定也會同步到你的其他電腦。"
+  },
+  "settingsExport": {
+    "message": "匯出"
+  },
+  "settingsImport": {
+    "message": "匯入"
+  },
+  "settingsExportSuccess": {
+    "message": "已開始下載設定。"
+  },
+  "settingsExportError": {
+    "message": "匯出失敗。請檢查你的設定與下載位置後再試一次。"
+  },
+  "settingsImportSuccess": {
+    "message": "已匯入設定。"
+  },
+  "settingsImportError": {
+    "message": "匯入失敗。請選擇有效的 Vuora 設定 JSON 檔案（最大 5 MB）。"
+  },
+  "feat_sf_liveLatency_label": {
+    "message": "直播延遲控制"
+  },
+  "feat_sf_liveLatency_desc": {
+    "message": "選擇追上直播的方式與要顯示的資訊。"
+  },
+  "feat_sf_playbackQuality_label": {
+    "message": "畫質選擇器"
+  },
+  "feat_sf_playbackQuality_desc": {
+    "message": "新增用於變更播放器畫質的選擇器。"
+  },
+  "feat_sf_playbackRate_label": {
+    "message": "播放速度選擇器"
+  },
+  "feat_sf_playbackRate_desc": {
+    "message": "新增可選擇 0.25x 至 2x 播放速度的選擇器。"
+  },
+  "feat_sf_playerVolume_label": {
+    "message": "播放器音量選擇器"
+  },
+  "feat_sf_playerVolume_desc": {
+    "message": "新增播放器音量選擇器，並自訂原生音量控制項。"
+  },
+  "ypcWatchSettings": {
+    "message": "影片頁面設定"
+  },
+  "yp_details": {
+    "message": "詳細資料"
+  },
+  "yp_auto": {
+    "message": "自動"
+  },
+  "yp_enabled": {
+    "message": "自動調整速度以追上直播"
+  },
+  "yp_playbackRate": {
+    "message": "自動追趕時的速度"
+  },
+  "yp_showPlaybackRate": {
+    "message": "顯示目前播放速度"
+  },
+  "yp_showLatency": {
+    "message": "顯示落後直播的延遲"
+  },
+  "yp_showHealth": {
+    "message": "顯示領先的緩衝時間"
+  },
+  "yp_showEstimation": {
+    "message": "顯示預估追上直播所需時間"
+  },
+  "yp_showCurrent": {
+    "message": "顯示播放位置（按一下可複製時間戳記網址）"
+  },
+  "yp_smooth": {
+    "message": "緩衝足夠時調整速度"
+  },
+  "yp_smoothThreshold": {
+    "message": "調整速度所需的緩衝時間（秒）"
+  },
+  "yp_smoothAuto": {
+    "message": "自動設定緩衝時間門檻"
+  },
+  "yp_skip": {
+    "message": "落後過多時跳至最新位置"
+  },
+  "yp_skipThreshold": {
+    "message": "落後達此時間時跳轉（秒）"
+  },
+  "yp_hideSlider": {
+    "message": "隱藏原生音量滑桿"
+  },
+  "yp_hideVolumeIcon": {
+    "message": "隱藏原生音量圖示"
+  },
+  "yp_latencyNote": {
+    "message": "即使關閉自動調整速度，仍可顯示資訊。速度調整僅在直播播放期間生效。"
+  },
+  "yp_buttonNote": {
+    "message": "在同一列覆蓋層選擇器中變更畫質、音量與播放速度。播放速度範圍為 0.25x 至 2x。請在瀏覽器的擴充功能設定中指派快速鍵。"
+  },
+  "ypcQuality": {
+    "message": "畫質"
+  },
+  "ypcRate": {
+    "message": "播放速度"
+  },
+  "ypcVolume": {
+    "message": "音量"
+  },
+  "ypcCopied": {
+    "message": "已複製"
+  },
+  "ypcSaveError": {
+    "message": "無法儲存設定。請再試一次。"
+  },
+  "ypcCommand_quality_1": {
+    "message": "YouTube 畫質按鈕 1"
+  },
+  "ypcCommand_quality_2": {
+    "message": "YouTube 畫質按鈕 2"
+  },
+  "ypcCommand_quality_3": {
+    "message": "YouTube 畫質按鈕 3"
+  },
+  "ypcCommand_quality_4": {
+    "message": "YouTube 畫質按鈕 4"
+  },
+  "ypcCommand_quality_5": {
+    "message": "YouTube 畫質按鈕 5"
+  },
+  "ypcCommand_quality_6": {
+    "message": "YouTube 畫質按鈕 6"
+  },
+  "ypcCommand_quality_7": {
+    "message": "YouTube 畫質按鈕 7"
+  },
+  "ypcCommand_quality_8": {
+    "message": "YouTube 畫質按鈕 8"
+  },
+  "ypcCommand_quality_9": {
+    "message": "YouTube 畫質按鈕 9"
+  },
+  "ypcCommand_rate_1": {
+    "message": "YouTube 播放速度按鈕 1"
+  },
+  "ypcCommand_rate_2": {
+    "message": "YouTube 播放速度按鈕 2"
+  },
+  "ypcCommand_rate_3": {
+    "message": "YouTube 播放速度按鈕 3"
+  },
+  "ypcCommand_rate_4": {
+    "message": "YouTube 播放速度按鈕 4"
+  },
+  "ypcCommand_rate_5": {
+    "message": "YouTube 播放速度按鈕 5"
+  },
+  "ypcCommand_rate_6": {
+    "message": "YouTube 播放速度按鈕 6"
+  },
+  "ypcCommand_rate_7": {
+    "message": "YouTube 播放速度按鈕 7"
+  },
+  "ypcCommand_rate_8": {
+    "message": "YouTube 播放速度按鈕 8"
+  },
+  "ypcCommand_volume_1": {
+    "message": "YouTube 音量按鈕 1"
+  },
+  "ypcCommand_volume_2": {
+    "message": "YouTube 音量按鈕 2"
+  },
+  "ypcCommand_volume_3": {
+    "message": "YouTube 音量按鈕 3"
+  },
+  "ypcCommand_volume_4": {
+    "message": "YouTube 音量按鈕 4"
+  },
+  "ypcCommand_volume_5": {
+    "message": "YouTube 音量按鈕 5"
+  },
+  "tabWikipedia": {
+    "message": "Wikipedia"
+  },
+  "wikipediaMaster": {
+    "message": "Wikipedia 閱讀設定"
+  },
+  "wikipediaMasterDesc": {
+    "message": "調整 Wikipedia 條目的版面、文字與色彩。"
+  },
+  "wikipediaOptions": {
+    "message": "Wikipedia 閱讀選項"
+  },
+  "wikipedia_theme": {
+    "message": "色彩"
+  },
+  "wikipedia_noto_sans_jp": {
+    "message": "Noto Sans JP"
+  },
+  "wikipedia_ibm_plex_sans_jp": {
+    "message": "IBM Plex Sans JP"
+  },
+  "wikipedia_m_plus_2": {
+    "message": "M PLUS 2"
+  },
+  "wikipedia_m_plus_rounded_1c": {
+    "message": "M PLUS Rounded 1c"
+  },
+  "wikipedia_murecho": {
+    "message": "Murecho"
+  },
+  "wikipedia_zen_kaku_gothic_new": {
+    "message": "Zen Kaku Gothic New"
+  },
+  "wikipedia_line_seed_jp": {
+    "message": "LINE Seed JP"
+  },
+  "wikipedia_font": {
+    "message": "內文字型"
+  },
+  "wikipedia_fontSize": {
+    "message": "文字大小"
+  },
+  "wikipedia_contentWidth": {
+    "message": "條目寬度"
+  },
+  "wikipedia_contentWidth_desc": {
+    "message": "條目的基準寬度。隱藏「外觀」面板時，會加上其空出的空間。開啟「將條目限制在設定寬度內」可維持此寬度。"
+  },
+  "wikipedia_lineHeight": {
+    "message": "行距"
+  },
+  "wikipedia_lineHeightValue": {
+    "message": "$1×"
+  },
+  "wikipedia_original": {
+    "message": "網站色彩"
+  },
+  "wikipedia_light": {
+    "message": "淺色"
+  },
+  "wikipedia_sepia": {
+    "message": "懷舊褐"
+  },
+  "wikipedia_dark": {
+    "message": "深色"
+  },
+  "wikipedia_sans": {
+    "message": "系統無襯線字型"
+  },
+  "wikipedia_serif": {
+    "message": "系統襯線字型"
+  },
+  "wikipediaContents": {
+    "message": "目錄"
+  },
+  "wikipediaClose": {
+    "message": "關閉"
+  },
+  "wikipediaImage": {
+    "message": "放大圖片"
+  },
+  "wikipediaReference": {
+    "message": "參考資料預覽"
+  },
+  "wikipediaSiteMenu": {
+    "message": "Wikipedia 選單"
+  },
+  "wikipediaDisplaySettings": {
+    "message": "顯示設定"
+  },
+  "wikipediaArticleInfo": {
+    "message": "條目資訊"
+  },
+  "feat_wikipedia_readableLayout_label": {
+    "message": "現代化條目版面"
+  },
+  "feat_wikipedia_hideAppearance_label": {
+    "message": "隱藏「外觀」面板"
+  },
+  "feat_wikipedia_hideAppearance_desc": {
+    "message": "隱藏條目右側的 Wikipedia「外觀」面板，並將空出的空間讓給條目使用。"
+  },
+  "feat_wikipedia_narrowContent_label": {
+    "message": "將條目限制在設定寬度內"
+  },
+  "feat_wikipedia_narrowContent_desc": {
+    "message": "將條目限制在下方「條目寬度」之內，不會擴展到隱藏「外觀」面板所空出的空間。請使用「條目寬度」變更寬度。"
+  },
+  "feat_wikipedia_readableLayout_desc": {
+    "message": "圍繞搜尋、目錄、條目及其資訊重新編排頁面。關閉後會還原原本的版面。"
+  },
+  "feat_wikipedia_stickyContents_label": {
+    "message": "固定目錄"
+  },
+  "feat_wikipedia_stickyContents_desc": {
+    "message": "讓目錄持續顯示，方便快速跳轉。"
+  },
+  "feat_wikipedia_imageViewer_label": {
+    "message": "圖片檢視器"
+  },
+  "feat_wikipedia_imageViewer_desc": {
+    "message": "放大條目中的圖片。"
+  },
+  "feat_wikipedia_linkPreview_label": {
+    "message": "連結與參考資料預覽"
+  },
+  "feat_wikipedia_linkPreview_desc": {
+    "message": "調整 Wikipedia 標準條目預覽的樣式，並就地顯示參考資料文字。在 Wikipedia 上啟用後才會顯示條目預覽。"
+  },
+  "wikipedia_headingFont": {
+    "message": "標題字型"
+  },
+  "wikipedia_inherit": {
+    "message": "與內文相同"
+  },
+  "wikipedia_linkStyle": {
+    "message": "連結樣式"
+  },
+  "wikipedia_underline": {
+    "message": "底線"
+  },
+  "wikipedia_color": {
+    "message": "色彩"
+  },
+  "wikipedia_coverImage": {
+    "message": "封面圖片"
+  },
+  "wikipedia_show": {
+    "message": "顯示"
+  },
+  "wikipedia_hide": {
+    "message": "隱藏"
+  },
+  "wikipedia_articleStyle": {
+    "message": "條目檢視"
+  },
+  "wikipedia_full": {
+    "message": "完整"
+  },
+  "wikipedia_pictures": {
+    "message": "文字與圖片"
+  },
+  "wikipedia_text": {
+    "message": "僅文字"
+  },
+  "wikipedia_articleStyle_desc": {
+    "message": "「完整」包含表格與其他內容。「文字與圖片」會省略表格等元素。「僅文字」則連圖片也省略。"
+  },
+  "wikipedia_linkStyle_desc": {
+    "message": "「底線」在滑鼠移到連結上之前使用文字顏色。「色彩」則一律使用連結顏色。"
+  },
+  "wikipedia_group_typography": {
+    "message": "文字與色彩"
+  },
+  "wikipedia_group_layout": {
+    "message": "版面"
+  },
+  "wikipedia_group_display": {
+    "message": "顯示"
+  },
+  "wikipedia_small": {
+    "message": "小"
+  },
+  "wikipedia_medium": {
+    "message": "中"
+  },
+  "wikipedia_large": {
+    "message": "大"
+  },
+  "wikipedia_auto": {
+    "message": "自動"
+  },
+  "wikipedia_legacy_theme": {
+    "message": "$THEME$（舊版主題）",
+    "placeholders": {
+      "theme": {
+        "content": "$1"
+      }
+    }
+  },
+  "wikipedia_one_dark": {
+    "message": "One Dark"
+  },
+  "wikipedia_one_light": {
+    "message": "One Light"
+  },
+  "wikipedia_dracula": {
+    "message": "Dracula"
+  },
+  "wikipedia_nord": {
+    "message": "Nord"
+  },
+  "wikipedia_monokai": {
+    "message": "Monokai"
+  },
+  "wikipedia_solarized_dark": {
+    "message": "Solarized Dark"
+  },
+  "wikipedia_solarized_light": {
+    "message": "Solarized Light"
+  },
+  "wikipedia_github_dark": {
+    "message": "GitHub Dark"
+  },
+  "wikipedia_github_light": {
+    "message": "GitHub Light"
+  },
+  "wikipedia_deep_ocean": {
+    "message": "深海"
+  },
+  "wikipedia_algae": {
+    "message": "藻綠"
+  },
+  "wikipedia_calmness": {
+    "message": "寧靜"
+  },
+  "wikipedia_desert": {
+    "message": "沙漠"
+  },
+  "wikipedia_fairy_dust": {
+    "message": "仙子塵"
+  },
+  "wikipedia_grey": {
+    "message": "灰色"
+  },
+  "wikipedia_nature": {
+    "message": "自然"
+  },
+  "languageAuto": { "message": "自動（跟隨瀏覽器）" },
+  "languageSelectLabel": { "message": "語言" },
+  "languageSelectTitle": { "message": "語言（已開啟的頁面需重新整理後生效）" }
+}

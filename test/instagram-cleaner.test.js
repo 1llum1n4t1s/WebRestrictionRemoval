@@ -72,6 +72,15 @@ class FakeElement {
   }
 }
 
+/** 投稿内の数値表示ボタン（いいね数など）。text を書き換えて後からの数値変化を再現する。 */
+class FakeButton extends FakeElement {
+  constructor(text = "") {
+    super("button");
+    this.text = text;
+  }
+  get textContent() { return this.text; }
+}
+
 class FakeCommentItem extends FakeElement {
   constructor(handle, { commentPermalink = true, extraCaptionTime = false } = {}) {
     super("div");
@@ -106,6 +115,7 @@ const createHarness = ({ pathname = "/", withComments = false, withDialog = true
   const body = new FakeElement("body");
   documentElement.append(body);
   const article = new FakeElement("article");
+  const buttons = [];
   const video = new FakeElement("video");
   video.paused = false;
   video.pauseCalls = 0;
@@ -161,7 +171,12 @@ const createHarness = ({ pathname = "/", withComments = false, withDialog = true
     querySelectorAll(selector) {
       if (selector === "article video") return [video];
       if (selector.startsWith("article ul:not(")) return withComments ? [feedComments, feedMixedCaption] : [];
-      if (selector.startsWith(":is(")) return [article, existing];
+      // 偽 DOM でも :not(.class) を解釈し、除外指定が効かない実装を見逃さない。
+      if (selector.startsWith("article button")) {
+        const excluded = [...selector.matchAll(/:not\(\.([\w-]+)\)/g)].map((match) => match[1]);
+        return buttons.filter((button) => excluded.every((name) => !button.classList.contains(name)));
+      }
+      if (selector.startsWith(":is(")) return [article, existing, ...buttons];
       return [];
     },
     addEventListener(type, listener) {
@@ -213,7 +228,12 @@ const createHarness = ({ pathname = "/", withComments = false, withDialog = true
     feedComments,
     feedMixedCaption,
     redirects,
-    documentElement, article,
+    documentElement, article, buttons,
+    // DOM が変化した体で dirty を立て、debounce 済みの sweep を 1 回走らせる。
+    sweep() {
+      for (const listener of documentListeners.get("visibilitychange") ?? []) listener({});
+      timers.filter((item) => item.delay === 300).at(-1)?.callback();
+    },
     invalidate() { context.chrome.runtime.id = undefined; },
     runIntervals() { for (const callback of [...intervals.values()]) callback(); },
     intervalCount() { return intervals.size; },
@@ -375,4 +395,50 @@ test('Instagram early: context失効時はobserver停止だけでなく先制非
   assert.equal(styles.has('display'), false);
   assert.equal(attributes.size, 0);
   assert.equal(classes.contains('__cpa-ig-comments-pre'), false);
+});
+
+test("Instagram cleaner: いいね数ボタンは最初の確認後に数値へ変わっても追従して隠す", () => {
+  const h = createHarness();
+  const like = new FakeButton("");
+  const share = new FakeButton("Share");
+  h.buttons.push(like, share);
+  h.update(true, { vanity: true });
+  h.sweep();
+  // 初回は数値でないので隠さない。
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), false);
+
+  like.text = "1,234";
+  h.sweep();
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), true);
+  // 数値でない他のボタンは巻き込まない。
+  assert.equal(share.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), false);
+});
+
+test("Instagram cleaner: 隠したいいね数ボタンが数値でなくなったら表示へ戻す", () => {
+  const h = createHarness();
+  const like = new FakeButton("12");
+  h.buttons.push(like);
+  h.update(true, { vanity: true });
+  h.sweep();
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), true);
+
+  like.text = "Follow";
+  h.sweep();
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), false);
+});
+
+test("Instagram cleaner: マスター OFF でマーカーを撤去した後、ON し直すと同じ文字列のボタンも再び隠す", () => {
+  const h = createHarness();
+  const like = new FakeButton("567");
+  h.buttons.push(like);
+  h.update(true, { vanity: true });
+  h.sweep();
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), true);
+
+  // 撤去でマーカーが外れても、過去に確認済みの文字列を理由に再判定を省かない。
+  h.update(false, {});
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), false);
+  h.update(true, { vanity: true });
+  h.sweep();
+  assert.equal(like.classList.contains(G.InstagramCleaner.VANITY_HIDE_CLASS), true);
 });

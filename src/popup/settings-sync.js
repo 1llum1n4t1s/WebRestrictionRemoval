@@ -50,5 +50,6 @@
       restore().catch(failed);
     }
   });
-  restore().catch(failed);
+  // popup.js が先に言語の読み込みを済ませるが、単独で読み込まれても同じ言語で出るよう待つ。
+  Promise.resolve(globalThis.Localizer?.ready).catch(() => {}).then(() => restore()).catch(failed);
 })();

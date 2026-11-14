@@ -146,7 +146,7 @@
   "amazonMerchantInfoAriaUnknown": { "message": "Seller unverified" },
 
   "searchFixerMaster": { "message": "YouTube Enhancements" },
-  "searchFixerMasterDesc": { "message": "Manage 38 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, sending videos to Gemini Notebook, and more." },
+  "searchFixerMasterDesc": { "message": "Manage 40 sub-features at once: Shorts removal, search noise filtering, watch-page cleanup, comment hiding, live-chat hiding, subscriptions enhancements, sending videos to Gemini Notebook, and more." },
 
   "instagramCleanerMaster": { "message": "Instagram cleaner" },
   "instagramCleanerMasterDesc": { "message": "Hide redundant UI such as Reels, Explore, and Stories in one toggle." },
@@ -421,6 +421,27 @@
   "bcOverlayLabel": { "message": "Broadcast" },
   "feat_sf_redirectShortsUrl_label": { "message": "Redirect Shorts URL to /watch" },
   "feat_sf_redirectShortsUrl_desc": { "message": "Force a /shorts/<ID> vertical-video page to the regular /watch?v=<ID> player." },
+  "feat_sf_playlistReverse_label": { "message": "Show reverse button on playlists" },
+  "feat_sf_playlistReverse_desc": { "message": "This setting only controls whether the reverse button is shown; it does not change the order. When ON, the playlist panel gets a \"Reverse: ON/OFF\" button and playlist pages get a \"Play in reverse\" button. Reversing is chosen per playlist with the button (kept only in the current tab); while it is ON, playback goes from the last video toward the first. Turning this setting OFF removes the buttons and restores the original order." },
+  "ytPlaylistReverseStateOn": { "message": "Reverse: ON" },
+  "ytPlaylistReverseStateOff": { "message": "Reverse: OFF" },
+  "ytPlaylistReverseOnTitle": { "message": "This playlist plays in reverse. Click to restore the original order" },
+  "ytPlaylistReverseOffTitle": { "message": "Playing in the original order. Click to reverse" },
+  "ytPlaylistReversePlay": { "message": "Play in reverse" },
+  "feat_sf_gameCrop_label": { "message": "Show game-screen zoom button" },
+  "feat_sf_gameCrop_desc": { "message": "This setting only controls whether the button is shown. When ON, the player toolbar gets a \"Game screen\" chip. For streams where the streamer crops the game footage into part of the video and places frames or an avatar around it, drag over the game area to zoom the player to just that area. The area is saved on this device per channel and reused automatically for that channel's videos. Turning this setting OFF removes the chip and the zoom (saved areas are kept)." },
+  "gcLabel": { "message": "Game screen" },
+  "gcToggleOn": { "message": "Zoom: ON" },
+  "gcToggleOff": { "message": "Zoom: OFF" },
+  "gcToggleOnTitle": { "message": "Zoomed to the game screen. Click to show the whole video" },
+  "gcToggleOffTitle": { "message": "Showing the whole video. Click to zoom to the saved game screen" },
+  "gcSelect": { "message": "Select area" },
+  "gcReselect": { "message": "Change area" },
+  "gcSelectTitle": { "message": "Drag on the video to select the game screen" },
+  "gcRemove": { "message": "Delete" },
+  "gcRemoveTitle": { "message": "Delete the saved game screen area for this channel" },
+  "gcHint": { "message": "Drag to select the game screen (Esc to cancel)" },
+  "ytPlaylistReversePlayTitle": { "message": "Start from the last video and play toward the first" },
   "feat_sf_searchGrid_label": { "message": "Show search results as grid" },
   "feat_sf_searchGrid_desc": { "message": "Convert search results from a single-column list to a multi-column grid (column count follows the grid setting; Auto matches the Home column count)." },
   "feat_sf_removeShortsChip_label": { "message": "Shorts filter chip" },
@@ -625,7 +646,7 @@
     "message": "Reference preview"
   },
   "wikipediaSiteMenu": { "message": "Wikipedia menu" },
-  "wikipediaArticleActions": { "message": "Article actions" },
+  "wikipediaDisplaySettings": { "message": "Display settings" },
   "wikipediaArticleInfo": { "message": "Article information" },
   "feat_wikipedia_readableLayout_label": {
     "message": "Modern article layout"
@@ -759,5 +780,8 @@
   },
   "wikipedia_nature": {
     "message": "Nature"
-  }
+  },
+  "languageAuto": { "message": "Auto (browser)" },
+  "languageSelectLabel": { "message": "Language" },
+  "languageSelectTitle": { "message": "Language. Open pages need a reload to update." }
 }

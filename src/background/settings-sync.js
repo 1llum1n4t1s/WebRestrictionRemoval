@@ -306,7 +306,10 @@
     await setStatus("ready");
   }
 
-  function failed() {
+  function failed(err) {
+    // 容量超過・通信失敗・保存失敗のどれかを開発者コンソールで切り分けられるよう原因を残す
+    // （状態値は従来どおり "error" のみで、外部送信は増えない）。
+    console.warn("[WebViewingAssist] settings sync failed:", err);
     setStatus("error").catch(() => {});
     if (active && ++attempts <= 3) schedule(15000);
   }

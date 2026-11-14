@@ -145,7 +145,7 @@
   "amazonMerchantInfoAriaUnknown": { "message": "販売元未確定" },
 
   "searchFixerMaster": { "message": "YouTube 機能拡張" },
-  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・Gemini Notebook 送信など 38 サブ機能を一括管理" },
+  "searchFixerMasterDesc": { "message": "Shorts 削除・検索結果ノイズ除去・動画ページ整形・コメント欄非表示・ライブチャット非表示・登録チャンネル拡張・Gemini Notebook 送信など 40 サブ機能を一括管理" },
 
   "instagramCleanerMaster": { "message": "Instagram クリーナー" },
   "instagramCleanerMasterDesc": { "message": "Reels / Explore / Stories などの冗長 UI を一括非表示" },
@@ -420,6 +420,27 @@
   "bcOverlayLabel": { "message": "配信時刻" },
   "feat_sf_redirectShortsUrl_label": { "message": "Shorts URL を /watch にリダイレクト" },
   "feat_sf_redirectShortsUrl_desc": { "message": "/shorts/<ID> で開いた縦動画ページを通常の /watch?v=<ID> プレイヤーに強制リダイレクト" },
+  "feat_sf_playlistReverse_label": { "message": "再生リストに逆順ボタンを表示" },
+  "feat_sf_playlistReverse_desc": { "message": "この設定は逆順ボタンを表示するかどうかだけを決め、並び順は変えない。ON にすると再生リスト欄に「逆順: ON/OFF」ボタン、再生リストページに「逆順で再生」ボタンが出る。逆順にするかは再生リストごとにボタンで切り替え（タブ内だけ保持）、ON の間は最後の動画から先頭へ向かって再生する。この設定を OFF にするとボタンを消し、逆順も解除して元の順序に戻る" },
+  "ytPlaylistReverseStateOn": { "message": "逆順: ON" },
+  "ytPlaylistReverseStateOff": { "message": "逆順: OFF" },
+  "ytPlaylistReverseOnTitle": { "message": "この再生リストは逆順で再生中。クリックで元の順序に戻す" },
+  "ytPlaylistReverseOffTitle": { "message": "元の順序で再生中。クリックで逆順にする" },
+  "ytPlaylistReversePlay": { "message": "逆順で再生" },
+  "feat_sf_gameCrop_label": { "message": "ゲーム画面拡大ボタンを表示" },
+  "feat_sf_gameCrop_desc": { "message": "この設定はボタンを表示するかどうかだけを決める。ON にするとプレーヤーのツールバーに「ゲーム画面」が出て、配信者が動画の外側に枠や立ち絵を置いてゲーム映像を一部にクロップしている配信で、ドラッグで囲んだ範囲だけをプレーヤー全体へ拡大できる。範囲はチャンネルごとに端末内へ保存し、同じチャンネルの動画で自動的に使う。OFF にするとボタンも拡大も解除される（保存した範囲は残る）" },
+  "gcLabel": { "message": "ゲーム画面" },
+  "gcToggleOn": { "message": "拡大: ON" },
+  "gcToggleOff": { "message": "拡大: OFF" },
+  "gcToggleOnTitle": { "message": "ゲーム画面だけを拡大中。クリックで動画全体の表示に戻す" },
+  "gcToggleOffTitle": { "message": "動画全体を表示中。クリックで保存したゲーム画面を拡大" },
+  "gcSelect": { "message": "範囲を指定" },
+  "gcReselect": { "message": "範囲を変更" },
+  "gcSelectTitle": { "message": "動画の上をドラッグして、ゲーム画面の範囲を囲む" },
+  "gcRemove": { "message": "削除" },
+  "gcRemoveTitle": { "message": "このチャンネルの保存したゲーム画面の範囲を削除" },
+  "gcHint": { "message": "ゲーム画面の範囲をドラッグで囲んでください（Esc で取消）" },
+  "ytPlaylistReversePlayTitle": { "message": "最後の動画から先頭へ向かって再生" },
   "feat_sf_searchGrid_label": { "message": "検索結果をグリッド表示" },
   "feat_sf_searchGrid_desc": { "message": "検索結果を 1 列リストから複数列グリッドに変更（列数はグリッド表示設定に従い、自動ならホームと同じ列数）" },
   "feat_sf_removeShortsChip_label": { "message": "Shorts フィルタチップ" },
@@ -624,7 +645,7 @@
     "message": "脚注プレビュー"
   },
   "wikipediaSiteMenu": { "message": "Wikipedia のメニュー" },
-  "wikipediaArticleActions": { "message": "記事の操作" },
+  "wikipediaDisplaySettings": { "message": "表示設定" },
   "wikipediaArticleInfo": { "message": "基本情報" },
   "feat_wikipedia_readableLayout_label": {
     "message": "新しい記事レイアウト"
@@ -758,5 +779,8 @@
   },
   "wikipedia_nature": {
     "message": "自然"
-  }
+  },
+  "languageAuto": { "message": "自動（ブラウザ）" },
+  "languageSelectLabel": { "message": "言語" },
+  "languageSelectTitle": { "message": "言語（開いているページは再読み込みで反映）" }
 }

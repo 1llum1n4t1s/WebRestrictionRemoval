@@ -22,6 +22,7 @@ const independentScripts = new Set([
   "src/content/tiktok-early.js",
   "src/content/x-early.js",
   "src/content/youtube-player-controls-main.js",
+  "src/content/youtube-playlist-reverse-main.js",
 ]);
 const dependentEntries = (manifest) => manifest.content_scripts.filter(entry =>
   !entry.js.every(file => independentScripts.has(file)));
@@ -45,7 +46,7 @@ const validateEntry = (entry) => {
   if (entry.matches.includes("http://*/*")) {
     const expectedNames = entry.js.includes("src/content/video-gamma.js") ? ["VideoGamma", "VideoFill"]
       : entry.js.includes("src/content/loupe.js") ? ["Loupe"] : ["VolumeBooster", "AudioPipeline"];
-    assert.deepEqual(Object.keys(exposed(context)).sort(), ["Actions", "ExtensionPaths", "SenderCheck", "StorageKeys", ...expectedNames].sort());
+    assert.deepEqual(Object.keys(exposed(context)).sort(), ["Actions", "ExtensionPaths", "Localizer", "SenderCheck", "StorageKeys", ...expectedNames].sort());
     if (expectedNames.includes("VolumeBooster")) {
       assert.equal(context.VolumeBooster.SETTINGS_KEYS.includes(context.StorageKeys.VOLUME_BOOSTER_ENABLED), true);
     }

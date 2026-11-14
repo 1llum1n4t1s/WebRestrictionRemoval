@@ -17,7 +17,7 @@ const fixture = (kind) => {
       getPropertyPriority: (k) => values.get(k)?.[1] || "",
       setProperty: (k, v, p) => values.set(k, [v, p]), removeProperty: (k) => values.delete(k) },
     addEventListener: (name, fn, options) => listeners.push({ name, fn, signal: options.signal }) };
-  let resolveInitial, change, scans = 0, controllers = 0, observer, raf, host;
+  let resolveInitial, change, scans = 0, controllers = 0, parses = 0, observer, raf, host;
   const events = {};
   const chrome = { runtime: { id: "extension", onMessage: { addListener() {} } },
     storage: { local: { get: () => new Promise((resolve) => { resolveInitial = resolve; }) },
@@ -29,7 +29,7 @@ const fixture = (kind) => {
     importNode: (node) => node };
   const context = vm.createContext({ window: { addEventListener: (name, fn) => { events[name] = fn; } },
     document, chrome, StorageKeys, VideoGamma, VideoFill, Actions, SenderCheck,
-    DOMParser: class { parseFromString() { return { documentElement: {} }; } },
+    DOMParser: class { parseFromString() { parses++; return { documentElement: {} }; } },
     AbortController: class extends AbortController { constructor() { super(); controllers++; } },
     MutationObserver: class { constructor(fn) { observer = this; this.callback = fn; } observe() { this.connected = true; } disconnect() { this.connected = false; } },
     requestAnimationFrame: (fn) => { raf = fn; return 1; }, cancelAnimationFrame: () => { raf = null; } });
@@ -41,7 +41,8 @@ const fixture = (kind) => {
       ...(kind === "gamma" ? { [StorageKeys.VIDEO_GAMMA_VALUE]: 1.5 } : { [StorageKeys.VIDEO_FILL_TARGET]: "21:9" }) }; },
     mutate(removedNodes = []) { observer.callback([{ removedNodes }]); if (raf) { const fn = raf; raf = null; fn(); } },
     metadata() { for (const l of listeners) if (!l.signal.aborted) l.fn(); },
-    get scans() { return scans; }, get controllers() { return controllers; }, get host() { return host; },
+    dropHost() { host = null; },
+    get scans() { return scans; }, get controllers() { return controllers; }, get parses() { return parses; }, get host() { return host; },
     get observed() { return observer?.connected === true; } };
 };
 
@@ -98,3 +99,22 @@ for (const kind of ["gamma", "fill"]) {
     if (kind === "gamma") assert.equal(f.host, null);
   });
 }
+
+test("gamma: 同じ値の通知では filter を作り直さず、ページが SVG ホストを消したら次の走査で再注入する", async () => {
+  const f = fixture("gamma");
+  await f.initial();
+  f.patch(f.settings(true));
+  assert.equal(f.parses, 1, "ON で filter を1回だけ構築する");
+  // 他機能の設定変更でも background が全設定を配信するため、同じ値の通知が繰り返し届く。
+  f.patch(f.settings(true));
+  f.patch({ [StorageKeys.VIDEO_GAMMA_VALUE]: 1.5 });
+  assert.equal(f.parses, 1, "値が同じなら作り直さない（参照する video の再描画を起こさない）");
+  f.patch({ [StorageKeys.VIDEO_GAMMA_VALUE]: 1.3 });
+  assert.equal(f.parses, 2, "値が変わったら作り直す");
+  // body の差し替え等でホストが失われても、observer 起点の再走査で補正が戻る。
+  f.dropHost();
+  assert.equal(f.host, null);
+  f.mutate();
+  assert.ok(f.host, "ホストを再注入する");
+  assert.equal(f.parses, 3);
+});

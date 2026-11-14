@@ -204,10 +204,16 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
     assert.equal(await page.$$eval(".__cpa-wiki-shell", els => els.length), 1);
     assert.equal(await page.evaluate(() => Object.entries(window.__wikiOriginalNodes).every(([id, { node }]) => document.getElementById(id) === node)), true);
     assert.equal(await page.$eval(".__cpa-wiki-rail", el => el.contains(document.querySelector(".__cpa-wiki-toc"))), true);
-    assert.equal(await page.$eval(".__cpa-wiki-facts", el => el.open), false);
-    assert.equal(await page.$eval(".__cpa-wiki-facts", el => el.nextElementSibling.querySelector("#section-one") !== null), true, "基本情報は冒頭の説明の後に置く");
-    assert.ok(await page.$eval(".__cpa-wiki-facts", el => Math.abs(el.getBoundingClientRect().width - document.querySelector("#mw-content-text").getBoundingClientRect().width) < 2), "基本情報が本文の全幅を使う");
-    await page.click(".__cpa-wiki-actions > summary");
+    // 広い画面（1600px）では基本情報カードを開いた状態で、元の infobox の位置から右へ浮かべる。
+    assert.equal(await page.$eval(".__cpa-wiki-facts", el => el.open), true, "広い画面では基本情報を開いて始める");
+    assert.equal(await page.$eval(".__cpa-wiki-facts", el => el.previousElementSibling?.matches('section[data-mw-section-id="1"]')), true, "基本情報は元の infobox の位置に置く");
+    assert.notEqual(await page.$eval(".__cpa-wiki-facts", el => getComputedStyle(el).float), "none", "広い画面では本文の右へ浮かべる");
+    assert.ok(await page.$eval(".__cpa-wiki-facts", el => el.getBoundingClientRect().width < document.querySelector("#mw-content-text").getBoundingClientRect().width * .5), "カードは本文の半分以下の幅");
+    // この文書は右列にページツールがピン留めされているので、基本情報は右列へ張り出さず本文列の中に浮かべる。
+    assert.ok(await page.evaluate(() => document.querySelector(".__cpa-wiki-facts").getBoundingClientRect().right <= document.querySelector("#mw-content-text").getBoundingClientRect().right + 1), "ページツールがある右列へは張り出さない");
+    // 記事の操作（閲覧・編集・履歴）は折りたたまず、題名の下の行に直接見える。ツールバーは #content 直下のまま。
+    assert.equal(await page.$eval(".vector-page-toolbar", el => el.parentElement.id), "content");
+    assert.ok(await page.$eval("#edit-article", el => el.getClientRects().length > 0), "編集リンクが開閉操作なしで見える");
     await page.focus("#edit-article");
     assert.equal(await page.evaluate(() => document.activeElement.id), "edit-article");
     await page.$eval("#searchInput", el => { el.value = "kept search"; });
@@ -392,7 +398,7 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
       const saved = await chrome.storage.local.get("wikipediaAppearance");
       await chrome.storage.local.set({ wikipediaAppearance: { ...saved.wikipediaAppearance, borderRadius: "square" } });
     });
-    await page.waitForFunction(() => getComputedStyle(document.getElementById("data-table")).borderRadius === "4px");
+    await page.waitForFunction(() => getComputedStyle(document.getElementById("data-table")).borderRadius === "12px");
     assert.equal(await page.$eval("html", el => el.hasAttribute("data-cpa-wiki-radius")), false);
     await choose("articleStyle", "pictures");
     await page.waitForFunction(() => getComputedStyle(document.getElementById("data-table")).display === "none");
@@ -589,7 +595,6 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
   });
   await t.test("編集モードでは無効化し、記事へ戻ると再適用する", async () => {
     await page.$eval("#edit-article", el => el.addEventListener("click", event => event.preventDefault()));
-    await page.$eval(".__cpa-wiki-actions", el => { el.open = true; });
     await page.click("#edit-article");
     // 編集開始を遅らせた間の設定更新や、開始前のキャンセルで構造を失わない。
     await worker.evaluate(async () => {
@@ -727,12 +732,10 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
       await live.setViewport({ width: 1920, height: 1080 });
       await live.goto("https://ja.wikipedia.org/wiki/ネコ", { waitUntil: "load", timeout: 30000 });
       await live.waitForSelector(".__cpa-wiki-toc a");
-      const openArticleActions = async () => {
-        const actions = await live.$(".__cpa-wiki-actions");
-        if (actions && !await actions.evaluate(el => el.open)) await live.click(".__cpa-wiki-actions > summary");
-      };
       assert.equal(await live.$eval("body", el => getComputedStyle(el).backgroundColor), "rgb(250, 250, 250)");
-      await live.waitForFunction(() => [...document.querySelectorAll("nav.vector-appearance-landmark")].some(el => el.getClientRects().length > 0));
+      // 表示パネルは閉じた折りたたみ（.__cpa-wiki-display）に入る。見出しだけが見え、中身は開くまで隠れる。
+      await live.waitForFunction(() => document.querySelector(".__cpa-wiki-display > summary")?.getClientRects().length > 0
+        && document.querySelector(".__cpa-wiki-display")?.open === false);
       const baseWidth = await live.$eval("#mw-content-text", el => el.getBoundingClientRect().width);
       const freedWidth = await live.$eval("#content", el => document.querySelector(".vector-column-end").getBoundingClientRect().width + parseFloat(getComputedStyle(el).columnGap));
       await worker.evaluate(async () => {
@@ -772,12 +775,14 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
       await popup.click("#wikipedia-feature-narrowContent");
       await live.waitForFunction(() => !document.documentElement.classList.contains("__cpa-wiki-narrow"));
       assert.ok(Math.abs(await live.$eval("#mw-content-text", el => el.getBoundingClientRect().width) - expandedWidth) < 2);
-      await openArticleActions();
       await live.click('label[for="vector-page-tools-dropdown-checkbox"]');
       await live.waitForSelector('button[data-event-name="pinnable-header.vector-page-tools.pin"]', { visible: true });
       await live.click('button[data-event-name="pinnable-header.vector-page-tools.pin"]');
       await live.waitForFunction(() => document.querySelector("#vector-page-tools-pinned-container")?.children.length > 0);
       assert.ok(await live.$eval("#vector-page-tools-pinned-container", el => el.getClientRects().length > 0), "ページツールを隠さない");
+      // 表示パネルを隠している間は、右列が残っても中身の空な「表示設定」見出しを出さない。
+      const displayCard = await live.$(".__cpa-wiki-display");
+      if (displayCard) assert.equal(await displayCard.evaluate(el => getComputedStyle(el).display), "none", "空の表示設定カードを出さない");
       assert.ok(Math.abs(await live.$eval("#mw-content-text", el => el.getBoundingClientRect().width) - baseWidth) < 2, "他のツールがある列を本文に重ねない");
       await worker.evaluate(async () => {
         const stored = await chrome.storage.local.get("wikipediaFeatures");
@@ -805,8 +810,10 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
         await chrome.storage.local.set({ wikipediaFeatures: { ...stored.wikipediaFeatures, hideAppearance: false } });
       });
       await live.waitForFunction(() => !document.documentElement.classList.contains("__cpa-wiki-hide-appearance")
-        && [...document.querySelectorAll("nav.vector-appearance-landmark")].some(el => el.getClientRects().length > 0));
-      await openArticleActions();
+        && document.querySelector(".__cpa-wiki-display > summary")?.getClientRects().length > 0);
+      // 閉じた折りたたみを開いてから、Vector 標準の「非表示」（ピン留め解除）を操作する。
+      await live.click(".__cpa-wiki-display > summary");
+      await live.waitForFunction(() => [...document.querySelectorAll("nav.vector-appearance-landmark")].some(el => el.getClientRects().length > 0));
       await live.click('button[data-event-name="pinnable-header.vector-appearance.unpin"]');
       await live.waitForFunction(() => document.querySelector("#vector-appearance-dropdown")?.getClientRects().length > 0);
       await worker.evaluate(async () => {
@@ -820,16 +827,34 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
         await chrome.storage.local.set({ wikipediaFeatures: { ...stored.wikipediaFeatures, hideAppearance: false } });
       });
       await live.waitForFunction(() => document.querySelector("#vector-appearance-dropdown").getClientRects().length > 0);
+      // 「外観メニューはこちらに移動しました」の案内は表示から数秒間、ボタンの上に重なる。消えてから開く（サイト側の案内の表示時間であり、拡張の描画とは無関係）。
+      await live.waitForFunction(() => [...document.querySelectorAll(".oo-ui-popupWidget")].every(el => el.classList.contains("oo-ui-element-hidden")), { timeout: 15000 });
       if (!await live.$eval("#vector-appearance-dropdown-checkbox", el => el.checked)) await live.click('label[for="vector-appearance-dropdown-checkbox"]');
       await live.waitForSelector('button[data-event-name="pinnable-header.vector-appearance.pin"]', { visible: true });
       await live.click('button[data-event-name="pinnable-header.vector-appearance.pin"]');
       await live.waitForFunction(() => document.querySelector("#vector-appearance-pinned-container #vector-appearance")?.getClientRects().length > 0);
-      if (await live.$eval(".__cpa-wiki-actions", el => el.open)) await live.click(".__cpa-wiki-actions > summary");
       assert.ok(await live.$eval("#mw-content-text", (el) => el.textContent.length > 1000));
       assert.equal(await live.evaluate(async () => (await document.fonts.load('400 18px "__cpa-wiki-line-seed-jp"', "日本語の本文")).length), 1, "実 Wikipedia でも同梱フォントを読める");
       assert.equal(await live.$(".__cpa-wiki-cover, .__cpa-wiki-gallery"), null);
       await live.screenshot({ path: path.join(output, "wikipedia-live-ja.png") });
-      await live.click(".__cpa-wiki-facts > summary");
+      // 右列がある 1920px では基本情報を右列へ張り出し、右端を #content（上部バー・操作行）に揃える。導入文は狭めない。
+      const livePlacement = await live.evaluate(() => {
+        const box = el => { const r = el?.getBoundingClientRect(); return r && { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+        return { facts: box(document.querySelector(".__cpa-wiki-facts")), text: box(document.querySelector("#mw-content-text")), content: box(document.querySelector("#content")),
+          display: box(document.querySelector(".__cpa-wiki-display")), intro: box(document.querySelector("#mw-content-text p")) };
+      });
+      assert.ok(livePlacement.facts.left >= livePlacement.text.right - 1 && Math.abs(livePlacement.facts.right - livePlacement.content.right) < 2, "基本情報は右列へ張り出し、右端が #content に揃う: " + JSON.stringify(livePlacement));
+      assert.ok(livePlacement.intro.right - livePlacement.intro.left > (livePlacement.text.right - livePlacement.text.left) * .9, "導入文は基本情報の分だけ狭めない");
+      assert.ok(!livePlacement.display || livePlacement.display.bottom <= livePlacement.facts.top, "基本情報は表示設定カードより下に置く");
+      // 右寄せの図版が互いに並んで本文列を食い潰さない（段落が極端に細くならない）。基本情報が記事末尾より長くてもフッターへ重ならない。
+      assert.ok(await live.evaluate(() => {
+        const text = document.querySelector("#mw-content-text").getBoundingClientRect().width;
+        const paragraphs = [...document.querySelectorAll("#mw-content-text .mw-parser-output p")].filter(p => !p.closest("table, figure, .thumb, .hatnote, .navbox, .__cpa-wiki-facts") && p.textContent.trim().length > 80);
+        const facts = document.querySelector(".__cpa-wiki-facts").getBoundingClientRect(), footer = document.querySelector(".__cpa-wiki-footer").getBoundingClientRect();
+        return paragraphs.length > 5 && paragraphs.every(p => p.getBoundingClientRect().width > text * .4) && facts.bottom <= footer.top;
+      }), "段落は本文列の4割以上の幅を保ち、基本情報はフッターへ重ならない");
+      // 1920px では基本情報カードが開いている。開いていなければ開いてから、中の画像を拡大する。
+      if (!await live.$eval(".__cpa-wiki-facts", el => el.open)) await live.click(".__cpa-wiki-facts > summary");
       await live.click('#mw-content-text a.mw-file-description:has(img[src*="Cat_poster"])');
       await live.waitForSelector("dialog[open].__cpa-wiki-image-dialog");
       await live.keyboard.press("Escape");
@@ -987,7 +1012,6 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
       });
       await live.waitForFunction(() => !document.querySelector(".__cpa-wiki-toc") && document.querySelector(".__cpa-wiki-site-menu")?.open);
       assert.ok(await live.$eval("#mw-panel-toc", el => el.getClientRects().length > 0), "独自目次OFFでも標準目次を利用できる");
-      await openArticleActions();
       const editLink = await live.$("#ca-edit a, #ca-viewsource a");
       assert.ok(editLink, "標準の編集・ソース表示リンクを残す");
       await editLink.click();
@@ -1017,26 +1041,30 @@ test("Wikipedia: popup → background → storage → content の操作経路", 
         await article.waitForSelector(`html[data-cpa-wiki-theme="${theme}"]`);
         const layout = await article.evaluate(() => {
           const facts = document.querySelector(".__cpa-wiki-facts");
-          return { open: facts.open, float: getComputedStyle(facts).float, width: facts.getBoundingClientRect().width,
+          return { open: facts.open, position: getComputedStyle(facts).position, width: facts.getBoundingClientRect().width,
             articleWidth: document.querySelector("#mw-content-text").getBoundingClientRect().width,
-            introWidth: document.querySelector(".mw-parser-output p").getBoundingClientRect().width };
+            introWidth: [...document.querySelectorAll(".mw-parser-output p")].find(p => !p.closest("table, figure, .thumb, .hatnote, .navbox, .__cpa-wiki-facts") && p.textContent.trim().length > 80)?.getBoundingClientRect().width };
         });
-        assert.equal(layout.open, false);
-        assert.equal(layout.float, "none");
-        assert.ok(Math.abs(layout.width - layout.articleWidth) < 2 && Math.abs(layout.introWidth - layout.articleWidth) < 2, "FFVIII の基本情報と本文は横並びにしない");
-        await article.click(".__cpa-wiki-facts > summary");
-        assert.ok(await article.$eval(".__cpa-wiki-facts > table", el => Math.abs(el.getBoundingClientRect().width - document.querySelector("#mw-content-text").getBoundingClientRect().width) < 3), "開いた基本情報も本文全幅を使う");
-        assert.ok(await article.$eval(".__cpa-wiki-facts-compact > table > tbody > tr:has(> th)", el => el.getBoundingClientRect().width < document.querySelector(".__cpa-wiki-facts").getBoundingClientRect().width * .6), "項目は全幅に引き伸ばさず段組みで詰める");
+        // 広い画面（右列あり）: 基本情報は開いたカードとして右列へ張り出し、導入文は本文列いっぱいに流れる（回り込まない）。
+        assert.equal(layout.open, true, "広い画面では基本情報を開いて始める");
+        assert.equal(layout.position, "absolute", "右列がある広い画面では基本情報カードを右列へ張り出す（float ではなく絶対配置）");
+        assert.ok(layout.width < layout.articleWidth * .5 && layout.introWidth > layout.articleWidth * .9, "FFVIII の導入文は基本情報カードの分だけ狭まらない");
+        assert.ok(await article.evaluate(() => Math.abs(document.querySelector(".__cpa-wiki-facts").getBoundingClientRect().right - document.querySelector("#content").getBoundingClientRect().right) < 2), "基本情報の右端が #content の右端に揃う");
+        assert.ok(await article.$eval(".__cpa-wiki-facts > table", el => Math.abs(el.getBoundingClientRect().width - document.querySelector(".__cpa-wiki-facts").getBoundingClientRect().width) < 3), "開いた基本情報の表がカード幅に収まる");
+        assert.ok(await article.$eval(".__cpa-wiki-facts-compact > table > tbody > tr:has(> th)", el => el.getBoundingClientRect().width > document.querySelector(".__cpa-wiki-facts").getBoundingClientRect().width * .85), "カード内の項目は1列で、行がカード幅を使う");
         if (theme === "one-dark") {
           await article.$eval(".__cpa-wiki-facts", el => el.scrollIntoView({ block: "start" }));
           await article.screenshot({ path: path.join(output, "wikipedia-facts-compact.png") });
           await article.setViewport({ width: 390, height: 844 });
+          // 狭い画面では閉じたカードから始める。開くと本文幅いっぱいに項目が並ぶ。
+          await article.waitForFunction(() => !document.querySelector(".__cpa-wiki-facts").open);
+          assert.equal(await article.$eval(".__cpa-wiki-facts", el => getComputedStyle(el).float), "none", "スマホでは基本情報を浮かべない");
+          await article.click(".__cpa-wiki-facts > summary");
           assert.ok(await article.$eval(".__cpa-wiki-facts-compact > table > tbody > tr:has(> th)", el => el.getBoundingClientRect().width > document.querySelector(".__cpa-wiki-facts").getBoundingClientRect().width * .85), "スマホでは基本情報を一段にする");
           assert.ok(await article.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
           await article.screenshot({ path: path.join(output, "wikipedia-facts-compact-mobile.png") });
           await article.setViewport({ width: 1706, height: 956 });
         }
-        await article.click(".__cpa-wiki-facts > summary");
         const colors = await templateColors(article);
         assert.ok(colors.navigation.length >= 3, "関連記事・典拠管理・カテゴリを実記事で確認する");
         assert.ok(colors.navigationTitles.length >= 2, "シリーズ名と典拠管理の内側のタイトルも確認する");

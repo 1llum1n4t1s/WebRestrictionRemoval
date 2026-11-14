@@ -22,7 +22,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 | `src/lib/audio-pipeline.js` | Chrome / Firefox で共有する DSP graph 構築と設定適用 | キャプチャ方法とメディア要素検出は呼び出し側が担当する |
 | `src/lib/scan-runner.js` / `src/lib/cleaner-core.js` / `src/content/early-framework.js` | DOM 監視、設定購読、document_start の先制非表示に共通するライフサイクル | サイト固有セレクタと表示内容は各 content script に残す |
 | `src/shared/kagayoi-support-*` | 問い合わせフォームと評価導線 | `@kagayoi/support-extension` の exact 固定版から同梱するコピー。製品固有の配置・配色だけを popup 側で与える |
-| `_locales/{en,ja}/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする |
+| `_locales/<9 言語>/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする。popup のヘッダーで選んだ言語は `Localizer`（`actions-core.js`）が `chrome.i18n` を差し替えて優先し、選択（`uiLanguage`）・辞書（`uiMessages`）・作成時の版（`uiMessagesVersion`）は端末内にだけ置く（同期・バックアップ対象外）。更新後は辞書を作り直す |
 | `test/` | 純粋関数、公開定数、機能件数、構文、manifest 差分、DSP、問い合わせ契約の drift 検知 | 実サイト DOM の時点依存挙動は手動・実ブラウザ確認で補う |
 | `../vps-web/lp/vuora/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | Cloudflare Workers Static Assets の `vps-web-lp` が配信し、拡張の API backend にはならない（設定は「製品ページの配信先」を参照） |
 
@@ -39,7 +39,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
   → DOM / CSS / video 要素へ適用
 ```
 
-音量の詳細設定やルーペの倍率・サイズなどは popup から `storage.local` へ直接保存し、各設定の購読先へ反映します。
+音量の詳細設定やルーペの倍率・サイズなどは popup が `SAVE_POPUP_STORAGE` で background へ渡し、保存キューを通して `storage.local` へ保存し、各設定の購読先へ反映します。
 
 設定名・既定値・storage 変換は `SettingsSchema`、メッセージ名は `Actions`、機能一覧は各 `FEATURES` 配列を正本にします。background は既存 storage と partial payload をマージして正規化し、content script は初期取得・メッセージ・`storage.onChanged` のいずれから更新されても同じ状態へ収束します。
 
@@ -91,7 +91,7 @@ Firefox では attach を開始する前に、メタデータ取得済み・ペ�
 2. `manifest.json` と `manifest.firefox.json` の共通 content scripts は drift テストで一致させ、ブラウザ差は音量処理・Firefox 固有権限・background 定義に限定します。
 3. background の message handler は `SenderCheck` で popup または content script の由来を検証します。
 4. DOM 監視は rAF coalesce と observer の再入防止を行い、extension context 失効時は observer、timer、listener、注入 DOM、inline style、Blob URL を片付けます。
-5. popup と content script の利用者向け文言は `_locales/{en,ja}/messages.json` と `chrome.i18n` を経由します。
+5. popup と content script の利用者向け文言は `_locales/<9 言語>/messages.json` と `chrome.i18n` を経由します。利用者が選んだ表示言語は `Localizer` が `chrome.i18n.getMessage` / `getUILanguage` を差し替えて優先し、差し替えが効かない環境では選択を名乗らずブラウザの言語のまま動かします。
 6. Manifest V3 の CSP に従い、実行 JavaScript はすべて拡張へ同梱します。問い合わせ共通部品もリモート実行せず、npm package から同期したファイルを配布物へ含めます。
 7. 外部通信はプライバシーポリシーの6例外だけです。X の画像保存はマスターと `imageDownload` が ON の場合だけ表示し、クリック時のみ HTTPS の `pbs.twimg.com/media/` へ `name=orig` を指定して取得します。画像パス・画質指定・IP アドレスが CDN へ伝わり、Cookie・リファラは送らず、リダイレクトは拒否します。画像取得、Gemini Notebook、問い合わせ、設定同期、登録チャンネルのサムネイル取得、Amazon 定期おトク便の金額取得で扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。Amazon の取得はマスター ON 時のみ、同一の `https://www.amazon.co.jp` に認証 Cookie 付きの読み取り GET を行います。配送価格を優先し、現在価格も取得できない個別商品だけ前回配送の実単価で補います。現在価格で補う場合は「参考合計（現在価格）」、前回単価を使う場合は「参考合計（前回価格を含む）」とし、請求額の変動を注記します。履歴・注文詳細は読み取り専用で、当該商品の単価だけを将来明細の数量に適用し、注文全体や他商品の金額は使いません。全明細が揃わなければ部分合計や代わりの0円を表示せず、取得結果はページ内メモリだけに保持して OFF・遷移時に中止・破棄します。
 8. バージョンは Chrome / Firefox manifest と `package.json` の間で同期し、`release/<manifest version>` ブランチから生成した成果物を同一バージョンとして公開します。`bun.lock` は依存解決の正本として frozen install で検証しますが、製品バージョンの正本にはしません。
@@ -108,7 +108,7 @@ Firefox では attach を開始する前に、メタデータ取得済み・ペ�
 
 ### サイト内 DOM と操作 UI の所有境界
 
-YouTube の画質・再生速度・音量・ライブ遅延指標、アーカイブの配信時刻は、`youtube-player-overlay.js` が所有する単一のプレイヤー内オーバーレイへ表示します。「動画ページ」の全サブ機能とプレイヤー詳細設定も isolated 側に表示します。YouTube マスター ON 時は全サブ機能 OFF でも設定入口を保ち、background が送信元・マスター・同期世代・許可カテゴリを確認して既存設定へ部分マージします。保存形式は popup と共有し、MAIN へ保存要求を橋渡ししません。共通ホストは分類の順序・設置・プレイヤー再生成時の再接続を管理し、各機能は自分の分類だけを登録・撤去します。プレイヤー操作は isolated 側がセッション専用の表示先を登録し、manifest の `world: "MAIN"` で直接読み込んだ権限を持たない MAIN 側はその内側だけを更新します。開始の受付は文書単位、動画操作とタイマーはセッション単位で管理し、機能 OFF 後の再開と読込順の違いに対応します。配信時刻の取得は isolated 側に保ちます。他の分類の ON/OFF に依存させず、専用の移動・折りたたみ・位置保存は行いません。
+YouTube の画質・再生速度・音量・ライブ遅延指標、ゲーム画面拡大のチップ、アーカイブの配信時刻は、`youtube-player-overlay.js` が所有する単一のプレイヤー内オーバーレイへ表示します。「動画ページ」の全サブ機能とプレイヤー詳細設定も isolated 側に表示します。YouTube マスター ON 時は全サブ機能 OFF でも設定入口を保ち、background が送信元・マスター・同期世代・許可カテゴリを確認して既存設定へ部分マージします。保存形式は popup と共有し、MAIN へ保存要求を橋渡ししません。共通ホストは分類の順序・設置・プレイヤー再生成時の再接続を管理し、各機能は自分の分類だけを登録・撤去します。プレイヤー操作は isolated 側がセッション専用の表示先を登録し、manifest の `world: "MAIN"` で直接読み込んだ権限を持たない MAIN 側はその内側だけを更新します。開始の受付は文書単位、動画操作とタイマーはセッション単位で管理し、機能 OFF 後の再開と読込順の違いに対応します。配信時刻の取得は isolated 側に保ちます。他の分類の ON/OFF に依存させず、専用の移動・折りたたみ・位置保存は行いません。
 
 Instagram の非表示処理、動画操作、Instagram / TikTok の画像保存は別々の content script が担当し、マスターと各サブ機能の両方が ON のときだけ動作します。動画操作は `instagram-video-controls.js` が `CleanerCore` で既存の設定を購読し、追加の保存キーや外部通信を持ちません。
 
@@ -145,4 +145,4 @@ Chrome は `manifest.json`、Firefox は `manifest.firefox.json` を `manifest.j
 
 ### Wikipedia の記事表示
 
-`src/content/wikipedia-reader.{js,css}` は Wikipedia の現在の文書を使い、Vector 2022 の記事を新しい閲覧構造へ組み直します。標準名前空間の記事閲覧 (`ns-0` / `action-view`) だけを対象とし、検索・記事タイトル・目次・本文・基本情報・記事操作・帰属の実ノードを移動します。コピーした本文の別画面は作らず、元の位置をコメントで記録し、レイアウト OFF・編集開始・ページ対象外・context 失効時に復元します。旧 Vector 等では構造を変えず、文字や配色の調整を適用します。独自の固定目次、現在文書内の脚注本文カード、読込済み画像の拡大を提供し、記事プレビューは Wikipedia 標準機能が有効な場合にその表示を整えます。外部ビューアー・別サイトへの転送・独自のネットワーク取得は行いません。標準プレビューの取得は Wikipedia 自身の既存動作です。本文・見出しで選んだ書体は、OFL ライセンスとともに同梱した7書体から Web フォントとして必要なものだけ読み込みます。フォント配信サービスへの通信はありません。他のフォント置換拡張と併用するときも記事本文では Vuora の書体を優先し、OFF で元の指定へ戻します。相手の設定やスタイルは変更しません。
+`src/content/wikipedia-reader.{js,css}` は Wikipedia の現在の文書を使い、Vector 2022 の記事を新しい閲覧構造へ組み直します。標準名前空間の記事閲覧 (`ns-0` / `action-view`) だけを対象とし、検索・目次・本文・基本情報・帰属の実ノードを移動します。題名バーと言語ボタン、記事操作のツールバーは `#content` 直下に残したまま、CSS の grid（題名バーは `display: contents`）で「題名・説明・操作行」のヒーローとして並べます。基本情報は元の infobox の位置で `details` のカードに包み、広い画面では開いたカードとして導入部の右へ浮かべ（右列がある幅では本文列を狭めず右列へ張り出して右端を上部バーに揃え、右列を畳む設定やページツールのピン留めがある場合は本文列の中に置きます）、狭い画面では閉じたカードにします。目次は広い画面で左レール、狭い画面で右下の丸いボタンです。コピーした本文の別画面は作らず、元の位置をコメントで記録し、レイアウト OFF・編集開始・ページ対象外・context 失効時に復元します。旧 Vector 等では構造を変えず、文字や配色の調整を適用します。独自の固定目次、現在文書内の脚注本文カード、読込済み画像の拡大を提供し、記事プレビューは Wikipedia 標準機能が有効な場合にその表示を整えます。外部ビューアー・別サイトへの転送・独自のネットワーク取得は行いません。標準プレビューの取得は Wikipedia 自身の既存動作です。本文・見出しで選んだ書体は、OFL ライセンスとともに同梱した7書体から Web フォントとして必要なものだけ読み込みます。フォント配信サービスへの通信はありません。他のフォント置換拡張と併用するときも記事本文では Vuora の書体を優先し、OFF で元の指定へ戻します。相手の設定やスタイルは変更しません。

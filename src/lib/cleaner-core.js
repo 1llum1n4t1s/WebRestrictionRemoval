@@ -44,8 +44,9 @@
     let featuresNotified = false;
 
     // 経路 1: 初期 storage.get — master / features 両方を通知
-    chrome.storage.local
-      .get([masterKey, featuresKey])
+    // 選んだ表示言語の読み込みを待ってから適用し、最初の描画から同じ言語で表示する。
+    Promise.resolve(globalThis.Localizer?.ready).catch(() => {})
+      .then(() => chrome.storage.local.get([masterKey, featuresKey]))
       .then((stored) => {
         // 初期取得より後の通知をキーごとに優先し、未通知キーだけを補完する。
         const patch = {};
@@ -87,7 +88,9 @@
   /** 単一 boolean の直接通知。読み取り失敗時は現在の状態を保持する。 */
   function subscribeBoolean({ masterKey, applyAction, onUpdate }) {
     let notified = false;
-    chrome.storage.local.get(masterKey)
+    // 選んだ表示言語の読み込みを待ってから適用し、最初の描画から同じ言語で表示する。
+    Promise.resolve(globalThis.Localizer?.ready).catch(() => {})
+      .then(() => chrome.storage.local.get(masterKey))
       .then((stored) => {
         if (!notified) onUpdate(stored[masterKey] === true);
       })
@@ -126,6 +129,8 @@
       }
       inFlight = true;
       try {
+        // 選択した表示言語の読み込みを待ってから適用し、最初の描画から同じ言語で表示する。
+        try { await globalThis.Localizer?.ready; } catch { /* 標準の言語で続ける */ }
         const stored = await chrome.storage.local.get(keys);
         if (!chrome?.runtime?.id) return;
         onStored(stored);

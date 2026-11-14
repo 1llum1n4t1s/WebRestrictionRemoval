@@ -16,7 +16,7 @@
     "test:dependencies": "bun test ./scripts/dependency-security.test.cjs"
   },
   "devDependencies": {
-    "@kagayoi/support-extension": "1.0.9",
+    "@kagayoi/support-extension": "1.0.10",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "puppeteer": "^25.17.0",

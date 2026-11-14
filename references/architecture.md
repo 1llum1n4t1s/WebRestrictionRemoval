@@ -71,7 +71,7 @@ Service worker。役割:
 2. **Offscreen Document ライフサイクル管理**: `ensureOffscreenDocument()` で並行作成ガード、`scheduleOffscreenClose()` で 30 秒アイドル後に自動クローズ。**音量ブースト中タブが残っている間は close を再延期**（`isVolumeBoosterActive` で確認、SW 再起動直後は安全側に倒す）。`reasons` は `["USER_MEDIA", "AUDIO_PLAYBACK"]`。
 3. **音量ブースター制御**: `setVolumeBoosterGain(tabId, gain, antiClip, nightMode, bassCut, muted, eqEnabled, eqGains, eqPreamp)` がエントリ。UNITY release 条件（EQ ON でも維持）・既存 AudioContext 経路・compressor preset / EQ preset 適用・ミュート時の gain ramp to 0 の詳細は Important Patterns 参照。
 4. **音量ブースター自動適用**: `chrome.tabs.onActivated` または local の音量設定変更で `autoApplyVolumeBooster(tabId)` を呼び出し。設定変更はブースト中の全タブへ反映する。自動適用中に既存 stream が消えた場合は新規キャプチャへ進まない。**既に boost 中のタブのみ**（`boostedTabIds.has(tabId)` ガード）が対象。新規タブは `tabCapture.getMediaStreamId` の user gesture 要件によりpopup open が必要。`chrome.storage.onChanged` で `volumeBoosterEnabled` が `false` になったら `releaseAllVolumeBoosterTabs()` で全 AudioContext を即座に解放（SW 再起動後 `boostedTabIds` が空の場合は offscreen に `ACTION_VOLUME_RELEASE_ALL` を直接送信するフォールバック経路あり）。
-5. **Message Handler の sender 検証**: `SenderCheck.isFromPopup` / `isFromContentScript` ヘルパーで由来を検証。`APPLY_SETTINGS` / `VOLUME_BOOSTER_*` は popup 由来のみ受け付ける。
+5. **Message Handler の sender 検証**: `SenderCheck.isFromPopup` / `isFromContentScript` ヘルパーで由来を検証。`APPLY_SETTINGS` / `VOLUME_BOOSTER_SET_GAIN` は popup 由来のみ受け付ける。
 6. **タブクローズで自動 release**: `chrome.tabs.onRemoved` で `ACTION_VOLUME_RELEASE_TAB` を offscreen に送信(permission 不要、SW 再起動でも永続的に発火する)。
 7. **設定マイグレーション**: `onInstalled` で旧キー削除 + 未設定キーの初期化（詳細は Important Patterns の「マイグレーション」を参照）。
 8. **ルーペ用 captureVisibleTab**: content script からの `LOUPE_REQUEST_CAPTURE` を受け、`chrome.tabs.captureVisibleTab(windowId, { format: "jpeg", quality: 70 })` を実行して JPEG DataURL を `sendResponse` で返す。`SenderCheck.isFromContentScript` で由来検証、sender.tab から targetTab を解決。Chrome 公式 2fps quota は content script の 500ms debounce で対応。
@@ -93,7 +93,7 @@ Service worker。役割:
 ### YouTube 機能拡張 (`src/content/search-fixer.js`)
 
 `hideSubscriptionsRelevant` は「動画フィルタ」内の既定OFFオプション。`/feed/subscriptions` で `ytd-rich-shelf-renderer #rich-shelf-header h2` が「関連が強い」または「Most relevant」と一致する `ytd-rich-section-renderer` だけをクラスで非表示にする（日本語DOMは実機確認済み）。見出し・動画・展開ボタン・区切り線を含む欄全体が対象で、通常の新着動画とShorts欄は保持する。既存の設定購読・フィード監視から再判定し、個別OFF・マスターOFF・SPA遷移・終了時はクラスを除去する。
-`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) と `searchFixerBlockedChannels` (配列) の 4 キーで管理（変数名は履歴的に `searchFixer*` を使用）。38 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
+`searchFixerEnabled` (master) と `searchFixerFeatures` (オブジェクト) と `searchFixerGridItems` (数値: 0/4/5/6) と `searchFixerBlockedChannels` (配列) の 4 キーで管理（変数名は履歴的に `searchFixer*` を使用）。40 機能の単一情報源は `actions.js` の `SearchFixer.FEATURES`。実装: top frame 限定で MutationObserver + `yt-navigate-finish` / `yt-navigate-start` イベントで onSettingsChanged を再実行（SPA navigation で CLASS_PROCESSED マーカーをリセットするため）。マスター OFF 時は observer / 注入 CSS / 装飾クラスをすべて停止。**Shorts 5 サブ機能の実装は search-fixer.js ではなく youtube-shorts.js が担当**（責務分離: SPA URL リダイレクト + サイト横断 DOM 削除は検索ページ限定の clean-up とは別レイヤ）。
 
 **チャンネルブロックリスト (`channelBlocklist`、video_filter カテゴリ)**: YouTube ホームの公式「このチャンネルは表示しない」の拡張版。`searchFixerBlockedChannels` (storage key、`{key, name}` 配列) に登録されたチャンネルの動画を **検索結果 + ホーム / 登録チャンネル / 急上昇等のフィードページの両方**から除去する（2026-07-14 に検索結果限定からフィードページへ拡張、category も `search_only` → `video_filter` に変更）。登録 UI は従来どおり **検索結果限定**: 未登録チャンネルのカードに **hover 表示の 🚫 登録ボタン**（`.__cpa-sfx-block-btn`）をチャンネル名 (`ytd-channel-name`) の直後 sibling として注入する（`<a>` の**外**に置く — 中に置くとクリックがナビゲーションと競合する）。実装上の要点:
 - **検索結果の除去 + 登録ボタンは `applyChannelBlocklist()`**（`ytd-video-renderer` / `ytd-channel-renderer` が対象、`removeDistractions()` 内で `isResultsPage()` ゲート済み）
@@ -391,15 +391,48 @@ X の aria-label は UI 言語でローカライズされる（実機で「ト�
 
 `youtube-player-controls.js` は YouTube / youtube-nocookie の通常ページと埋込フレームへ注入し、live_chat は対象外です。`youtube-player-controls-main.js` は同じ範囲へ manifest の `world: "MAIN"` で直接注入します。ページへ `<script src="chrome-extension://…">` を追加する経路と、そのための web_accessible_resources は持ちません。MAIN は開始メッセージの受付だけを常駐させ、機能 ON 時に isolated 側のセッション付き slot を確認して操作エンジンを開始します。`available` / `start` / `ready` / `settings` の通知と heartbeat により読込順・プレイヤー生成待ちに対応し、OFF・SPA・期限切れでエンジンを撤去して再開可能にします。MAIN は権限 API・fetch・保存を持ちません。
 
+### 再生リスト逆順再生 (`src/content/youtube-playlist-reverse.{js,css}` + `youtube-playlist-reverse-main.js`)
+
+チャンネル側の登録ミスで Part10 → Part1 のように逆向きに並んだ再生リストを、最後の動画から先頭へ向かって再生する `watch_page` の既定OFFサブ機能（`playlistReverse`）。動画ページの再生リスト欄（ループ・シャッフルの並び、`#playlist-action-menu #top-level-buttons-computed`）に「逆順: ON/OFF」切り替え、再生リストページの見出しの操作列（「すべて再生」の隣、`yt-flexible-actions-view-model`）に「逆順で再生」を置く。後者は ON にしてから、読み込み済みで `index` が最大の動画リンクを YouTube 自身のリンクとして押す（100本を超えて未読込の動画がある場合は読み込み済みの最後から始まる）。
+
+- **横取りの経路（実機確認済み）**: 自動の次へ・次へ / 前へボタン・Shift+N / Shift+P は、すべて `yt-playlist-manager` が発火する `yt-navigate`（`detail.endpoint.watchEndpoint.index` は 0 始まり）で動く。`<video>` の `ended` を止めても YouTube の自動移動は止まらない。最後の動画の終了時は移動が起きず、最後の動画で次へを押すと `ytd-watch-flexy` が `playlistId` のないリスト外の動画へ移る。一覧のクリックは `ytd-playlist-panel-video-renderer` から届く。
+- **MAIN world（`youtube-playlist-reverse-main.js`）**: 別 world の CustomEvent detail は isolated world から読めないため、判定は MAIN で行う。window の capture で `yt-navigate` を受け、manager 由来の index が現在 +1 / −1（ループ時の折り返しを含む）なら止めて `playVideoAt` で反対向きへ移す。最後の動画からのリスト外移動は、次へボタン / Shift+N の直後か終了状態のときだけ順方向として扱う。`ended` では自分で 1 つ前へ移す。自分が起こした移動は期待 index の 1 回だけ通し、動画 ID 単位のラッチで 1 本につき移動 1 回に限る。一覧のクリック・シャッフル ON・1 曲ループ・広告中は通す。逆順の終わり（index 0）ではループ全体時だけ最後へ折り返し、それ以外は止める。権限 API・fetch・保存を持たない。
+- **2 つの ON/OFF の区別**: ポップアップの `playlistReverse` は「ボタンを表示するか」だけ（文言は「再生リストに逆順ボタンを表示」）。逆順にするかは再生リストごとにボタンで切り替え、状態を「逆順: ON/OFF」と文字で表示する。設定 OFF でボタンも逆順も解除する。
+- **isolated world（`youtube-playlist-reverse.js`）**: 設定購読（master AND `playlistReverse`）、ボタン生成（`chrome.i18n`）、再生リスト欄の並びを CSS の `column-reverse` で見た目だけ逆にするクラス、逆順にした再生リスト ID の保持を担う。ID はタブの `sessionStorage`（最大50件）にだけ置き、`chrome.storage`・設定同期・バックアップの対象外。ミックス（`RD`〜）は対象外。
+- **生存確認**: isolated が `postMessage` で現在逆順の再生リスト ID を通知し、2 秒ごとに送り直す。MAIN は 7 秒途絶えると拡張機能の無効化・更新とみなし、横取りを止めてボタンとクラスを撤去する。OFF・context 失効時は isolated が UI を撤去して `stop` を送る。
+- 検証は `test/youtube-playlist-reverse.test.js`（MAIN の移動判定）と実ブラウザで行う。長い再生リスト（`getPlaylist()` が全件を返さない場合）の終端は未検証。
+
+### 表示言語の切り替え (`Localizer` in `src/lib/actions-core.js` + popup ヘッダーの `#uiLanguage`)
+
+拡張機能の標準 `chrome.i18n` はブラウザの UI 言語に固定のため、利用者が選んだ言語の文言（同梱の `_locales/<code>/messages.json` を `Localizer.compact` で `{ key: { m, p? } }` に圧縮）を `chrome.storage.local` の `uiMessages`（選択は `uiLanguage`、自動は未設定）に保存し、全コンテキストで `chrome.i18n.getMessage` / `getUILanguage` をその言語を優先する版へ差し替える（`Localizer` が `actions-core.js` の読み込み時に実行。既存の呼び出し箇所は変更不要。キーが無いときは標準へ戻す）。placeholders と `$1`〜`$9`・`$$` は Chrome と同じ規則で展開する。`CleanerCore.subscribeStored` は初回適用の前に `Localizer.ready` を待ち、最初の描画から選んだ言語で出す。storage の変更は `onChanged` で後からも反映する（開いているページの既存の表示は再読み込みで反映）。初回の storage 取得を持つ経路（`subscribe` / `subscribeBoolean`、`search-fixer.js`、`image-downloader.js`、popup の `settings-sync.js`）も `Localizer.ready` を待つ。
+
+- **更新後の辞書**: `uiMessages` と一緒に作成時の拡張機能の版（`uiMessagesVersion`）を保存し、`Localizer.ensureFresh()` が版の違う辞書を同梱の messages.json から作り直す（background の `onInstalled` とポップアップの起動時に呼ぶ）。更新でキーが増えても、選んだ言語とブラウザの言語が混ざらない。作成は `Localizer.save(code)`（ポップアップの選択も同じ）。
+- **差し替えの確認**: 代入（無理なら `Object.defineProperty`）の後に `chrome.i18n.getMessage` が差し替えた関数か確かめ、効かない環境では `Localizer.code` を設定せず、選択もブラウザ標準の言語のまま動かす（選択欄と表示がずれない）。Chrome では実機で確認済み。Firefox は未確認。
+- **書体**: popup の `<html lang>` は実際の言語（`zh-CN` 等）で、`popup.css` の `:root:lang(zh-CN | zh-TW | ko)` が各言語のシステム書体を先頭にする（日本語書体のままだと中国語で字形が混ざる）。
+
+- **ポップアップ**: ヘッダーのタイトル横の選択欄（自動 + 9 言語。言語名は自国語表記）。選ぶと文言を fetch して保存し、ポップアップを開き直す。問い合わせ部品が `<html lang>` を表示前に読むため、選択は拡張機能ページの `localStorage`（`cpaUiLanguage`）にも控え、早期の即時関数が同期的に lang を決める。`lang` は実際の言語（`zh-CN` など）で、問い合わせ部品は `ja` か否かだけを見る。
+- **対象外**: manifest の `__MSG_*__`（拡張機能名・ショートカットの説明）はブラウザが処理するため、ブラウザの言語のまま。
+- 検証は `test/localizer.test.js`、全ロケールの整合は `test/locales.test.js`。
+
+### ゲーム画面拡大 (`src/content/youtube-game-crop.{js,css}` + `SearchFixer.GAME_CROP`)
+
+配信者が動画の外側に枠・コメント欄・立ち絵を置き、ゲーム映像を一部にクロップしている配信で、利用者が囲んだ範囲だけをプレーヤー全体へ拡大する `watch_page` の既定OFFサブ機能（`gameCrop`、設定の文言は「ゲーム画面拡大ボタンを表示」）。
+
+- **UI**: 共通オーバーレイ（`youtube-player-overlay.js` の分類 `crop`、順序はプレーヤー操作 → ゲーム画面 → 配信時刻）に「ゲーム画面」チップを置く。範囲なしは「範囲を指定」だけ、範囲ありは「拡大: ON/OFF」「範囲を変更」「削除」。ボタンを出すかの設定と、拡大の ON/OFF は別物で、後者はチップの「拡大: ON/OFF」で状態を文字で示す（設定 OFF でチップも拡大も解除、範囲は残る）。
+- **範囲の指定**: 「範囲を指定」で拡大を一時的に外し、プレーヤー全体を覆う透明レイヤー（`__cpa-gc-layer`）上のドラッグで囲む。離した時点で保存して ON にする（0.1 未満の小さな範囲・クリックだけは採用しない）。Esc で取消。レイヤーはプレーヤー内に置くので全画面でも使える。
+- **保存**: 範囲は動画フレームに対する割合 `{x,y,w,h,on}`（解像度・画質・プレーヤーの大きさが変わってもずれない）で、投稿チャンネルの識別子（`/@handle` / `/channel/UC…` を小文字化）をキーに `youtube.com` の `localStorage`（`__cpa_yt_game_crop_v1`、最大100件）へ置く。`chrome.storage`・設定同期・バックアップの対象外で、`storage` イベントでタブ間共有する。チャンネルを特定できないページでは動画 ID をキーにメモリだけで保持する。
+- **表示**: video 要素へ個別プロパティ `translate` / `scale` / `clip-path` と `transform-origin: 0 0` を `!important` で書く（`transform` は黒帯除去と衝突させないため使わない。併用は想定しない）。元の inline 値は退避して OFF・撤去・選択中・広告中に復元する。倍率は範囲の縦横比を保ってプレーヤーに収まる最大値、範囲の中心をプレーヤーの中心へ置き、範囲の外側は clip-path で隠す（レターボックスの映像は要素座標の px で clip）。位置は `offsetLeft/Top` の連鎖で求め、transform の影響を受けない。ResizeObserver（プレーヤー・video）、video の style 属性の監視、`loadedmetadata` / `resize` で追従する。
+- 純粋な計算（正規化・倍率・clip・チャンネル識別子）は `SearchFixer.GAME_CROP`（新しい `globalThis` 名前空間は増やさない）に置き、`test/youtube-game-crop.test.js` で検証する。自動検出は行わない（配信ごとに枠の形が違い、誤検出で見たい映像を切るおそれがあるため、利用者の指定を正とする）。
+
 ### Wikipedia 閲覧調整
 
-基本情報の通常の項目／値の表は、実ノードと読み順を保持したまま2段の段組みで配置します。長い値の隣にも後続項目を詰め、ラベル列の余白と段落間隔を抑えます。幅が足りなければ1段になります。複雑なセル結合を持つ表はこの変形を行わず、元の表構造を保ちます。
+基本情報（`table.infobox`）は、実ノードと読み順を保持したまま `details.__cpa-wiki-facts` で包み、**元の infobox の位置**（導入部の先頭）に置きます。広い画面（1000px 以上）では開いた角丸カードとして導入部の右へ浮かべます（`float: inline-end`、幅は `clamp(268px, 38%, 340px)`、導入文が左に回り込みます）。右列がある 1280px 以上では、カードを `position: absolute`（`#mw-content-text` を基準に、縦位置は `top: auto` で元の位置、右端は本文の右端から右列へ）にして右列の幅（288px）で張り出させます。float から外すので、右寄せ図版の `clear` や並びに干渉せず、導入文は本文列いっぱいに流れ、カードの右端は上部バー・操作行の右端に揃います。カードが記事本文より長い場合は、はみ出す高さを JS が測り（`ResizeObserver`）、本文グリッドの下余白（`--cpa-wiki-facts-overflow`）へ足してフッターへ重ねません。表示パネルを隠して列を畳んだ場合・右列にページツールがピン留めされている場合・1280px 未満では、従来どおり本文列の中へ浮かべます。狭い画面では閉じたカードから始め、開くと本文幅いっぱいに表示します（2列に収まる幅では項目を2段に並べます）。開閉は画面幅の境界（`WIDE_LAYOUT`）を跨いだときの既定値として適用し、利用者が一度でも開閉した後は上書きしません。通常の項目／値の表（`facts-compact`）は行ごとの「ラベル｜値」の2列に整え、複雑なセル結合を持つ表は変形せず元の表構造のままカード内に収めます。区分見出し（背景色付きの単一セル行）は独自テーマではアクセント色の淡い面にそろえ、画像・グラフの色は触りません。
 
-新レイアウトのヘッダーは既存のロゴ・検索・アカウント操作を使い、記事幅に連動する配置と余白、テーマの淡い背景を使う角丸の検索欄、控えめなログインボタンで整えます。Codex 検索の初期フォームと Vue 初期化後の両方を対象にし、モバイルで検索を展開しても入力・送信・候補が重ならないようにします。検索候補・標準メニュー・各リンクの挙動は Wikipedia の実装を維持します。
+新レイアウトの上部バーは既存のロゴ・検索・アカウント操作を使い、細いヘアラインの下に置きます。上部バー・通知・本文グリッド・フッターは共通の外枠（`--cpa-wiki-frame` と `--cpa-wiki-page-padding`）を共有し、左右端が一致します。検索欄は角丸のピル、ログインは細い枠のピルです。上部バーは `position: relative; z-index: 20` とし、検索候補・ユーザーメニュー・主メニューが後続の sticky 要素（左レール・右の表示パネル）より前面に出ます（`backdrop-filter` / `transform` は包含ブロックを作るため使いません）。上部バーは固定（sticky）にせず、Vector の固定ヘッダー（ログイン時のみ・`#firstHeading` の交差で表示、表示クラスは `body.vector-sticky-header-visible`）と二重に出ません。固定ヘッダー表示中はレールと右の表示パネルの `top` をその下へ下げます。Codex 検索の初期フォームと Vue 初期化後の両方を対象にし、モバイルで検索を展開しても入力・送信・候補が重ならないようにします。検索候補・標準メニュー・各リンクの挙動は Wikipedia の実装を維持します。
 
 関連記事・典拠管理の `navbox` は、枠と展開後の本文面をテーマの本文色へ、見出し・グループ・交互背景をテーマの案内色へ合わせます。見出し内の固定背景と文字色も解除し、リンクは既存のリンク表示設定を継承します。`catlinks` も同じ案内色を使い、マスター OFF・元の配色ではいずれもサイトの表示へ戻します。
 
-独自目次はスクロール位置に合わせて現在の h2／h3 のリンクへ `aria-current="location"` を付け、テーマ色の背景・左線・太字で示します。位置の計測は requestAnimationFrame でまとめ、記事自体を動かさず目次内のスクロールだけで選択項目を表示します。リサイズ・目次再開・見出し更新にも追従し、目次 OFF／機能解除時に保留フレームと参照を破棄します。
+独自目次は、新レイアウトの広い画面（1000px 以上）では左レールに常設し、▼ マーカーを出さない小見出し「目次」・縦のガイドライン・h3 の字下げと縮小で表示します。狭い画面では画面右下の丸い「目次」ボタン（`details` の `summary`）になり、押すと一覧のカードが開き、項目を選ぶと閉じます（本文の前に積みません）。`readableLayout` OFF の浮動目次は従来どおり 1400px で開閉します。独自目次はスクロール位置に合わせて現在の h2／h3 のリンクへ `aria-current="location"` を付け、アクセント色の左線・淡い面・太字で示します。位置の計測は requestAnimationFrame でまとめ、記事自体を動かさず目次内のスクロールだけで選択項目を表示します。リサイズ・目次再開・見出し更新にも追従し、目次 OFF／機能解除時に保留フレームと参照を破棄します。
 
 角の形は角丸に統一し、切替 UI は提供しません。旧 `borderRadius` は設定・同期・バックアップの互換性のため受け付けますが、表示には使いません。
 
@@ -409,13 +442,13 @@ Wikipedia が `mw-interlanguage-selector-disabled` を付けた場合、サイ�
 
 E2E はタブを作り直さず、実記事の同じ文書でテーマ・幅・行間・レイアウト等を8回切り替え、各回で言語一覧を開閉します。サイト配信の違いに左右されないよう、後半は観測済みの ULS 無効状態を実記事上で再現し、標準一覧の Enter／Space・Tab・フォーカス離脱・Escape・モバイルの画面内表示も確認します。固定ヘッダーの入口は fixture で検証し、ログイン済みの実画面は別の確認範囲です。
 
-表示パネルを非表示にし、右列にページツールがピン留めされていない場合は、右列と間隔の分を本文に使います。`narrowContent` を ON にすると空いた領域へ広げず、設定済みの記事幅に収めます。ほかのページツールが右列にある場合はその列を保ちます。行間は文字サイズに対する倍率 `lineHeight`（1.30〜2.40、0.05刻み）で保存し、本文へ適用します。旧設定に行間がなければ従来の1.85倍で補完します。
+右の表示パネル（Vector の外観メニュー、ピン留めしたページツール）は読書中のノイズになるため、外観メニューの実ノード（`nav.vector-appearance-landmark`）を独自の `details`（`.__cpa-wiki-display`、見出し「表示設定」）へ移し、既定では閉じた1行のカードにします。開くと従来のメニューを使え、ラジオは項目ごとに横並びにして高さを抑えます。Vector の「非表示」操作でピン留めが外れて中身が空になった場合は、カードごと隠します。OFF・編集開始時は他の移動ノードと同じく元の位置へ戻し、独自の `details` を撤去します。右列は 312px（カード 288px + 本文との間隔 24px）で、上端は操作行の高さの中央（言語ボタンと同じ高さ）に揃え、スクロールには追従させません（基本情報カードが同じ列へ張り出すため、sticky にすると重なります）。1280px 以上では開いたパネルを閉じたカードの下へ重ねて表示し（Vector の `contain: paint` と固定コンテナの `overflow` を外して切れないようにします）、基本情報を押し下げません。1280px 未満では本文の下へ回し、パネルはその位置で通常どおり開きます。表示パネルを非表示にし、右列にページツールがピン留めされていない場合は、右列と間隔の分を本文に使います。`narrowContent` を ON にすると空いた領域へ広げず、設定済みの記事幅に収めます。ほかのページツールが右列にある場合はその列を保ちます。行間は文字サイズに対する倍率 `lineHeight`（1.30〜2.40、0.05刻み）で保存し、本文へ適用します。旧設定に行間がなければ従来の1.85倍で補完します。本文列が 720px 未満のときは、コンテナクエリで右寄せ図版の最大幅を 220px にし、導入段落が図版の横で細い列に押し込まれないようにします。左レールのスクロールバーは細く薄い色にし、目次の見出しは上端を題名の字の上端へ合わせます。本文列より広い `wikitable` は表の中で横スクロールし、右列の基本情報や横スクロールバーへ重ねません。
 
 `*://*.wikipedia.org/*` の top frame に `actions-core.js` → `actions.js` → `cleaner-core.js` → `scan-runner.js` → `wikipedia-reader.js` と専用 CSS を読み込みます。`wikipediaEnabled` は既定 OFF。`wikipediaFeatures` の `readableLayout` / `stickyContents` / `imageViewer` / `linkPreview` はマスター ON のときだけ既定 ON、`hideAppearance` / `narrowContent` は既定 OFF です。後者は Vector の表示パネルと表示ボタンをピン留め状態にかかわらず隠します。外観はテーマ・本文書体・見出し書体・文字サイズ・行間・記事幅・リンク表示・記事表示を調整できます。テーマ一覧 `WikipediaReader.AVAILABLE_THEMES` は Wikipedia 自体の配色と自動切替に加え One Dark / Light、Dracula、Nord、Monokai、Solarized Dark / Light、GitHub Dark / Light。旧テーマの保存値も `WikipediaReader.THEMES` で受け入れ、使用中の場合だけ旧値を選択欄に残します。自動切替は One Light / Dark をシステム設定に合わせます。書体はシステムのゴシック／明朝と同梱7書体（見出しは「本文と同じ」も選択可）。文字サイズは S/M/L が 14/16/18px、細かい指定は14–24px。記事幅は640–1200pxで、S/M/L（680/860/1200px）と細かい指定を併用できます。`WikipediaReader` の正規化関数を popup・background・同期・バックアップと content script で共有します。
 
-記事閲覧 (`ns-0` / `action-view`) 時だけ適用します。`readableLayout` は Vector 2022 と必要な標準ヘッダー・タイトルバー・ツールバーがある文書で、検索を含む上部バー、目次の左列、記事ヘッダー、本文、基本情報、記事操作、帰属フッターへ構造を組み直します。Wikipedia の実ノードを移すため、検索・言語切替・編集・履歴・本文の ID やイベントを保持します。移動前の位置へコメントを挿入し、解除時に逆順で戻します。独自ラッパー内のサイト所有ノードは ID に依存せず復元し、サイトが差し替えたノードも保持します。元のページ全体が交換された場合は古い文書を復活させません。旧 Vector 等では元の構造を保ち、外観調整だけを適用します。
+記事閲覧 (`ns-0` / `action-view`) 時だけ適用します。`readableLayout` は Vector 2022 と必要な標準ヘッダー・タイトルバー・ツールバーがある文書で、検索を含む上部バー、目次の左列、記事ヒーロー、本文、基本情報カード、帰属フッターへ構造を組み直します。記事ヒーローは `#content` の grid で「題名 → 説明（`shortdescription`、独自ノードは説明文だけ）→ 閲覧／編集／履歴などのツールバーと言語ボタンの1行」と並べます。題名バー（`.vector-page-titlebar`）は DOM を動かさず `display: contents` にして、`#firstHeading` と言語ボタンを grid の区画へ置きます（言語メニューの初期化・ULS 無効時のフォールバック・固定ヘッダーの交差判定は `#firstHeading` を見るため影響しません）。ツールバーも `#content` 直下のまま CSS で並べ替えるだけで、記事操作の折りたたみは持ちません。Wikipedia の実ノードを移すため、検索・言語切替・編集・履歴・本文の ID やイベントを保持します。移動前の位置へコメントを挿入し、解除時に逆順で戻します。独自ラッパー内のサイト所有ノードは ID に依存せず復元し、サイトが差し替えたノードも保持します。元のページ全体が交換された場合は古い文書を復活させません。旧 Vector 等では元の構造を保ち、外観調整だけを適用します。
 
-記事操作と基本情報は `details` で折りたたみます。基本情報は冒頭の説明の後に本文全幅のブロックで置き、画面幅にかかわらず最初は閉じます。本文へ回り込ませず、開閉状態はリサイズで変更しません。初期 URL と文書内リンクが閉じた領域を指す場合は開き、印刷時も内容を展開して帰属とともに印刷します。独自目次を OFF にした場合は標準目次を表示し、固定した標準メニューも保持します。編集の URL・要素・`html` の VisualEditor クラスは文書全体の監視で検出し、編集開始時に元へ戻し、閲覧復帰時に再構成します。リンクのクリックだけで編集待機状態は作りません。固定目次・脚注本文カード・読込済み画像の拡大は追加 UI とし、記事プレビューは Wikipedia の標準カードを調整します。独自 fetch・外部ビューアー・別サイト転送はありません。OFF・対象外遷移・context 失効時には追加 UI とスタイルを撤去します。
+基本情報は `details` のカードです（前述）。初期 URL と文書内リンクが閉じた領域を指す場合は開き、印刷時も内容を展開して帰属とともに印刷します。独自目次を OFF にした場合は標準目次を表示し、固定した標準メニューも保持します。編集の URL・要素・`html` の VisualEditor クラスは文書全体の監視で検出し、編集開始時に元へ戻し、閲覧復帰時に再構成します。リンクのクリックだけで編集待機状態は作りません。固定目次・脚注本文カード・読込済み画像の拡大は追加 UI とし、記事プレビューは Wikipedia の標準カードを調整します。独自 fetch・外部ビューアー・別サイト転送はありません。OFF・対象外遷移・context 失効時には追加 UI とスタイルを撤去します。
 
 画像は読込済みの要素から表示用 canvas へ描画し、再取得・画素の読出し・保存を行いません。`scripts/verify-wikipedia.js` は実際の拡張ポップアップから設定配信と復元を確認する E2E です。未使用の専用絶対パスを `VUORA_BROWSER_TEST_DIR` に指定し、`bun test ./scripts/verify-wikipedia.js` で実行します。`VUORA_LIVE_WIKIPEDIA=1` を指定すると日本語・英語 Wikipedia の実記事の確認も追加します。画像と専用プロファイルは指定先へ保存するため、終了後は必要な画像だけ保持してプロファイルを清掃します。
 

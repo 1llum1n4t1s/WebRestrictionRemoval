@@ -376,21 +376,26 @@
           if (items.length === 0 || items.length > 15) return;
           // 各 li 内にユーザープロフィールリンク（`/<username>/` 形式）があるかカウント
           let userLinkCount = 0;
-          let confirmedCommentCount = 0;
+          let allConfirmedComments = true;
           for (const li of items) {
+            // 全項目がコメント固有 permalink を持つことが採用条件なので、満たさない項目が
+            // 見つかった時点で結果（不採用）は確定する。残りの項目は走査しない。
+            if (!isConfirmedCommentItem(li)) {
+              allConfirmedComments = false;
+              break;
+            }
             const link = li.querySelector("a[href^='/']");
             const href = link?.getAttribute("href") ?? "";
             // `/<username>/` または `/<username>` の短い英数記号パスのみマッチ
             if (/^\/[\w.]{1,30}\/?($|\?)/.test(href)) {
               userLinkCount++;
             }
-            if (isConfirmedCommentItem(li)) confirmedCommentCount++;
           }
           // 全項目にコメント固有 permalink があり、80% 以上が user link を持つ UL だけを扱う。
           // caption とコメントが同居する `_a9z6` は caption に permalink が無いため通らない。
           if (
             !ul.classList.contains("_a9z6") &&
-            confirmedCommentCount === items.length &&
+            allConfirmedComments &&
             userLinkCount / items.length >= 0.8
           ) {
             ul.classList.add(InstagramCleaner.COMMENT_LIST_CLASS);
@@ -433,15 +438,11 @@
           const len = children.length;
           if (len < 2 || len > 50) return;
           // `_a9z6` は caption とコメントの混在リスト。その祖先と article を内包する wrapper も対象外。
-          if (
-            container.classList.contains("_a9z6") ||
-            container.querySelector("._a9z6") ||
-            container.querySelector("article") ||
-            container.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
-          ) return;
+          if (container.classList.contains("_a9z6")) return;
           let userLinkCount = 0;
           let confirmedCommentCount = 0;
           let loaderCount = 0;
+          let allChildrenAccounted = true;
           const handles = new Set();
           const publicCommentIds = new Set();
           for (const child of children) {
@@ -456,16 +457,26 @@
               userLinkCount++;
               handles.add(m[1]);
             }
+            let confirmed = false;
             if (publicShortcode) {
               const commentId = getPublicCommentId(child, publicShortcode);
               if (commentId !== null) {
-                confirmedCommentCount++;
+                confirmed = true;
                 publicCommentIds.add(commentId);
               }
-            } else if (isConfirmedCommentItem(child)) {
-              confirmedCommentCount++;
+            } else {
+              confirmed = isConfirmedCommentItem(child);
             }
+            if (!confirmed) {
+              // 採用条件は「全ての子がコメント（公開詳細では空の loading 専用子を含む）」なので、
+              // そうでない子が見つかった時点で不採用が確定する。残りの子と、部分木全体を探す
+              // 下の除外判定は省く（候補 div は大量にあり、大半は最初の子で落ちる）。
+              allChildrenAccounted = false;
+              break;
+            }
+            confirmedCommentCount++;
           }
+          if (!allChildrenAccounted) return;
           // 公開詳細では空の loading 専用子だけを除外し、コメント自体は最低 2 件必要。
           // 全コメントが comment permalink time + 70% 以上 user link。
           // 公開詳細は各直系項目を別コメント ID で裏付け、他の経路は handle 2 種類以上を維持する。
@@ -476,6 +487,13 @@
             userLinkCount / (len - loaderCount) >= 0.7 &&
             (publicShortcode ? publicCommentIds.size === confirmedCommentCount : handles.size >= 2)
           ) {
+            // 投稿本文を含む `_a9z6`・article・既にマーク済みのコメントリストを内包する wrapper は対象外。
+            // 部分木の検索は高価なので、子の条件を全て満たした候補にだけ行う。
+            if (
+              container.querySelector("._a9z6") ||
+              container.querySelector("article") ||
+              container.querySelector("." + InstagramCleaner.COMMENT_LIST_CLASS)
+            ) return;
             matches.push(container);
           }
         });
@@ -490,6 +508,10 @@
       // 一部 SubFrame で querySelector が例外を投げるケースをサイレントスキップ
     }
   }
+
+  // 数値ボタンごとに「最後に判定した textContent」を持つ。DOM に印を増やさず、ボタンが破棄されれば
+  // 自動的に解放されるよう WeakMap にする。
+  const counterButtonText = new WeakMap();
 
   /**
    * 「数値表示」要素にマーカークラス `__cpa-ig-hide-counter` を付ける（CSS 側で `display:none`）。
@@ -507,28 +529,31 @@
    *   - スコープを `<article>` または `<header>` 配下に限定して誤マッチを抑制
    *   - `<span>` は直系子 ≤1 に限定して wrapper span を除外
    *   - テキスト長 ≤30 文字に限定
-   *   - 既処理は `:not()` で除外して 300ms 再走査コストも削減
+   *   - (1) は文字列が変わっていない確認済みボタンの再判定を省き、(2) は処理済みを `:not()` で除外して
+   *     300ms 再走査コストを抑える
    */
   function markCounterButtons() {
     try {
       // (1) フィード `<article>` 内の数値ボタン（いいね数 / 再生回数等）
+      // 数値は hydration や更新で後から入る・変わるため、最初に確認した文字列で判定を固定しない。
+      // 確認済みの印（VANITY_CHECKED_CLASS）と、確認時の文字列（WeakMap）が両方一致するボタンだけ
+      // 再判定を省く。印はマーカー撤去（cleanupMarkers）で外れるので、ON し直せば再判定される。
+      // 判定結果は現在の文字列に追従させ、数値でなくなったボタンは隠さない状態へ戻す。
       document
-        .querySelectorAll(
-          "article button:not(." +
-            InstagramCleaner.VANITY_HIDE_CLASS +
-            "):not(." +
-            InstagramCleaner.VANITY_CHECKED_CLASS +
-            ")"
-        )
+        .querySelectorAll("article button")
         .forEach((btn) => {
-          const text = (btn.textContent ?? "").trim();
+          const raw = btn.textContent ?? "";
+          if (counterButtonText.get(btn) === raw &&
+              btn.classList.contains(InstagramCleaner.VANITY_CHECKED_CLASS)) return;
+          counterButtonText.set(btn, raw);
           btn.classList.add(InstagramCleaner.VANITY_CHECKED_CLASS);
-          if (!text || text.length > 30) return;
+          const text = raw.trim();
           // 純粋な数値表現（カンマ・小数点・空白 + 末尾の単位）にマッチするか
           // 例: "1,234" / "567" / "1.2k" / "10万" / "5 億"
-          if (/^\d[\d,.\s]*(?:k|m|b|億|万|千|t)?$/i.test(text)) {
-            btn.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
-          }
+          const isCounter = !!text && text.length <= 30 &&
+            /^\d[\d,.\s]*(?:k|m|b|億|万|千|t)?$/i.test(text);
+          if (isCounter) btn.classList.add(InstagramCleaner.VANITY_HIDE_CLASS);
+          else btn.classList.remove(InstagramCleaner.VANITY_HIDE_CLASS);
         });
 
       // (2) プロフィールヘッダの「投稿XXX件」「フォロワーXXX人」「フォロー中XXX人」
