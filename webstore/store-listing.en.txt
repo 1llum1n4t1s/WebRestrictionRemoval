@@ -78,7 +78,7 @@ Vuora brings 13 everyday browsing aids together in one popup. Twelve of them can
 ■ How to use
 
 1. Click the toolbar icon to open the popup.
-2. Choose a section from the menu at the top (Tune / YouTube / X / Instagram / TikTok / Wikipedia / Color Picker / Settings).
+2. Choose the section you want from the menu at the top.
 3. Use the switches, sliders and selectors in each section. Changes are saved automatically and take effect right away.
 
 Volume Booster, Video Gamma, black-bar removal, Loupe and the three Amazon features are under Tune. The popup remembers the last section you opened.
