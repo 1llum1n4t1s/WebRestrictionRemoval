@@ -17,13 +17,13 @@ Vuora brings 13 everyday browsing aids together in one popup. Twelve of them can
 ■ Main features
 
 · 📺 YouTube Enhancements (OFF by default)
-  38 sub-features, each with its own switch.
+  40 sub-features, each with its own switch.
   Video filters: hide playlists / mixes / individual Shorts / Shorts shelves / live, premiere and station items / members-only videos / already-watched videos / recommendation sections on Home. A channel blocklist removes chosen channels across YouTube, and you can hide "Most relevant" in Subscriptions and videos from channels outside your country.
   Search results: hide video shelves, card lists, courses, channel intro cards, Shorts carousels, related-search blocks and the Shorts filter chip; hide verified-channel, artist-channel or chapter videos; grey out results that don't contain your search terms; outline thumbnails; show results as a grid.
-  Watch page: hide comments and live chat, show the original broadcast time on stream archives, live latency control (choose how to catch up and which live stats to show), quality / playback speed (0.25x–2x) / player volume selectors, and redirect Shorts URLs to the regular watch page.
+  Watch page: hide comments and live chat, show the original broadcast time on stream archives, live latency control (choose how to catch up and which live stats to show), quality / playback speed (0.25x–2x) / player volume selectors, and redirect Shorts URLs to the regular watch page. A "Reverse" button in the playlist panel plays playlists saved backwards (Part 10 → Part 1) from the last video forward, including next, previous and autoplay. For streams that show the game in part of the frame, drag over the game screen to zoom the player to just that area (saved per channel on your device).
   Menus & layout: hide the Shorts sidebar entry, show all subscriptions in the left menu, add an "All subscriptions" shortcut, turn the subscriptions page into a searchable grid, and lay out Home and feeds as an even grid (with selectable column count).
   Integrations: add the current video, search results, playlists or channel videos as sources to Gemini Notebook in your own Google account.
-  Quality, speed, volume, live stats and broadcast time sit in one row of compact chips just above the control bar, so they barely cover the video. Everything else opens from a gear button and can be changed during playback. You can assign keyboard shortcuts for quality, speed and volume in your browser's extension shortcut settings.
+  Quality, speed, volume, live stats, game-screen zoom and broadcast time sit in one row of compact chips just above the control bar, so they barely cover the video. Everything else opens from a gear button and can be changed during playback. You can assign keyboard shortcuts for quality, speed and volume in your browser's extension shortcut settings.
 
 · 🐦 X Cleaner (OFF by default)
   10 sub-features to calm down X (formerly Twitter).
@@ -84,11 +84,11 @@ Vuora brings 13 everyday browsing aids together in one popup. Twelve of them can
 Volume Booster, Video Gamma, black-bar removal, Loupe and the three Amazon features are under Tune. The popup remembers the last section you opened.
 
 ■ Save and load settings
-Under Settings you can sync settings across PCs through your browser's sync service and export or import them as a JSON file. Backups include all feature settings, the equalizer, blocked channels, color history and the selected section, and can be moved to another PC or between Chrome and Firefox. Sync on/off, the Gemini Notebook account, sign-in details, caches and on-page positions stay on each device. The popup is available in Japanese and English, with light and dark themes.
+Under Settings you can sync settings across PCs through your browser's sync service and export or import them as a JSON file. Backups include all feature settings, the equalizer, blocked channels, color history and the selected section, and can be moved to another PC or between Chrome and Firefox. Sync on/off, the Gemini Notebook account, sign-in details, caches and on-page positions stay on each device. The interface is available in 9 languages (English, Japanese, Simplified and Traditional Chinese, Korean, Spanish, French, German and Brazilian Portuguese). It follows your browser's language, and you can also choose one next to the popup title. Light and dark themes are supported.
 
 ■ Privacy
 
-· Settings are normally stored on your device. Only if you turn on settings sync are eligible settings shared through your browser's sync service.
+· Settings are normally stored on your device. Only if you turn on settings sync are eligible settings shared through your browser's sync service. Game-screen zoom areas and the chosen display language stay on your device and are not synced.
 · Page content and tab audio are not collected or sent for advertising, analytics or telemetry. Volume Booster only amplifies and plays back audio; nothing is recorded, saved or sent.
 · Network access is limited to what the features you use or enable need:
   - Instagram / TikTok / X image saving: images are fetched from each service's image servers only when you click the save button (no cookies or referrer are sent)
