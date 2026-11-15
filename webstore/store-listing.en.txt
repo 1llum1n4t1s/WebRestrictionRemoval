@@ -12,93 +12,92 @@ Vuora
 A Chrome extension that locally tunes the readability, audio, and continuity of the page you are viewing.
 
 ■ Description (under 16,000 chars)
-An extension that consolidates 13 categories of viewing aids — plus a shared sub-feature (image download button on Instagram / TikTok / X) — into a single popup, all designed for comfortable everyday browsing.
-
-📖 Wikipedia reading settings (opt-in, default OFF)
-Adjust article width, typeface, text size, and colors on Wikipedia. Includes sticky contents, enlargement of loaded images, and in-page reference previews. Styles Wikipedia’s standard article previews when enabled on Wikipedia. Article text, editing links, and attribution remain available. No external viewer, redirects, or new article fetches.
+Vuora brings 13 everyday browsing aids together in one popup. Twelve of them can be switched on and off individually, and all twelve start OFF, so only the features you choose ever touch a page. The Color Picker is always available.
 
 ■ Main features
 
-· 📺 YouTube cleanup (opt-in, default OFF)
-  Hides / removes Shorts from the sidebar / shelves / search results, and redirects /shorts/<id> URLs to /watch?v=<id>.
-  YouTube Enhancements offers 38 fine-grained sub-features (search-result noise, filter-by-video-attribute, highlight, watch-page layout including comment & live-chat hiding, grid columns, subscriptions enhancements, hiding "Most relevant" in Subscriptions, live-latency reduction, and quality / playback-speed / player-volume selectors).
-  Quality, volume, and playback speed appear in one row of selectors when enabled. Playback speeds range from 0.25x to 2x. Selectors, live indicators, and archive broadcast time sit in compact chips just above the control bar, so they barely cover the video. Other settings open in a panel from the gear button: general settings use two columns and live-latency settings use a full-width section (one column on narrow players). Assign shortcuts in your browser's extension settings.
+· 📺 YouTube Enhancements (OFF by default)
+  38 sub-features, each with its own switch.
+  Video filters: hide playlists / mixes / individual Shorts / Shorts shelves / live, premiere and station items / members-only videos / already-watched videos / recommendation sections on Home. A channel blocklist removes chosen channels across YouTube, and you can hide "Most relevant" in Subscriptions and videos from channels outside your country.
+  Search results: hide video shelves, card lists, courses, channel intro cards, Shorts carousels, related-search blocks and the Shorts filter chip; hide verified-channel, artist-channel or chapter videos; grey out results that don't contain your search terms; outline thumbnails; show results as a grid.
+  Watch page: hide comments and live chat, show the original broadcast time on stream archives, live latency control (choose how to catch up and which live stats to show), quality / playback speed (0.25x–2x) / player volume selectors, and redirect Shorts URLs to the regular watch page.
+  Menus & layout: hide the Shorts sidebar entry, show all subscriptions in the left menu, add an "All subscriptions" shortcut, turn the subscriptions page into a searchable grid, and lay out Home and feeds as an even grid (with selectable column count).
+  Integrations: add the current video, search results, playlists or channel videos as sources to Gemini Notebook in your own Google account.
+  Quality, speed, volume, live stats and broadcast time sit in one row of compact chips just above the control bar, so they barely cover the video. Everything else opens from a gear button and can be changed during playback. You can assign keyboard shortcuts for quality, speed and volume in your browser's extension shortcut settings.
 
-· 🐦 X cleaner (opt-in, default OFF)
-  Ten sub-features to hide distracting UI and save post images on X (formerly Twitter). Enable image download under Extras to save post images in original quality using the button shown on hover.
-  Layout: hide the right pane (widening the timeline into it) / trends / who to follow / messages dock
-  Noise: hide promoted posts / Premium upsells / Grok / engagement counts (reply, repost, like, views)
+· 🐦 X Cleaner (OFF by default)
+  10 sub-features to calm down X (formerly Twitter).
+  Layout: hide the right pane (the timeline widens into the freed space) / trends / who to follow / the messages dock
+  Noise: hide promoted posts / Premium upsells / Grok / engagement counts (replies, reposts, likes, views)
   Timeline: open Home on the "Following" tab
-  * Selectors are structural data-testid matches only, so they do not depend on the display language.
-  * Image downloads request HTTPS pbs.twimg.com/media/ only on click, with name=orig, image format, image path and IP address. No cookies or referrer are sent; redirects are rejected.
+  Extras: hover a post image to show a save button and download it in original quality
 
-· 📦 Amazon Subscribe & Save monthly total (opt-in, default OFF)
-  On https://www.amazon.co.jp/auto-deliveries, retrieves missing prices from Amazon and shows unit price × quantity totals in the list. When delivery prices are missing, current prices or previous delivery unit prices are used to show a reference total. The billed amount may change and coupons are not included. No partial total is shown unless all items are available. Legacy monthly pages remain supported.
+· 📷 Instagram Cleaner (OFF by default)
+  12 sub-features to trim clutter and add video controls.
+  Main: remove Reels (including URL redirects) / remove Explore / hide the Stories tray on Home / send Stories URLs back to Home / hide Threads promotion
+  Extras: hide like and follower counts / stop videos in posts from autoplaying / hide comments / hide Notes / hide the unread DM badge / add a seek bar to videos (Space toggles playback while enabled) / add a save button to post photos
 
-· 🏆 Amazon jump-to-ranking button (opt-in, default OFF)
-  The "Amazon Bestsellers Rank" links in a product's detail section appear in different positions on every page, making them hard to find. This consolidates a single "Go to this product's ranking" button at the top of the product info; clicking it navigates (same tab) to the most specific subcategory ranking. It only scans the bestsellers links inside the product-detail containers, so the button appears only on product pages that have a ranking link.
-  ※ Pure DOM manipulation; no price/history reading or external transmission.
+· 🎵 TikTok Cleaner (OFF by default)
+  3 sub-features: hide comments / hide suggested accounts / add a save button to post images.
 
-· 📦 Amazon seller / shipper badge (opt-in, default OFF)
-  Extracts the seller and shipper from Amazon's hidden divs (#merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div) and shows them as a non-clickable info badge ("📦 Sold: XXX / Ships: YYY") at the top of the product info, right next to the jump-to-ranking button. **Amazon-fulfilled and marketplace listings are visually distinguished** (Amazon-fulfilled = green badge / marketplace = orange warning badge), making it easy to spot suspicious marketplace listings at a glance. The detection uses Amazon's own isInternal flag (embedded JSON in the <script> inside #merchantInfoFeature_feature_div) as the primary signal, with the seller name as a fallback.
-  ※ Pure DOM manipulation; no price/history reading or external transmission.
+· 📖 Wikipedia reading settings (OFF by default)
+  Rebuilds Wikipedia articles around search, contents, the article and its info box, and lets you adjust colors, body and heading typefaces, text size, line spacing, article width, link style and how much of the article to show (full / text and images / text only). Seven Japanese typefaces are bundled, so no fonts are downloaded from outside.
+  Sub-features: modern article layout / sticky contents / image viewer / link and reference previews / hide the Appearance panel / keep the article within a set width
+  Article text, editing links and attribution stay in place, and nothing is redirected or fetched from elsewhere. Turning it off restores the original page.
 
-· 📷 Instagram cleaner (opt-in, default OFF)
-  Organizes Instagram UI and adds video controls through 12 sub-features.
-  Main: Remove Reels (with URL redirect) / Remove Explore / Hide Stories tray / Stories URL → home / Hide Threads promotion
-  Extras: Hide vanity counts / Block videos in posts / Hide comments / Hide Notes / Hide unread DM badge / Video seek bar (Space toggles playback while enabled) / Image download button
-  ※ Client-side DOM and CSS only; nothing is transmitted externally.
+· 📦 Amazon Subscribe & Save monthly total (OFF by default)
+  Shows a per-month total (unit price × quantity) on the Subscribe & Save management page of amazon.co.jp. When a price isn't listed, the current Subscribe & Save price is retrieved from Amazon, falling back to the previous delivery's unit price for a reference total. Billed amounts may change and coupons aren't included. No partial total is shown unless every item's price is available.
 
-· 🎵 TikTok cleaner (opt-in, default OFF)
-  Hides TikTok's redundant UI through 3 sub-features.
-  Main: Hide comments / Hide suggested accounts / Image download button
-  ※ For direct photo / video URL access, the entire right panel is hidden; in the modal viewer (Browser Mode) only the comment list is hidden, preserving the profile.
-  ※ Client-side DOM and CSS only; nothing is transmitted externally.
+· 🏆 Amazon jump-to-ranking button (OFF by default)
+  Bestseller rank links sit in a different spot on every product page. This gathers them into one button at the top of the product info that takes you to the most specific subcategory ranking.
 
-· 🔊 Volume Booster (opt-in, default OFF)
-  Amplifies the active tab's volume from 0% to 300%. Turn the master toggle ON to enable the slider; the settings (gain value, sub-toggles, mute, equalizer) are persisted globally. The Volume Booster uses chrome.tabCapture + an offscreen document and works uniformly on all sites regardless of URL (including EME-protected video such as Netflix / Prime Video). Boost starts the moment you open the popup on the active tab (chrome.tabCapture requires a user gesture, so opening the popup serves as that gesture). It uses a chain — "preamp GainNode → 10-band peaking BiquadFilterNode → Night-Mode compression (DynamicsCompressor) → manual GainNode for amplification → Wall-Thump Guard (highpass BiquadFilterNode cutting bass) → Auto Distortion Guard / limiter (DynamicsCompressor)" — which follows a mastering-order EQ → compression → make-up gain → bass cut → limiter layout. The sub-features (Auto Distortion Guard / Night Mode / Wall-Thump Guard / Equalizer) all default to OFF.
-  The slider uses a logarithmic mapping over the 100..300% range so equal distance equals equal dB; gain changes are smoothed with a 45 ms ramp to suppress clicks. A mute 🔊/🔇 button sits at the left edge of the slider so you can silence the tab with one click while preserving the slider value and sub-toggle settings, and restore the original volume instantly with another click (this is an independent layer from Chrome's native tab mute). The 10-band graphic equalizer covers 32 / 64 / 125 / 250 / 500 / 1K / 2K / 4K / 8K / 16K Hz with ±12 dB per band, plus a preamp (overall ±12 dB) and presets (Flat / Bass Boost / Treble Boost / Vocal / Loudness / Custom — switches to Custom automatically on manual adjustment). Even at 100%, if any of Auto Distortion Guard / Night Mode / Wall-Thump Guard / mute / Equalizer is ON, the AudioContext is preserved so use cases like "leave the volume alone but tame sudden peaks", "tame loud night-time scenes", "cut only the bass to stop wall thumps", "instant silence at 100%", or "apply EQ only at 100%" still work. On tab switch, only tabs already being boosted are auto-reapplied; new tabs are applied once you open the popup and operate it.
-  ※ Master OFF / slider 100% with all sub-toggles, mute, and EQ OFF / tab closed / Extension disabled — any of these instantly releases the AudioContext and frees resources.
-  ※ No recording, storage, or external transmission whatsoever.
+· 📦 Amazon seller / shipper badge (OFF by default)
+  Reads the seller and shipper from the product page and shows them as a "Sold by / Ships from" badge at the top of the product info, green for items sold by Amazon and orange for marketplace sellers, so you can check who you're buying from at a glance.
 
-· 🎞️ Video Gamma (opt-in, default OFF)
-  Applies gamma correction to <video> elements on the page using SVG <feComponentTransfer type="gamma">. Master toggle + slider; the slider center (1.0) means no correction, left is darker (max 3.0), right is brighter (min 0.3). The setting is shared across tabs, and <video> elements inside iframes (e.g. YouTube embeds) also receive the same correction via all_frames: true.
-  ※ Video data is not read, recorded, or transmitted; the feature only attaches an SVG filter, fully client-side.
+· 🔊 Volume Booster (OFF by default)
+  Adjusts tab volume from 0% to 300%. It applies to the tab where you open the popup, and is automatically reapplied when you switch back to a tab that is already boosted. Works on any site.
+  · Auto Distortion Guard: tames sudden peaks to reduce clipping when boosting
+  · Night Mode: gently compresses loud voices and explosions so quiet sounds aren't buried
+  · Wall-Thump Guard: cuts deep bass that carries through walls and floors
+  · 10-band equalizer: ±12 dB per band from 32 Hz to 16 kHz, with a preamp and 9 presets (switches to Custom when you adjust it yourself)
+  · Mute button: silence and restore in one click while keeping your settings
+  These options also work at 100% volume. Audio processing is released as soon as it's no longer needed.
 
-· 🖥️ Remove video black bars (opt-in, default OFF)
-  Removes the letterbox/pillarbox black bars seen on ultrawide monitors by Zoom (aspect-preserving crop) or Stretch (expand only the deficient axis) to fill the screen. Master toggle + display-mode selection + target-monitor preset; the video's aspect ratio is auto-detected from videoWidth / videoHeight. Shared across tabs, and <video> inside iframes also receive the same treatment via all_frames: true.
-  ※ Video data is not read, recorded, or transmitted; the feature only applies a CSS transform, fully client-side.
+· 🎞️ Video Gamma (OFF by default)
+  Applies gamma correction to videos on the page. The slider's center (1.0) means no correction; move right to lift shadows and brighten, or left to add contrast and darken (range 0.3–3.0). One setting covers all tabs, including embedded videos.
 
-· 🔍 Loupe (opt-in, default OFF)
-  A circular magnifier that follows the mouse cursor. When the master toggle is ON, the active tab is captured as a JPEG snapshot via chrome.tabs.captureVisibleTab, attached as the background-image of a circular position: fixed lens (clip-path: circle()), and the background-position is updated at 60 fps with rAF coalescing on mousemove to magnify the area under the cursor. Because the captured pixels include video / iframe / canvas content, this is ideal for "pause a video and inspect fine details". Zoom is selected from 1.5× / 2.5× / 4× in the popup segment control; the lens diameter is adjustable 150–1000 px via a slider. Left-clicking the page while the lens is showing removes it instantly and flips the master toggle OFF. Re-capture is triggered automatically on initial activation / scroll (500 ms debounced) / large DOM changes (MutationObserver) / window resize.
-  ※ The captured JPEG is converted to a Blob URL referenced only by the content script DOM, and is released via URL.revokeObjectURL on OFF. No recording, storage, or external transmission.
+· 🖥️ Remove video black bars (OFF by default)
+  Removes letterbox and pillarbox bars on ultrawide and other monitors by zooming (keeping the aspect ratio) or stretching the video to fill the screen. Pick your monitor's aspect ratio or resolution, and each video's shape is detected automatically.
+
+· 🔍 Loupe (OFF by default)
+  A circular magnifier that follows your cursor. It magnifies a snapshot of the current view, so you can inspect the details of a paused video too. Choose 1.5x, 2.5x or 4x zoom and a lens diameter of 150–1000 px. Left-click the page to turn it off.
 
 · 🎨 Color Picker (always available)
-  The "Color Picker" tab in the popup uses the EyeDropper API to pick a color from anywhere on screen and copy it to the clipboard in HEX / RGB / HSL. Whether to include "#" in HEX is individually toggleable. Picked colors are kept on the device only as a specimen box (history) of up to 20 entries.
-  ※ Nothing is recorded, stored, or transmitted; everything happens inside the popup.
+  Pick any color on screen with the eyedropper and copy it to the clipboard as HEX, RGB or HSL. You can also paste a color code to add it. Up to 20 picked colors are kept as history on your device.
 
 ■ How to use
 
 1. Click the toolbar icon to open the popup.
-2. Pick the feature you want via the popup's tab bar (Tune / YouTube / X / Instagram / TikTok / Color Picker / Settings).
-3. Toggle on/off and tweak values via toggles and sliders inside each tab (auto-saved).
-4. For Volume Booster and Video Gamma, drag the sliders directly.
-5. On the "Color Picker" tab, trigger EyeDropper to pick a color from the screen.
+2. Choose a section from the menu at the top (Tune / YouTube / X / Instagram / TikTok / Wikipedia / Color Picker / Settings).
+3. Use the switches, sliders and selectors in each section. Changes are saved automatically and take effect right away.
 
-Settings are auto-saved and restored on next launch.
+Volume Booster, Video Gamma, black-bar removal, Loupe and the three Amazon features are under Tune. The popup remembers the last section you opened.
 
 ■ Save and load settings
-The "07 Settings" tab brings together browser settings sync and JSON export/import. Save all feature settings, EQ, blocked channels, color history and selected tabs, and transfer them to another PC or between Chrome and Firefox. Sync on/off, destination accounts, authentication, caches and on-site overlay positions remain device-specific. Imported feature settings also sync when sync is on. The popup has a refreshed, calmer design in Japanese and English, with light and dark themes.
+Under Settings you can sync settings across PCs through your browser's sync service and export or import them as a JSON file. Backups include all feature settings, the equalizer, blocked channels, color history and the selected section, and can be moved to another PC or between Chrome and Firefox. Sync on/off, the Gemini Notebook account, sign-in details, caches and on-page positions stay on each device. The popup is available in Japanese and English, with light and dark themes.
 
 ■ Privacy
 
-· Settings are stored on your device (chrome.storage.local). Optional settings sync shares eligible settings through the browser's sync service.
-· Page content and tab audio are not collected or transmitted for advertising, analytics, or telemetry.
-· Only when you submit the optional contact form are your email address, optional name, inquiry content, verification code, and related support details sent to Kagayoi Support.
-· Other external communication is limited to user-initiated or opt-in Instagram / TikTok / X image retrieval, sending video URLs to Gemini Notebook, browser settings sync, subscription channel thumbnails, and Amazon Subscribe & Save price retrieval.
-· Amazon price retrieval runs only while the feature is ON, using read-only requests with Amazon authentication cookies to the same https://www.amazon.co.jp origin. Amazon receives delivery, subscription, history, and order identifiers, product URLs, and your IP address. Orders and deliveries are not changed, and nothing is sent to the developer's server. Results stay only in page memory; turning the feature OFF or navigating away cancels requests and discards results.
-  (When both the cleaner master toggle and the Instagram / TikTok / X image download option are ON, an image GET is issued against each site's official CDN (*.cdninstagram.com / scontent-*.fna.fbcdn.net / *.tiktokcdn.com / *.tiktokcdn-us.com / HTTPS pbs.twimg.com/media/) only at the moment the user clicks. credentials:omit + redirect:manual + referrerPolicy:no-referrer block cross-origin auth-info transmission, and a hostname allowlist blocks proxy fetches to any other origin.)
-· While Volume Booster is in use, tab audio data is only amplified and re-output through an AudioContext; no recording, storage, or external transmission is performed.
+· Settings are normally stored on your device. Only if you turn on settings sync are eligible settings shared through your browser's sync service.
+· Page content and tab audio are not collected or sent for advertising, analytics or telemetry. Volume Booster only amplifies and plays back audio; nothing is recorded, saved or sent.
+· Network access is limited to what the features you use or enable need:
+  - Instagram / TikTok / X image saving: images are fetched from each service's image servers only when you click the save button (no cookies or referrer are sent)
+  - YouTube Enhancements: only while hiding channels from other countries, showing all subscriptions, the subscriptions grid or broadcast time is on, related YouTube pages (channel about pages, the subscriptions list, watch pages) and thumbnail images are fetched
+  - Send to Gemini Notebook: only when the sub-feature is on and you use the send panel, the extension talks to Gemini Notebook with your signed-in Google account to check the destination and add URLs such as videos
+  - Amazon Subscribe & Save monthly total: only while it's on, prices are read from amazon.co.jp. Orders and deliveries are never changed, and results stay within the page
+  - Settings sync: uses your browser's sync service only when turned on
+  - Contact: what you enter is sent to Kagayoi Support only when you submit the form
+· Browsing data is never sent to the developer's servers.
 
 ■ Category
 Productivity → Tools
@@ -134,61 +133,41 @@ English, Japanese
 Yes
 
 ■ Single-purpose description
-To tune the readability, audio, and continuity of the page you are viewing, using only local settings the user chose.
+To tune the readability, audio, and ease of work of the page you are viewing, according to the settings the user chose.
 
 ■ Data-use disclosure
 
-  · Do you collect personally identifiable information?
-    No
+  · Data types collected (checked):
+    - Personally identifiable information
+    - Authentication information
+    - Personal communications
+        Only when the user submits the contact form: the email address, optional name, subject, message, and email verification code entered are handled by Kagayoi Support. Browsing data is never sent to the developer's servers.
 
-  · How do you handle user data?
-    - Sale of user data: No
-    - Using or transferring user data for purposes unrelated to the original purpose: No
-    - Using or transferring user data for creditworthiness assessment or lending: No
+  · Data types not collected:
+    Health information, Financial and payment information, Location, Web history, User activity, Website content
 
-■ Permission justifications (concise, ~40–60 chars)
+  · How do you handle user data? (all three checked)
+    - Selling user data: No (I do not sell or transfer user data to third parties, outside of the approved use cases)
+    - Using or transferring user data for purposes unrelated to the item's single purpose: No (I do not use or transfer user data for purposes that are unrelated to my item's single purpose)
+    - Using or transferring user data to determine creditworthiness or for lending: No (I do not use or transfer user data to determine creditworthiness or for lending purposes)
+
+■ Permission justifications
 
   activeTab:
-  Used to apply settings to the current tab from the popup, and to determine the target tab for the Volume Booster.
+  To apply settings to the current tab from the popup, and to determine the target tab for the Volume Booster.
 
   storage:
-  Used to persist feature toggles, slider settings, and color-picker history on the device (chrome.storage.local).
+  To save feature on/off states, slider settings, and the color-picker history on the device (chrome.storage.local). Only when the optional "Sync settings across PCs" is turned on, the eligible settings are also saved to chrome.storage.sync. The color-picker history and sign-in details are not synced.
 
   offscreen:
-  Used to maintain the Volume Booster's AudioContext / GainNode / BiquadFilterNode / DynamicsCompressor chain outside the Service Worker. Tab audio captured via tabCapture is fed into this offscreen document's AudioContext to apply 0–300% amplification, 10-band EQ, and compression.
+  To keep the Volume Booster's audio processing (amplification, 10-band equalizer, and compression with an AudioContext) running outside the Service Worker. Tab audio captured with tabCapture is only processed in this offscreen document and played back again; nothing is recorded, saved, or sent externally.
 
   tabCapture:
-  Used by the Volume Booster to capture tab audio and apply 0–300% amplification, 10-band EQ, and compression via AudioContext. Only the active tab the user operates from the popup is targeted (a user gesture is required), and it works uniformly on all sites regardless of URL (including EME-protected video such as Netflix / Prime Video).
+  For the Volume Booster, to capture the audio of the active tab the user operated from the popup, apply amplification, a 10-band equalizer, and compression, and play it back. It targets only that tab, starting from a user action; audio is never recorded, saved, or sent externally.
 
-  <all_urls> (host permission):
-  Used by the Loupe feature to call chrome.tabs.captureVisibleTab and display the active tab's visible region as a magnified JPEG image in a circular lens. The activeTab permission alone can be revoked early after popup close or SPA internal navigation, blocking the capture. Adding <all_urls> ensures the Loupe runs reliably. The effective access scope is unchanged because content_scripts already inject on all http(s) sites.
+■ Host permission justifications
 
-■ Host-permission justifications
-
-  http://*/* and https://*/*:
-  Required so that three features — Video Gamma, Remove video black bars, and Loupe — can be injected as content scripts on all http(s) sites.
-  (1) Video Gamma: when the master toggle is ON, the Extension injects CSS that applies an SVG filter (url(#__cpa-video-gamma)) to <video> elements, plus an SVG <feComponentTransfer type="gamma"> definition, into <body>. To cover all tabs and all frames (including <video> in iframes), the script runs on http://*/* + https://*/* with all_frames: true.
-  (2) Remove video black bars: when the master toggle is ON, detects each <video>'s aspect ratio and removes top/bottom or left/right bars via CSS transform (all frames; the original inline transform is restored on removal).
-  (3) Loupe: when the master toggle is ON, shows a cursor-following circular magnifier (the magnified image itself is obtained via captureVisibleTab — see <all_urls> below).
-  None of these read, modify, or transmit the page DOM (Video Gamma / Remove video black bars only attach a filter / transform to <video>; they do not read or save video data).
-
-  *://*.youtube.com/*:
-  Required for YouTube Enhancements (38 sub-features including Shorts removal, subscriptions enhancements, live-latency reduction, and quality / speed / volume selectors). Search-result noise removal, watch-page decoration (comment hiding / live-chat collapse), home grid column count, /shorts/<id> → /watch?v=<id> redirect, and the /feed/channels grid view use DOM/CSS operations. Player controls also use YouTube's in-page player API. Nothing read is transmitted off-device.
-
-  *://www.amazon.co.jp/auto-deliveries*:
-  Required to show Amazon recurring-delivery totals. The script reads delivery items and quantities in Manage pages, fills missing unit prices through read-only requests to the same Amazon origin, and inserts a total when all items are accounted for. It hides totals when completeness cannot be confirmed, including on legacy monthly pages. Nothing is sent to the developer server.
-
-  *://www.amazon.co.jp/*:
-  Required for the Amazon jump-to-ranking button + Amazon seller / shipper badge.
-  (1) Jump-to-ranking button: scans only the "Amazon Bestsellers Rank" links (a[href*="bestsellers/"]) inside the product-detail containers and inserts a consolidated button at the top of the product info that links to the most specific subcategory. Self-gates to product pages.
-  (2) Seller / shipper badge: extracts the seller and shipper from #merchantInfoFeature_feature_div / #fulfillerInfoFeature_feature_div hidden divs and shows them as a badge at the top of the product info (Amazon-fulfilled = green badge / marketplace = orange warning badge). The Amazon-fulfilled detection uses Amazon's own isInternal flag (embedded JSON in the <script> inside #merchantInfoFeature_feature_div) as the primary signal, with the seller name as a fallback.
-  Neither feature reads price/history nor transmits anything externally; nothing read is transmitted off-device.
-
-  *://*.instagram.com/*:
-  Required for the Instagram cleaner (12 sub-features). Hides / adds Reels / Explore / Stories tray / Threads promotion / vanity counts / video playback / comment list / Notes / message counters / video seek bar / image download button using semantic selectors based on aria-label / href / role / data-pagelet / SVG path data. URL redirects (e.g. /reels/, /explore/) are also opt-in. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.cdninstagram.com / scontent-*.fna.fbcdn.net), with credentials:omit + redirect:manual blocking third-party transmission. Nothing read is transmitted off-device.
-
-  *://*.tiktok.com/*:
-  Required for the TikTok cleaner (3 sub-features). Comment list / suggested accounts / image download button are implemented via semantic selectors based on data-e2e and [class*="..."]. For direct photo / video URL access the entire right panel is hidden; in the modal viewer (Browser Mode) only the comment list is hidden. Image download issues an image GET only at the moment the user clicks, and only against official CDNs (*.tiktokcdn.com / *.tiktokcdn-us.com). Nothing read is transmitted off-device.
+  Content scripts are injected into all http(s) pages for the features that work on videos on every site (video gamma correction, black-bar removal, and the Loupe). Only while it is on, the Loupe captures the visible area of the current tab as a still image and shows it magnified (nothing is saved or sent externally). In addition, display adjustments for each site are made on YouTube, Amazon.co.jp, Instagram, TikTok, X, and Wikipedia. Only when the user has enabled it, the URL of the chosen YouTube video is sent to Gemini Notebook (notebooklm.google.com), and inquiries the user submits are sent to support.kagayoi.com. Browsing data is never sent to the developer's servers.
 
 ■ Do you use remote code?
 No
