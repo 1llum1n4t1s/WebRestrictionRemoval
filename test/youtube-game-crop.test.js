@@ -7,7 +7,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const context = vm.createContext({ URL });
-for (const file of ["src/lib/actions-core.js", "src/lib/actions.js"]) {
+for (const file of ["src/shared/ui-localizer.js", "src/lib/actions-core.js", "src/lib/actions.js"]) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, "..", file), "utf8"), context, { filename: file });
 }
 const Crop = context.SearchFixer.GAME_CROP;

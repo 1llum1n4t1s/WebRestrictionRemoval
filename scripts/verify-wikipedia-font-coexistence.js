@@ -23,6 +23,8 @@ test("Wikipedia のフォントを Vuora が優先し、OFF で ReplaceFontSelec
   }
   fs.accessSync(path.dirname(output), fs.constants.W_OK);
   fs.mkdirSync(output);
+  // Windows アカウントのロック防止（必須）: 新規プロファイルの空パスワード確認（LogonUser 失敗）を避けるため起動前にシードする。理由は chrome-profile-seed.mjs を参照。
+  (await import("./chrome-profile-seed.mjs")).seedChromeProfile(path.join(output, "profile"));
   const browser = await puppeteer.launch({
     headless: true,
     enableExtensions: [path.resolve(__dirname, ".."), replacementRoot],

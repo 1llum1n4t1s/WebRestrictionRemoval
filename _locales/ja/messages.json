@@ -782,5 +782,7 @@
   },
   "languageAuto": { "message": "自動（ブラウザ）" },
   "languageSelectLabel": { "message": "言語" },
-  "languageSelectTitle": { "message": "言語（開いているページは再読み込みで反映）" }
+  "languageSelectTitle": { "message": "言語（開いているページは再読み込みで反映）" },
+  "kagayoiSupportContact": { "message": "お問い合わせ" },
+  "kagayoiSupportRate": { "message": "評価をお願いします！" }
 }

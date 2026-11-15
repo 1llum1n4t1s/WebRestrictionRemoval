@@ -1695,5 +1695,7 @@
   },
   "languageAuto": { "message": "自動（跟隨瀏覽器）" },
   "languageSelectLabel": { "message": "語言" },
-  "languageSelectTitle": { "message": "語言（已開啟的頁面需重新整理後生效）" }
+  "languageSelectTitle": { "message": "語言（已開啟的頁面需重新整理後生效）" },
+  "kagayoiSupportContact": { "message": "聯絡支援" },
+  "kagayoiSupportRate": { "message": "請為我們評分！" }
 }

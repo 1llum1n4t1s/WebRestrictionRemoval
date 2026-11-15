@@ -1695,5 +1695,7 @@
   },
   "languageAuto": { "message": "自动（跟随浏览器）" },
   "languageSelectLabel": { "message": "语言" },
-  "languageSelectTitle": { "message": "语言（已打开的页面需刷新后生效）" }
+  "languageSelectTitle": { "message": "语言（已打开的页面需刷新后生效）" },
+  "kagayoiSupportContact": { "message": "联系支持" },
+  "kagayoiSupportRate": { "message": "请给我们评分！" }
 }

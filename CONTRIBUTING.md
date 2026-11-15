@@ -28,7 +28,7 @@ bun run deps
 ```bash
 bun --bun run build                # アイコン + スクリーンショット一括生成
 bun --bun run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
-bun --bun run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer)
+bun --bun run generate-screenshots # webstore/store-assets.json → webstore/images/ (vitrina。実拡張を撮影)
 ```
 
 ### テスト・lint
@@ -134,7 +134,7 @@ Popup (src/popup/popup.{html,js,css})
 | `src/popup/` | popup UI |
 | `_locales/{en,ja}/` | i18n (Chrome i18n API) |
 | `test/actions.test.js` | 純粋関数テスト（FEATURES / 公開定数の drift 検知を含む。件数は実行結果を参照） |
-| `webstore/` | ストア申請用 HTML テンプレート / 画像生成 / store-listing テキスト |
+| `webstore/` | ストア掲載画像の設定 (`store-assets.json`)・画像生成キット (`vitrina/`)・store-listing テキスト |
 | `AGENTS.md` | ストア掲載情報の同期・確認コマンド |
 
 ## コーディング規約

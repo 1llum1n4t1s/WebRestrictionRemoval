@@ -146,25 +146,25 @@
     // 販売: XXX
     const sellerEl = panelEl.querySelector(`.${ROOT}__seller`);
     if (sellerEl) {
-      const next = ScanRunner.safeMsg("amazonMerchantInfoSoldBy", "販売") + ": " + seller;
+      const next = ScanRunner.safeMsg("amazonMerchantInfoSoldBy", "Sold") + ": " + seller;
       if (sellerEl.textContent !== next) sellerEl.textContent = next;
     }
 
     // 出荷: YYY
     const shipperEl = panelEl.querySelector(`.${ROOT}__shipper`);
     if (shipperEl) {
-      const next = ScanRunner.safeMsg("amazonMerchantInfoShipsFrom", "出荷") + ": " + shipper;
+      const next = ScanRunner.safeMsg("amazonMerchantInfoShipsFrom", "Ships") + ": " + shipper;
       if (shipperEl.textContent !== next) shipperEl.textContent = next;
     }
 
     // aria-label を「Amazon 直販: 販売 XXX / 出荷 YYY」のような完全形に更新
     const variantLabel =
       variant === "amazon"
-        ? ScanRunner.safeMsg("amazonMerchantInfoAriaAmazon", "Amazon 直販")
+        ? ScanRunner.safeMsg("amazonMerchantInfoAriaAmazon", "Amazon-fulfilled")
         : variant === "marketplace"
-        ? ScanRunner.safeMsg("amazonMerchantInfoAriaMarketplace", "マーケット出品")
-        : ScanRunner.safeMsg("amazonMerchantInfoAriaUnknown", "販売元未確定");
-    const aria = `${variantLabel}: ${ScanRunner.safeMsg("amazonMerchantInfoSoldBy", "販売")} ${seller} / ${ScanRunner.safeMsg("amazonMerchantInfoShipsFrom", "出荷")} ${shipper}`;
+        ? ScanRunner.safeMsg("amazonMerchantInfoAriaMarketplace", "Marketplace listing")
+        : ScanRunner.safeMsg("amazonMerchantInfoAriaUnknown", "Seller unverified");
+    const aria = `${variantLabel}: ${ScanRunner.safeMsg("amazonMerchantInfoSoldBy", "Sold")} ${seller} / ${ScanRunner.safeMsg("amazonMerchantInfoShipsFrom", "Ships")} ${shipper}`;
     if (panelEl.getAttribute("aria-label") !== aria) {
       panelEl.setAttribute("aria-label", aria);
     }

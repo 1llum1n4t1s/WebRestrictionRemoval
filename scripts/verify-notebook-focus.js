@@ -15,6 +15,8 @@ fs.accessSync(path.dirname(output), fs.constants.W_OK);
 fs.mkdirSync(output);
 process.env.TEMP = output; process.env.TMP = output;
 (async () => {
+  // Windows アカウントのロック防止（必須）: 新規プロファイルの空パスワード確認（LogonUser 失敗）を避けるため起動前にシードする。理由は chrome-profile-seed.mjs を参照。
+  (await import("./chrome-profile-seed.mjs")).seedChromeProfile(path.join(output, "profile"));
   const browser = await puppeteer.launch({headless: true, userDataDir: path.join(output, "profile"), args: ["--no-first-run", "--disable-sync", "--disable-background-networking"]});
   try {
     for (const scenario of ["account-error", "new-error", "outside-error", "missing-key"]) {
@@ -39,6 +41,7 @@ process.env.TEMP = output; process.env.TMP = output;
           i18n: {getMessage: () => ""}
         };
       });
+      await page.addScriptTag({path: path.resolve(__dirname, "../src/shared/ui-localizer.js")});
       for (const file of ["actions-core.js", "actions-video.js", "actions-loupe.js", "actions-volume.js", "actions.js", "cleaner-core.js"]) await page.addScriptTag({path: path.resolve(__dirname, "../src/lib", file)});
       await page.addScriptTag({path: path.resolve(__dirname, "../src/content/youtube-notebooklm.js")});
       await page.waitForSelector(".__cpa-nlm-btn");

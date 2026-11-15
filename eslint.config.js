@@ -7,7 +7,7 @@
  * 設計方針:
  * - `src/` の IIFE + globalThis 公開定数を明示列挙 (no-implicit-globals 違反を防ぎつつ、
  *   用途別の actions*.js が公開する定数を読み取り専用 global として承認する)
- * - `scripts/` / `webstore/generate-screenshots.js` は Node ESM/CJS 環境
+ * - `scripts/` は Node ESM/CJS 環境（`webstore/vitrina/` はキット正本の逐語コピーのため対象外）
  * - `test/` は Node 標準 test runner 環境
  */
 
@@ -66,8 +66,7 @@ module.exports = [
       "node_modules/**",
       "dist/**",
       "webstore/images/**",
-      "webstore/popup-render.html",
-      "webstore/popup-shim.js",
+      "webstore/vitrina/**",
       "firefox-build/**",
       "web-ext-artifacts/**",
       "temp/**",
@@ -113,7 +112,6 @@ module.exports = [
     files: [
       "scripts/**/*.mjs",
       "scripts/**/*.js",
-      "webstore/generate-screenshots.js",
     ],
     languageOptions: {
       ecmaVersion: 2022,
@@ -124,15 +122,5 @@ module.exports = [
       },
     },
     rules: COMMON_RULES,
-  },
-  {
-    // Puppeteer の page.evaluate(() => document.fonts.ready) は callback 内がブラウザ context
-    // で動くため、ESLint には外側スコープでも document を許可しておく必要がある
-    files: ["webstore/generate-screenshots.js"],
-    languageOptions: {
-      globals: {
-        document: "readonly",
-      },
-    },
   },
 ];

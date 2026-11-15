@@ -372,7 +372,7 @@
     // 通常のフォームを含むポップオーバー。menu の項目・キー操作契約を宣言しない。
     panelEl.id = PANEL_CLASS;
     panelEl.setAttribute("role", "group");
-    panelEl.setAttribute("aria-label", i18n("nlmPickNotebook", "送信先のノートブック"));
+    panelEl.setAttribute("aria-label", i18n("nlmPickNotebook", "Destination notebook"));
     // 取得済みならそのまま出す（2 回目以降は待たされない）。裏で最新化して差分だけ反映する。
     if (notebooks) renderPanelList(); else renderPanelLoading();
     document.body.appendChild(panelEl);
@@ -442,7 +442,7 @@
     renderPanelShell(() => {
       const msg = document.createElement("div");
       msg.className = "__cpa-nlm-msg";
-      msg.textContent = i18n("nlmLoading", "ノートブックを読み込み中…");
+      msg.textContent = i18n("nlmLoading", "Loading notebooks…");
       return [msg];
     });
   }
@@ -461,7 +461,7 @@
 
     const head = document.createElement("div");
     head.className = "__cpa-nlm-head";
-    head.textContent = i18n("nlmPickNotebook", "送信先のノートブック");
+    head.textContent = i18n("nlmPickNotebook", "Destination notebook");
     panelEl.appendChild(head);
     panelEl.appendChild(renderAccountRow());
 
@@ -469,7 +469,7 @@
     create.type = "button";
     create.className = "__cpa-nlm-item __cpa-nlm-item--new";
     create.dataset.nlmFocusKey = "new";
-    create.textContent = i18n("nlmNewNotebook", "＋ 新しいノートブックを作成");
+    create.textContent = i18n("nlmNewNotebook", "+ Create a new notebook");
     create.addEventListener("click", () => void send(null));
     panelEl.appendChild(create);
 
@@ -496,7 +496,7 @@
     const open = document.createElement("button");
     open.type = "button";
     open.className = "__cpa-nlm-item";
-    open.textContent = i18n("nlmOpenNotebookLm", "NotebookLM を開く");
+    open.textContent = i18n("nlmOpenNotebookLm", "Open Gemini Notebook");
     open.addEventListener("click", () => {
       window.open(`${NotebookLm.ORIGIN}/`, "_blank", "noopener");
       closePanel();
@@ -524,17 +524,17 @@
 
     const label = document.createElement("span");
     label.className = "__cpa-nlm-account-label";
-    label.textContent = i18n("nlmAccount", "Google アカウント");
+    label.textContent = i18n("nlmAccount", "Google account");
 
     const select = document.createElement("select");
     select.dataset.nlmFocusKey = "account";
     select.className = "__cpa-nlm-account-select";
-    select.setAttribute("aria-label", i18n("nlmAccount", "Google アカウント"));
+    select.setAttribute("aria-label", i18n("nlmAccount", "Google account"));
     // アカウント一覧が取れていればメールアドレスで、取れなければ番号だけで並べる。
     // 番号だけの旧表示は「どれを選べばいいか分からない」ため、実名表示を優先する。
     const numberedLabel = (i) => (i === 0
-      ? i18n("nlmAccountDefault", "既定 (0)")
-      : i18n("nlmAccountNth", "アカウント {0}").replace("{0}", String(i)));
+      ? i18n("nlmAccountDefault", "Default (0)")
+      : i18n("nlmAccountNth", "Account {0}").replace("{0}", String(i)));
     const entries = Array.isArray(accounts) && accounts.length > 0
       ? accounts.map((a) => ({ index: a.index, label: a.email }))
       : Array.from({ length: NotebookLm.MAX_ACCOUNT_INDEX + 1 }, (_, i) => ({ index: i, label: numberedLabel(i) }));
@@ -582,7 +582,7 @@
       if (!notebooks || notebooks.length === 0) {
         const empty = document.createElement("div");
         empty.className = "__cpa-nlm-msg";
-        empty.textContent = i18n("nlmEmpty", "既存のノートブックはありません");
+        empty.textContent = i18n("nlmEmpty", "No existing notebooks");
         return [empty];
       }
       const list = document.createElement("div");
@@ -703,21 +703,21 @@
   function formatError(code) {
     switch (code) {
       case "not-authorized":
-        return i18n("nlmErrorAuth", "NotebookLM にログインしてください");
+        return i18n("nlmErrorAuth", "Please sign in to Gemini Notebook");
       case "protocol-changed":
-        return i18n("nlmErrorProtocol", "NotebookLM 側の仕様変更で連携できません");
+        return i18n("nlmErrorProtocol", "Can't connect — Gemini Notebook changed its interface");
       case "network-failed":
-        return i18n("nlmErrorNetwork", "NotebookLM に接続できませんでした");
+        return i18n("nlmErrorNetwork", "Could not reach Gemini Notebook");
       case "notebook-full":
-        return i18n("nlmErrorFull", "このノートブックはソース数が上限です");
+        return i18n("nlmErrorFull", "This notebook has reached its source limit");
       case "no-urls":
-        return i18n("nlmErrorNoUrls", "送信できる動画が見つかりませんでした");
+        return i18n("nlmErrorNoUrls", "No videos found to send");
       case "create-failed":
       case "add-failed":
       case "rpc-failed":
-        return i18n("nlmErrorRpc", "NotebookLM への送信に失敗しました");
+        return i18n("nlmErrorRpc", "Failed to send to Gemini Notebook");
       default:
-        return i18n("nlmErrorUnknown", "NotebookLM への送信に失敗しました");
+        return i18n("nlmErrorUnknown", "Failed to send to Gemini Notebook");
     }
   }
 
@@ -744,7 +744,7 @@
     }
     sending = true;
     closePanel();
-    if (btnEl) btnEl.textContent = `📓 ${i18n("nlmSending", "NotebookLM に送信中…")}`;
+    if (btnEl) btnEl.textContent = `📓 ${i18n("nlmSending", "Sending…")}`;
     try {
       const res = await chrome.runtime.sendMessage({
         action: Actions.NOTEBOOK_LM_SEND,
@@ -754,7 +754,7 @@
       if (res?.ok) {
         // 上限で溢れた分があれば件数を伝えてから開く（黙って捨てない）。
         if (res.skipped > 0 && btnEl) {
-          btnEl.textContent = `📓 ${i18n("nlmSkipped", "{0} 件が上限超過で未送信").replace("{0}", String(res.skipped))}`;
+          btnEl.textContent = `📓 ${i18n("nlmSkipped", "{0} item(s) skipped (source limit)").replace("{0}", String(res.skipped))}`;
         }
         // 送信先は background が開く。開けなかったときだけリンクに退避する。
         if (!res.opened) openNotebook(res.url);
@@ -807,7 +807,7 @@
     link.href = url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = i18n("nlmOpenNotebook", "作成したノートブックを開く");
+    link.textContent = i18n("nlmOpenNotebook", "Open the notebook that was created");
     panelEl.appendChild(link);
     document.body.appendChild(panelEl);
     positionPanel();

@@ -19,7 +19,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const path = require("node:path");
 
-for (const file of ["src/lib/actions-core.js","src/lib/actions-video.js","src/lib/actions-loupe.js","src/lib/actions-volume.js","src/lib/actions.js"]) {
+for (const file of ["src/shared/ui-localizer.js","src/lib/actions-core.js","src/lib/actions-video.js","src/lib/actions-loupe.js","src/lib/actions-volume.js","src/lib/actions.js"]) {
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, "..", file), "utf8"));
 }
 

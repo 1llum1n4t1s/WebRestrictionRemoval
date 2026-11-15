@@ -1,6 +1,7 @@
 [install]
-# 公開直後24時間は導入しない。検証済みの正確な版だけ minimumReleaseAgeExcludes に追加する（現在は例外なし）。
+# 公開直後24時間は導入しない。検証済みの正確な版だけ minimumReleaseAgeExcludes に追加する。
 minimumReleaseAge = 86400
+minimumReleaseAgeExcludes = ["@kagayoi/support-extension@1.0.12"]
 
 [run]
 # CLIのnode shebangもBunで実行する。

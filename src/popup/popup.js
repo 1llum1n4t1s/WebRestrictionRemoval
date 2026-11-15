@@ -22,7 +22,7 @@
  *   - 全 UI 文字列は `_locales/<9 言語>/messages.json` から `chrome.i18n.getMessage` 経由で取得する
  *     （ヘッダーの言語選択で切り替えた場合は `Localizer` が選んだ言語の文言を優先する）
  *   - 静的テキストは popup.html の `data-i18n` / `data-i18n-attr` 属性で指定し、
- *     applyI18nToDom() が DOMContentLoaded で一括適用する
+ *     Localizer.localizeDocument() が DOMContentLoaded で一括適用する
  *   - 動的テキスト（status / picker note / pill 等）は i18n() ヘルパー経由
  *   - ブラウザ UI 言語に合う言語、無ければ英語にフォールバック
  *     （manifest.json の `default_locale: "en"` で実現）
@@ -100,42 +100,6 @@ function categoryMessageKey(categoryId) {
   return `category${camel}`;
 }
 
-/**
- * `data-i18n` / `data-i18n-html` / `data-i18n-attr` 属性を持つ要素群に対して
- * messages.json のメッセージを一括適用する。popup.html を fallback 日本語入りで配信し、
- * DOMContentLoaded 直後にここで上書きすることで、英語環境でも違和感のない UI を出す。
- *
- * - data-i18n="key": textContent を上書き
- * - data-i18n-attr="attr1:key1;attr2:key2": 任意属性を上書き（aria-label / placeholder / title 等）
- *
- * 注: 以前あった `data-i18n-html` (innerHTML 上書き) は AMO の UNSAFE_VAR_ASSIGNMENT
- * 警告対象だったため廃止し、HTML 構造を持つ説明文は popup.html 側で
- * `<span data-i18n=...>前半</span><code>...</code><span data-i18n=...>後半</span>` の
- * 3 セグメント分割で表現するようにした。
- */
-function applyI18nToDom(root) {
-  const scope = root || document;
-  // textContent
-  scope.querySelectorAll("[data-i18n]").forEach((el) => {
-    const key = el.getAttribute("data-i18n");
-    const msg = i18n(key);
-    if (msg) el.textContent = msg;
-  });
-  // 属性
-  scope.querySelectorAll("[data-i18n-attr]").forEach((el) => {
-    const spec = el.getAttribute("data-i18n-attr") || "";
-    spec.split(";").forEach((pair) => {
-      const idx = pair.indexOf(":");
-      if (idx < 0) return;
-      const attr = pair.slice(0, idx).trim();
-      const key = pair.slice(idx + 1).trim();
-      if (!attr || !key) return;
-      const msg = i18n(key);
-      if (msg) el.setAttribute(attr, msg);
-    });
-  });
-}
-
 // tabCapture → offscreen 経路 (Chrome) が使えるかの判定。Chrome では chrome.offscreen /
 // chrome.tabCapture が存在し、Firefox MV3 では両方とも未定義 (2026 時点)。
 // /rere B1-001 修正: background.js L12 と非対称だった (popup は chrome.offscreen のみ判定)。
@@ -148,8 +112,8 @@ const HAS_VOLUME_BOOSTER =
 
 // Gecko (Firefox) 判定: 拡張機能 URL スキームで判定する (moz-extension:// = Gecko)。
 // typeof browser 判定は Chrome 137+ が extension context に browser namespace を露出するため
-// 判別子にならない。webstore/generate-screenshots.js の popup-shim 環境 (chrome スタブ) でも
-// getURL 不在 → catch → false になり、Firefox 専用注記が Chrome ストア素材に写り込まない。
+// 判別子にならない。chrome スタブ環境など getURL が無い場合も
+// catch → false になり、Firefox 専用注記が Chrome ストア素材に写り込まない。
 const IS_GECKO_EXTENSION = (() => {
   try {
     return chrome.runtime.getURL("").startsWith("moz-extension://");
@@ -171,59 +135,8 @@ const VOLUME_BOOSTER_VIA_MES = IS_GECKO_EXTENSION && !HAS_VOLUME_BOOSTER;
  * 前に最寄りの `[lang]` から表示言語を決めて描画する。DOMContentLoaded 内で lang を切り替えると
  * 英語環境でも部品が日本語のまま表示されるため、classic script の読込時（module より前）に実行する。
  */
-(() => {
-  try {
-    // 利用者が選んだ表示言語は、storage の非同期読み込みを待てないこの時点のため、
-    // 拡張機能ページ自身の localStorage に控えた値を同期的に使う（問い合わせ部品が lang を先に読む）。
-    let chosen = null;
-    try { chosen = Localizer.normalizeCode(window.localStorage.getItem("cpaUiLanguage")); } catch { /* 読めなければ自動 */ }
-    if (chosen) {
-      document.documentElement.lang = Localizer.toTag(chosen);
-    } else if (chrome?.i18n?.getUILanguage) {
-      const ui = chrome.i18n.getUILanguage();
-      if (typeof ui === "string" && ui.length > 0) {
-        // 実際の UI 言語を設定し、文字種に合った書体・字形・ハイフネーションを使えるようにする。
-        // 問い合わせ部品は日本語かそれ以外かだけを見る（ja 以外は英語表示）。
-        document.documentElement.lang = ui;
-      }
-    }
-  } catch {
-    // 読めなくても表示には影響しない
-  }
-})();
-
-/**
- * ヘッダーの言語選択。「自動」はブラウザの言語、それ以外は選んだ言語の文言を storage に保存し、
- * ポップアップを開き直して反映する（開いているページは再読み込みで反映される）。
- * 言語名は各言語の自国語表記のまま（どの表示言語でも選べるように）。
- */
-function initLanguageSelect() {
-  const select = document.getElementById("uiLanguage");
-  if (!select) return;
-  select.replaceChildren();
-  const auto = new Option(chrome.i18n.getMessage("languageAuto") || "Auto", "auto");
-  select.add(auto);
-  for (const language of Localizer.LANGUAGES) select.add(new Option(language.name, language.code));
-  select.value = Localizer.code ?? "auto";
-  select.addEventListener("change", async () => {
-    const code = Localizer.normalizeCode(select.value);
-    select.disabled = true;
-    try {
-      if (code) {
-        await Localizer.save(code);
-        try { window.localStorage.setItem("cpaUiLanguage", code); } catch { /* 控えが無くても storage の値で表示できる */ }
-      } else {
-        await chrome.storage.local.remove([StorageKeys.UI_LANGUAGE, StorageKeys.UI_MESSAGES, StorageKeys.UI_VERSION]);
-        try { window.localStorage.removeItem("cpaUiLanguage"); } catch { /* 同上 */ }
-      }
-      location.reload();
-    } catch {
-      // 失敗時は元の選択に戻す。
-      select.value = Localizer.code ?? "auto";
-      select.disabled = false;
-    }
-  });
-}
+// 共通モジュールが localStorage の控え（cpaUiLanguage）→ getUILanguage の順で <html lang> を同期的に合わせる。
+Localizer.applyDocumentLang();
 
 document.addEventListener("DOMContentLoaded", async () => {
   // Firefox 版 (MES 経路): オーディオセクションは表示したまま、MES 経路の制約
@@ -240,8 +153,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   try { await Localizer.ready; } catch { /* 標準の言語で続ける */ }
   // 更新後に辞書が古い版のままなら、ここで作り直してから描画する（選んだ言語と標準の言語を混ぜない）。
   await Localizer.ensureFresh();
-  applyI18nToDom();
-  initLanguageSelect();
+  Localizer.localizeDocument();
+  // 言語選択はヘッダーの <select id="uiLanguage">。選んだ言語を storage に保存し、ポップアップを再読み込みして反映する。
+  Localizer.mountLanguageSelect(document.getElementById("uiLanguage"));
 
   // ----- 観測性: 拡張バージョンを footer に表示 (I-7) -----
   // サポート対応時の「バージョンを教えてください」コストを削るため、popup を開けば常時見える形で提示。

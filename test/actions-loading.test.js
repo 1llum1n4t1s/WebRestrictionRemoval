@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const root = path.join(__dirname, "..");
+const localizer = "src/shared/ui-localizer.js";
 const core = "src/lib/actions-core.js";
 const all = [core, "src/lib/actions-video.js", "src/lib/actions-loupe.js", "src/lib/actions-volume.js", "src/lib/actions.js"];
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -34,15 +35,16 @@ const validateEntry = (entry) => {
       : entry.js.includes(volumeConsumer) ? [core, "src/lib/actions-volume.js", "src/lib/audio-pipeline.js"]
         : [core, "src/lib/actions.js"];
   assert.deepEqual(files, expectedFiles, "必要な定義群が依存順に存在する");
-  assert.deepEqual(entry.js.slice(0, files.length), files, "定義群は consumer より先に配列先頭へ置く");
+  assert.deepEqual(entry.js.slice(1, files.length + 1), files, "定義群は consumer より先に配列先頭へ置く");
+  assert.equal(entry.js[0], localizer, "ui-localizer.js は content script の先頭（Localizer が getMessage を差し替えてから他を評価する）");
   if (entry.js.includes(volumeConsumer)) {
     assert.deepEqual(entry.matches, ["http://*/*", "https://*/*"]);
     assert.equal(entry.all_frames, true);
     assert.equal(entry.run_at, "document_idle");
-    assert.deepEqual(entry.js, [...expectedFiles, volumeConsumer]);
+    assert.deepEqual(entry.js, [localizer, ...expectedFiles, volumeConsumer]);
   }
   const context = create();
-  load(context, files);
+  load(context, [localizer, ...files]);
   if (entry.matches.includes("http://*/*")) {
     const expectedNames = entry.js.includes("src/content/video-gamma.js") ? ["VideoGamma", "VideoFill"]
       : entry.js.includes("src/content/loupe.js") ? ["Loupe"] : ["VolumeBooster", "AudioPipeline"];
@@ -63,24 +65,32 @@ const validateManifest = (manifest, firefox) => {
 test("popup・offscreen・両 background の読み込み順は依存を満たす", () => {
   const htmlFiles = (file) => [...read(file).matchAll(/<script src="\.\.\/lib\/(actions[^"/]*)"><\/script>/g)]
     .map(match => `src/lib/${match[1]}`);
+  // ui-localizer.js は actions-core.js より前（popup は <head>、offscreen は先頭）で読み込む。
+  for (const file of ["src/popup/popup.html", "src/offscreen/offscreen.html"]) {
+    const html = read(file);
+    assert.ok(html.indexOf("../shared/ui-localizer.js") >= 0 && html.indexOf("../shared/ui-localizer.js") < html.indexOf("../lib/actions-core.js"), file);
+  }
+  const firefoxScripts = JSON.parse(read("manifest.firefox.json")).background.scripts;
+  assert.equal(firefoxScripts[0], localizer, "Firefox の background.scripts の先頭");
+  assert.match(read("src/background/background.js"), /importScripts\("\/src\/shared\/ui-localizer\.js", "\/src\/lib\/actions-core\.js"/);
   const firefox = JSON.parse(read("manifest.firefox.json")).background.scripts.filter(file => all.includes(file));
   const chrome = [...read("src/background/background.js").matchAll(/"\/(src\/lib\/actions[^"/]*)"/g)].map(match => match[1]);
   for (const files of [htmlFiles("src/popup/popup.html"), firefox, chrome]) {
     assert.deepEqual(files, all);
-    load(create(), files);
+    load(create(), [localizer, ...files]);
   }
   const offscreen = htmlFiles("src/offscreen/offscreen.html");
   assert.deepEqual(offscreen, [core, "src/lib/actions-volume.js", "src/lib/actions.js"]);
-  load(create(), offscreen);
+  load(create(), [localizer, ...offscreen]);
 });
 
 test("全分割定義の再評価は公開オブジェクトの参照を維持し、別フレームとは共有しない", () => {
   const first = create();
-  load(first, all);
+  load(first, [localizer, ...all]);
   const before = exposed(first);
-  load(first, all);
+  load(first, [localizer, ...all]);
   const second = create();
-  load(second, all);
+  load(second, [localizer, ...all]);
   assert.equal(vm.runInContext("globalThis === this", first), true);
   for (const [name, value] of Object.entries(before)) {
     assert.strictEqual(first[name], value, name);
@@ -101,10 +111,10 @@ for (const manifest of ["manifest.json", "manifest.firefox.json"]) {
     for (const specific of site) for (const generic of universal) {
       for (const pair of [[specific, generic], [generic, specific]]) {
         const context = create();
-        load(context, definitions(pair[0]));
+        load(context, [localizer, ...definitions(pair[0])]);
         const before = exposed(context);
-        load(context, definitions(pair[1]));
-        load(context, definitions(pair[0]));
+        load(context, [localizer, ...definitions(pair[1])]);
+        load(context, [localizer, ...definitions(pair[0])]);
         for (const [name, value] of Object.entries(before)) assert.strictEqual(context[name], value, name);
       }
     }

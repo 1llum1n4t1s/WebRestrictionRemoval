@@ -469,7 +469,7 @@
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = ImageDownloader.BUTTON_CLASS;
-    const dlLabel = chrome.i18n.getMessage("imageDownloadButtonLabel") || "画像をダウンロード";
+    const dlLabel = chrome.i18n.getMessage("imageDownloadButtonLabel") || "Download image";
     btn.setAttribute("aria-label", dlLabel);
     btn.title = dlLabel;
     btn.appendChild(buildDownloadIcon());

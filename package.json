@@ -8,15 +8,15 @@
     "sync:support": "bun --preserve-symlinks-main ./node_modules/@kagayoi/support-extension/bin/kagayoi-support-sync.mjs",
     "ci:install": "bun scripts/Install-Dependencies.mjs",
     "generate-icons": "bun scripts/generate-icons.js",
-    "generate-screenshots": "bun webstore/generate-screenshots.js",
+    "generate-screenshots": "bun webstore/vitrina/vitrina.mjs generate",
     "build": "bun --bun run sync:support && bun --bun run build:assets",
     "build:assets": "bun --bun run generate-icons && bun --bun run generate-screenshots",
     "test": "bun test",
-    "lint": "bun --no-env-file --no-install --bun run eslint src/ test/ scripts/ webstore/generate-screenshots.js",
+    "lint": "bun --no-env-file --no-install --bun run eslint src/ test/ scripts/",
     "test:dependencies": "bun test ./scripts/dependency-security.test.cjs"
   },
   "devDependencies": {
-    "@kagayoi/support-extension": "1.0.10",
+    "@kagayoi/support-extension": "1.0.12",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "puppeteer": "^25.17.0",

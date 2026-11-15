@@ -44,6 +44,8 @@ const host = async (initial = {}, firefox = false) => {
       },
     },
   });
+  // 表示言語の共通モジュール（background は先頭で読み込む）。
+  vm.runInContext(read("shared/ui-localizer.js"), context);
   for (const file of ["actions-core.js", "actions-video.js", "actions-loupe.js", "actions-volume.js", "actions.js"]) {
     vm.runInContext(read(`lib/${file}`), context);
   }

@@ -1695,5 +1695,7 @@
   },
   "languageAuto": { "message": "Automatique (navigateur)" },
   "languageSelectLabel": { "message": "Langue" },
-  "languageSelectTitle": { "message": "Langue (les pages ouvertes se mettent à jour au rechargement)" }
+  "languageSelectTitle": { "message": "Langue (les pages ouvertes se mettent à jour au rechargement)" },
+  "kagayoiSupportContact": { "message": "Contacter le support" },
+  "kagayoiSupportRate": { "message": "Évaluez-nous !" }
 }

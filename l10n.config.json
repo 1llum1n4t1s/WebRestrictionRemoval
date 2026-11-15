@@ -1,0 +1,14 @@
+{
+  "ignore": [
+    {
+      "path": "src/background/background.js",
+      "pattern": "^\\s*justification:",
+      "reason": "chrome.offscreen の justification は開発者向けの申告文で UI に出ない"
+    },
+    {
+      "path": "src/content/search-fixer.js",
+      "pattern": "^\\s*\"(ミックスリスト|ライブ|プレミア|ステーション|メンバー限定)",
+      "reason": "YouTube のバッジ表記との照合用（ページ照合文字列）"
+    }
+  ]
+}

@@ -17,6 +17,8 @@ test("Amazon: 配送DOMの集計・ID境界・ノード再利用・OFF復元", a
   }
   fs.accessSync(path.dirname(output), fs.constants.W_OK);
   fs.mkdirSync(output);
+  // Windows アカウントのロック防止（必須）: 新規プロファイルの空パスワード確認（LogonUser 失敗）を避けるため起動前にシードする。理由は chrome-profile-seed.mjs を参照。
+  (await import("./chrome-profile-seed.mjs")).seedChromeProfile(path.join(output, "profile"));
   const browser = await puppeteer.launch({ headless: true, enableExtensions: [path.resolve(__dirname, "..")],
     userDataDir: path.join(output, "profile"), args: ["--no-first-run", "--disable-sync"] });
   t.after(() => browser.close());

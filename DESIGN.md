@@ -22,7 +22,7 @@ Vuora は Manifest V3 の Chrome / Firefox 拡張機能です。YouTube、Amazon
 | `src/lib/audio-pipeline.js` | Chrome / Firefox で共有する DSP graph 構築と設定適用 | キャプチャ方法とメディア要素検出は呼び出し側が担当する |
 | `src/lib/scan-runner.js` / `src/lib/cleaner-core.js` / `src/content/early-framework.js` | DOM 監視、設定購読、document_start の先制非表示に共通するライフサイクル | サイト固有セレクタと表示内容は各 content script に残す |
 | `src/shared/kagayoi-support-*` | 問い合わせフォームと評価導線 | `@kagayoi/support-extension` の exact 固定版から同梱するコピー。製品固有の配置・配色だけを popup 側で与える |
-| `_locales/<9 言語>/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする。popup のヘッダーで選んだ言語は `Localizer`（`actions-core.js`）が `chrome.i18n` を差し替えて優先し、選択（`uiLanguage`）・辞書（`uiMessages`）・作成時の版（`uiMessagesVersion`）は端末内にだけ置く（同期・バックアップ対象外）。更新後は辞書を作り直す |
+| `_locales/<9 言語>/` | popup と注入 UI の利用者向け文言 | `chrome.i18n` を経由し、未対応言語は英語へフォールバックする。popup のヘッダーで選んだ言語は `Localizer`（共通モジュール `src/shared/ui-localizer.js`）が `chrome.i18n` を差し替えて優先し、選択（`uiLanguage`）・辞書（`uiMessages`）・作成時の版（`uiMessagesVersion`）は端末内にだけ置く（同期・バックアップ対象外）。更新後は辞書を作り直す |
 | `test/` | 純粋関数、公開定数、機能件数、構文、manifest 差分、DSP、問い合わせ契約の drift 検知 | 実サイト DOM の時点依存挙動は手動・実ブラウザ確認で補う |
 | `../vps-web/lp/vuora/` | `vuora.kagayoi.com` の静的 LP とプライバシーページ | Cloudflare Workers Static Assets の `vps-web-lp` が配信し、拡張の API backend にはならない（設定は「製品ページの配信先」を参照） |
 

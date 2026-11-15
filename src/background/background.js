@@ -3,7 +3,7 @@
 // manifest.firefox.json の background.scripts に定義ファイルを併記してあり、
 // background.js 実行時には既に評価済みなのでここでは skip する。
 if (typeof importScripts === "function") {
-  importScripts("/src/lib/actions-core.js", "/src/lib/actions-video.js", "/src/lib/actions-loupe.js", "/src/lib/actions-volume.js", "/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js");
+  importScripts("/src/shared/ui-localizer.js", "/src/lib/actions-core.js", "/src/lib/actions-video.js", "/src/lib/actions-loupe.js", "/src/lib/actions-volume.js", "/src/lib/actions.js", "/src/lib/settings-backup.js", "/src/background/settings-sync.js");
 }
 
 // 音量ブースターの tabCapture → offscreen 経路は offscreen + tabCapture API に依存する
@@ -16,7 +16,21 @@ const HAS_VOLUME_BOOSTER = typeof chrome.offscreen !== "undefined" && typeof chr
 // ---------- 初期化 ----------
 // 更新後に、選んだ表示言語の辞書が古い版のままなら作り直す（新しいキーが標準の言語で混ざらないように）。
 // 設定の保存キューとは無関係（端末内の表示言語だけ）なので、下の設定移行とは別に登録する。
-chrome.runtime.onInstalled.addListener(() => { globalThis.Localizer?.ensureFresh(); });
+chrome.runtime.onInstalled.addListener(async () => {
+  try { await Localizer.ready; await Localizer.ensureFresh(); } catch { /* 標準の言語で続ける */ }
+  applyActionTitle();
+});
+
+// 拡張アイコンのツールチップ（manifest の default_title はブラウザの言語固定）を、選んだ表示言語へ追従させる。
+// 起動時と、popup など他のコンテキストでの言語変更（storage 経由）で再設定する。
+function applyActionTitle() {
+  try {
+    const title = Localizer.t("defaultTitle");
+    if (title) Promise.resolve(chrome.action.setTitle({ title })).catch(() => {});
+  } catch { /* action API が無い環境では何もしない */ }
+}
+Localizer.ready.then(applyActionTitle, () => {});
+Localizer.onChange(applyActionTitle);
 
 // onInstalled: 初回インストール / アップデート時
 //   - 旧バージョンの設定キー（v1.0.x の copyPasteSettings、v1.0.17 の enabled / volumeBoosterEnabled /

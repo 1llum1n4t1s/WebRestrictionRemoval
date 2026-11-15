@@ -783,5 +783,7 @@
   },
   "languageAuto": { "message": "Auto (browser)" },
   "languageSelectLabel": { "message": "Language" },
-  "languageSelectTitle": { "message": "Language. Open pages need a reload to update." }
+  "languageSelectTitle": { "message": "Language. Open pages need a reload to update." },
+  "kagayoiSupportContact": { "message": "Contact support" },
+  "kagayoiSupportRate": { "message": "Please rate us!" }
 }

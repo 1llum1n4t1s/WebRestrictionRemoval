@@ -134,7 +134,7 @@ API 経由で送る `<ul>` 等の HTML は `&lt;ul&gt;` としてエスケープ
 5. `README.md` / `README.en.md` の機能列挙
 6. `docs/privacy-policy.{md,en.md}` の storage 説明
 7. `webstore/store-listing.{,en,firefox.ja,firefox.en}.txt` の機能リスト
-8. `webstore/02-features.html` の件数（スクリーンショット生成で焼き込まれる）
+8. `webstore/store-assets.json` の件数表記（13 機能・YouTube 40 サブ機能・カラー履歴 20 件。スクリーンショット生成で焼き込まれる。`test/actions.test.js` が正本と照合する）
 
 `bun --bun run test` で件数 drift を CI 検知できる。
 

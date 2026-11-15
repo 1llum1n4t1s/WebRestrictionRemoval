@@ -1695,5 +1695,7 @@
   },
   "languageAuto": { "message": "자동(브라우저)" },
   "languageSelectLabel": { "message": "언어" },
-  "languageSelectTitle": { "message": "언어(열려 있는 페이지는 새로고침 후 적용)" }
+  "languageSelectTitle": { "message": "언어(열려 있는 페이지는 새로고침 후 적용)" },
+  "kagayoiSupportContact": { "message": "문의하기" },
+  "kagayoiSupportRate": { "message": "평가해 주세요!" }
 }

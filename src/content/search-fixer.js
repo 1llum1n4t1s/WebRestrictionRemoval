@@ -1010,7 +1010,7 @@
       btn.type = "button";
       btn.className = BLOCK_BTN_CLASS;
       btn.textContent = "🚫";
-      btn.title = chrome.i18n.getMessage("sfBlockChannelBtnTitle") || "このチャンネルを検索結果に表示しない";
+      btn.title = chrome.i18n.getMessage("sfBlockChannelBtnTitle") || "Hide this channel from search results";
       btn.setAttribute("aria-label", btn.title);
       btn.addEventListener("click", onBlockButtonClick);
       info.channelName.insertAdjacentElement("afterend", btn);
@@ -2720,7 +2720,7 @@
     const entry = document.createElement("a");
     entry.className = SUBS_SHORTCUT_MARKER;
     entry.href = "/feed/channels";
-    const allSubsLabel = chrome.i18n.getMessage("subsAllShortcutLabel") || "すべての登録チャンネル";
+    const allSubsLabel = chrome.i18n.getMessage("subsAllShortcutLabel") || "All subscriptions";
     entry.title = allSubsLabel;
     entry.setAttribute("aria-label", allSubsLabel);
     // YouTube の Trusted Types policy で innerHTML 文字列代入は弾かれうるので createElement で構築。
@@ -3247,7 +3247,7 @@
 
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = chrome.i18n.getMessage("subsSearchPlaceholder") || "チャンネル名またはハンドルで絞り込み";
+    search.placeholder = chrome.i18n.getMessage("subsSearchPlaceholder") || "Filter by channel name or handle";
     search.autocomplete = "off";
     search.spellcheck = false;
     // /rere C1-001 修正: 旧実装は debounce ゼロで毎打鍵に全 N×querySelector を走査していたため、

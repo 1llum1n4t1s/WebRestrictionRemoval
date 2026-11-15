@@ -412,10 +412,10 @@
     }
     const msg = (key, fallback) => ScanRunner.safeMsg(key, fallback);
     const ready = state.status === "ready";
-    const label = ready ? (state.previous ? msg("amazonTotalPreviousReference", "参考合計（前回価格を含む）")
-      : state.reference ? msg("amazonTotalReference", "参考合計（現在価格）") : msg("amazonTotalText", "合計金額"))
-      : state.status === "loading" ? msg("amazonTotalLoading", "合計金額を取得中…") : msg("amazonTotalUnavailable", "合計金額を取得できませんでした");
-    const description = state.reference ? msg("amazonTotalReferenceNote", "請求額は変わる場合があります") : "";
+    const label = ready ? (state.previous ? msg("amazonTotalPreviousReference", "Estimated total (includes previous prices)")
+      : state.reference ? msg("amazonTotalReference", "Estimated total (current prices)") : msg("amazonTotalText", "Total"))
+      : state.status === "loading" ? msg("amazonTotalLoading", "Loading total…") : msg("amazonTotalUnavailable", "Could not retrieve the total");
+    const description = state.reference ? msg("amazonTotalReferenceNote", "The billed amount may change") : "";
     const fingerprint = JSON.stringify([label, ready ? state.total : null, description]);
     if (root.dataset.value === fingerprint) return;
     root.dataset.value = fingerprint;

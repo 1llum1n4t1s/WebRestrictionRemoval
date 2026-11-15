@@ -191,7 +191,7 @@
     heading.className = "__cpa-ypc-heading";
     const label = document.createElement("span");
     label.className = "__cpa-ypc-label";
-    label.textContent = i18n("bcOverlayLabel", "配信時刻");
+    label.textContent = i18n("bcOverlayLabel", "Broadcast");
     heading.appendChild(label);
     overlayEl.appendChild(heading);
     overlayTimeEl = document.createElement("div");

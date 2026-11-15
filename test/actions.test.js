@@ -1311,23 +1311,24 @@ test("FEATURES 件数の固定アサート（ドキュメント整合性の再�
   assert.equal(G.XCleaner.FEATURES.length, 10, "XCleaner.FEATURES は 10 件");
 });
 
-test("ストア画像の表示件数がFEATURES正本と一致し、初期OFFを12機能に限定する", () => {
-  const text = (name) => fs.readFileSync(path.join(__dirname, "../webstore", name), "utf8")
-    .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
-  const featureCount = (content, label) => {
-    const match = content.match(new RegExp(`${label}\\s*[・]?\\s*(\\d+)`));
-    assert.ok(match, `${label} の表示件数がある`);
-    return Number(match[1]);
-  };
-  for (const file of ["02-features.html", "03-hero-promo.html", "05-promo-marquee.html"]) {
-    const content = text(file);
-    assert.equal(featureCount(content, "YouTube(?:\\s+機能拡張)?"), G.SearchFixer.FEATURES.length, file);
-    if (file !== "03-hero-promo.html") {
-      assert.equal(featureCount(content, "Instagram(?:\\s+クリーナー)?"), G.InstagramCleaner.FEATURES.length, file);
-      assert.equal(featureCount(content, "TikTok(?:\\s+クリーナー)?"), G.TikTokCleaner.FEATURES.length, file);
-    }
+test("ストア画像の表示件数がFEATURES正本と一致する", () => {
+  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "../webstore/store-assets.json"), "utf8"));
+  const variants = (value) => (typeof value === "string" ? [value] : Object.values(value));
+  const hero = cfg.slides.find((slide) => slide.layout === "hero");
+  const youtube = cfg.slides.find((slide) => slide.capture === "popup-youtube");
+  const picker = cfg.slides.find((slide) => slide.capture === "popup-picker");
+  // 全言語の文言が同じ件数を示す（訳し漏れ・件数だけの更新漏れを検知）
+  for (const text of variants(hero.chips[0])) {
+    assert.ok(text.includes("13"), "ヒーローの機能数 13: " + text);
   }
-  assert.match(text("02-features.html"), /インストール直後は\s*12\s*機能が\s*OFF/);
+  for (const text of variants(youtube.body)) {
+    assert.ok(text.includes(String(G.SearchFixer.FEATURES.length)), "YouTube サブ機能数 " + G.SearchFixer.FEATURES.length + ": " + text);
+  }
+  for (const text of variants(picker.body)) {
+    assert.ok(text.includes(String(G.ColorPicker.HISTORY_LIMIT)), "カラー履歴上限 " + G.ColorPicker.HISTORY_LIMIT + ": " + text);
+  }
+  assert.ok(cfg.tiles.tagline.includes("13"), "タイルの機能数 13");
+  assert.equal(Object.keys(hero.chips[0]).length, 9, "ヒーロー文言は 9 言語");
 });
 
 // ---------- 海外チャンネル除外 (hideForeignChannels) の純粋関数 ----------

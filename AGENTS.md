@@ -50,7 +50,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 
 popup は **8 カテゴリをカスタムドロップダウンで切り替える構成** (`調整 / YouTube / X / Instagram / TikTok / Wikipedia / カラーピッカー / 設定`)。タブ順序は `PopupTabs.ALL` 配列で管理、`POPUP_LAST_TAB` storage key に最後のタブを永続化。**サブタブ（調整タブの オーディオ / 映像 / Amazon、YouTube / Instagram のカテゴリ）も `POPUP_LAST_SUBTAB`（親タブ id → サブタブ id のレコード）に永続化**する（`PopupTabs.normalizeSubTabs` で形だけ正規化し、保存済み id が現存しないときは先頭サブタブにフォールバック。1 キーに複数タブ分が相乗りするので書き戻し前に storage 現在値を再取得してマージする）。
 
-設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（9 言語: 英語・日本語・簡体字中国語 `zh_CN`・繁体字中国語 `zh_TW`・韓国語 `ko`・スペイン語 `es`・フランス語 `fr`・ドイツ語 `de`・ブラジルポルトガル語 `pt_BR`。ブラウザ UI 言語に合う言語、無ければ英語にフォールバック。構成は Toolport と同じ）。`manifest.json` の `default_locale: "en"` + `_locales/<9 言語>/messages.json`（`en` を正本）を単一情報源とし、popup ヘッダーの言語選択は `Localizer`（`actions-core.js`）が `chrome.i18n` を差し替えて実現し、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。
+設定は `chrome.storage.local` の各 boolean / 数値キーで保存。UI は **Chrome i18n API でローカライズ**（9 言語: 英語・日本語・簡体字中国語 `zh_CN`・繁体字中国語 `zh_TW`・韓国語 `ko`・スペイン語 `es`・フランス語 `fr`・ドイツ語 `de`・ブラジルポルトガル語 `pt_BR`。ブラウザ UI 言語に合う言語、無ければ英語にフォールバック。構成は Toolport と同じ）。`manifest.json` の `default_locale: "en"` + `_locales/<9 言語>/messages.json`（`en` を正本）を単一情報源とし、popup ヘッダーの言語選択は `Localizer`（共通モジュール `src/shared/ui-localizer.js`）が `chrome.i18n` を差し替えて実現し、popup 静的テキストは `data-i18n` 属性、popup の動的テキストと content script の DOM 注入テキストは `chrome.i18n.getMessage()` 経由で取得する。コードコメント / `console.log` メッセージは開発者向けで日本語のまま残す。**インストール直後は全マスタートグル OFF**（音量ブースターもマスター OFF かつ全サブトグル OFF = 完全に無処理）。サイト挙動を勝手に書き換えないオプトイン方針。
 
 ## Build Commands
 
@@ -59,7 +59,7 @@ bun run deps                     # 初回 / 開発 / CI 共通（Bun版・lock�
 bun --bun run ci:install           # 同じ固定復元入口の互換名
 bun --bun run build                # アイコン + スクリーンショット一括生成
 bun --bun run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
-bun --bun run generate-screenshots # webstore/*.html → webstore/images/*.png (Puppeteer, concurrency=2)
+bun --bun run generate-screenshots # webstore/store-assets.json → webstore/images/<locale>/screenshot-NN.png + tile-*.png (vitrina。Windows は release=実拡張で 9 言語、それ以外は smoke)
 bun --bun run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
 bun --bun run test                     # Bun の node:test 互換テスト（件数は出力サマリ `tests N` を正とする）
 bun test ./test/actions.test.js                  # 単一テストファイルのみ実行 (さらに --test-name-pattern="FEATURES" で個別ケース絞り込み)
@@ -136,6 +136,8 @@ Lint は ESLint v10 flat config:
 bun --bun run lint
 ```
 
+- **Chrome を起動するスクリプトを足すときはシード必須**: puppeteer.launch・chrome-launcher・Chrome の直接起動は、起動前に user-data-dir の `Local State` へ `{"password_manager":{"os_password_blank":false,"os_password_last_changed":"9223372036854775000"}}` を書く。Windows の Chromium は新規プロファイルごとに空パスワードで LogonUser を呼び（`password_manager_util_win.cc` の `CheckBlankPasswordWithPrefs`）、ログオン失敗（Security 4625）として数えられるため、並列・連続起動で Windows アカウントがロックされる（2026-11-15 実害）。`scripts/chrome-profile-seed.mjs` の `createSeededProfile()` / `seedChromeProfile()` を使い、userDataDir 未指定の起動は作らない（`webstore/vitrina/` は逐語コピーで対策済み）。
+
 ### デバッグ
 - popup: ポップアップ右クリック →「検証」で DevTools
 - background SW: `chrome://extensions` の「Service Worker」リンク
@@ -203,7 +205,21 @@ bun "$HOME/.agents/skills/vava/scripts/update-amo-listing.mjs" --slug 'web-viewi
 
 job間の検証済み成果物はprivate R2へSigV4で保存し、repository・commit・run・producer attemptのidentityと各ファイルのSHA-256/サイズを検証して復元する。設定は `vars.CLOUDFLARE_ACCOUNT_ID` / `vars.R2_ARTIFACT_BUCKET` と `secrets.R2_ARTIFACT_ACCESS_KEY_ID` / `secrets.R2_ARTIFACT_SECRET_ACCESS_KEY`（当該bucket限定）。`ci-artifacts/` は30日で削除され、恒久配布とは区別する。
 
-CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使い、同期upload成功・応答ID・manifest版の一致を確認してpublishする。非同期uploadは版を確定できないため自動publishせず停止する。公開workflowは `queue: max` で直列化し、Dashboardや他の手動公開と並行しない。
+CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使い、同期upload成功・応答ID・manifest版の一致を確認する（既定の `-Stage All` はその後publishまで行うが、CIは `-Stage Upload` でアップロードだけを行い、申請は `cws-submit.yml` が `-Stage Publish` で行う）。非同期uploadは版を確定できないため自動publishせず停止する。公開workflowは `queue: max` で直列化し、Dashboardや他の手動公開と並行しない。
+
+### CWS のアップロードと申請の分離
+
+`publish.yml` は検証済みZIPを `-Stage Upload` で下書きとしてアップロードするだけで、審査へは申請しない。新ロケールの掲載画像欄はアップロード後でないと Dashboard に出ないため、申請は別workflow `.github/workflows/cws-submit.yml`（手動実行、`-Stage Publish`）で行う。
+
+1. `release/x.y.z` を push する（publish.yml がアップロードする）
+2. Dashboard（Edictora）でロケール別の掲載画像などを整えて下書き保存する
+3. `gh workflow run cws-submit.yml -f version=x.y.z --ref release/x.y.z` で申請する
+
+- API v2 は未申請の下書き版を返さないため、下書きの版そのものは確認できない。`cws-submit.yml` は次を満たす場合だけ `:publish` する: 実行 ref が `release/<version>` で manifest の版が入力と一致する。`publish.yml` の直近のアップロード成功 run（固定ステップ名 `Chrome Web Store にアップロード（下書き）`。`actions: read` で履歴を参照）が同じ commit である。fetchStatus で item identity・直近アップロード状態・公開/審査中の版を確認できる。
+- 同版が申請済み・公開済み（PENDING_REVIEW / STAGED / PUBLISHED / PUBLISHED_TO_TESTERS）なら再送せず成功終了する。別版の審査中、より新しい版の存在、直近アップロードの進行中・失敗、状態不明は申請せず停止する。
+- Dashboard で手動アップロードした下書きなど、同じ commit のアップロード成功 run が無い場合は申請されない。その場合は Dashboard から手動で申請する。
+- 両workflowは同じ concurrency group で直列化する。申請中は Dashboard の操作を並行しない。
+- `cws-submit.yml` も `environment: chrome-web-store` を使う。
 
 ## Bun依存の脆弱性検出
 

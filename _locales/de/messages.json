@@ -1695,5 +1695,7 @@
   },
   "languageAuto": { "message": "Automatisch (Browser)" },
   "languageSelectLabel": { "message": "Sprache" },
-  "languageSelectTitle": { "message": "Sprache (geöffnete Seiten übernehmen sie nach dem Neuladen)" }
+  "languageSelectTitle": { "message": "Sprache (geöffnete Seiten übernehmen sie nach dem Neuladen)" },
+  "kagayoiSupportContact": { "message": "Support kontaktieren" },
+  "kagayoiSupportRate": { "message": "Bitte bewerten Sie uns!" }
 }

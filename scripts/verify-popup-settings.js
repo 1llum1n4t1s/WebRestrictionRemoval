@@ -29,6 +29,8 @@ test("popup: 履歴通知・保存失敗・同時操作", {timeout:60000}, async
  process.env.TEMP=output; process.env.TMP=output;
  t.after(()=>server.close());
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ // Windows アカウントのロック防止（必須）: 新規プロファイルの空パスワード確認（LogonUser 失敗）を避けるため起動前にシードする。理由は chrome-profile-seed.mjs を参照。
+ (await import("./chrome-profile-seed.mjs")).seedChromeProfile(path.join(output, "profile"));
  const browser=await puppeteer.launch({headless:true,userDataDir:path.join(output,"profile"),args:['--no-first-run','--disable-sync']});
  try {
  const page=await browser.newPage(); const errors=[];

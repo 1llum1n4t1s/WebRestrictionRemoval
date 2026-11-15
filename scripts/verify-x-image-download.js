@@ -17,6 +17,8 @@ test("X: popup設定・画像別ボタン・orig取得・OFF復元", { timeout: 
   }
   fs.accessSync(path.dirname(output), fs.constants.W_OK); fs.mkdirSync(output);
   const downloadsDir = path.join(output, "downloads"); fs.mkdirSync(downloadsDir);
+  // Windows アカウントのロック防止（必須）: 新規プロファイルの空パスワード確認（LogonUser 失敗）を避けるため起動前にシードする。理由は chrome-profile-seed.mjs を参照。
+  (await import("./chrome-profile-seed.mjs")).seedChromeProfile(path.join(output, "profile"));
   const browser = await puppeteer.launch({ headless: true, enableExtensions: [path.resolve(__dirname, "..")],
     userDataDir: path.join(output, "profile"), args: ["--no-first-run", "--disable-sync"] });
   t.after(() => browser.close());

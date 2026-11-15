@@ -106,7 +106,7 @@
     a.setAttribute("role", "button");
     a.setAttribute(
       "aria-label",
-      ScanRunner.safeMsg("amazonRankingJumpAriaLabel", "この商品が所属するランキングへ移動")
+      ScanRunner.safeMsg("amazonRankingJumpAriaLabel", "Go to this product's ranking")
     );
 
     const icon = document.createElement("span");
@@ -119,7 +119,7 @@
 
     const title = document.createElement("span");
     title.className = `${ROOT}__title`;
-    title.textContent = ScanRunner.safeMsg("amazonRankingJumpButton", "この商品が所属するランキングへ移動");
+    title.textContent = ScanRunner.safeMsg("amazonRankingJumpButton", "Go to this product's ranking");
 
     const cat = document.createElement("span");
     cat.className = `${ROOT}__cat hidden`;

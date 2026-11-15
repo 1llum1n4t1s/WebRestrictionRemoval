@@ -161,7 +161,7 @@ body {
 /* 表示言語の選択: タイトルの横に置く小さな選択欄。枠と配色は他の入力欄と揃える。 */
 .hdr-lang {
   flex: none;
-  max-width: 116px;
+  max-width: 136px;
   height: 28px;
   padding: 0 6px;
   border: 1px solid var(--rule);

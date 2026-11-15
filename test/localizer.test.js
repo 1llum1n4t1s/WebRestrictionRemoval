@@ -1,12 +1,12 @@
 "use strict";
-// 表示言語の切り替え（Localizer）。chrome.i18n を差し替え、選んだ言語を優先し、無ければ標準へ戻すことを検証する。
+// 表示言語の切り替え（Localizer。共通モジュール src/shared/ui-localizer.js）。chrome.i18n を差し替え、選んだ言語を優先し、無ければ標準へ戻すことを検証する。
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/actions-core.js"), "utf8");
+const source = fs.readFileSync(path.join(__dirname, "../src/shared/ui-localizer.js"), "utf8");
 
 function load({ stored = {}, native = {} } = {}) {
   const listeners = [];
@@ -98,7 +98,7 @@ test("更新後は版の違う辞書を同梱の messages.json から作り直�
       onChanged: { addListener: (fn) => listeners.push(fn) },
     },
   };
-  const context = vm.createContext({ chrome, fetch: async (url) => ({ ok: url.endsWith("/_locales/de/messages.json"), json: async () => ({ fresh: { message: "Neu" } }) }) });
+  const context = vm.createContext({ chrome, location: { href: "chrome-extension://x/src/background/background.js" }, fetch: async (url) => ({ ok: url.endsWith("/_locales/de/messages.json"), json: async () => ({ fresh: { message: "Neu" } }) }) });
   vm.runInContext(source, context);
   await context.Localizer.ready;
   assert.equal(chrome.i18n.getMessage("fresh"), "", "更新前は新しいキーがない（標準へ戻る）");

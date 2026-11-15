@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
@@ -9,6 +9,7 @@
   <link rel="preload" href="fonts/IBMPlexSansJP-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/IBMPlexSansJP-Bold.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="popup.css" />
+  <script src="../shared/ui-localizer.js"></script>
 </head>
 <body>
   <!-- ===== Icon sprite =====
@@ -158,15 +159,15 @@
         <h1 class="hdr-title" data-i18n="headerTitle">Vuora</h1>
         <p class="hdr-tag" data-i18n="headerTagline">増幅 / 整理 / 維持 を 1 つのパネルから</p>
       </div>
-      <!-- 表示言語の切り替え（選択肢は popup.js が Localizer.LANGUAGES から作る） -->
-      <select id="uiLanguage" class="hdr-lang" data-i18n-attr="aria-label:languageSelectLabel;title:languageSelectTitle" aria-label="言語"></select>
+      <!-- 表示言語の切り替え（選択肢は popup.js が Localizer.mountLanguageSelect で作る） -->
+      <select id="uiLanguage" class="hdr-lang" data-i18n-attr="aria-label:languageSelectLabel;title:languageSelectTitle" aria-label="Language"></select>
     </header>
 
     <!-- ===== Category selector ===== -->
     <button type="button" id="categoryTrigger" class="category-trigger" popovertarget="categoryMenu" disabled aria-haspopup="listbox"
             aria-expanded="false" aria-controls="categoryMenu" aria-labelledby="categoryLabel categoryName">
       <span class="category-icon" aria-hidden="true"><svg class="ic"><use id="categoryIcon" href="#ic-sliders"></use></svg></span>
-      <span class="category-current"><span id="categoryLabel" class="category-label" data-i18n="categorySelectorLabel">カテゴリ</span><span id="categoryName" class="category-name">調整</span></span>
+      <span class="category-current"><span id="categoryLabel" class="category-label" data-i18n="categorySelectorLabel">カテゴリ</span><span id="categoryName" class="category-name">Tune</span></span>
       <svg class="category-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
     </button>
     <div id="categoryMenu" class="category-menu" popover="auto" role="listbox" data-i18n-attr="aria-label:tabbarAriaLabel" aria-label="表示するカテゴリ">
