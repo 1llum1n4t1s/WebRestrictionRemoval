@@ -1,0 +1,240 @@
+{
+  "brand": "Vuora",
+  "icon": "icons/icon.svg",
+  "extensionDir": ".",
+  "palette": {
+    "primary": "#1FB5C0",
+    "secondary": "#F5A524"
+  },
+  "locales": [
+    "en",
+    "ja",
+    "zh_CN",
+    "zh_TW",
+    "ko",
+    "es",
+    "fr",
+    "de",
+    "pt_BR"
+  ],
+  "captures": [
+    {
+      "id": "popup-tune",
+      "kind": "popup",
+      "page": "src/popup/popup.html",
+      "storage": {
+        "popupLastTab": "tune",
+        "popupLastSubTab": {
+          "tune": "audio"
+        },
+        "volumeBoosterEnabled": true,
+        "volumeBoosterLastGain": 150,
+        "volumeBoosterAntiClipEnabled": true
+      }
+    },
+    {
+      "id": "popup-youtube",
+      "kind": "popup",
+      "page": "src/popup/popup.html",
+      "storage": {
+        "popupLastTab": "youtube",
+        "searchFixerEnabled": true
+      }
+    },
+    {
+      "id": "popup-picker",
+      "kind": "popup",
+      "page": "src/popup/popup.html",
+      "storage": {
+        "popupLastTab": "picker",
+        "colorPickerHistory": [
+          {
+            "hex": "#1FB5C0",
+            "ts": 1760000000000
+          },
+          {
+            "hex": "#F5A524",
+            "ts": 1759999000000
+          },
+          {
+            "hex": "#2F7BFF",
+            "ts": 1759998000000
+          },
+          {
+            "hex": "#C0605A",
+            "ts": 1759997000000
+          },
+          {
+            "hex": "#3F8F5B",
+            "ts": 1759996000000
+          }
+        ]
+      }
+    }
+  ],
+  "slides": [
+    {
+      "layout": "hero",
+      "capture": "popup-tune",
+      "tagline": {
+        "msg": "headerTagline"
+      },
+      "chips": [
+        {
+          "en": "13 tools, one popup",
+          "ja": "1つのポップアップに13機能",
+          "zh_TW": "13項功能整合於同一面板",
+          "de": "13 Werkzeuge, ein Popup",
+          "zh_CN": "13项功能集于同一面板",
+          "ko": "팝업 하나에 13가지 기능",
+          "es": "13 herramientas en un solo popup",
+          "fr": "13 outils dans une seule fenêtre",
+          "pt_BR": "13 ferramentas em um só popup"
+        },
+        {
+          "en": "Everything off until you opt in",
+          "ja": "インストール直後はすべてOFF",
+          "zh_TW": "安裝後全部預設關閉",
+          "de": "Alles aus, bis Sie es einschalten",
+          "zh_CN": "安装后默认全部关闭",
+          "ko": "설치 직후에는 모두 꺼짐",
+          "es": "Todo desactivado hasta que usted lo active",
+          "fr": "Tout reste désactivé tant que vous ne l’activez pas",
+          "pt_BR": "Tudo desativado até você ativar"
+        },
+        {
+          "en": "9 display languages",
+          "ja": "9言語の表示に対応",
+          "zh_TW": "支援9種顯示語言",
+          "de": "9 Anzeigesprachen",
+          "zh_CN": "支持9种显示语言",
+          "ko": "9개 표시 언어 지원",
+          "es": "9 idiomas de interfaz",
+          "fr": "9 langues d’affichage",
+          "pt_BR": "9 idiomas de exibição"
+        }
+      ]
+    },
+    {
+      "layout": "feature",
+      "capture": "popup-youtube",
+      "kicker": {
+        "msg": "tabYoutube"
+      },
+      "title": {
+        "en": "Tidy YouTube, just the way you want",
+        "ja": "YouTubeを、必要なぶんだけ整える",
+        "zh_TW": "依需求整理\nYouTube",
+        "de": "YouTube so aufräumen, wie Sie es wollen",
+        "zh_CN": "按需整理\nYouTube",
+        "ko": "YouTube를 필요한 만큼만 깔끔하게",
+        "es": "Ordene YouTube a su manera",
+        "fr": "YouTube, épuré comme vous l’entendez",
+        "pt_BR": "Organize o YouTube do seu jeito"
+      },
+      "body": {
+        "en": "Choose from 40 options such as hiding Shorts, comments and live chat, or a grid view for subscriptions.",
+        "ja": "Shorts・コメント欄・ライブチャットの[[非表示]]や、登録チャンネルのグリッド表示など、40のサブ機能から選べます。",
+        "zh_TW": "可從40項子功能中挑選，例如隱藏Shorts、[[留言區]]與即時聊天，或以格狀顯示訂閱頻道。",
+        "de": "40 Optionen zur Auswahl, etwa Shorts, Kommentare und Live-Chat ausblenden oder Abos als Raster anzeigen.",
+        "zh_CN": "可从40项子功能中挑选，例如隐藏Shorts、[[评论区]]和直播聊天，或以网格显示订阅频道。",
+        "ko": "Shorts·댓글·라이브 채팅 숨기기, 구독 채널 그리드 보기 등 40가지 세부 기능 중에서 고를 수 있습니다.",
+        "es": "Elija entre 40 opciones, como ocultar Shorts, comentarios y chat en directo, o ver las suscripciones en cuadrícula.",
+        "fr": "Choisissez parmi 40 options, comme masquer les Shorts, les commentaires et le chat en direct, ou afficher les abonnements en grille.",
+        "pt_BR": "Escolha entre 40 opções, como ocultar Shorts, comentários e chat ao vivo, ou ver as inscrições em grade."
+      },
+      "bullets": [
+        {
+          "en": "Archive streams show their broadcast time",
+          "ja": "配信アーカイブに配信時刻を表示",
+          "zh_TW": "直播存檔顯示當時的直播時間",
+          "de": "Archivierte Streams zeigen die Sendezeit",
+          "zh_CN": "直播存档显示当时的直播时间",
+          "ko": "라이브 다시 보기에 방송 시각 표시",
+          "es": "Los directos archivados muestran su hora de emisión",
+          "fr": "Les rediffusions de directs affichent leur heure de diffusion",
+          "pt_BR": "Transmissões arquivadas mostram o horário da live"
+        },
+        {
+          "en": "Quality, speed and volume from the player bar",
+          "ja": "画質・速度・音量をプレーヤー上で変更",
+          "zh_TW": "在播放器上調整畫質、速度與音量",
+          "de": "Qualität, Tempo und Lautstärke direkt im Player",
+          "zh_CN": "在播放器上调整画质、速度和音量",
+          "ko": "플레이어에서 화질·속도·음량 조절",
+          "es": "Calidad, velocidad y volumen desde el propio reproductor",
+          "fr": "Qualité, vitesse et volume depuis le lecteur",
+          "pt_BR": "Qualidade, velocidade e volume direto no player"
+        },
+        {
+          "en": "Reverse playlist playback",
+          "ja": "再生リストの逆順再生",
+          "zh_TW": "播放清單倒序播放",
+          "de": "Wiedergabelisten rückwärts abspielen",
+          "zh_CN": "播放列表倒序播放",
+          "ko": "재생목록 거꾸로 재생",
+          "es": "Reproducción inversa de listas",
+          "fr": "Lecture inversée des playlists",
+          "pt_BR": "Reprodução invertida de playlists"
+        }
+      ]
+    },
+    {
+      "layout": "feature",
+      "capture": "popup-picker",
+      "kicker": {
+        "msg": "tabPicker"
+      },
+      "title": {
+        "en": "Pick any color on screen",
+        "ja": "画面の色を採取して、すぐコピー",
+        "zh_TW": "擷取畫面上的顏色",
+        "de": "Jede Farbe auf dem Bildschirm aufnehmen",
+        "zh_CN": "拾取屏幕上的任意颜色",
+        "ko": "화면의 색을 추출하세요",
+        "es": "Capture cualquier color de la pantalla",
+        "fr": "Prélevez n’importe quelle couleur à l’écran",
+        "pt_BR": "Capture qualquer cor da tela"
+      },
+      "body": {
+        "en": "Copy colors as HEX, RGB or HSL. Your last 20 picks are kept in the history.",
+        "ja": "HEX・RGB・HSLの形式でコピーでき、採取した色は最大20件の履歴に残ります。",
+        "zh_TW": "可用HEX、RGB或HSL格式複製，擷取的顏色最多保留20筆記錄。",
+        "de": "Farben als HEX, RGB oder HSL kopieren. Die letzten 20 Farben bleiben im Verlauf.",
+        "zh_CN": "可用HEX、RGB或HSL格式复制，拾取的颜色最多保留20条历史记录。",
+        "ko": "HEX·RGB·HSL 형식으로 복사할 수 있고, 추출한 색은 최대 20개까지 기록에 남습니다.",
+        "es": "Copie los colores como HEX, RGB o HSL. Los últimos 20 colores quedan en el historial.",
+        "fr": "Copiez les couleurs en HEX, RGB ou HSL. Les 20 dernières couleurs restent dans l’historique.",
+        "pt_BR": "Copie as cores em HEX, RGB ou HSL. As últimas 20 cores ficam no histórico."
+      },
+      "bullets": [
+        {
+          "en": "Eyedropper for any pixel on screen",
+          "ja": "スポイトで画面上の任意の色を指定",
+          "zh_TW": "以滴管選取畫面上任一色彩",
+          "de": "Pipette für jede Stelle auf dem Bildschirm",
+          "zh_CN": "用吸管选取屏幕上任意位置的颜色",
+          "ko": "스포이트로 화면의 어느 색이든 지정",
+          "es": "Cuentagotas para cualquier punto de la pantalla",
+          "fr": "Pipette pour n’importe quel point de l’écran",
+          "pt_BR": "Conta-gotas para qualquer ponto da tela"
+        },
+        {
+          "en": "Type or paste a color code to save it",
+          "ja": "色コードを入力して履歴へ保存",
+          "zh_TW": "輸入色彩代碼即可存入記錄",
+          "de": "Farbcode eintippen und im Verlauf speichern",
+          "zh_CN": "输入颜色代码即可存入历史记录",
+          "ko": "색상 코드를 입력해 기록에 저장",
+          "es": "Escriba un código de color para guardarlo",
+          "fr": "Saisissez un code couleur pour l’enregistrer",
+          "pt_BR": "Digite um código de cor para salvá-lo"
+        }
+      ]
+    }
+  ],
+  "tiles": {
+    "tagline": "13 browsing tools in one popup",
+    "capture": "popup-tune"
+  }
+}

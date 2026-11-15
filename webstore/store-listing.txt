@@ -115,15 +115,13 @@ Vuora
 → images/icon-128.png
 
 ■ スクリーンショット（1280x800）※最大5枚、最低1枚
-  1枚目: webstore/images/01-popup-ui-1280x800.png
-  2枚目: webstore/images/02-features-1280x800.png
-  3枚目: webstore/images/03-hero-promo-1280x800.png
+  ロケール別（en ja zh_CN zh_TW ko es fr de pt_BR）に各 3 枚: webstore/images/<ロケール>/screenshot-01.png 〜 screenshot-03.png
 
 ■ プロモーション タイル（小）（440x280）※任意
-→ webstore/images/promo-small-440x280.png
+→ webstore/images/tile-small.png
 
 ■ マーキー プロモーション タイル（1400x560）※任意
-→ webstore/images/promo-marquee-1400x560.png
+→ webstore/images/tile-marquee.png
 
 ------------------------------------------------------------
 
