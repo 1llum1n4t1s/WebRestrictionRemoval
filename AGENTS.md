@@ -19,7 +19,7 @@ Vuora は Chrome / Firefox 拡張機能 (Manifest V3)。Web ブラウジング�
 | TikTok クリーナー サブ機能 | 3 | `TikTokCleaner.FEATURES` |
 | X クリーナー サブ機能 | 10 | `XCleaner.FEATURES`（レイアウト 4 + ノイズ除去 4 + タイムライン 1 + 追加機能 1） |
 | Firefox 提供機能 | 13 | 全 13 機能（音量ブースターは Firefox 専用 MES 経路 `volume-booster-mes.js`。EME_HOSTS の DRM サイトでは無効） |
-| `globalThis` 公開定数 | 29 | `actions-core.js` / `actions-video.js` / `actions-loupe.js` / `actions-volume.js` / `actions.js` の合計 25 名前空間（`test/actions.test.js` の `required` 配列が単一情報源）+ ScanRunner + AudioPipeline + CleanerCore + SettingsBackup。※ `rg "globalThis\.\w+ = "` は二重ロード防止フラグ（`__cpaActionsLoaded` / `__cpaActionsCoreLoaded` / `__cpaActionsVideoLoaded` / `__cpaActionsLoupeLoaded` / `__cpaActionsVolumeLoaded` / `__cpaAudioPipelineLoaded`）も拾うので、素の grep 件数は名前空間数と一致しない |
+| `globalThis` 公開定数 | 29 | `test/actions.test.js` の `required` 配列の 25 名前空間（`actions-*.js` 5 本と `Localizer`＝`src/shared/ui-localizer.js`）+ ScanRunner + AudioPipeline + CleanerCore + SettingsBackup。※ `rg "globalThis\.\w+ = "` は二重ロード防止フラグ（`__cpa*Loaded`）も拾うため、素の grep 件数は名前空間数と一致しない |
 | カラーピッカー履歴上限 | 20 件 | `ColorPicker.HISTORY_LIMIT` |
 | popup タブ数 | 8 | `PopupTabs.ALL`（調整 / YouTube / X / Instagram / TikTok / Wikipedia / カラーピッカー / 設定） |
 | YouTube 機能拡張 カテゴリ数 | 5 | `SearchFixer.CATEGORIES`（menu_ui / video_filter / watch_page / search_only / integration） |
@@ -60,64 +60,54 @@ bun --bun run ci:install           # 同じ固定復元入口の互換名
 bun --bun run build                # アイコン + スクリーンショット一括生成
 bun --bun run generate-icons       # icons/icon.svg → icons/icon-{16,48,128}.png (sharp)
 bun --bun run generate-screenshots # webstore/store-assets.json → webstore/images/<locale>/screenshot-NN.png + tile-*.png (vitrina。Windows は release=実拡張で 9 言語、それ以外は smoke)
-bun --bun run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + globalThis 定数列挙 (/rere D-004 + /opop Phase 1 で導入、v1.0.31 で Dependabot 経由 v10 化)
+bun --bun run lint                 # ESLint v10 flat config + no-implicit-globals (warn) + globalThis 定数列挙
 bun --bun run test                     # Bun の node:test 互換テスト（件数は出力サマリ `tests N` を正とする）
 bun test ./test/actions.test.js                  # 単一テストファイルのみ実行 (さらに --test-name-pattern="FEATURES" で個別ケース絞り込み)
 pwsh -NoProfile -File zip.ps1  # ストア申請用 ZIP (Windows、Unix は ./zip.sh)
 ```
 
-Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-firefox-background.js` を正本とし、`zip.ps1` / `zip.sh` / 配布 CI で共用する。
+Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-firefox-background.js` が正本で、`zip.ps1` / `zip.sh` / 配布 CI が共用する。
 
 テストファイルの担当範囲:
 
 | ファイル | 担当 |
 |---|---|
 | `test/actions.test.js` | 純粋関数の境界値 + FEATURES 件数 + `globalThis` 公開名の drift 検知（詳細は Key Files 表） |
-| `test/syntax-check.test.js` | `src/**/*.js` を動的列挙して classic script は `vm.Script`、HTML の module 宣言対象は Bun の `SourceTextModule()` で構文 check（content_scripts の追加・削除で手動更新が要らない） |
+| `test/syntax-check.test.js` | `src/**/*.js` を動的列挙し、classic script は `vm.Script`、HTML の module 宣言対象は `SourceTextModule()` で構文 check |
 | `test/manifest-drift.test.js` | `manifest.json` と `manifest.firefox.json` の content_scripts 一致検証 |
 | `test/audio-pipeline.test.js` | `src/lib/audio-pipeline.js` の DSP ヘルパー |
 | `test/kagayoi-support.test.js` | 同梱した問い合わせ部品と popup / manifest / プライバシーポリシーの契約・正本一致検証 |
 | `test/settings-backup.test.js` | 設定JSONの往復・許可リスト・型と容量の検証 |
 | `test/settings-sync.test.js` | 設定同期のオプトイン・競合解決・削除伝播・再起動回復・容量超過時の保持 |
-| `test/subscriptions-relevant.test.js` | 登録フィードの「関連が強い」欄だけの非表示と、OFF・SPA 遷移・DOM 再利用時の復元 |
-| `test/settings-application.test.js` | popup の部分更新・同期世代と保存キュー・Chrome 音量設定の全ブーストタブ反映 |
-| `test/instagram-cleaner.test.js` | コメントと本文の分離、投稿動画の再生抑止、OFF・context 失効時の復元 |
-| `test/image-downloader.test.js` | TikTok の安全な挿入先、共有コンテナ内の画像別ボタン所有・URL・位置・撤去 |
-| `test/instagram-video-controls.test.js` | Instagram 動画コントロールの Space 抑止・再生切替・入力除外・repeat・OFF cleanup |
-| `test/actions-loading.test.js` | popup / offscreen / 両 background と各注入エントリの分割定義の読み込み順・依存閉包・再評価時の参照同一性 |
-| `test/youtube-playlist-reverse.test.js` | 再生リスト逆順再生の MAIN 側判定（次へ / 前への入れ替え、最後の動画の終了、ループ折り返し、heartbeat 途絶時の撤去） |
-| `test/localizer.test.js` | `Localizer` の文言差し込み・`chrome.i18n` への差し替えとフォールバック・storage 変更の反映 |
-| `test/locales.test.js` | 全ロケールが英語と同じキー・順序・placeholders を持ち空文言がないこと、appName 45 / appDescription 132 文字以内、popup.html の data-i18n が英語に存在すること。言語追加時は EXPECTED を更新 |
-| `test/youtube-game-crop.test.js` | ゲーム画面拡大の純粋な計算（範囲の正規化・保存上限・倍率と中心合わせ・clip）。DOM 描画は実ブラウザで確認 |
-| `test/broadcast-clock-render.test.js` | 配信時刻オーバーレイの描画間引き中の最終位置の追従描画（一時停止直前の時刻を残さない）と撤去時の予約取消 |
-| `test/live-chat-collapse.test.js` | ライブチャット折りたたみの遷移後の再適用・手動再表示の維持、遷移中 OFF・失効時の解除 |
+| `test/subscriptions-relevant.test.js` | 登録フィード「関連が強い」欄の非表示と OFF・SPA 遷移・DOM 再利用時の復元 |
+| `test/settings-application.test.js` | popup の部分更新・同期世代と保存キュー・音量設定の全ブーストタブ反映 |
+| `test/instagram-cleaner.test.js` / `test/instagram-video-controls.test.js` | Instagram のコメントと本文の分離・動画再生抑止・Space/repeat 操作と、OFF・context 失効時の復元 |
+| `test/image-downloader.test.js` | TikTok の挿入先、共有コンテナ内の画像別ボタンの所有・URL・位置・撤去 |
+| `test/actions-loading.test.js` | 各エントリの分割定義の読み込み順・依存閉包・再評価時の参照同一性 |
+| `test/youtube-playlist-reverse.test.js` | 再生リスト逆順再生の MAIN 側判定と heartbeat 途絶時の撤去 |
+| `test/localizer.test.js` | `Localizer` の文言差し込み・`chrome.i18n` 差し替えとフォールバック・storage 変更の反映 |
+| `test/locales.test.js` | 全ロケールが英語と同じキー・順序・placeholders で空文言なし、appName 45 / appDescription 132 文字以内、popup.html の data-i18n が英語に存在すること。言語追加時は EXPECTED を更新 |
+| `test/youtube-game-crop.test.js` | ゲーム画面拡大の純粋な計算。DOM 描画は実ブラウザで確認 |
+| `test/broadcast-clock-render.test.js` / `live-chat-collapse` / `video-adjustments` / `loupe-bodyless`（同 `.test.js`） | 配信時刻の描画追従と撤去、ライブチャット折りたたみの再適用と OFF 復元、ガンマ補正・黒帯除去の OFF 時非接触と復元、body 無し文書でのルーペ起動 |
 | `test/search-fixer-blocked-channels.test.js` | チャンネル除外リストの storage 通知反映・500件上限・初期取得より新しい通知の優先 |
-| `test/video-adjustments.test.js` | ガンマ補正 / 黒帯除去の OFF 時非接触・元の inline style 復元・metadata 待機の解除 |
-| `test/background-installed.test.js` | onInstalled の storage 読み取り失敗時も sentinel まで進み、既存設定を既定値で上書きしない |
-| `test/offscreen-audio-init.test.js` | 音量ブースター初期化失敗時の track 停止 → AudioContext close の解放順 |
-| `test/loupe-bodyless.test.js` | body の無い文書でルーペが起動状態に固着せず、body 取得後に起動する |
-| `test/early-orphan.test.js` | TikTok / X の early で context 失効後に pre クラスを撤去する |
-| `scripts/Install-Dependencies.test.mjs` | `bun run deps` の固定復元入口が版不一致・lock 欠落・不正を拒否すること |
-| `scripts/dependency-security.test.cjs` | deepmerge patch の prototype 汚染防止と通常 API の維持、minimatch / multimatch override・ESLint 設定経路の import patch・web-ext FileFilter の除外維持（`bun run test:dependencies` でも単独実行） |
-| `test/_load-actions.js` | 上記から共有する分割定義ロード用ヘルパー。Bun の探索規則に従うため、総件数は `bun --bun run test` の出力を正とする |
+| `test/background-installed.test.js` / `offscreen-audio-init` / `early-orphan`（同 `.test.js`） | onInstalled の読み取り失敗時に既存設定を上書きしない、音量ブースター初期化失敗時の解放順、early の context 失効後の pre クラス撤去 |
+| `scripts/Install-Dependencies.test.mjs` / `scripts/dependency-security.test.cjs` | `bun run deps` が版不一致・lock 欠落・不正を拒否すること、deepmerge patch・minimatch / multimatch override・import patch・web-ext FileFilter の維持（後者は `bun run test:dependencies` でも単独実行） |
+| `test/_load-actions.js` | 分割定義ロード用の共有ヘルパー。総件数は `bun --bun run test` の出力を正とする |
 | `scripts/verify-*.js` | 実ブラウザ（Puppeteer）の手動 E2E。`bun --bun run test` の対象外。未使用の絶対パスを `VUORA_BROWSER_TEST_DIR` に渡して `bun test ./scripts/verify-popup-settings.js` のように個別実行する |
 
 ### 依存パッケージの運用
 
 - **`package.json` の overrides / trustedDependencies が依存制約とビルド許可の正本**。公開後24時間の待機と検証済み版の例外は `bunfig.toml` に置く。
-- `web-ext` 配下の推移依存のセキュリティ修正は `package.json` の overrides で維持する。新規 advisory は `bun why <package>` で経路と修正版を確認する。
-- `bunfig.toml` の `minimumReleaseAge = 86400` で公開後24時間の待機を維持する。検証済みの正確な版だけ `minimumReleaseAgeExcludes` に追加する。
+- `web-ext` 配下の推移依存の修正は overrides で維持する。新規 advisory は `bun why <package>` で経路と修正版を確認する。
+- `bunfig.toml` の `minimumReleaseAge = 86400` を維持し、検証済みの正確な版だけ `minimumReleaseAgeExcludes` に追加する。
 - `@kagayoi/support-extension` は exact 固定し、`bun --bun run sync:support` で `src/shared/kagayoi-support-*` を正本から同期する。同梱コピーへ製品固有の変更を加えず、正本一致は `bun --bun run kagayoi-support-sync --check` で検証する。
-- **GitHub Actions は SHA ピン + タグコメント運用**。Dependabot は SHA だけ更新して**コメントの version 表記は直さない**ので、bump PR を取り込んだら `gh api repos/<owner>/<repo>/git/matching-refs/tags` で SHA → タグを引き直してコメントを合わせる（実例: v6.0.0 表記のまま v7.0.1 へ上がっていた）。
+- **GitHub Actions は SHA ピン + タグコメント運用**。Dependabot は SHA だけ更新して**コメントの version 表記は直さない**ので、bump PR を取り込んだら `gh api repos/<owner>/<repo>/git/matching-refs/tags` で SHA → タグを引き直してコメントを合わせる。
 - 依存更新の正規ルートは `/deps` スキル。バージョン番号（`manifest.json` / `package.json`）には触れない。
 
 ## Development Workflow
 
 ### Chrome に未パッケージ拡張機能をロード
-1. `chrome://extensions` を開く → デベロッパーモード ON
-2. 「パッケージ化されていない拡張機能を読み込む」→ プロジェクトルートを選択
-3. コード変更後は拡張機能カードの 🔄 リロードボタン
-4. content script 変更時は対象タブを再読込、background SW 変更時は SW 再起動が必要
+`chrome://extensions` でデベロッパーモード ON →「パッケージ化されていない拡張機能を読み込む」でプロジェクトルートを選ぶ。コード変更後は拡張機能カードのリロード、content script 変更時は対象タブの再読込、background SW 変更時は SW 再起動が必要。
 
 ### JS 構文チェック / テスト
 コード変更後は以下 1 コマンドを実行（構文 check + 純粋関数テスト + drift 検知をすべて含む）:
@@ -126,17 +116,9 @@ Firefox 用 background の Chrome 専用ブロック除去は `scripts/strip-fir
 bun --bun run test
 ```
 
-内訳（担当範囲の一覧は §Build Commands のテスト表を参照）:
-- `test/syntax-check.test.js` が `src/**/*.js` を**動的列挙**して構文 check する（ファイル数はハードコードしないので、content_scripts を増減しても更新不要）
-- `test/actions.test.js` が `globalThis` 公開名 / FEATURES 件数 / Loupe 純粋関数 / extractHandleFromHref Unicode 境界値 / BroadcastClock 純粋関数（videoId 抽出 / liveBroadcastDetails パース / 配信時刻算出 / yyyy/MM/dd　hh:mm:ss 整形）境界値 / SettingsSchema 整合 / **EQ 定数・clamp 関数・プリセット境界値・コミュニティ 4 プリセット (eargasm/eargasmKai/perfect/perfectKai) 値固定** をアサート
+担当範囲の一覧は §Build Commands のテスト表を参照する。`test/syntax-check.test.js` は `src/**/*.js` を動的列挙するため、content_scripts を増減しても更新不要。`test/actions.test.js` は `globalThis` 公開名・FEATURES 件数・各純粋関数の境界値・SettingsSchema 整合・EQ 定数とコミュニティ 4 プリセットの値固定をアサートする。Lint は `bun --bun run lint`。
 
-Lint は ESLint v10 flat config:
-
-```bash
-bun --bun run lint
-```
-
-- **Chrome を起動するスクリプトを足すときはシード必須**: puppeteer.launch・chrome-launcher・Chrome の直接起動は、起動前に user-data-dir の `Local State` へ `{"password_manager":{"os_password_blank":false,"os_password_last_changed":"9223372036854775000"}}` を書く。Windows の Chromium は新規プロファイルごとに空パスワードで LogonUser を呼び（`password_manager_util_win.cc` の `CheckBlankPasswordWithPrefs`）、ログオン失敗（Security 4625）として数えられるため、並列・連続起動で Windows アカウントがロックされる（2026-11-15 実害）。`scripts/chrome-profile-seed.mjs` の `createSeededProfile()` / `seedChromeProfile()` を使い、userDataDir 未指定の起動は作らない（`webstore/vitrina/` は逐語コピーで対策済み）。
+- **Chrome を起動するスクリプトを足すときはシード必須**: puppeteer.launch・chrome-launcher・Chrome の直接起動は、起動前に user-data-dir の `Local State` へ `{"password_manager":{"os_password_blank":false,"os_password_last_changed":"9223372036854775000"}}` を書く。Windows の Chromium は新規プロファイルごとに空パスワードで LogonUser を呼び、ログオン失敗（Security 4625）として数えられて並列・連続起動で Windows アカウントがロックされるため。`scripts/chrome-profile-seed.mjs` の `createSeededProfile()` / `seedChromeProfile()` を使い、userDataDir 未指定の起動は作らない（`webstore/vitrina/` は対策済み）。
 
 ### デバッグ
 - popup: ポップアップ右クリック →「検証」で DevTools
@@ -199,37 +181,32 @@ bun "$HOME/.agents/skills/vava/scripts/update-amo-listing.mjs" --slug 'web-viewi
 
 ### AMO 公開のHTTP境界
 
-公開workflowは最終XPIを配布物検証へ通し、SHA-256・GUID・versionを `scripts/Publish-Amo.ps1`（PowerShell 7.2 以上）へ渡す。JWT認証・全ページの非公開listed版検査・upload検証・GUIDへのPUT提出の受付応答まで確認し、同一snapshotでhash検証と送信を行う。保存UUIDの再利用・重複・不明な受付結果は停止する。CI成功は審査完了・ストア公開を意味しない。
+公開workflowは最終XPIを配布物検証へ通し、SHA-256・GUID・versionを `scripts/Publish-Amo.ps1`（PowerShell 7.2 以上）へ渡す。JWT認証・非公開listed版検査・upload検証・GUIDへのPUT提出の受付応答まで確認し、同一snapshotでhash検証と送信を行う。保存UUIDの再利用・重複・不明な受付結果は停止する。CI成功は審査完了・ストア公開を意味しない。
 
 ### CI中間成果物
 
-job間の検証済み成果物はprivate R2へSigV4で保存し、repository・commit・run・producer attemptのidentityと各ファイルのSHA-256/サイズを検証して復元する。設定は `vars.CLOUDFLARE_ACCOUNT_ID` / `vars.R2_ARTIFACT_BUCKET` と `secrets.R2_ARTIFACT_ACCESS_KEY_ID` / `secrets.R2_ARTIFACT_SECRET_ACCESS_KEY`（当該bucket限定）。`ci-artifacts/` は30日で削除され、恒久配布とは区別する。
+job間の検証済み成果物はprivate R2へSigV4で保存し、repository・commit・run・producer attemptのidentityと各ファイルのSHA-256/サイズを検証して復元する。設定は `vars.CLOUDFLARE_ACCOUNT_ID` / `vars.R2_ARTIFACT_BUCKET` と当該bucket限定の `secrets.R2_ARTIFACT_*`（access key id / secret）。`ci-artifacts/` は30日で削除され、恒久配布とは区別する。
 
-CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使い、同期upload成功・応答ID・manifest版の一致を確認する（既定の `-Stage All` はその後publishまで行うが、CIは `-Stage Upload` でアップロードだけを行い、申請は `cws-submit.yml` が `-Stage Publish` で行う）。非同期uploadは版を確定できないため自動publishせず停止する。公開workflowは `queue: max` で直列化し、Dashboardや他の手動公開と並行しない。
+CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使い、同期upload成功・応答ID・manifest版の一致を確認する。非同期uploadは版を確定できないため自動publishせず停止する。公開workflowは `queue: max` で直列化し、Dashboardや他の手動公開と並行しない。
 
 ### CWS のアップロードと申請の分離
 
-`publish.yml` は検証済みZIPを `-Stage Upload` で下書きとしてアップロードするだけで、審査へは申請しない。新ロケールの掲載画像欄はアップロード後でないと Dashboard に出ないため、申請は別workflow `.github/workflows/cws-submit.yml`（手動実行、`-Stage Publish`）で行う。
+`publish.yml` は検証済みZIPを `-Stage Upload` で下書きとしてアップロードするだけで、審査へは申請しない（スクリプト既定の `-Stage All` はpublishまで行う）。新ロケールの掲載画像欄はアップロード後でないと Dashboard に出ないため、申請は別workflow `cws-submit.yml`（手動実行、`-Stage Publish`、`environment: chrome-web-store`）で行う。
 
 1. `release/x.y.z` を push する（publish.yml がアップロードする）
 2. Dashboard（Edictora）でロケール別の掲載画像などを整えて下書き保存する
 3. `gh workflow run cws-submit.yml -f version=x.y.z --ref release/x.y.z` で申請する
 
-- API v2 は未申請の下書き版を返さないため、下書きの版そのものは確認できない。`cws-submit.yml` は次を満たす場合だけ `:publish` する: 実行 ref が `release/<version>` で manifest の版が入力と一致する。`publish.yml` の直近のアップロード成功 run（固定ステップ名 `Chrome Web Store にアップロード（下書き）`。`actions: read` で履歴を参照）が同じ commit である。fetchStatus で item identity・直近アップロード状態・公開/審査中の版を確認できる。
+- API v2 は未申請の下書き版を返さないため、`cws-submit.yml` は実行 ref が `release/<version>` で manifest の版が入力と一致し、`publish.yml` の直近のアップロード成功 run（固定ステップ名 `Chrome Web Store にアップロード（下書き）`）が同じ commit の場合だけ `:publish` する。Dashboard で手動アップロードした下書きなど該当 run が無い場合は申請されないため、Dashboard から手動で申請する。
 - 同版が申請済み・公開済み（PENDING_REVIEW / STAGED / PUBLISHED / PUBLISHED_TO_TESTERS）なら再送せず成功終了する。別版の審査中、より新しい版の存在、直近アップロードの進行中・失敗、状態不明は申請せず停止する。
-- Dashboard で手動アップロードした下書きなど、同じ commit のアップロード成功 run が無い場合は申請されない。その場合は Dashboard から手動で申請する。
 - 両workflowは同じ concurrency group で直列化する。申請中は Dashboard の操作を並行しない。
-- `cws-submit.yml` も `environment: chrome-web-store` を使う。
 
 ## Bun依存の脆弱性検出
 
-依存の固定復元は `bun run deps` を使う。lock欠落・破損を拒否し、`[run] bun=true` 経由で依存のpostinstallまでBunで実行する。Node.jsがあるPCでも通常の `bun install` を直接使う経路へ戻さない。
-
-依存更新は通常のDependabot PRで受け、Dependency validationで検証する。ローカルの `bun audit` でlock全体を監査できる。依存の自動修正・自動マージは行わない。
-
+依存の固定復元は `bun run deps` を使う。lock欠落・破損を拒否し、`[run] bun=true` 経由で依存のpostinstallまでBunで実行する。通常の `bun install` を直接使う経路へ戻さない。依存更新は通常のDependabot PRで受けDependency validationで検証し、ローカルの `bun audit` でlock全体を監査できる。依存の自動修正・自動マージは行わない。
 
 ### 依存の暫定セキュリティ修正
 
-minimatch は 11.0.4 以降、multimatch は named import 対応の 8 系へ override する。node-forge は web-ext → @devicefarmer/adbkit@3 の指定（`^1.3.1`）では 1.4.3 を許容するが、bun.lock の adbkit 依存記録が 1.4.2 のままで `bun audit fix` でも上がらないため、Forge の TLS・Ed25519・ReDoS 修正を含む 1.4.3 を下限として override する（override なしで lock が 1.4.3 以上へ解決されるようになった時点で撤去する）。ESLint 設定の ESM 経路は @eslint/eslintrc@3.3.7 と @eslint/config-array@0.21.2 の最小 import patch で互換性を保つ。web-ext@10.8.0 の FileFilter は Windows で windowsPathsNoEscape を明示し、開発用ファイルやアーカイブの除外を維持する。
+minimatch は 11.0.4 以降、multimatch は named import 対応の 8 系へ override する。node-forge は bun.lock の adbkit 依存記録が 1.4.2 のままで `bun audit fix` でも上がらないため、TLS・Ed25519・ReDoS 修正を含む 1.4.3 を下限として override する（override なしで lock が 1.4.3 以上へ解決されるようになった時点で撤去する）。ESLint 設定の ESM 経路は @eslint/eslintrc@3.3.7 と @eslint/config-array@0.21.2 の最小 import patch で互換性を保つ。web-ext@10.8.0 の FileFilter は Windows で windowsPathsNoEscape を明示し、開発用ファイルやアーカイブの除外を維持する。
 
-CVE-2026-93753（GHSA-gcqx-w48m-w2h4）の deepmerge 4.3.1 は公式修正版が未公開のため、patches/deepmerge@4.3.1.patch で戻り値への書込みを own データ属性にし、__proto__ 経由の prototype 汚染を防ぐ。bun run test:dependencies で web-ext → addons-linter の実解決先の攻撃入力と通常 API を検証する。Bun 標準の patchedDependencies で適用し、公式修正版の採用時に patch の要否を再確認する。バージョンベースの bun audit 警告は残るため、警告を除外したり成功扱いにしない。
+CVE-2026-93753（GHSA-gcqx-w48m-w2h4）の deepmerge 4.3.1 は公式修正版が未公開のため、Bun 標準の patchedDependencies（patches/deepmerge@4.3.1.patch）で戻り値への書込みを own データ属性にし、__proto__ 経由の prototype 汚染を防ぐ。`bun run test:dependencies` で攻撃入力と通常 API を検証し、公式修正版の採用時に patch の要否を再確認する。bun audit の警告は残るため、除外・成功扱いにしない。
