@@ -1,0 +1,86 @@
+Vuora es una extensión que reúne en una sola ventana emergente 13 funciones para que la navegación web diaria resulte más cómoda. Las 12 funciones, salvo el Selector de color, se pueden activar y desactivar por separado, y todas están desactivadas de forma predeterminada. Puede activar solo las que quiera usar.
+
+■ Funciones principales
+
+・📺 Mejoras de YouTube (desactivada de forma predeterminada)
+  40 subfunciones que se activan y desactivan una por una.
+  Filtro de videos: oculta listas de reproducción / mixes / videos de Shorts / estantes de Shorts / directos, estrenos y estaciones / exclusivos para miembros / videos ya vistos / secciones recomendadas de la página de inicio. Incluye una lista de canales bloqueados que elimina de todo YouTube los videos de los canales registrados, la opción de ocultar «Más relevantes» de las suscripciones y la exclusión de videos de canales de otros países distintos del suyo.
+  Resultados de búsqueda: oculta estantes de videos, listas de tarjetas, cursos, presentaciones de canales, estantes horizontales de Shorts, búsquedas relacionadas y chips de filtro de Shorts, entre otros; oculta canales verificados, canales de artistas y videos con capítulos; muestra en gris los videos que no contienen el término buscado; añade un borde a las miniaturas y muestra los resultados en cuadrícula.
+  Página de reproducción: oculta los comentarios y el chat en directo, muestra la hora real de emisión en los archivos de directos, ofrece control de latencia en vivo (permite configurar cómo se recupera el retraso y la visualización de los indicadores del directo), cambia la calidad, la velocidad de reproducción (de 0,25 a 2 veces) y el volumen del reproductor, y redirige las URL de Shorts a la página de reproducción normal. En las listas de reproducción registradas al revés, como de Part10 a Part1, el botón «Invertir» del panel de la lista permite reproducirlas empezando por el último video (siguiente, anterior y reproducción automática también van al revés). En los directos en los que el emisor coloca el juego en una parte de la pantalla, solo se amplía a todo el reproductor la pantalla de juego que usted delimite arrastrando (el área se guarda en su dispositivo para cada canal).
+  Menú / diseño: oculta el elemento de Shorts de la barra lateral, muestra todas las suscripciones en el menú izquierdo, añade un acceso directo a «Todas las suscripciones», convierte la lista de suscripciones en una cuadrícula (con búsqueda por nombre de canal y por identificador) y alinea en cuadrícula la página de inicio y los feeds (con número de columnas a elegir).
+  Integraciones: añade como fuentes a Gemini Notebook, en su propia cuenta de Google, el video que está viendo, los resultados de búsqueda, las listas de reproducción y los videos de un canal.
+  La calidad, la velocidad, el volumen, los indicadores del directo, la ampliación de la pantalla de juego y la hora de emisión aparecen como pequeños chips en una sola fila justo encima de la barra de controles, por lo que casi no tapan el video. El resto de los ajustes se abre desde el botón de engranaje y se puede cambiar durante la reproducción. Para cambiar la calidad, la velocidad y el volumen puede asignar teclas en los ajustes de atajos de extensiones del navegador.
+
+・🐦 Limpiador de X (desactivada de forma predeterminada)
+  10 subfunciones que ordenan los elementos que distraen en X (antes Twitter).
+  Diseño: oculta el panel derecho (la cronología se amplía en el espacio liberado) / tendencias / usuarios sugeridos / el dock de mensajes de la parte inferior derecha
+  Ruido: oculta las publicaciones promocionadas / las invitaciones a Premium / Grok / los recuentos de reacciones (respuestas, reposts, Me gusta, visualizaciones)
+  Cronología: abre la página de inicio en la pestaña «Siguiendo»
+  Extras: al pasar el ratón sobre la imagen de una publicación, muestra un botón de guardado y la guarda en calidad original
+
+・📷 Limpiador de Instagram (desactivada de forma predeterminada)
+  12 subfunciones que ordenan los elementos redundantes y añaden controles de video.
+  Principal: eliminar Reels (incluida la redirección de URL) / eliminar Explore / ocultar la fila de Stories de la página de inicio / devolver las URL de Stories a la página de inicio / ocultar las invitaciones a Threads
+  Extras: ocultar los recuentos de Me gusta y de seguidores / evitar la reproducción automática de videos en las publicaciones / ocultar los comentarios / ocultar Notes / ocultar el número de mensajes nuevos / mostrar una barra de búsqueda en los videos (si está activada, la barra espaciadora reproduce y pausa) / mostrar un botón de guardado en las fotos de las publicaciones
+
+・🎵 Limpiador de TikTok (desactivada de forma predeterminada)
+  Tiene 3 subfunciones: ocultar los comentarios / ocultar las cuentas recomendadas / mostrar un botón de guardado en las imágenes de las publicaciones.
+
+・📖 Ajustes de lectura de Wikipedia (desactivada de forma predeterminada)
+  Reorganiza los artículos de Wikipedia en un diseño de lectura más cómodo, centrado en la búsqueda, el índice, el texto y el cuadro de información, y permite ajustar los colores, la tipografía del texto y de los títulos, el tamaño de letra, el interlineado, el ancho del artículo, la visualización de los enlaces y el área visible del artículo (todo / texto e imágenes / solo texto). Incluye 7 tipografías japonesas, por lo que no se descargan fuentes del exterior.
+  Subfunciones: nuevo diseño de artículo / índice fijo / ampliación de imágenes / vista previa de enlaces y notas al pie / ocultar el panel «Apariencia» / ajustar el texto a un ancho determinado
+  El texto del artículo, los accesos a la edición y la atribución se conservan tal cual, y no se redirige a sitios externos ni se obtienen artículos por cuenta propia. Al desactivarla se restablece la estructura original de la página.
+
+・📦 Total mensual de Suscríbete y ahorra de Amazon (desactivada de forma predeterminada)
+  Muestra en la pantalla de gestión de Suscríbete y ahorra (Subscribe & Save) de amazon.co.jp el importe total por mes de entrega (precio unitario × cantidad). Para los productos sin precio en la lista, obtiene de Amazon el precio actual de la suscripción y, si no puede obtenerlo, calcula un total de referencia con el precio unitario de la entrega anterior. El importe facturado puede variar y no se tienen en cuenta los cupones. Si no se dispone del importe de todos los productos, no se muestra un total parcial.
+
+・🏆 Botón para ir al ranking de Amazon (desactivada de forma predeterminada)
+  El enlace al «ranking de más vendidos» está en un lugar distinto en cada página de producto. Esta función lo reúne en un único botón en la parte superior de la información del producto. Al pulsarlo, lleva al ranking de la subcategoría más específica a la que pertenece el producto.
+
+・📦 Insignia de vendedor / remitente de Amazon (desactivada de forma predeterminada)
+  Lee el vendedor y el remitente de la página de producto y los muestra en la parte superior de la información del producto como una insignia «Vendido por: ○○ / Enviado por: ○○». Las ventas directas de Amazon se muestran en verde y las de vendedores del marketplace en naranja, lo que facilita comprobar quién vende antes de comprar.
+
+・🔊 Amplificador de volumen (desactivada de forma predeterminada)
+  Ajusta el volumen de la pestaña entre 0 y 300 %. Se aplica a la pestaña en la que se abre la ventana emergente y, en las pestañas que ya están amplificadas, se vuelve a aplicar automáticamente al cambiar de pestaña. Funciona en cualquier tipo de sitio.
+  ・Protección automática contra distorsión: reduce los picos repentinos de sonido fuerte y atenúa la saturación al amplificar
+  ・Modo nocturno: suaviza las voces fuertes y las explosiones para acortar la diferencia con los sonidos bajos
+  ・Protección contra golpes de graves: recorta los graves que retumban en paredes y suelos
+  ・Ecualizador de 10 bandas: ajusta cada banda de 32 Hz a 16 kHz en ±12 dB. Incluye preamplificador y 9 preajustes (al ajustar manualmente cambia a «Personalizado»)
+  ・Botón de silencio: silencia y restaura con un clic sin perder los ajustes
+  Estas subfunciones se pueden usar solas incluso con el volumen al 100 %. Cuando ya no hacen falta, el procesamiento de audio se libera de inmediato.
+
+・🎞️ Gamma de video (desactivada de forma predeterminada)
+  Aplica corrección gamma a los videos de la página. El centro del control deslizante (1,0) significa sin corrección; al moverlo a la derecha se aclaran las zonas oscuras y la imagen se ve más luminosa, y al moverlo a la izquierda aumenta el contraste y la imagen se oscurece (de 0,3 a 3,0). Es un ajuste común a todas las pestañas, incluidos los videos incrustados.
+
+・🖥️ Quitar barras negras del video (desactivada de forma predeterminada)
+  Elimina las barras negras que aparecen arriba y abajo o a los lados del video en monitores ultrapanorámicos y similares, mediante zoom (ampliación manteniendo la relación de aspecto) o estiramiento, para llenar la pantalla. Al elegir la relación de aspecto o la resolución de su monitor, la forma de cada video se detecta automáticamente.
+
+・🔍 Lupa (desactivada de forma predeterminada)
+  Una lupa circular que sigue al cursor del ratón. Captura la vista actual como imagen fija y la amplía, por lo que también permite examinar los detalles de un video en pausa. Puede ajustar el aumento a 1,5 / 2,5 / 4 veces y el diámetro de la lente de 150 a 1000 px. Al hacer clic izquierdo en la pantalla se desactiva.
+
+・🎨 Selector de color (siempre disponible)
+  Capture con el cuentagotas un color de la pantalla y cópielo al portapapeles en HEX, RGB o HSL. También puede pegar un código de color para registrarlo. Los colores capturados se guardan en su dispositivo como historial, hasta un máximo de 20.
+
+■ Cómo usar
+
+1. Haga clic en el icono de la barra de herramientas para abrir la ventana emergente
+2. Elija la pantalla que necesite en el selector de categorías de la parte superior
+3. Configure cada función con sus interruptores, controles deslizantes y campos de selección (los cambios se guardan automáticamente y se aplican de inmediato)
+
+El Amplificador de volumen, el Gamma de video, la eliminación de barras negras, la Lupa y las 3 funciones de Amazon están en «Ajustar». La última pantalla que abrió se conserva para la próxima vez.
+
+■ Guardar y cargar ajustes
+En «Ajustes» puede sincronizar la configuración entre varios equipos mediante la función de sincronización del navegador, y exportarla o importarla como archivo JSON. Se guardan los ajustes de todas las funciones, el ecualizador, los canales bloqueados, el historial de colores y la pantalla que se está mostrando, y se pueden trasladar a otro equipo o entre Chrome y Firefox. La activación de la sincronización, la cuenta de destino de Gemini Notebook, los datos de autenticación, la caché y la posición de los elementos en la página se conservan por dispositivo. La interfaz está disponible en 9 idiomas (japonés, inglés, chino〈simplificado y tradicional〉, coreano, español, francés, alemán y portugués〈Brasil〉); cambia según el idioma del navegador y también puede elegirlo junto al título de la ventana emergente. Es compatible con los temas claro y oscuro.
+
+■ Privacidad
+
+・Los ajustes se guardan normalmente en su dispositivo. Solo si activa la sincronización opcional de ajustes, los ajustes correspondientes se comparten a través del servicio de sincronización del navegador. El área de ampliación de la pantalla de juego y el idioma de la interfaz elegido se guardan únicamente en el dispositivo y no se sincronizan
+・No se recopila ni se envía el contenido de las páginas que visita ni el audio de las pestañas con fines publicitarios, analíticos o de telemetría. El Amplificador de volumen solo amplifica y reproduce el audio; no graba, guarda ni envía nada
+・Las comunicaciones externas se limitan a las necesarias para las siguientes funciones que usted utilice o active
+  - Guardado de imágenes de Instagram / TikTok / X: solo cuando pulsa el botón de guardado, se obtiene la imagen de los servidores de distribución de imágenes de cada servicio (no se envían cookies ni referer)
+  - Mejoras de YouTube: solo mientras están activadas la exclusión de canales de otros países, la visualización completa y en cuadrícula de las suscripciones y la hora de emisión, se obtienen de YouTube la información de los canales, la lista de suscripciones, las páginas de reproducción y otras, además de las miniaturas
+  - Envío a Gemini Notebook: solo cuando activa la subfunción y usa el panel de envío, se comunica con Gemini Notebook mediante la cuenta de Google con la que ha iniciado sesión, para comprobar el destino y añadir URL de videos y otros contenidos
+  - Total mensual de Suscríbete y ahorra de Amazon: solo mientras está activada, lee los precios de amazon.co.jp. No modifica pedidos ni entregas, y el resultado se conserva únicamente dentro de la página
+  - Sincronización de ajustes: usa el servicio de sincronización del navegador solo si la activa
+  - Contacto: solo cuando usted envía el formulario, el contenido introducido se envía a Kagayoi Support
+・No se envían datos de navegación a los servidores del desarrollador

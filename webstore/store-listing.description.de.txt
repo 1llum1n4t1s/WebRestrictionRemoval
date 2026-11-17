@@ -1,0 +1,86 @@
+Vuora ist eine Erweiterung, die 13 Funktionen für ein angenehmeres tägliches Surfen in einem einzigen Popup bündelt. Außer dem Farbwähler lassen sich die 12 Funktionen jeweils einzeln ein- und ausschalten; im Ausgangszustand sind alle ausgeschaltet. Sie können nur die Funktionen aktivieren, die Sie nutzen möchten.
+
+■ Hauptfunktionen
+
+・📺 YouTube-Erweiterungen (im Ausgangszustand aus)
+  40 Unterfunktionen, die sich einzeln ein- und ausschalten lassen.
+  Videofilter: Blendet Playlists / Mixe / Shorts-Videos / Shorts-Regale / Livestreams, Premieren und Stationen / Videos nur für Mitglieder / bereits angesehene Videos / empfohlene Bereiche der Startseite aus. Eine Kanal-Sperrliste entfernt die Videos der von Ihnen eingetragenen Kanäle auf ganz YouTube; zusätzlich können Sie „Am relevantesten“ in den Abos ausblenden und Videos von Kanälen außerhalb Ihres Landes ausschließen.
+  Suchergebnisse: Blendet Videoregale, Kartenlisten, Kurse, Kanalvorstellungen, horizontale Shorts-Regale, verwandte Suchanfragen, Shorts-Filter-Chips und Ähnliches aus; blendet verifizierte Kanäle, Künstlerkanäle und Videos mit Kapiteln aus; stellt Videos, die den Suchbegriff nicht enthalten, grau dar; zeichnet Vorschaubilder mit einem Rahmen und zeigt die Suchergebnisse als Raster an.
+  Wiedergabeseite: Blendet Kommentare und Live-Chat aus, zeigt bei Livestream-Archiven die tatsächliche Sendezeit an, Live-Latenzsteuerung (einstellbar, wie ein Rückstand aufgeholt wird und welche Live-Werte angezeigt werden), Umschalten von Qualität, Wiedergabegeschwindigkeit (0,25- bis 2-fach) und Player-Lautstärke sowie Umleitung von Shorts-URLs auf die normale Wiedergabeseite. Für Playlists, die rückwärts angelegt wurden, etwa von Part10 bis Part1, spielt die Schaltfläche „Umgekehrt“ im Playlist-Bereich ab dem letzten Video der Reihe nach ab (auch Weiter, Zurück und Autoplay laufen in umgekehrter Richtung). Bei Streams, in denen der Streamer das Spiel in einen Teil des Bildes legt, wird nur das per Ziehen umrahmte Spielbild auf den gesamten Player vergrößert (der Bereich wird pro Kanal auf dem Gerät gespeichert).
+  Menü / Layout: Blendet den Shorts-Eintrag in der Seitenleiste aus, zeigt alle Abos im linken Menü an, fügt eine Verknüpfung zu „Alle Abos“ hinzu, wandelt die Abo-Liste in ein Raster um (Suche nach Kanalname und Handle) und ordnet Startseite und Feeds als Raster an (Spaltenzahl wählbar).
+  Integrationen: Fügt das aktuell angesehene Video, Suchergebnisse, Playlists und Videos eines Kanals als Quellen zu Gemini Notebook in Ihrem eigenen Google-Konto hinzu.
+  Qualität, Geschwindigkeit, Lautstärke, Live-Werte, Spielbild-Zoom und Sendezeit erscheinen als kleine Chips in einer Zeile direkt über der Steuerleiste und verdecken das Video kaum. Alle weiteren Einstellungen öffnen Sie über die Zahnrad-Schaltfläche und können sie während der Wiedergabe ändern. Für das Umschalten von Qualität, Geschwindigkeit und Lautstärke lassen sich in den Tastenkürzel-Einstellungen für Erweiterungen Ihres Browsers Tasten zuweisen.
+
+・🐦 X-Aufräumer (im Ausgangszustand aus)
+  10 Unterfunktionen, die störende Anzeigen auf X (früher Twitter) aufräumen.
+  Layout: Rechte Spalte ausblenden (die Timeline wird entsprechend breiter) / Trends / Konto-Vorschläge / das Nachrichten-Dock unten rechts
+  Störendes: Werbe-Posts / Premium-Werbung / Grok / Reaktionszahlen (Antworten, Reposts, Likes, Aufrufe) ausblenden
+  Timeline: Die Startseite auf dem Tab „Folge ich“ öffnen
+  Extras: Beim Darüberfahren mit der Maus über ein Post-Bild erscheint eine Speichern-Schaltfläche, mit der es in Originalqualität gespeichert wird
+
+・📷 Instagram-Aufräumer (im Ausgangszustand aus)
+  12 Unterfunktionen, die überflüssige Anzeigen aufräumen und Videosteuerung hinzufügen.
+  Haupt: Reels entfernen (einschließlich URL-Umleitung) / Explore entfernen / Stories-Leiste der Startseite ausblenden / Story-URLs zur Startseite zurückleiten / Verweise auf Threads ausblenden
+  Extras: Like- und Follower-Zahlen ausblenden / automatische Wiedergabe von Videos in Posts verhindern / Kommentare ausblenden / Notes ausblenden / Zahl neuer Nachrichten ausblenden / Suchleiste in Videos anzeigen (bei Aktivierung starten und pausieren Sie mit der Leertaste) / Speichern-Schaltfläche auf Post-Fotos anzeigen
+
+・🎵 TikTok-Aufräumer (im Ausgangszustand aus)
+  3 Unterfunktionen: Kommentare ausblenden / empfohlene Konten ausblenden / Speichern-Schaltfläche auf Post-Bildern anzeigen.
+
+・📖 Wikipedia-Leseeinstellungen (im Ausgangszustand aus)
+  Ordnet Wikipedia-Artikel zu einem gut lesbaren Layout um, das sich auf Suche, Inhaltsverzeichnis, Text und Infobox konzentriert, und ermöglicht die Anpassung von Farben, Schriftarten für Text und Überschriften, Schriftgröße, Zeilenabstand, Artikelbreite, Linkdarstellung und angezeigtem Artikelbereich (alles / Text und Bilder / nur Text). 7 japanische Schriftarten sind enthalten, sodass keine Schriften von außen geladen werden.
+  Unterfunktionen: neues Artikel-Layout / fixiertes Inhaltsverzeichnis / Bildvergrößerung / Vorschau von Links und Fußnoten / Bereich „Darstellung“ ausblenden / Text auf eine festgelegte Breite begrenzen
+  Artikeltext, Bearbeitungszugänge und Quellenangaben bleiben unverändert erhalten; es gibt weder eine Weiterleitung auf externe Seiten noch ein eigenes Abrufen von Artikeln. Beim Ausschalten kehrt die ursprüngliche Seitenstruktur zurück.
+
+・📦 Amazon Sparabo – Monatssumme (im Ausgangszustand aus)
+  Zeigt im Verwaltungsbereich des Sparabos (Subscribe & Save) auf amazon.co.jp die Gesamtsumme je Liefermonat an (Einzelpreis × Menge). Für Artikel ohne Preis in der Liste wird der aktuelle Sparabo-Preis von Amazon abgerufen; ist er nicht abrufbar, wird eine Referenzsumme mit dem Einzelpreis der letzten Lieferung berechnet. Der berechnete Betrag kann abweichen, Gutscheine werden nicht berücksichtigt. Liegen nicht für alle Artikel Beträge vor, wird keine Teilsumme angezeigt.
+
+・🏆 Amazon-Button „Zum Ranking“ (im Ausgangszustand aus)
+  Der Link zum „Bestseller-Rang“ sitzt auf jeder Produktseite an einer anderen Stelle. Diese Funktion fasst ihn zu einem einzigen Button oben in den Produktinformationen zusammen. Ein Klick führt zum Ranking der detailliertesten Unterkategorie, zu der das Produkt gehört.
+
+・📦 Amazon-Badge Verkäufer / Versender (im Ausgangszustand aus)
+  Liest Verkäufer und Versender von der Produktseite und zeigt sie oben in den Produktinformationen als Badge „Verkauf: ○○ / Versand: ○○“ an. Direktverkauf durch Amazon wird grün, Angebote von Marktplatzverkäufern orange dargestellt, sodass Sie den Verkäufer vor dem Kauf leicht prüfen können.
+
+・🔊 Lautstärkeverstärker (im Ausgangszustand aus)
+  Stellt die Lautstärke des Tabs von 0 bis 300 % ein. Sie gilt für den Tab, in dem Sie das Popup öffnen; bei einem bereits verstärkten Tab wird sie beim Wechseln der Tabs automatisch erneut angewendet. Funktioniert auf jeder Art von Website.
+  ・Auto-Verzerrungsschutz: Dämpft plötzliche laute Spitzen und verringert das Übersteuern bei der Verstärkung
+  ・Nachtmodus: Dämpft laute Stimmen und Explosionen sanft, um den Abstand zu leisen Geräuschen zu verringern
+  ・Nachbarschutz: Schneidet Bässe ab, die in Wänden und Böden nachhallen
+  ・10-Band-Equalizer: Stellt jedes Band von 32 Hz bis 16 kHz in ±12 dB ein. Mit Vorverstärker und 9 Voreinstellungen (bei manueller Anpassung wechselt er auf „Benutzerdefiniert“)
+  ・Stummschalt-Button: Ton mit einem Klick aus- und wieder einschalten, ohne die Einstellungen zu verlieren
+  Diese Unterfunktionen lassen sich auch bei 100 % Lautstärke allein nutzen. Wird die Audioverarbeitung nicht mehr gebraucht, wird sie sofort freigegeben.
+
+・🎞️ Videogamma (im Ausgangszustand aus)
+  Wendet eine Gammakorrektur auf die Videos der Seite an. Die Mitte des Schiebereglers (1,0) bedeutet keine Korrektur; nach rechts werden dunkle Bereiche angehoben und das Bild heller, nach links steigt der Kontrast und das Bild wird dunkler (0,3 bis 3,0). Die Einstellung gilt gemeinsam für alle Tabs, einschließlich eingebetteter Videos.
+
+・🖥️ Schwarze Videoränder entfernen (im Ausgangszustand aus)
+  Entfernt die schwarzen Ränder oben und unten bzw. an den Seiten von Videos, etwa auf Ultrawide-Monitoren, durch Zoomen (Vergrößern unter Beibehaltung des Seitenverhältnisses) oder Strecken, sodass das Video den Bildschirm ausfüllt. Wählen Sie das Seitenverhältnis oder die Auflösung Ihres Monitors, erkennt die Erweiterung die Form jedes Videos automatisch.
+
+・🔍 Lupe (im Ausgangszustand aus)
+  Eine runde Lupe, die dem Mauszeiger folgt. Sie vergrößert den aktuellen Bildschirminhalt als Standbild, sodass Sie auch Details eines pausierten Videos prüfen können. Die Vergrößerung lässt sich auf 1,5- / 2,5- / 4-fach und der Linsendurchmesser auf 150 bis 1000 px einstellen. Ein Linksklick auf die Seite schaltet sie aus.
+
+・🎨 Farbwähler (immer verfügbar)
+  Nehmen Sie mit der Pipette eine Farbe vom Bildschirm auf und kopieren Sie sie als HEX, RGB oder HSL in die Zwischenablage. Sie können auch einen Farbcode einfügen und so eine Farbe hinzufügen. Aufgenommene Farben werden als Verlauf mit bis zu 20 Einträgen auf Ihrem Gerät gespeichert.
+
+■ Verwendung
+
+1. Klicken Sie auf das Symbol in der Symbolleiste, um das Popup zu öffnen
+2. Wählen Sie oben in der Kategorieauswahl die gewünschte Ansicht aus
+3. Stellen Sie jede Funktion über ihre Schalter, Schieberegler und Auswahlfelder ein (Änderungen werden automatisch gespeichert und sofort übernommen)
+
+Lautstärkeverstärker, Videogamma, das Entfernen schwarzer Videoränder, Lupe und die 3 Amazon-Funktionen finden Sie unter „Anpassen“. Die zuletzt geöffnete Ansicht bleibt beim nächsten Mal erhalten.
+
+■ Einstellungen speichern und laden
+Unter „Einstellungen“ können Sie die Einstellungen über die Synchronisierung des Browsers zwischen mehreren PCs abgleichen sowie als JSON-Datei exportieren und importieren. Gespeichert werden die Einstellungen aller Funktionen, der Equalizer, gesperrte Kanäle, der Farbverlauf und die angezeigte Ansicht; sie lassen sich auf einen anderen PC oder zwischen Chrome und Firefox übertragen. Ob die Synchronisierung an ist, das Zielkonto für Gemini Notebook, Anmeldedaten, der Cache und die Positionen der Elemente auf der Seite bleiben je Gerät erhalten. Die Oberfläche ist in 9 Sprachen verfügbar (Japanisch, Englisch, Chinesisch〈vereinfacht und traditionell〉, Koreanisch, Spanisch, Französisch, Deutsch und Portugiesisch〈Brasilien〉); sie richtet sich nach der Browsersprache und lässt sich auch neben dem Popup-Titel auswählen. Helle und dunkle Designs werden unterstützt.
+
+■ Datenschutz
+
+・Einstellungen werden normalerweise auf Ihrem Gerät gespeichert. Nur wenn Sie die optionale Einstellungssynchronisierung aktivieren, werden die betreffenden Einstellungen über den Synchronisierungsdienst des Browsers geteilt. Der Bereich des Spielbild-Zooms und die gewählte Anzeigesprache werden nur auf dem Gerät gespeichert und nicht synchronisiert
+・Der Inhalt der angesehenen Seiten und der Ton der Tabs werden nicht für Werbe-, Analyse- oder Telemetriezwecke erfasst oder gesendet. Der Lautstärkeverstärker verstärkt und gibt den Ton lediglich wieder; es wird nichts aufgenommen, gespeichert oder gesendet
+・Externe Verbindungen beschränken sich auf das, was die folgenden von Ihnen bedienten oder aktivierten Funktionen benötigen
+  - Bildspeicherung bei Instagram / TikTok / X: Nur wenn Sie auf die Speichern-Schaltfläche klicken, wird das Bild von den Bildservern des jeweiligen Dienstes abgerufen (es werden weder Cookies noch Referrer gesendet)
+  - YouTube-Erweiterungen: Nur solange das Ausschließen von Kanälen aus anderen Ländern, die vollständige Anzeige und Rasterdarstellung der Abos oder die Anzeige der Sendezeit aktiviert ist, werden auf YouTube Kanalvorstellungen, die Abo-Liste, Wiedergabeseiten und Ähnliches sowie Vorschaubilder abgerufen
+  - Senden an Gemini Notebook: Nur wenn Sie die Unterfunktion aktivieren und das Sendefenster verwenden, kommuniziert die Erweiterung mit dem angemeldeten Google-Konto mit Gemini Notebook, um das Ziel zu prüfen und URLs von Videos und Ähnlichem hinzuzufügen
+  - Amazon Sparabo – Monatssumme: Nur solange sie aktiviert ist, werden Preise von amazon.co.jp gelesen. Bestellungen und Lieferungen werden nicht geändert, und das Ergebnis bleibt nur auf der Seite erhalten
+  - Einstellungssynchronisierung: Der Synchronisierungsdienst des Browsers wird nur verwendet, wenn Sie sie aktivieren
+  - Kontakt: Nur wenn Sie das Formular absenden, wird Ihre Eingabe an Kagayoi Support gesendet
+・Browserdaten werden nicht an die Server des Entwicklers gesendet
