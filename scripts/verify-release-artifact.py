@@ -177,7 +177,12 @@ for name, data in files.items():
         for value in re.findall(r"url\(\s*['\"]?([^'\")\s]+)", data.decode("utf-8")):
             local_reference(name, value)
     elif name.endswith(".js"):
+        # 参照の検出はコードだけを対象にする。共通モジュール（ui-localizer.js 等）の説明コメントにある
+        # `importScripts("src/shared/ui-localizer.js")` のような使用例を、実際の参照として扱わないため、
+        # ブロックコメントと行頭の行コメントを取り除いてから探す（文字列中の "//" を壊さないよう行末コメントは残す）。
         source = data.decode("utf-8")
+        source = re.sub(r"/\*[\s\S]*?\*/", "", source)
+        source = re.sub(r"(?m)^\s*//.*$", "", source)
         for value in re.findall(r"runtime\.getURL\(\s*['\"]([^'\"]+)['\"]\s*\)", source):
             present(value.lstrip("/"))
         for arguments in re.findall(r"importScripts\(([^)]+)\)", source):
