@@ -164,7 +164,7 @@ Instagram の非表示・動画操作・画像保存を変更するときは、[
 - `webstore/` は掲載情報と画像の生成元。popup 撮影用の生成物は Git 管理しない。`zip.ps1` / `zip.sh` はストア提出用 ZIP / XPI を生成する。
 - `.amo-metadata.json` は登録済み GUID の version 提出用。未登録 GUID は Developer Hub で初回登録する。`.cws-id` は公開ストア ID でありコミット対象。
 - `bunfig.toml` は依存公開後の待機と例外、`package.json` は overrides / trustedDependencies の正本。依存更新は `/deps` を使う。
-- `.github/workflows/publish.yml` は検証済み成果物を CWS / AMO に提出する。公開は明示依頼時に限る。
+- `.github/workflows/publish.yml` は検証済み成果物を CWS / AMO に提出する。main のコミットに付けた軽量タグ `v<version>` の push で起動し、`workflow_dispatch`（`target` と `expected_sha` 指定）は push の run が出なかったときや対象を指定した再開用。公開は明示依頼時に限る。
 - `memory-bank/WebRestrictionRemoval/*.md` はホスト側ファイルを直接操作せず memory-bank-mcp 経由で扱う。
 
 ## Important Patterns
@@ -191,13 +191,13 @@ CWSは `scripts/Publish-Cws.ps1`（PowerShell 7、API v2）を使い、同期upl
 
 ### CWS のアップロードと申請の分離
 
-`publish.yml` は検証済みZIPを `-Stage Upload` で下書きとしてアップロードするだけで、審査へは申請しない（スクリプト既定の `-Stage All` はpublishまで行う）。新ロケールの掲載画像欄はアップロード後でないと Dashboard に出ないため、申請は別workflow `cws-submit.yml`（手動実行、`-Stage Publish`、`environment: chrome-web-store`）で行う。
+`publish.yml`（版タグ `v<version>` の push で起動）は検証済みZIPを `-Stage Upload` で下書きとしてアップロードするだけで、審査へは申請しない（スクリプト既定の `-Stage All` はpublishまで行う）。新ロケールの掲載画像欄はアップロード後でないと Dashboard に出ないため、申請は別workflow `cws-submit.yml`（手動実行、`-Stage Publish`、`environment: chrome-web-store`）で行う。
 
-1. `release/x.y.z` を push する（publish.yml がアップロードする）
+1. `main` を push してから、同じ commit に軽量タグ `vx.y.z` を付けて push する（publish.yml がアップロードする）
 2. Dashboard（Edictora）でロケール別の掲載画像などを整えて下書き保存する
-3. `gh workflow run cws-submit.yml -f version=x.y.z --ref release/x.y.z` で申請する
+3. `gh workflow run cws-submit.yml -f version=x.y.z --ref vx.y.z` で申請する
 
-- API v2 は未申請の下書き版を返さないため、`cws-submit.yml` は実行 ref が `release/<version>` で manifest の版が入力と一致し、`publish.yml` の直近のアップロード成功 run（固定ステップ名 `Chrome Web Store にアップロード（下書き）`）が同じ commit の場合だけ `:publish` する。Dashboard で手動アップロードした下書きなど該当 run が無い場合は申請されないため、Dashboard から手動で申請する。
+- API v2 は未申請の下書き版を返さないため、`cws-submit.yml` は実行 ref が軽量タグ `v<version>`（`main` の祖先）で manifest の版が入力と一致し、`publish.yml` の直近のアップロード成功 run（固定ステップ名 `Chrome Web Store にアップロード（下書き）`）が同じ commit で、同じタグから起動している場合だけ `:publish` する。Dashboard で手動アップロードした下書きなど該当 run が無い場合は申請されないため、Dashboard から手動で申請する。
 - 同版が申請済み・公開済み（PENDING_REVIEW / STAGED / PUBLISHED / PUBLISHED_TO_TESTERS）なら再送せず成功終了する。別版の審査中、より新しい版の存在、直近アップロードの進行中・失敗、状態不明は申請せず停止する。
 - 両workflowは同じ concurrency group で直列化する。申請中は Dashboard の操作を並行しない。
 

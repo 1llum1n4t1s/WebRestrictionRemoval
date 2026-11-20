@@ -94,7 +94,7 @@ Firefox では attach を開始する前に、メタデータ取得済み・ペ�
 5. popup と content script の利用者向け文言は `_locales/<9 言語>/messages.json` と `chrome.i18n` を経由します。利用者が選んだ表示言語は `Localizer` が `chrome.i18n.getMessage` / `getUILanguage` を差し替えて優先し、差し替えが効かない環境では選択を名乗らずブラウザの言語のまま動かします。
 6. Manifest V3 の CSP に従い、実行 JavaScript はすべて拡張へ同梱します。問い合わせ共通部品もリモート実行せず、npm package から同期したファイルを配布物へ含めます。
 7. 外部通信はプライバシーポリシーの6例外だけです。X の画像保存はマスターと `imageDownload` が ON の場合だけ表示し、クリック時のみ HTTPS の `pbs.twimg.com/media/` へ `name=orig` を指定して取得します。画像パス・画質指定・IP アドレスが CDN へ伝わり、Cookie・リファラは送らず、リダイレクトは拒否します。画像取得、Gemini Notebook、問い合わせ、設定同期、登録チャンネルのサムネイル取得、Amazon 定期おトク便の金額取得で扱うデータと発火条件を、実装・manifest・ストア掲載・プライバシーポリシー間で一致させます。Amazon の取得はマスター ON 時のみ、同一の `https://www.amazon.co.jp` に認証 Cookie 付きの読み取り GET を行います。配送価格を優先し、現在価格も取得できない個別商品だけ前回配送の実単価で補います。現在価格で補う場合は「参考合計（現在価格）」、前回単価を使う場合は「参考合計（前回価格を含む）」とし、請求額の変動を注記します。履歴・注文詳細は読み取り専用で、当該商品の単価だけを将来明細の数量に適用し、注文全体や他商品の金額は使いません。全明細が揃わなければ部分合計や代わりの0円を表示せず、取得結果はページ内メモリだけに保持して OFF・遷移時に中止・破棄します。
-8. バージョンは Chrome / Firefox manifest と `package.json` の間で同期し、`release/<manifest version>` ブランチから生成した成果物を同一バージョンとして公開します。`bun.lock` は依存解決の正本として frozen install で検証しますが、製品バージョンの正本にはしません。
+8. バージョンは Chrome / Firefox manifest と `package.json` の間で同期し、`main` のコミットに付けた軽量タグ `v<manifest version>` から生成した成果物を同一バージョンとして公開します。`bun.lock` は依存解決の正本として frozen install で検証しますが、製品バージョンの正本にはしません。
 
 ## 採用済みの設計判断
 
@@ -130,7 +130,7 @@ Chrome は tabCapture により EME を含むタブ出力を処理できます�
 
 ### リリース成果物を manifest 差し替えで分ける
 
-Chrome は `manifest.json`、Firefox は `manifest.firefox.json` を `manifest.json` として梱包し、Firefox 成果物から未対応の offscreen / tabCapture 呼び出しを strip します。単一ソースを共有できる一方、variant drift の危険があるため、両 manifest の content scripts と生成成果物をテストします。`release/**` の push は GitHub Actions で Chrome Web Store と Firefox AMO を独立に提出し、一方の失敗で他方を連鎖停止させません。
+Chrome は `manifest.json`、Firefox は `manifest.firefox.json` を `manifest.json` として梱包し、Firefox 成果物から未対応の offscreen / tabCapture 呼び出しを strip します。単一ソースを共有できる一方、variant drift の危険があるため、両 manifest の content scripts と生成成果物をテストします。版タグ `v<x.y.z>` の push は GitHub Actions で Chrome Web Store と Firefox AMO を独立に提出し、一方の失敗で他方を連鎖停止させません。
 
 ## 検証と正本
 

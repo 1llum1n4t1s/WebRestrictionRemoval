@@ -78,7 +78,7 @@ bash ./zip.sh firefox
 
 ## CI 自動公開
 
-`release/<X.Y.Z>` ブランチを push すると、GitHub Actions が以下を並列実行します:
+`main` のコミットに付けた軽量タグ `v<X.Y.Z>` を push すると、GitHub Actions が以下を並列実行します:
 
 1. **Chrome Web Store** へ Submit for review (`web-viewing-assist.zip`)
 2. **Firefox AMO** へ submission API で submit (`scripts/Publish-Amo.ps1`、受付確認まで)
@@ -91,7 +91,7 @@ Chrome / Firefox の publish は `package` だけに依存する別 job で、Ch
 
 ### バージョンアップ手順
 
-`/vava` スキル経由で行います。手動で `manifest.json` / `package.json` の version を書き換えないでください (リリースブランチ作成・タグ打ち・関連ファイル一括更新を /vava が担当)。
+`/vava` スキル経由で行います。手動で `manifest.json` / `package.json` の version を書き換えないでください (版タグ `v<X.Y.Z>` の作成と push・関連ファイル一括更新を /vava が担当)。
 
 ## アーキテクチャ概要
 

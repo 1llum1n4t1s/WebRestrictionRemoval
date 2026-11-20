@@ -13,7 +13,7 @@
 |---|---|---|
 | **音量ブースター無音化** | 「音量ブースター ON で 5 分後ぐらいから音が出ない」 | §2-A |
 | **DOM 機能停止** | 「Amazon 月別合計が出ない」「Instagram から Reels が消えない」 | §2-B |
-| **リリース失敗** | release/X.Y.Z push で publish.yml が fail | §2-C |
+| **リリース失敗** | タグ vX.Y.Z の push で publish.yml が fail | §2-C |
 | **storage 破損** | popup を開くと全 OFF に戻る | §2-D |
 | **拡張機能リロード後の挙動** | 「拡張機能の更新後、機能が動かなくなった」 | §2-E |
 
@@ -56,6 +56,7 @@
 - Chrome の pre-flight は同 version、version 不明、upload 状態不明を検出すると停止する。`ITEM_NOT_UPDATABLE` 等のエラーは Dashboard とログの `crxVersion` / `uploadState` を照合する
 - Firefox は認証付きで listed version の全ページを確認し、既存 version があれば提出せず非ゼロ終了する。`Version * already exists` の場合も AMO の登録版と審査状態、失敗ログを確認する
 - workflow の再実行（`github.run_attempt > 1`）では package job が実行されない。未確認の提出状態を再実行やガードの無効化で迂回しない。自動の同 version 再提出・復旧経路は用意されていない
+- 版タグ `vX.Y.Z` は動かさず、削除・付け替え・force push もしない。runner・外部障害・secret・Environment の許可 ref など修正が要らない原因は、ストア側の状態を確認して解消したうえで `gh workflow run publish.yml --ref vX.Y.Z -f target=<chrome|firefox> -f expected_sha=<タグの完全な SHA>` で対象を指定して再開する。コード・workflow の修正が要る場合は patch を 1 つ上げて新しい版タグで公開し直す（/vava）
 
 #### ロールバック手順
 
